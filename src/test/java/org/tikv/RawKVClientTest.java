@@ -12,7 +12,7 @@ import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.util.FastByteComparisons;
 
 public class RawKVClientTest {
-  private static final String RAW_PREFIX = "raw_";
+  private static final String RAW_PREFIX = "raw_\\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
   private static final int WORKER_CNT = 100;
