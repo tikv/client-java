@@ -30,8 +30,6 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 import org.tikv.ReadOnlyPDClient;
 import org.tikv.TiSession;
-import org.tikv.codec.Codec;
-import org.tikv.codec.CodecDataOutput;
 import org.tikv.exception.GrpcException;
 import org.tikv.exception.TiClientInternalException;
 import org.tikv.key.Key;
@@ -91,9 +89,24 @@ public class RegionManager {
     }
 
     synchronized TiRegion getRegionByRawKey(ByteString key) {
-      CodecDataOutput cdo = new CodecDataOutput();
-      Codec.BytesCodec.writeBytes(cdo, key.toByteArray());
-      return getRegionByKey(cdo.toByteString());
+      Long regionId;
+      regionId = keyToRegionIdCache.get(Key.toRawKey(key));
+      if (logger.isDebugEnabled()) {
+        logger.debug(String.format("getRegionByKey key[%s] -> ID[%s]", formatBytes(key), regionId));
+      }
+      if (regionId == null) {
+        logger.debug("Key not find in keyToRegionIdCache:" + formatBytes(key));
+        TiRegion region = pdClient.getRegionByRawKey(ConcreteBackOffer.newGetBackOff(), key);
+        if (!putRegion(region)) {
+          throw new TiClientInternalException("Invalid Region: " + region.toString());
+        }
+        return region;
+      }
+      TiRegion region = regionCache.get(regionId);
+      if (logger.isDebugEnabled()) {
+        logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
+      }
+      return region;
     }
 
     private synchronized boolean putRegion(TiRegion region) {
