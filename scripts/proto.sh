@@ -15,19 +15,19 @@
 #
 
 if [ -d "kvproto" ]; then
-    cd kvproto; git fetch -p; git pull origin rename_java_package; cd ..
+    cd kvproto; git pull origin master; cd ..
 else
-    git clone https://github.com/birdstorm/kvproto; cd kvproto; git checkout rename_java_package; cd ..
+    git clone https://github.com/pingcap/kvproto
 fi
 
 if [ -d "raft-rs" ]; then
-    cd raft-rs; git fetch -p; git pull origin master; cd ..
+    cd raft-rs; git pull origin master; cd ..
 else
     git clone https://github.com/pingcap/raft-rs
 fi
 
 if [ -d "tipb" ]; then
-    cd tipb; git fetch -p; git pull origin master; cd ..
+    cd tipb; git pull origin master; cd ..
 else 
     git clone https://github.com/pingcap/tipb
 fi
