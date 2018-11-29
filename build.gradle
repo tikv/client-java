@@ -1,0 +1,154 @@
+apply plugin: 'java'
+apply plugin: 'maven'
+apply plugin: 'idea'
+apply plugin: "com.google.protobuf"
+
+group = 'org.tikv'
+version = '2.0-SNAPSHOT'
+
+description = """TiSpark Project TiKV Java Client"""
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+tasks.withType(JavaCompile) {
+	options.encoding = 'UTF-8'
+}
+
+buildscript {
+  repositories {
+    maven { url "http://repo.maven.apache.org/maven2" }
+  }
+  dependencies {
+    classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.7'
+  }
+}
+
+sourceSets {
+    main {
+        proto {
+            srcDir './proto'
+			include '**/*.proto'
+        }
+        java {
+            // include self written and generated code
+            srcDirs 'src/main/java', 'target/generated-sources/main/java'            
+        }
+    }
+	test {
+		java {
+			srcDirs 'src/test/java'
+		}
+	}
+    // remove the test configuration - at least in your example you don't have a special test proto file
+}
+
+protobuf {
+    // Configure the protoc executable
+    protoc {
+        // Download from repositories
+        artifact = 'com.google.protobuf:protoc:3.1.0'
+    }
+
+	// Locate the codegen plugins
+	plugins {
+		// Locate a plugin with name 'grpc'. This step is optional.
+		// If you don't locate it, protoc will try to use "protoc-gen-grpc" from
+		// system search path.
+		grpc {
+			artifact = 'io.grpc:protoc-gen-grpc-java:1.4.0'
+			// or
+			// path = 'tools/protoc-gen-grpc-java'
+		}
+    }
+
+    generateProtoTasks.generatedFilesBaseDir = 'target/generated-sources'
+
+    generateProtoTasks {
+        // all() returns the collection of all protoc tasks
+        all().each { task ->
+			task.plugins {
+				grpc {
+					outputSubDir = 'grpc-java'
+				}
+			}
+            // Here you can configure the task
+        }
+
+        // In addition to all(), you may get the task collection by various
+        // criteria:
+
+        // (Java only) returns tasks for a sourceSet
+        ofSourceSet('main')
+
+    }   
+}
+
+clean {
+	delete protobuf.generatedFilesBaseDir
+}
+
+idea {
+	module {}
+}
+
+repositories {
+     maven { url "http://repo.maven.apache.org/maven2" }
+}
+
+dependencies {
+    compile group: 'log4j', name: 'log4j', version:'1.2.17'
+    compile group: 'net.sf.trove4j', name: 'trove4j', version:'3.0.1'
+    compile group: 'com.sangupta', name: 'murmur', version:'1.0.0'
+    compile group: 'io.grpc', name: 'grpc-netty', version:'1.7.0'
+    compile group: 'io.grpc', name: 'grpc-protobuf', version:'1.7.0'
+    compile group: 'io.grpc', name: 'grpc-stub', version:'1.7.0'
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version:'2.8.11'
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version:'2.8.11.1'
+    compile(group: 'com.fasterxml.jackson.module', name: 'jackson-module-scala_2.11', version:'2.8.11') {
+		exclude(module: 'guava')
+    }
+    compile group: 'joda-time', name: 'joda-time', version:'2.9.9'
+    compile group: 'org.joda', name: 'joda-convert', version:'1.9.2'
+    testCompile group: 'io.grpc', name: 'grpc-testing', version:'1.7.0'
+    compile group: 'org.apache.logging.log4j', name: 'log4j-api', version:'2.8.1'
+    compile group: 'org.apache.logging.log4j', name: 'log4j-core', version:'2.8.1'
+    compile group: 'org.apache.spark', name: 'spark-core_2.11', version:'2.3.2'
+    compile group: 'org.apache.spark', name: 'spark-catalyst_2.11', version:'2.3.2'
+    compile group: 'org.apache.spark', name: 'spark-sql_2.11', version:'2.3.2'
+    compile group: 'org.apache.spark', name: 'spark-hive_2.11', version:'2.3.2'
+    compile group: 'org.apache.spark', name: 'spark-hive-thriftserver_2.11', version:'2.3.2'
+    compile group: 'org.apache.spark', name: 'spark-unsafe_2.11', version:'2.3.2'
+    compile group: 'org.slf4j', name: 'slf4j-api', version:'1.7.16'
+    compile group: 'org.slf4j', name: 'slf4j-log4j12', version:'1.7.16'
+    compile group: 'org.slf4j', name: 'jul-to-slf4j', version:'1.7.16'
+    compile group: 'org.slf4j', name: 'jcl-over-slf4j', version:'1.7.16'
+	compile 'com.google.protobuf:protobuf-java:3.1.0'
+}
+
+task updateProtoModule(type: Exec) {
+    if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+        commandLine 'cmd', '/c', './scripts/proto.sh'
+    } else {
+        commandLine 'sh', '-c', './scripts/proto.sh'
+    }
+}
+
+compileJava << {
+	println 'Compiling'
+}
+
+task copyResources(type: Copy) {
+	includeEmptyDirs = false
+	copy {
+		from "./kvproto/vendor/github.com/gogo/protobuf/"
+		include "**/gogoproto/**"
+		into "./proto/"
+	}
+	copy {
+		from "./kvproto/proto/", "./raft-rs/proto/", "./tipb/proto"
+		into "./proto/"
+	}
+}
+
+compileJava.dependsOn copyResources
+copyResources.dependsOn updateProtoModule

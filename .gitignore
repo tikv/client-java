@@ -57,3 +57,15 @@ raft-rs
 # ignore tikv-client bazel build
 bazel-*
 
+# ignore gradle
+.gradle
+build/
+
+# Cache of project
+.gradletasknamecache
+
+# Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
+!gradle-wrapper.jar
+
+# # Work around https://youtrack.jetbrains.com/issue/IDEA-116898
+# gradle/wrapper/gradle-wrapper.properties
