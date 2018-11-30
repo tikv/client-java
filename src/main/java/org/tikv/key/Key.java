@@ -20,20 +20,14 @@ import static org.tikv.codec.KeyUtils.formatBytes;
 
 import com.google.protobuf.ByteString;
 import java.util.Arrays;
-import org.tikv.codec.CodecDataOutput;
-import org.tikv.types.DataType;
 import org.tikv.util.FastByteComparisons;
 
 public class Key implements Comparable<Key> {
-  protected static final byte[] TBL_PREFIX = new byte[] {'t'};
 
   protected final byte[] value;
   protected final int infFlag;
 
   public static final Key EMPTY = createEmpty();
-  public static final Key NULL = createNull();
-  public static final Key MIN = createTypelessMin();
-  public static final Key MAX = createTypelessMax();
 
   private Key(byte[] value, boolean negative) {
     this.value = requireNonNull(value, "value is null");
@@ -60,17 +54,6 @@ public class Key implements Comparable<Key> {
     return new Key(bytes);
   }
 
-  private static Key createNull() {
-    CodecDataOutput cdo = new CodecDataOutput();
-    DataType.encodeNull(cdo);
-    return new Key(cdo.toBytes()) {
-      @Override
-      public String toString() {
-        return "null";
-      }
-    };
-  }
-
   private static Key createEmpty() {
     return new Key(new byte[0]) {
       @Override
@@ -81,28 +64,6 @@ public class Key implements Comparable<Key> {
       @Override
       public String toString() {
         return "EMPTY";
-      }
-    };
-  }
-
-  private static Key createTypelessMin() {
-    CodecDataOutput cdo = new CodecDataOutput();
-    DataType.encodeIndex(cdo);
-    return new Key(cdo.toBytes()) {
-      @Override
-      public String toString() {
-        return "MIN";
-      }
-    };
-  }
-
-  private static Key createTypelessMax() {
-    CodecDataOutput cdo = new CodecDataOutput();
-    DataType.encodeMaxValue(cdo);
-    return new Key(cdo.toBytes()) {
-      @Override
-      public String toString() {
-        return "MAX";
       }
     };
   }

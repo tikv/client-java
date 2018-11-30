@@ -62,7 +62,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private TsoRequest tsoReq;
   private volatile LeaderWrapper leaderWrapper;
   private ScheduledExecutorService service;
-  private IsolationLevel isolationLevel;
   private List<HostAndPort> pdAddrs;
 
   @Override

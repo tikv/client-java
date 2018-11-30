@@ -273,27 +273,6 @@ public class LockResolverTest {
     public RetryException() {}
   }
 
-  private SelectResponse coprocess(
-      RegionStoreClient client, DAGRequest request, List<Coprocessor.KeyRange> ranges)
-      throws RetryException {
-    BackOffer backOffer = defaultBackOff();
-    Queue<SelectResponse> responseQueue = new ArrayDeque<>();
-
-    if (client.coprocess(backOffer, request, ranges, responseQueue) != null) {
-      throw new RetryException();
-    }
-
-    List<Chunk> resultChunk = new ArrayList<>();
-    while (!responseQueue.isEmpty()) {
-      SelectResponse response = responseQueue.poll();
-      if (response != null) {
-        resultChunk.addAll(response.getChunksList());
-      }
-    }
-
-    return SelectResponse.newBuilder().addAllChunks(resultChunk).build();
-  }
-
   @Before
   public void setUp() throws Exception {
     TiConfiguration conf = TiConfiguration.createDefault("127.0.0.1:2379");

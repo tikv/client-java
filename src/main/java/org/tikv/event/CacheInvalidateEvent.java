@@ -82,14 +82,6 @@ public class CacheInvalidateEvent implements Serializable {
     invalidateStore = true;
   }
 
-  public boolean shouldUpdateRegion() {
-    return invalidateRegion;
-  }
-
-  public boolean shouldUpdateStore() {
-    return invalidateStore;
-  }
-
   public CacheType getCacheType() {
     return cacheType;
   }
