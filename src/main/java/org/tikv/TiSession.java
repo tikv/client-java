@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-
 import org.tikv.event.CacheInvalidateEvent;
 import org.tikv.region.RegionManager;
 
@@ -100,5 +99,5 @@ public class TiSession implements AutoCloseable {
   }
 
   @Override
-  public void close() throws Exception { }
+  public void close() throws Exception {}
 }
