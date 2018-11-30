@@ -1,6 +1,5 @@
 apply plugin: 'java'
 apply plugin: 'maven'
-apply plugin: 'idea'
 apply plugin: "com.google.protobuf"
 
 group = 'org.tikv'
@@ -35,9 +34,7 @@ sourceSets {
         }
     }
 	test {
-		java {
-			srcDirs 'src/test/java'
-		}
+		java {}
 	}
     // remove the test configuration - at least in your example you don't have a special test proto file
 }
@@ -85,10 +82,6 @@ protobuf {
 
 clean {
 	delete protobuf.generatedFilesBaseDir
-}
-
-idea {
-	module {}
 }
 
 repositories {
