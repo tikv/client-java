@@ -95,6 +95,9 @@ public class ConcreteBackOffer implements BackOffer {
       case BoTiKVRPC:
         backOffFunction = BackOffFunction.create(500, 5000, BackOffStrategy.EqualJitter);
         break;
+      case BoStoreNotMatch:
+        backOffFunction = BackOffFunction.create(100, 3000, BackOffStrategy.EqualJitter);
+        break;
     }
     return backOffFunction;
   }

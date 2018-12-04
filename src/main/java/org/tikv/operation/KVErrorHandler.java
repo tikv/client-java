@@ -23,7 +23,6 @@ import io.grpc.StatusRuntimeException;
 import java.util.function.Function;
 import org.apache.log4j.Logger;
 import org.tikv.codec.KeyUtils;
-import org.tikv.event.CacheInvalidateEvent;
 import org.tikv.exception.GrpcException;
 import org.tikv.kvproto.Errorpb;
 import org.tikv.region.RegionErrorReceiver;
@@ -38,7 +37,6 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   private static final int NO_LEADER_STORE_ID =
       0; // if there's currently no leader of a store, store id is set to 0
   private final Function<RespT, Errorpb.Error> getRegionError;
-  private final Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack;
   private final RegionManager regionManager;
   private final RegionErrorReceiver recv;
   private final TiRegion ctxRegion;
@@ -52,10 +50,6 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
     this.recv = recv;
     this.regionManager = regionManager;
     this.getRegionError = getRegionError;
-    this.cacheInvalidateCallBack =
-        regionManager != null && regionManager.getSession() != null
-            ? regionManager.getSession().getCacheInvalidateCallback()
-            : null;
   }
 
   private Errorpb.Error getRegionError(RespT resp) {
@@ -68,55 +62,6 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   private void invalidateRegionStoreCache(TiRegion ctxRegion) {
     regionManager.invalidateRegion(ctxRegion.getId());
     regionManager.invalidateStore(ctxRegion.getLeader().getStoreId());
-    notifyRegionStoreCacheInvalidate(
-        ctxRegion.getId(),
-        ctxRegion.getLeader().getStoreId(),
-        CacheInvalidateEvent.CacheType.REGION_STORE);
-  }
-
-  /** Used for notifying Spark driver to invalidate cache from Spark workers. */
-  private void notifyRegionStoreCacheInvalidate(
-      long regionId, long storeId, CacheInvalidateEvent.CacheType type) {
-    if (cacheInvalidateCallBack != null) {
-      cacheInvalidateCallBack.apply(new CacheInvalidateEvent(regionId, storeId, true, true, type));
-      logger.info(
-          "Accumulating cache invalidation info to driver:regionId="
-              + regionId
-              + ",storeId="
-              + storeId
-              + ",type="
-              + type.name());
-    } else {
-      logger.warn(
-          "Failed to send notification back to driver since CacheInvalidateCallBack is null in executor node.");
-    }
-  }
-
-  private void notifyRegionCacheInvalidate(long regionId) {
-    if (cacheInvalidateCallBack != null) {
-      cacheInvalidateCallBack.apply(
-          new CacheInvalidateEvent(
-              regionId, 0, true, false, CacheInvalidateEvent.CacheType.REGION_STORE));
-      logger.info(
-          "Accumulating cache invalidation info to driver:regionId="
-              + regionId
-              + ",type="
-              + CacheInvalidateEvent.CacheType.REGION_STORE.name());
-    } else {
-      logger.warn(
-          "Failed to send notification back to driver since CacheInvalidateCallBack is null in executor node.");
-    }
-  }
-
-  private void notifyStoreCacheInvalidate(long storeId) {
-    if (cacheInvalidateCallBack != null) {
-      cacheInvalidateCallBack.apply(
-          new CacheInvalidateEvent(
-              0, storeId, false, true, CacheInvalidateEvent.CacheType.REGION_STORE));
-    } else {
-      logger.warn(
-          "Failed to send notification back to driver since CacheInvalidateCallBack is null in executor node.");
-    }
   }
 
   // Referenced from TiDB
@@ -161,9 +106,6 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
             // to a new store address.
             retry = false;
           }
-          notifyRegionStoreCacheInvalidate(
-              ctxRegion.getId(), newStoreId, CacheInvalidateEvent.CacheType.LEADER);
-
           backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
         } else {
           logger.info(
@@ -171,9 +113,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
                   "Received zero store id, from region %d try next time", ctxRegion.getId()));
           backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
         }
-
         backOffer.doBackOff(backOffFuncType, new GrpcException(error.toString()));
-
         return retry;
       } else if (error.hasStoreNotMatch()) {
         // this error is reported from raftstore:
@@ -184,17 +124,18 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
             String.format(
                 "Store Not Match happened with region id %d, store id %d",
                 ctxRegion.getId(), storeId));
+        logger.warn(String.format("%s", error.getStoreNotMatch()));
 
         this.regionManager.invalidateStore(storeId);
         recv.onStoreNotMatch(this.regionManager.getStoreById(storeId));
-        notifyStoreCacheInvalidate(storeId);
+        backOffer.doBackOff(
+            BackOffFunction.BackOffFuncType.BoStoreNotMatch, new GrpcException(error.toString()));
         return true;
       } else if (error.hasStaleEpoch()) {
         // this error is reported from raftstore:
         // region has outdated version，please try later.
         logger.warn(String.format("Stale Epoch encountered for region [%s]", ctxRegion));
         this.regionManager.onRegionStale(ctxRegion.getId());
-        notifyRegionCacheInvalidate(ctxRegion.getId());
         return false;
       } else if (error.hasServerIsBusy()) {
         // this error is reported from kv:
@@ -241,10 +182,6 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
     regionManager.onRequestFail(ctxRegion.getId(), ctxRegion.getLeader().getStoreId());
-    notifyRegionStoreCacheInvalidate(
-        ctxRegion.getId(),
-        ctxRegion.getLeader().getStoreId(),
-        CacheInvalidateEvent.CacheType.REQ_FAILED);
 
     backOffer.doBackOff(
         BackOffFunction.BackOffFuncType.BoTiKVRPC,
