@@ -15,8 +15,6 @@
 
 package org.tikv;
 
-import static org.tikv.operation.iterator.CoprocessIterator.getHandleIterator;
-import static org.tikv.operation.iterator.CoprocessIterator.getRowIterator;
 import static org.tikv.util.KeyRangeUtils.makeRange;
 
 import com.google.common.collect.Range;
@@ -28,18 +26,13 @@ import org.tikv.exception.TiClientInternalException;
 import org.tikv.key.Key;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 import org.tikv.kvproto.Metapb.Store;
-import org.tikv.meta.TiDAGRequest;
 import org.tikv.meta.TiTimestamp;
 import org.tikv.operation.iterator.ConcreteScanIterator;
-import org.tikv.operation.iterator.IndexScanIterator;
 import org.tikv.region.RegionStoreClient;
 import org.tikv.region.TiRegion;
-import org.tikv.row.Row;
 import org.tikv.util.BackOffer;
 import org.tikv.util.ConcreteBackOffer;
 import org.tikv.util.Pair;
-import org.tikv.util.RangeSplitter;
-import org.tikv.util.RangeSplitter.RegionTask;
 
 public class Snapshot {
   private final TiTimestamp timestamp;
@@ -75,59 +68,6 @@ public class Snapshot {
     RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, getSession());
     // TODO: Need to deal with lock error after grpc stable
     return client.get(ConcreteBackOffer.newGetBackOff(), key, timestamp.getVersion());
-  }
-
-  /**
-   * Issue a table read request
-   *
-   * @param dagRequest DAG request for coprocessor
-   * @return a Iterator that contains all result from this select request.
-   */
-  public Iterator<Row> tableRead(TiDAGRequest dagRequest) {
-    if (dagRequest.isIndexScan()) {
-      Iterator<Long> iter =
-          getHandleIterator(
-              dagRequest,
-              RangeSplitter.newSplitter(session.getRegionManager())
-                  .splitRangeByRegion(dagRequest.getRanges()),
-              session);
-      return new IndexScanIterator(this, dagRequest, iter);
-    } else {
-      return getRowIterator(
-          dagRequest,
-          RangeSplitter.newSplitter(session.getRegionManager())
-              .splitRangeByRegion(dagRequest.getRanges()),
-          session);
-    }
-  }
-
-  /**
-   * Below is lower level API for env like Spark which already did key range split Perform table
-   * scan
-   *
-   * @param dagRequest DAGRequest for coprocessor
-   * @param task RegionTask of the coprocessor request to send
-   * @return Row iterator to iterate over resulting rows
-   */
-  public Iterator<Row> tableRead(TiDAGRequest dagRequest, List<RegionTask> task) {
-    if (dagRequest.isDoubleRead()) {
-      Iterator<Long> iter = getHandleIterator(dagRequest, task, session);
-      return new IndexScanIterator(this, dagRequest, iter);
-    } else {
-      return getRowIterator(dagRequest, task, session);
-    }
-  }
-
-  /**
-   * Below is lower level API for env like Spark which already did key range split Perform handle
-   * scan
-   *
-   * @param dagRequest DAGRequest for coprocessor
-   * @param tasks RegionTask of the coprocessor request to send
-   * @return Row iterator to iterate over resulting rows
-   */
-  public Iterator<Long> indexHandleRead(TiDAGRequest dagRequest, List<RegionTask> tasks) {
-    return getHandleIterator(dagRequest, tasks, session);
   }
 
   public Iterator<KvPair> scan(ByteString startKey) {

@@ -34,7 +34,6 @@ import org.tikv.codec.Codec.BytesCodec;
 import org.tikv.codec.CodecDataOutput;
 import org.tikv.exception.GrpcException;
 import org.tikv.exception.TiClientInternalException;
-import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.PDGrpc.PDBlockingStub;
@@ -62,7 +61,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private TsoRequest tsoReq;
   private volatile LeaderWrapper leaderWrapper;
   private ScheduledExecutorService service;
-  private IsolationLevel isolationLevel;
   private List<HostAndPort> pdAddrs;
 
   @Override

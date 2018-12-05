@@ -19,26 +19,17 @@ package org.tikv.region;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.tikv.region.RegionStoreClient.RequestTypes.REQ_TYPE_DAG;
 import static org.tikv.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
 import static org.tikv.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.pingcap.tidb.tipb.DAGRequest;
-import com.pingcap.tidb.tipb.SelectResponse;
 import io.grpc.ManagedChannel;
 import java.util.*;
 import java.util.function.Supplier;
-import jline.internal.TestAccessible;
-import org.apache.hadoop.hive.ql.lockmgr.LockException;
 import org.apache.log4j.Logger;
 import org.tikv.AbstractGRPCClient;
 import org.tikv.TiSession;
 import org.tikv.exception.*;
-import org.tikv.kvproto.Coprocessor;
-import org.tikv.kvproto.Coprocessor.KeyRange;
-import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Kvrpcpb.BatchGetRequest;
 import org.tikv.kvproto.Kvrpcpb.BatchGetResponse;
 import org.tikv.kvproto.Kvrpcpb.Context;
@@ -60,34 +51,13 @@ import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvStub;
 import org.tikv.operation.KVErrorHandler;
-import org.tikv.streaming.StreamingResponse;
 import org.tikv.txn.Lock;
 import org.tikv.txn.LockResolverClient;
-import org.tikv.util.BackOffFunction;
 import org.tikv.util.BackOffer;
-import org.tikv.util.ConcreteBackOffer;
-import org.tikv.util.RangeSplitter;
 
 // RegionStore itself is not thread-safe
 public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, TikvStub>
     implements RegionErrorReceiver {
-  public enum RequestTypes {
-    REQ_TYPE_SELECT(101),
-    REQ_TYPE_INDEX(102),
-    REQ_TYPE_DAG(103),
-    REQ_TYPE_ANALYZE(104),
-    BATCH_ROW_COUNT(64);
-
-    private final int value;
-
-    RequestTypes(int value) {
-      this.value = value;
-    }
-
-    public int getValue() {
-      return value;
-    }
-  }
 
   private static final Logger logger = Logger.getLogger(RegionStoreClient.class);
   private TiRegion region;
@@ -99,7 +69,7 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
   // lockResolverClient, after implements the
   // write implementation of tispark, we can change
   // it to private
-  @TestAccessible public final LockResolverClient lockResolverClient;
+  public final LockResolverClient lockResolverClient;
   private TikvBlockingStub blockingStub;
   private TikvStub asyncStub;
 
@@ -382,145 +352,6 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
       throw new RegionException(resp.getRegionError());
     }
     return resp.getKvsList();
-  }
-
-  /**
-   * Execute and retrieve the response from TiKV server.
-   *
-   * @param req Select request to process
-   * @param ranges Key range list
-   * @return Remaining tasks of this request, if task split happens, null otherwise
-   */
-  public List<RangeSplitter.RegionTask> coprocess(
-      BackOffer backOffer,
-      DAGRequest req,
-      List<KeyRange> ranges,
-      Queue<SelectResponse> responseQueue) {
-    if (req == null || ranges == null || req.getExecutorsCount() < 1) {
-      throw new IllegalArgumentException("Invalid coprocess argument!");
-    }
-
-    Supplier<Coprocessor.Request> reqToSend =
-        () ->
-            Coprocessor.Request.newBuilder()
-                .setContext(region.getContext())
-                .setTp(REQ_TYPE_DAG.getValue())
-                .setData(req.toByteString())
-                .addAllRanges(ranges)
-                .build();
-
-    // we should handle the region error ourselves
-    KVErrorHandler<Coprocessor.Response> handler =
-        new KVErrorHandler<>(
-            regionManager,
-            this,
-            region,
-            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-    Coprocessor.Response resp =
-        callWithRetry(backOffer, TikvGrpc.METHOD_COPROCESSOR, reqToSend, handler);
-    return handleCopResponse(backOffer, resp, ranges, responseQueue);
-  }
-
-  // handleCopResponse checks coprocessor Response for region split and lock,
-  // returns more tasks when that happens, or handles the response if no error.
-  // if we're handling streaming coprocessor response, lastRange is the range of last
-  // successful response, otherwise it's nil.
-  private List<RangeSplitter.RegionTask> handleCopResponse(
-      BackOffer backOffer,
-      Coprocessor.Response response,
-      List<KeyRange> ranges,
-      Queue<SelectResponse> responseQueue) {
-    if (response.hasRegionError()) {
-      Errorpb.Error regionError = response.getRegionError();
-      backOffer.doBackOff(
-          BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(regionError.toString()));
-      logger.warn("Re-splitting region task due to region error:" + regionError.getMessage());
-      // Split ranges
-      return RangeSplitter.newSplitter(session.getRegionManager()).splitRangeByRegion(ranges);
-    }
-
-    if (response.hasLocked()) {
-      logger.debug(String.format("coprocessor encounters locks: %s", response.getLocked()));
-      Lock lock = new Lock(response.getLocked());
-      boolean ok = lockResolverClient.resolveLocks(backOffer, new ArrayList<>(Arrays.asList(lock)));
-      if (!ok) {
-        backOffer.doBackOff(BoTxnLockFast, new LockException());
-      }
-      // Split ranges
-      return RangeSplitter.newSplitter(session.getRegionManager()).splitRangeByRegion(ranges);
-    }
-
-    String otherError = response.getOtherError();
-    if (otherError != null && !otherError.isEmpty()) {
-      logger.warn(String.format("Other error occurred, message: %s", otherError));
-      throw new GrpcException(otherError);
-    }
-
-    responseQueue.offer(coprocessorHelper(response));
-    return null;
-  }
-
-  // TODO: wait for future fix
-  // coprocessStreaming doesn't handle split error
-  // future work should handle it and do the resolve
-  // locks correspondingly
-  public Iterator<SelectResponse> coprocessStreaming(DAGRequest req, List<KeyRange> ranges) {
-    Supplier<Coprocessor.Request> reqToSend =
-        () ->
-            Coprocessor.Request.newBuilder()
-                .setContext(region.getContext())
-                // TODO: If no executors...?
-                .setTp(REQ_TYPE_DAG.getValue())
-                .setData(req.toByteString())
-                .addAllRanges(ranges)
-                .build();
-
-    KVErrorHandler<StreamingResponse> handler =
-        new KVErrorHandler<>(
-            regionManager,
-            this,
-            region,
-            StreamingResponse::getFirstRegionError // TODO: handle all errors in streaming respinse
-            );
-
-    StreamingResponse responseIterator =
-        this.callServerStreamingWithRetry(
-            ConcreteBackOffer.newCopNextMaxBackOff(),
-            TikvGrpc.METHOD_COPROCESSOR_STREAM,
-            reqToSend,
-            handler);
-    return coprocessorHelper(responseIterator);
-  }
-
-  private Iterator<SelectResponse> coprocessorHelper(StreamingResponse response) {
-    Iterator<Coprocessor.Response> responseIterator = response.iterator();
-    // If we got nothing to handle, return null
-    if (!responseIterator.hasNext()) return null;
-
-    // Simply wrap it
-    return new Iterator<SelectResponse>() {
-      @Override
-      public boolean hasNext() {
-        return responseIterator.hasNext();
-      }
-
-      @Override
-      public SelectResponse next() {
-        return coprocessorHelper(responseIterator.next());
-      }
-    };
-  }
-
-  private SelectResponse coprocessorHelper(Coprocessor.Response resp) {
-    try {
-      SelectResponse selectResp = SelectResponse.parseFrom(resp.getData());
-      if (selectResp.hasError()) {
-        throw new SelectException(selectResp.getError(), selectResp.getError().getMsg());
-      }
-      return selectResp;
-    } catch (InvalidProtocolBufferException e) {
-      throw new TiClientInternalException("Error parsing protobuf for coprocessor response.", e);
-    }
   }
 
   public TiSession getSession() {

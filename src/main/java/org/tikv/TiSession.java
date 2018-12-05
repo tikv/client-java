@@ -16,31 +16,19 @@
 package org.tikv;
 
 import com.google.common.net.HostAndPort;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import org.tikv.catalog.Catalog;
-import org.tikv.event.CacheInvalidateEvent;
-import org.tikv.meta.TiTimestamp;
 import org.tikv.region.RegionManager;
-import org.tikv.util.ConcreteBackOffer;
 
 public class TiSession implements AutoCloseable {
   private static final Map<String, ManagedChannel> connPool = new HashMap<>();
   private final TiConfiguration conf;
-  private Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
   // below object creation is either heavy or making connection (pd), pending for lazy loading
   private volatile RegionManager regionManager;
   private volatile PDClient client;
-  private volatile Catalog catalog;
-  private volatile ExecutorService indexScanThreadPool;
-  private volatile ExecutorService tableScanThreadPool;
 
   public TiSession(TiConfiguration conf) {
     this.conf = conf;
@@ -48,18 +36,6 @@ public class TiSession implements AutoCloseable {
 
   public TiConfiguration getConf() {
     return conf;
-  }
-
-  public TiTimestamp getTimestamp() {
-    return getPDClient().getTimestamp(ConcreteBackOffer.newTsoBackOff());
-  }
-
-  public Snapshot createSnapshot() {
-    return new Snapshot(getTimestamp(), this);
-  }
-
-  public Snapshot createSnapshot(TiTimestamp ts) {
-    return new Snapshot(ts, this);
   }
 
   public PDClient getPDClient() {
@@ -70,25 +46,6 @@ public class TiSession implements AutoCloseable {
           client = PDClient.createRaw(this);
         }
         res = client;
-      }
-    }
-    return res;
-  }
-
-  public Catalog getCatalog() {
-    Catalog res = catalog;
-    if (res == null) {
-      synchronized (this) {
-        if (catalog == null) {
-          catalog =
-              new Catalog(
-                  this::createSnapshot,
-                  conf.getMetaReloadPeriod(),
-                  conf.getMetaReloadPeriodUnit(),
-                  conf.ifShowRowId(),
-                  conf.getDBPrefix());
-        }
-        res = catalog;
       }
     }
     return res;
@@ -130,58 +87,10 @@ public class TiSession implements AutoCloseable {
     return channel;
   }
 
-  public ExecutorService getThreadPoolForIndexScan() {
-    ExecutorService res = indexScanThreadPool;
-    if (res == null) {
-      synchronized (this) {
-        if (indexScanThreadPool == null) {
-          indexScanThreadPool =
-              Executors.newFixedThreadPool(
-                  conf.getIndexScanConcurrency(),
-                  new ThreadFactoryBuilder().setDaemon(true).build());
-        }
-        res = indexScanThreadPool;
-      }
-    }
-    return res;
-  }
-
-  public ExecutorService getThreadPoolForTableScan() {
-    ExecutorService res = tableScanThreadPool;
-    if (res == null) {
-      synchronized (this) {
-        if (tableScanThreadPool == null) {
-          tableScanThreadPool =
-              Executors.newFixedThreadPool(
-                  conf.getTableScanConcurrency(),
-                  new ThreadFactoryBuilder().setDaemon(true).build());
-        }
-        res = tableScanThreadPool;
-      }
-    }
-    return res;
-  }
-
   public static TiSession create(TiConfiguration conf) {
     return new TiSession(conf);
   }
 
-  public Function<CacheInvalidateEvent, Void> getCacheInvalidateCallback() {
-    return cacheInvalidateCallback;
-  }
-
-  /**
-   * This is used for setting call back function to invalidate cache information
-   *
-   * @param callBackFunc callback function
-   */
-  public void injectCallBackFunc(Function<CacheInvalidateEvent, Void> callBackFunc) {
-    this.cacheInvalidateCallback = callBackFunc;
-  }
-
   @Override
-  public void close() throws Exception {
-    getThreadPoolForTableScan().shutdownNow();
-    getThreadPoolForIndexScan().shutdownNow();
-  }
+  public void close() throws Exception {}
 }

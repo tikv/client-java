@@ -177,6 +177,9 @@ public class RegionManager {
         if (store.getState().equals(StoreState.Tombstone)) {
           return null;
         }
+        if (logger.isDebugEnabled()) {
+          logger.debug(String.format("getStoreById ID[%s] -> Store[%s]", id, store));
+        }
         storeCache.put(id, store);
         return store;
       } catch (Exception e) {
