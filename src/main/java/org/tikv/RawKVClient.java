@@ -1,9 +1,7 @@
 package org.tikv;
 
 import com.google.protobuf.ByteString;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.operation.iterator.RawScanIterator;
@@ -46,6 +44,34 @@ public class RawKVClient {
     Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByRawKey(key);
     RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
     client.rawPut(defaultBackOff(), key, value);
+  }
+
+  /**
+   * Put a list of raw key-value pair to TiKV
+   *
+   * @param kvPairs kvPairs
+   */
+  public void batchPut(List<Kvrpcpb.KvPair> kvPairs) {
+    Map<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> regionMap = new HashMap<>();
+    for (Kvrpcpb.KvPair kvPair : kvPairs) {
+      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByRawKey(kvPair.getKey());
+      regionMap.computeIfAbsent(pair, t -> new ArrayList<>()).add(kvPair);
+    }
+
+    List<Kvrpcpb.KvPair> remainingPairs = new ArrayList<>();
+
+    for (Map.Entry<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> entry :
+        regionMap.entrySet()) {
+      RegionStoreClient client =
+          RegionStoreClient.create(entry.getKey().first, entry.getKey().second, session);
+      if (!client.rawBatchPut(defaultBackOff(), entry.getValue())) {
+        remainingPairs.addAll(entry.getValue());
+      }
+    }
+    if (!remainingPairs.isEmpty()) {
+      // re-splitting ranges
+      batchPut(remainingPairs);
+    }
   }
 
   /**
