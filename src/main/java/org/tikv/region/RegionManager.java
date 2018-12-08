@@ -88,27 +88,6 @@ public class RegionManager {
       return region;
     }
 
-    synchronized TiRegion getRegionByRawKey(ByteString key) {
-      Long regionId;
-      regionId = keyToRegionIdCache.get(Key.toRawKey(key));
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("getRegionByKey key[%s] -> ID[%s]", formatBytes(key), regionId));
-      }
-      if (regionId == null) {
-        logger.debug("Key not find in keyToRegionIdCache:" + formatBytes(key));
-        TiRegion region = pdClient.getRegionByRawKey(ConcreteBackOffer.newGetBackOff(), key);
-        if (!putRegion(region)) {
-          throw new TiClientInternalException("Invalid Region: " + region.toString());
-        }
-        return region;
-      }
-      TiRegion region = regionCache.get(regionId);
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
-      }
-      return region;
-    }
-
     private synchronized boolean putRegion(TiRegion region) {
       if (logger.isDebugEnabled()) {
         logger.debug("putRegion: " + region);
@@ -196,29 +175,12 @@ public class RegionManager {
     return cache.getRegionByKey(key);
   }
 
-  public TiRegion getRegionByRawKey(ByteString key) {
-    return cache.getRegionByRawKey(key);
-  }
-
   public TiRegion getRegionById(long regionId) {
     return cache.getRegionById(regionId);
   }
 
   public Pair<TiRegion, Store> getRegionStorePairByKey(ByteString key) {
     TiRegion region = cache.getRegionByKey(key);
-    if (region == null) {
-      throw new TiClientInternalException("Region not exist for key:" + formatBytes(key));
-    }
-    if (!region.isValid()) {
-      throw new TiClientInternalException("Region invalid: " + region.toString());
-    }
-    Peer leader = region.getLeader();
-    long storeId = leader.getStoreId();
-    return Pair.create(region, cache.getStoreById(storeId));
-  }
-
-  public Pair<TiRegion, Store> getRegionStorePairByRawKey(ByteString key) {
-    TiRegion region = cache.getRegionByRawKey(key);
     if (region == null) {
       throw new TiClientInternalException("Region not exist for key:" + formatBytes(key));
     }

@@ -77,34 +77,27 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   @Override
   public TiRegion getRegionByKey(BackOffer backOffer, ByteString key) {
-    CodecDataOutput cdo = new CodecDataOutput();
-    BytesCodec.writeBytes(cdo, key.toByteArray());
-    ByteString encodedKey = cdo.toByteString();
-
-    Supplier<GetRegionRequest> request =
-        () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(encodedKey).build();
+    Supplier<GetRegionRequest> request;
+    if (conf.getKvMode().equalsIgnoreCase("RAW")) {
+      request = () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
+    } else {
+      CodecDataOutput cdo = new CodecDataOutput();
+      BytesCodec.writeBytes(cdo, key.toByteArray());
+      ByteString encodedKey = cdo.toByteString();
+      request =
+          () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(encodedKey).build();
+    }
 
     PDErrorHandler<GetRegionResponse> handler =
         new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
 
-    GetRegionResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_GET_REGION, request, handler);
-    return new TiRegion(
-        resp.getRegion(), resp.getLeader(), conf.getIsolationLevel(), conf.getCommandPriority());
-  }
-
-  @Override
-  public TiRegion getRegionByRawKey(BackOffer backOffer, ByteString key) {
-    Supplier<GetRegionRequest> request =
-        () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
-    PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
     GetRegionResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_GET_REGION, request, handler);
     return new TiRegion(
         resp.getRegion(),
         resp.getLeader(),
         conf.getIsolationLevel(),
         conf.getCommandPriority(),
-        true);
+        conf.getKvMode());
   }
 
   @Override
@@ -116,7 +109,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                     resp.getRegion(),
                     resp.getLeader(),
                     conf.getIsolationLevel(),
-                    conf.getCommandPriority()));
+                    conf.getCommandPriority(),
+                    conf.getKvMode()));
     Supplier<GetRegionRequest> request =
         () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
 
@@ -138,7 +132,11 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         callWithRetry(backOffer, PDGrpc.METHOD_GET_REGION_BY_ID, request, handler);
     // Instead of using default leader instance, explicitly set no leader to null
     return new TiRegion(
-        resp.getRegion(), resp.getLeader(), conf.getIsolationLevel(), conf.getCommandPriority());
+        resp.getRegion(),
+        resp.getLeader(),
+        conf.getIsolationLevel(),
+        conf.getCommandPriority(),
+        conf.getKvMode());
   }
 
   @Override
@@ -150,7 +148,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                     resp.getRegion(),
                     resp.getLeader(),
                     conf.getIsolationLevel(),
-                    conf.getCommandPriority()));
+                    conf.getCommandPriority(),
+                    conf.getKvMode()));
 
     Supplier<GetRegionByIDRequest> request =
         () -> GetRegionByIDRequest.newBuilder().setHeader(header).setRegionId(id).build();

@@ -18,7 +18,7 @@ public class RawKVClient {
   private final RegionManager regionManager;
 
   private RawKVClient(String addresses) {
-    session = TiSession.create(TiConfiguration.createDefault(addresses));
+    session = TiSession.create(TiConfiguration.createRawDefault(addresses));
     regionManager = session.getRegionManager();
   }
 
@@ -41,7 +41,7 @@ public class RawKVClient {
    * @param value raw value
    */
   public void put(ByteString key, ByteString value) {
-    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByRawKey(key);
+    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
     RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
     client.rawPut(defaultBackOff(), key, value);
   }
@@ -54,7 +54,7 @@ public class RawKVClient {
   public void batchPut(List<Kvrpcpb.KvPair> kvPairs) {
     Map<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> regionMap = new HashMap<>();
     for (Kvrpcpb.KvPair kvPair : kvPairs) {
-      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByRawKey(kvPair.getKey());
+      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(kvPair.getKey());
       regionMap.computeIfAbsent(pair, t -> new ArrayList<>()).add(kvPair);
     }
 
@@ -81,7 +81,7 @@ public class RawKVClient {
    * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
    */
   public ByteString get(ByteString key) {
-    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByRawKey(key);
+    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
     RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
     return client.rawGet(defaultBackOff(), key);
   }
@@ -120,14 +120,14 @@ public class RawKVClient {
    * @param key raw key to be deleted
    */
   public void delete(ByteString key) {
-    TiRegion region = regionManager.getRegionByRawKey(key);
+    TiRegion region = regionManager.getRegionByKey(key);
     Kvrpcpb.Context context =
         Kvrpcpb.Context.newBuilder()
             .setRegionId(region.getId())
             .setRegionEpoch(region.getRegionEpoch())
             .setPeer(region.getLeader())
             .build();
-    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByRawKey(key);
+    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
     RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
     client.rawDelete(defaultBackOff(), key, context);
   }

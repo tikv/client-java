@@ -39,7 +39,8 @@ public class MockServerTest {
             .addPeers(Metapb.Peer.newBuilder().setId(11).setStoreId(13))
             .build();
 
-    region = new TiRegion(r, r.getPeers(0), Kvrpcpb.IsolationLevel.RC, Kvrpcpb.CommandPri.Low);
+    region =
+        new TiRegion(r, r.getPeers(0), Kvrpcpb.IsolationLevel.RC, Kvrpcpb.CommandPri.Low, "KV");
     pdServer.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
     server = new KVMockServer();
     port = server.start(region);
