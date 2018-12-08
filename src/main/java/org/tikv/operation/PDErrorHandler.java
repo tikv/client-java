@@ -18,6 +18,7 @@
 package org.tikv.operation;
 
 import java.util.function.Function;
+import org.apache.log4j.Logger;
 import org.tikv.PDClient;
 import org.tikv.exception.GrpcException;
 import org.tikv.kvproto.Pdpb;
@@ -25,6 +26,7 @@ import org.tikv.util.BackOffFunction;
 import org.tikv.util.BackOffer;
 
 public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
+  private static final Logger logger = Logger.getLogger(PDErrorHandler.class);
   private final Function<RespT, Pdpb.Error> getError;
   private final PDClient client;
 
@@ -36,7 +38,9 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleResponseError(BackOffer backOffer, RespT resp) {
     if (resp == null) {
-      return false;
+      String msg = "Request Failed with unknown reason for PD GetRegionResponse";
+      logger.warn(msg);
+      return handleRequestError(backOffer, new GrpcException(msg));
     }
     Pdpb.Error error = getError.apply(resp);
     if (error != null) {
