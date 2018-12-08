@@ -42,18 +42,13 @@ public class TiRegion implements Serializable {
   private final Kvrpcpb.CommandPri commandPri;
 
   public TiRegion(
-      Region meta, Peer peer, IsolationLevel isolationLevel, Kvrpcpb.CommandPri commandPri) {
-    this(meta, peer, isolationLevel, commandPri, false);
-  }
-
-  public TiRegion(
       Region meta,
       Peer peer,
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
-      boolean isRawRegion) {
+      String kvMode) {
     Objects.requireNonNull(meta, "meta is null");
-    this.meta = decodeRegion(meta, isRawRegion);
+    this.meta = decodeRegion(meta, kvMode.equalsIgnoreCase("RAW"));
     if (peer == null || peer.getId() == 0) {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());

@@ -32,7 +32,7 @@ public class RawScanIterator extends ScanIterator {
   }
 
   TiRegion loadCurrentRegionToCache() throws Exception {
-    Pair<TiRegion, Metapb.Store> pair = regionCache.getRegionStorePairByRawKey(startKey);
+    Pair<TiRegion, Metapb.Store> pair = regionCache.getRegionStorePairByKey(startKey);
     TiRegion region = pair.first;
     Metapb.Store store = pair.second;
     try (RegionStoreClient client = RegionStoreClient.create(region, store, session)) {
