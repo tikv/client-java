@@ -53,7 +53,7 @@ mvn clean install -Dmaven.test.skip=true
 After building, add following lines into your `pom.xml` 
 ```xml
 <dependency>
-    <groupId>com.pingcap.tikv</groupId>
+    <groupId>org.tikv</groupId>
     <artifactId>tikv-client-java</artifactId>
     <version>2.0-SNAPSHOT</version>
 </dependency>
