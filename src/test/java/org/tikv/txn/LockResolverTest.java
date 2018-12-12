@@ -15,40 +15,35 @@
 
 package org.tikv.txn;
 
-import static junit.framework.TestCase.*;
-import static org.tikv.util.BackOffFunction.BackOffFuncType.BoTxnLock;
-
 import com.google.protobuf.ByteString;
-import com.pingcap.tidb.tipb.*;
-import java.lang.reflect.Field;
-import java.util.*;
-import java.util.function.Supplier;
 import org.junit.Before;
 import org.junit.Test;
-import org.tikv.PDClient;
-import org.tikv.ReadOnlyPDClient;
-import org.tikv.TiConfiguration;
-import org.tikv.TiSession;
-import org.tikv.exception.KeyException;
-import org.tikv.exception.RegionException;
+import org.tikv.common.PDClient;
+import org.tikv.common.ReadOnlyPDClient;
+import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
+import org.tikv.common.exception.KeyException;
+import org.tikv.common.exception.RegionException;
+import org.tikv.common.meta.TiTimestamp;
+import org.tikv.common.operation.KVErrorHandler;
+import org.tikv.common.region.RegionStoreClient;
+import org.tikv.common.region.TiRegion;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Coprocessor;
-import org.tikv.kvproto.Kvrpcpb.CommitRequest;
-import org.tikv.kvproto.Kvrpcpb.CommitResponse;
-import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
-import org.tikv.kvproto.Kvrpcpb.KeyError;
-import org.tikv.kvproto.Kvrpcpb.Mutation;
-import org.tikv.kvproto.Kvrpcpb.Op;
-import org.tikv.kvproto.Kvrpcpb.PrewriteRequest;
-import org.tikv.kvproto.Kvrpcpb.PrewriteResponse;
+import org.tikv.kvproto.Kvrpcpb.*;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
-import org.tikv.meta.TiTimestamp;
-import org.tikv.operation.KVErrorHandler;
-import org.tikv.region.RegionStoreClient;
-import org.tikv.region.TiRegion;
-import org.tikv.util.BackOffer;
-import org.tikv.util.ConcreteBackOffer;
-import org.tikv.util.Pair;
+
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Supplier;
+
+import static junit.framework.TestCase.*;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLock;
 
 public class LockResolverTest {
   private TiSession session;
