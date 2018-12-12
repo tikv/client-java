@@ -17,7 +17,6 @@ package org.tikv.common.util;
 
 import com.google.common.util.concurrent.SettableFuture;
 import io.grpc.stub.StreamObserver;
-
 import java.util.concurrent.Future;
 
 public class FutureObserver<Value, RespT> implements StreamObserver<RespT> {

@@ -15,15 +15,14 @@
 
 package org.tikv.common.streaming;
 
-import org.tikv.kvproto.Coprocessor;
-import org.tikv.kvproto.Errorpb;
+import static java.util.Objects.requireNonNull;
 
-import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-
-import static java.util.Objects.requireNonNull;
+import javax.annotation.Nonnull;
+import org.tikv.kvproto.Coprocessor;
+import org.tikv.kvproto.Errorpb;
 
 public class StreamingResponse implements Iterable {
   private Iterator<Coprocessor.Response> resultIterator;

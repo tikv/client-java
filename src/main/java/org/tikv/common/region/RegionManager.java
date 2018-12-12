@@ -17,9 +17,16 @@
 
 package org.tikv.common.region;
 
+import static org.tikv.common.codec.KeyUtils.formatBytes;
+import static org.tikv.common.util.KeyRangeUtils.makeRange;
+
 import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
 import com.google.protobuf.ByteString;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.log4j.Logger;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.TiSession;
@@ -31,14 +38,6 @@ import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb.Peer;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.tikv.common.codec.KeyUtils.formatBytes;
-import static org.tikv.common.util.KeyRangeUtils.makeRange;
 
 public class RegionManager {
   private static final Logger logger = Logger.getLogger(RegionManager.class);

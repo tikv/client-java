@@ -15,13 +15,12 @@
 
 package org.tikv.common.key;
 
-import com.google.protobuf.ByteString;
-import org.tikv.common.util.FastByteComparisons;
-
-import java.util.Arrays;
-
 import static java.util.Objects.requireNonNull;
 import static org.tikv.common.codec.KeyUtils.formatBytes;
+
+import com.google.protobuf.ByteString;
+import java.util.Arrays;
+import org.tikv.common.util.FastByteComparisons;
 
 public class Key implements Comparable<Key> {
 

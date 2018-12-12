@@ -15,15 +15,14 @@
 
 package org.tikv.common.codec;
 
-import gnu.trove.list.array.TIntArrayList;
-import org.joda.time.*;
-import org.tikv.common.exception.InvalidCodecFormatException;
+import static com.google.common.base.Preconditions.checkArgument;
 
+import gnu.trove.list.array.TIntArrayList;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.util.Arrays;
-
-import static com.google.common.base.Preconditions.checkArgument;
+import org.joda.time.*;
+import org.tikv.common.exception.InvalidCodecFormatException;
 
 public class Codec {
 

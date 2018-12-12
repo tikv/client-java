@@ -15,18 +15,17 @@
 
 package org.tikv.common.operation.iterator;
 
+import static java.util.Objects.requireNonNull;
+
 import com.google.protobuf.ByteString;
+import java.util.Iterator;
+import java.util.List;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Kvrpcpb;
-
-import java.util.Iterator;
-import java.util.List;
-
-import static java.util.Objects.requireNonNull;
 
 public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
   protected final TiSession session;

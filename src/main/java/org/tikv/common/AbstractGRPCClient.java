@@ -15,21 +15,20 @@
 
 package org.tikv.common;
 
+import static io.grpc.stub.ClientCalls.asyncBidiStreamingCall;
+import static io.grpc.stub.ClientCalls.blockingServerStreamingCall;
+
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.AbstractStub;
 import io.grpc.stub.ClientCalls;
 import io.grpc.stub.StreamObserver;
+import java.util.function.Supplier;
 import org.apache.log4j.Logger;
 import org.tikv.common.operation.ErrorHandler;
 import org.tikv.common.policy.RetryMaxMs.Builder;
 import org.tikv.common.policy.RetryPolicy;
 import org.tikv.common.streaming.StreamingResponse;
 import org.tikv.common.util.BackOffer;
-
-import java.util.function.Supplier;
-
-import static io.grpc.stub.ClientCalls.asyncBidiStreamingCall;
-import static io.grpc.stub.ClientCalls.blockingServerStreamingCall;
 
 public abstract class AbstractGRPCClient<
         BlockingStubT extends AbstractStub<BlockingStubT>, StubT extends AbstractStub<StubT>>

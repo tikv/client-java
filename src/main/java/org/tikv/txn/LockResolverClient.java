@@ -17,8 +17,14 @@
 
 package org.tikv.txn;
 
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
+
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
+import java.util.*;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 import org.apache.log4j.Logger;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiSession;
@@ -38,13 +44,6 @@ import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvStub;
-
-import java.util.*;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Supplier;
-
-import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
 
 // LockResolver resolves locks and also caches resolved txn status.
 public class LockResolverClient extends AbstractGRPCClient<TikvBlockingStub, TikvStub>

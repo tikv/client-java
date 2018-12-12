@@ -1,16 +1,15 @@
 package org.tikv.raw;
 
 import com.google.protobuf.ByteString;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.Before;
 import org.junit.Test;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.FastByteComparisons;
 import org.tikv.kvproto.Kvrpcpb;
-
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.stream.Collectors;
 
 public class RawKVClientTest {
   private static final String RAW_PREFIX = "raw_\\u0001_";

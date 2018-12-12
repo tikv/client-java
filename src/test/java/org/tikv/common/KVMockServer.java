@@ -15,6 +15,8 @@
 
 package org.tikv.common;
 
+import static org.tikv.common.key.Key.toRawKey;
+
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import com.pingcap.tidb.tipb.Chunk;
@@ -23,6 +25,10 @@ import com.pingcap.tidb.tipb.SelectResponse;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.util.*;
+import java.util.stream.Collectors;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Coprocessor;
@@ -34,13 +40,6 @@ import org.tikv.kvproto.Errorpb.StaleEpoch;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.Context;
 import org.tikv.kvproto.TikvGrpc;
-
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static org.tikv.common.key.Key.toRawKey;
 
 public class KVMockServer extends TikvGrpc.TikvImplBase {
 

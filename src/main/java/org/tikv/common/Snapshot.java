@@ -15,8 +15,13 @@
 
 package org.tikv.common;
 
+import static org.tikv.common.util.KeyRangeUtils.makeRange;
+
 import com.google.common.collect.Range;
 import com.google.protobuf.ByteString;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
@@ -28,12 +33,6 @@ import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 import org.tikv.kvproto.Metapb.Store;
-
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
-import static org.tikv.common.util.KeyRangeUtils.makeRange;
 
 public class Snapshot {
   private final TiTimestamp timestamp;

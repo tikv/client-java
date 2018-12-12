@@ -15,7 +15,10 @@
 
 package org.tikv.common;
 
+import static org.junit.Assert.*;
+
 import com.google.protobuf.ByteString;
+import java.io.IOException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -25,10 +28,6 @@ import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
-
-import java.io.IOException;
-
-import static org.junit.Assert.*;
 
 public class RegionManagerTest {
   private PDMockServer server;

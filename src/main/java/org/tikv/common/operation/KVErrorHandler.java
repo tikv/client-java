@@ -20,6 +20,7 @@ package org.tikv.common.operation;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import java.util.function.Function;
 import org.apache.log4j.Logger;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
@@ -29,8 +30,6 @@ import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Errorpb;
-
-import java.util.function.Function;
 
 // TODO: consider refactor to Builder mode
 public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {

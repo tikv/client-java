@@ -17,14 +17,13 @@
 
 package org.tikv.common.operation;
 
+import java.util.function.Function;
 import org.apache.log4j.Logger;
 import org.tikv.common.PDClient;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Pdpb;
-
-import java.util.function.Function;
 
 public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
   private static final Logger logger = Logger.getLogger(PDErrorHandler.class);

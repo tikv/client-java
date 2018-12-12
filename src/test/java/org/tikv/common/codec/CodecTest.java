@@ -15,11 +15,11 @@
 
 package org.tikv.common.codec;
 
-import org.junit.Test;
-import org.tikv.common.codec.Codec.*;
-
 import static org.junit.Assert.*;
 import static org.tikv.common.codec.Codec.*;
+
+import org.junit.Test;
+import org.tikv.common.codec.Codec.*;
 
 public class CodecTest {
   @Test

@@ -15,11 +15,11 @@
 
 package org.tikv.common.key;
 
-import com.google.common.primitives.UnsignedBytes;
-import org.junit.Test;
-
 import static org.junit.Assert.assertEquals;
 import static org.tikv.common.key.Key.toRawKey;
+
+import com.google.common.primitives.UnsignedBytes;
+import org.junit.Test;
 
 public class KeyTest {
 

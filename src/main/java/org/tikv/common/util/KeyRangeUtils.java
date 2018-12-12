@@ -15,17 +15,16 @@
 
 package org.tikv.common.util;
 
+import static org.tikv.common.key.Key.toRawKey;
+
 import com.google.common.collect.BoundType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Range;
 import com.google.protobuf.ByteString;
+import java.util.List;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
 import org.tikv.kvproto.Coprocessor.KeyRange;
-
-import java.util.List;
-
-import static org.tikv.common.key.Key.toRawKey;
 
 public class KeyRangeUtils {
   public static Range<Key> makeRange(ByteString startKey, ByteString endKey) {

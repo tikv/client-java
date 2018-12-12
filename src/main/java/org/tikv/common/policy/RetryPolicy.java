@@ -17,12 +17,11 @@ package org.tikv.common.policy;
 
 import com.google.common.collect.ImmutableSet;
 import io.grpc.Status;
+import java.util.concurrent.Callable;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.operation.ErrorHandler;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
-
-import java.util.concurrent.Callable;
 
 public abstract class RetryPolicy<RespT> {
   BackOffer backOffer = ConcreteBackOffer.newCopNextMaxBackOff();

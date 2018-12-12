@@ -16,12 +16,11 @@ package org.tikv.common.util;
 
 import com.google.common.primitives.Longs;
 import com.google.common.primitives.UnsignedBytes;
-import sun.misc.Unsafe;
-
 import java.lang.reflect.Field;
 import java.nio.ByteOrder;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import sun.misc.Unsafe;
 
 /**
  * Utility code to do optimized byte-array comparison. This is borrowed from Apache Cassandra which

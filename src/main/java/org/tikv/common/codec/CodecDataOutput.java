@@ -16,7 +16,6 @@
 package org.tikv.common.codec;
 
 import com.google.protobuf.ByteString;
-
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;

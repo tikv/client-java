@@ -15,7 +15,15 @@
 
 package org.tikv.txn;
 
+import static junit.framework.TestCase.*;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLock;
+
 import com.google.protobuf.ByteString;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Supplier;
 import org.junit.Before;
 import org.junit.Test;
 import org.tikv.common.PDClient;
@@ -35,15 +43,6 @@ import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Kvrpcpb.*;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
-
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.function.Supplier;
-
-import static junit.framework.TestCase.*;
-import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLock;
 
 public class LockResolverTest {
   private TiSession session;

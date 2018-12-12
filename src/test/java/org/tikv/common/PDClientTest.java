@@ -15,7 +15,12 @@
 
 package org.tikv.common;
 
+import static org.junit.Assert.*;
+import static org.tikv.common.GrpcUtils.encodeKey;
+
 import com.google.protobuf.ByteString;
+import java.io.IOException;
+import java.util.concurrent.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -27,12 +32,6 @@ import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
-
-import java.io.IOException;
-import java.util.concurrent.*;
-
-import static org.junit.Assert.*;
-import static org.tikv.common.GrpcUtils.encodeKey;
 
 public class PDClientTest {
 

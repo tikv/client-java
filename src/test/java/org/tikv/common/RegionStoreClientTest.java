@@ -15,18 +15,17 @@
 
 package org.tikv.common;
 
+import static org.junit.Assert.*;
+
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
+import java.util.List;
 import org.junit.Test;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
-
-import java.util.List;
-
-import static org.junit.Assert.*;
 
 public class RegionStoreClientTest extends MockServerTest {
 

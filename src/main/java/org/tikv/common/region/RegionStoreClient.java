@@ -17,8 +17,17 @@
 
 package org.tikv.common.region;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
+
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Supplier;
 import org.apache.log4j.Logger;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiSession;
@@ -34,16 +43,6 @@ import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvStub;
 import org.tikv.txn.Lock;
 import org.tikv.txn.LockResolverClient;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.function.Supplier;
-
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
-import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
 
 // RegionStore itself is not thread-safe
 public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, TikvStub>

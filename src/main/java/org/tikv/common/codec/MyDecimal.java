@@ -16,7 +16,6 @@
 package org.tikv.common.codec;
 
 import com.google.common.annotations.VisibleForTesting;
-
 import java.math.BigDecimal;
 import java.util.Arrays;
 

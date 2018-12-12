@@ -1,6 +1,7 @@
 package org.tikv.raw;
 
 import com.google.protobuf.ByteString;
+import java.util.*;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.operation.iterator.RawScanIterator;
@@ -12,8 +13,6 @@ import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
-
-import java.util.*;
 
 public class RawKVClient {
   private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";

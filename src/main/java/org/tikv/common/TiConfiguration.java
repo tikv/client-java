@@ -17,14 +17,13 @@ package org.tikv.common;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.HostAndPort;
-import org.tikv.kvproto.Kvrpcpb.CommandPri;
-import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import org.tikv.kvproto.Kvrpcpb.CommandPri;
+import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
 public class TiConfiguration implements Serializable {
   private static final int DEF_TIMEOUT = 10;
