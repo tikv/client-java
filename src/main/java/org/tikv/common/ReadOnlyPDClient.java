@@ -16,11 +16,12 @@
 package org.tikv.common;
 
 import com.google.protobuf.ByteString;
-import java.util.concurrent.Future;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Metapb.Store;
+
+import java.util.concurrent.Future;
 
 /** Readonly PD client including only reading related interface Supposed for TiDB-like use cases */
 public interface ReadOnlyPDClient {
@@ -60,9 +61,6 @@ public interface ReadOnlyPDClient {
   Store getStore(BackOffer backOffer, long storeId);
 
   Future<Store> getStoreAsync(BackOffer backOffer, long storeId);
-
-  /** Close underlining resources */
-  void close();
 
   /** Get associated session * @return the session associated to client */
   TiSession getSession();
