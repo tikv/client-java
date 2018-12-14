@@ -14,7 +14,7 @@ import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 
-public class RawKVClient {
+public class RawKVClient implements AutoCloseable {
   private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
   private final TiSession session;
   private final RegionManager regionManager;
@@ -34,6 +34,11 @@ public class RawKVClient {
 
   public static RawKVClient create(String address) {
     return new RawKVClient(address);
+  }
+
+  @Override
+  public void close() {
+    session.close();
   }
 
   /**

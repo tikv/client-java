@@ -15,7 +15,10 @@
 
 package org.tikv.common.exception;
 
-public class TiClientInternalException extends RuntimeException {
+public class TiClientInternalException extends TiKVException {
+
+  private static final long serialVersionUID = -4841312649312881270L;
+
   public TiClientInternalException(String msg) {
     super(msg);
   }

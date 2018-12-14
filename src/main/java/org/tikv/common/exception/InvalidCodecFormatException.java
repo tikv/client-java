@@ -15,7 +15,10 @@
 
 package org.tikv.common.exception;
 
-public class InvalidCodecFormatException extends RuntimeException {
+public class InvalidCodecFormatException extends TiKVException {
+
+  private static final long serialVersionUID = -2797509298995930121L;
+
   public InvalidCodecFormatException(String msg) {
     super(msg);
   }
