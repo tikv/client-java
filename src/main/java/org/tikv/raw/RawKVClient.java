@@ -4,10 +4,12 @@ import com.google.protobuf.ByteString;
 import java.util.*;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.operation.iterator.RawScanIterator;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
@@ -48,9 +50,17 @@ public class RawKVClient implements AutoCloseable {
    * @param value raw value
    */
   public void put(ByteString key, ByteString value) {
-    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
-    RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
-    client.rawPut(defaultBackOff(), key, value);
+    BackOffer backOffer = defaultBackOff();
+    while (true) {
+      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
+      RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
+      try {
+        client.rawPut(backOffer, key, value);
+        return;
+      } catch (final TiKVException e) {
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+      }
+    }
   }
 
   /**
@@ -71,7 +81,9 @@ public class RawKVClient implements AutoCloseable {
         regionMap.entrySet()) {
       RegionStoreClient client =
           RegionStoreClient.create(entry.getKey().first, entry.getKey().second, session);
-      if (!client.rawBatchPut(defaultBackOff(), entry.getValue())) {
+      try {
+        client.rawBatchPut(defaultBackOff(), entry.getValue());
+      } catch (final TiKVException e) {
         remainingPairs.addAll(entry.getValue());
       }
     }
@@ -88,9 +100,16 @@ public class RawKVClient implements AutoCloseable {
    * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
    */
   public ByteString get(ByteString key) {
-    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
-    RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
-    return client.rawGet(defaultBackOff(), key);
+    BackOffer backOffer = defaultBackOff();
+    while (true) {
+      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
+      RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
+      try {
+        return client.rawGet(defaultBackOff(), key);
+      } catch (final TiKVException e) {
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+      }
+    }
   }
 
   /**
@@ -127,16 +146,24 @@ public class RawKVClient implements AutoCloseable {
    * @param key raw key to be deleted
    */
   public void delete(ByteString key) {
-    TiRegion region = regionManager.getRegionByKey(key);
-    Kvrpcpb.Context context =
-        Kvrpcpb.Context.newBuilder()
-            .setRegionId(region.getId())
-            .setRegionEpoch(region.getRegionEpoch())
-            .setPeer(region.getLeader())
-            .build();
-    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
-    RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
-    client.rawDelete(defaultBackOff(), key, context);
+    BackOffer backOffer = defaultBackOff();
+    while (true) {
+      TiRegion region = regionManager.getRegionByKey(key);
+      Kvrpcpb.Context context =
+          Kvrpcpb.Context.newBuilder()
+              .setRegionId(region.getId())
+              .setRegionEpoch(region.getRegionEpoch())
+              .setPeer(region.getLeader())
+              .build();
+      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
+      RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
+      try {
+        client.rawDelete(defaultBackOff(), key, context);
+        return;
+      } catch (final TiKVException e) {
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+      }
+    }
   }
 
   private Iterator<Kvrpcpb.KvPair> rawScanIterator(ByteString startKey, ByteString endKey) {
