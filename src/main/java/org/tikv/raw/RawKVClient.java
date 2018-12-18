@@ -1,3 +1,18 @@
+/*
+ * Copyright 2018 PingCAP, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.tikv.raw;
 
 import com.google.protobuf.ByteString;
@@ -69,27 +84,33 @@ public class RawKVClient implements AutoCloseable {
    * @param kvPairs kvPairs
    */
   public void batchPut(List<Kvrpcpb.KvPair> kvPairs) {
-    Map<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> regionMap = new HashMap<>();
-    for (Kvrpcpb.KvPair kvPair : kvPairs) {
-      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(kvPair.getKey());
-      regionMap.computeIfAbsent(pair, t -> new ArrayList<>()).add(kvPair);
-    }
-
-    List<Kvrpcpb.KvPair> remainingPairs = new ArrayList<>();
-
-    for (Map.Entry<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> entry :
-        regionMap.entrySet()) {
-      RegionStoreClient client =
-          RegionStoreClient.create(entry.getKey().first, entry.getKey().second, session);
-      try {
-        client.rawBatchPut(defaultBackOff(), entry.getValue());
-      } catch (final TiKVException e) {
-        remainingPairs.addAll(entry.getValue());
+    BackOffer backOffer = defaultBackOff();
+    while (true) {
+      Map<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> regionMap = new HashMap<>();
+      for (Kvrpcpb.KvPair kvPair : kvPairs) {
+        Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(kvPair.getKey());
+        regionMap.computeIfAbsent(pair, t -> new ArrayList<>()).add(kvPair);
       }
-    }
-    if (!remainingPairs.isEmpty()) {
+
+      List<Kvrpcpb.KvPair> remainingPairs = new ArrayList<>();
+
+      for (Map.Entry<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> entry :
+          regionMap.entrySet()) {
+        RegionStoreClient client =
+            RegionStoreClient.create(entry.getKey().first, entry.getKey().second, session);
+        try {
+          client.rawBatchPut(defaultBackOff(), entry.getValue());
+        } catch (final TiKVException e) {
+          remainingPairs.addAll(entry.getValue());
+        }
+      }
+      if (remainingPairs.isEmpty()) {
+        return;
+      }
       // re-splitting ranges
-      batchPut(remainingPairs);
+      backOffer.doBackOff(
+          BackOffFunction.BackOffFuncType.BoRegionMiss,
+          new TiKVException("BatchPut encounter exception, need re-split the ranges"));
     }
   }
 
