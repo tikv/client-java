@@ -16,7 +16,6 @@
 package org.tikv.raw;
 
 import com.google.protobuf.ByteString;
-import java.util.*;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.TiKVException;
@@ -30,6 +29,8 @@ import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
+
+import java.util.*;
 
 public class RawKVClient implements AutoCloseable {
   private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
@@ -85,14 +86,15 @@ public class RawKVClient implements AutoCloseable {
    */
   public void batchPut(List<Kvrpcpb.KvPair> kvPairs) {
     BackOffer backOffer = defaultBackOff();
+    List<Kvrpcpb.KvPair> remainingPairs = new ArrayList<>();
     while (true) {
+      kvPairs.addAll(remainingPairs);
+      remainingPairs.clear();
       Map<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> regionMap = new HashMap<>();
       for (Kvrpcpb.KvPair kvPair : kvPairs) {
         Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(kvPair.getKey());
         regionMap.computeIfAbsent(pair, t -> new ArrayList<>()).add(kvPair);
       }
-
-      List<Kvrpcpb.KvPair> remainingPairs = new ArrayList<>();
 
       for (Map.Entry<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> entry :
           regionMap.entrySet()) {
@@ -111,6 +113,7 @@ public class RawKVClient implements AutoCloseable {
       backOffer.doBackOff(
           BackOffFunction.BackOffFuncType.BoRegionMiss,
           new TiKVException("BatchPut encounter exception, need re-split the ranges"));
+      kvPairs.clear();
     }
   }
 
