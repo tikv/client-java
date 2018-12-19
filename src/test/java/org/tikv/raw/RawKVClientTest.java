@@ -5,8 +5,11 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.log4j.Logger;
 import org.junit.Before;
 import org.junit.Test;
+import org.tikv.common.codec.KeyUtils;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.FastByteComparisons;
 import org.tikv.kvproto.Kvrpcpb;
@@ -29,6 +32,7 @@ public class RawKVClientTest {
   private static final ExecutorService executors = Executors.newFixedThreadPool(WORKER_CNT);
   private final ExecutorCompletionService<Object> completionService =
       new ExecutorCompletionService<>(executors);
+  private static final Logger logger = Logger.getLogger(RawKVClientTest.class);
 
   static {
     orderedKeys = new ArrayList<>();
@@ -79,20 +83,24 @@ public class RawKVClientTest {
     Kvrpcpb.KvPair kv1 = Kvrpcpb.KvPair.newBuilder().setKey(key1).setValue(value1).build();
     Kvrpcpb.KvPair kv2 = Kvrpcpb.KvPair.newBuilder().setKey(key2).setValue(value2).build();
 
-    checkEmpty(key1);
-    checkEmpty(key2);
-    checkPut(key1, value1);
-    checkPut(key2, value2);
-    List<Kvrpcpb.KvPair> result = new ArrayList<>();
-    List<Kvrpcpb.KvPair> result2 = new ArrayList<>();
-    result.add(kv1);
-    result.add(kv2);
-    checkScan(key, key3, result);
-    checkScan(key1, key3, result);
-    result2.add(kv1);
-    checkScan(key, key2, result2);
-    checkDelete(key1);
-    checkDelete(key2);
+    try {
+      checkEmpty(key1);
+      checkEmpty(key2);
+      checkPut(key1, value1);
+      checkPut(key2, value2);
+      List<Kvrpcpb.KvPair> result = new ArrayList<>();
+      List<Kvrpcpb.KvPair> result2 = new ArrayList<>();
+      result.add(kv1);
+      result.add(kv2);
+      checkScan(key, key3, result);
+      checkScan(key1, key3, result);
+      result2.add(kv1);
+      checkScan(key, key2, result2);
+      checkDelete(key1);
+      checkDelete(key2);
+    } catch (final TiKVException e) {
+      logger.warn("Test fails with Exception: " + e);
+    }
   }
 
   private List<Kvrpcpb.KvPair> rawKeys() {
@@ -131,18 +139,22 @@ public class RawKVClientTest {
       return;
     }
 
-    prepare();
+    try {
+      prepare();
 
-    if (batchPut) {
-      rawBatchPutTest(putCases, benchmark);
-    } else {
-      rawPutTest(putCases, benchmark);
+      if (batchPut) {
+        rawBatchPutTest(putCases, benchmark);
+      } else {
+        rawPutTest(putCases, benchmark);
+      }
+      rawGetTest(getCases, benchmark);
+      rawScanTest(scanCases, benchmark);
+      rawDeleteTest(deleteCases, benchmark);
+
+      prepare();
+    } catch (final TiKVException e) {
+      logger.warn("Test fails with Exception " + e);
     }
-    rawGetTest(getCases, benchmark);
-    rawScanTest(scanCases, benchmark);
-    rawDeleteTest(deleteCases, benchmark);
-
-    prepare();
     System.out.println("ok, test done");
   }
 
@@ -152,7 +164,18 @@ public class RawKVClientTest {
     int sz = remainingKeys.size();
     System.out.println("deleting " + sz);
     int base = sz / WORKER_CNT;
-    remainingKeys.forEach(kvPair -> checkDelete(kvPair.getKey()));
+    remainingKeys.forEach(
+        kvPair -> {
+          try {
+            checkDelete(kvPair.getKey());
+          } catch (final TiKVException e) {
+            logger.warn(
+                "kvPair check delete fails: "
+                    + KeyUtils.formatBytes(kvPair.getKey())
+                    + ", "
+                    + KeyUtils.formatBytes(kvPair.getValue()));
+          }
+        });
     for (int cnt = 0; cnt < WORKER_CNT; cnt++) {
       int i = cnt;
       completionService.submit(

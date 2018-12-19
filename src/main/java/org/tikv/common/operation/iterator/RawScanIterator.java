@@ -17,9 +17,11 @@ package org.tikv.common.operation.iterator;
 
 import com.google.protobuf.ByteString;
 import org.tikv.common.TiSession;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
@@ -40,7 +42,14 @@ public class RawScanIterator extends ScanIterator {
       if (limit <= 0) {
         currentCache = null;
       } else {
-        currentCache = client.rawScan(backOffer, startKey, limit);
+        while (true) {
+          try {
+            currentCache = client.rawScan(backOffer, startKey, limit);
+            break;
+          } catch (final TiKVException e) {
+            backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+          }
+        }
       }
       return region;
     }

@@ -15,8 +15,11 @@
 
 package org.tikv.common.exception;
 
-public class GrpcException extends RuntimeException {
-  public GrpcException(Exception e) {
+public class GrpcException extends TiKVException {
+
+  private static final long serialVersionUID = -6087861427311222214L;
+
+  public GrpcException(Throwable e) {
     super(e);
   }
 
@@ -24,7 +27,7 @@ public class GrpcException extends RuntimeException {
     super(msg);
   }
 
-  public GrpcException(String msg, Exception e) {
+  public GrpcException(String msg, Throwable e) {
     super(msg, e);
   }
 }

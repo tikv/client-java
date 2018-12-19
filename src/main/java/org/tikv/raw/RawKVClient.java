@@ -1,20 +1,38 @@
+/*
+ * Copyright 2018 PingCAP, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.tikv.raw;
 
 import com.google.protobuf.ByteString;
-import java.util.*;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.operation.iterator.RawScanIterator;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 
-public class RawKVClient {
+import java.util.*;
+
+public class RawKVClient implements AutoCloseable {
   private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
   private final TiSession session;
   private final RegionManager regionManager;
@@ -36,6 +54,11 @@ public class RawKVClient {
     return new RawKVClient(address);
   }
 
+  @Override
+  public void close() {
+    session.close();
+  }
+
   /**
    * Put a raw key-value pair to TiKV
    *
@@ -43,9 +66,17 @@ public class RawKVClient {
    * @param value raw value
    */
   public void put(ByteString key, ByteString value) {
-    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
-    RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
-    client.rawPut(defaultBackOff(), key, value);
+    BackOffer backOffer = defaultBackOff();
+    while (true) {
+      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
+      RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
+      try {
+        client.rawPut(backOffer, key, value);
+        return;
+      } catch (final TiKVException e) {
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+      }
+    }
   }
 
   /**
@@ -54,25 +85,35 @@ public class RawKVClient {
    * @param kvPairs kvPairs
    */
   public void batchPut(List<Kvrpcpb.KvPair> kvPairs) {
-    Map<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> regionMap = new HashMap<>();
-    for (Kvrpcpb.KvPair kvPair : kvPairs) {
-      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(kvPair.getKey());
-      regionMap.computeIfAbsent(pair, t -> new ArrayList<>()).add(kvPair);
-    }
-
+    BackOffer backOffer = defaultBackOff();
     List<Kvrpcpb.KvPair> remainingPairs = new ArrayList<>();
-
-    for (Map.Entry<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> entry :
-        regionMap.entrySet()) {
-      RegionStoreClient client =
-          RegionStoreClient.create(entry.getKey().first, entry.getKey().second, session);
-      if (!client.rawBatchPut(defaultBackOff(), entry.getValue())) {
-        remainingPairs.addAll(entry.getValue());
+    while (true) {
+      kvPairs.addAll(remainingPairs);
+      remainingPairs.clear();
+      Map<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> regionMap = new HashMap<>();
+      for (Kvrpcpb.KvPair kvPair : kvPairs) {
+        Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(kvPair.getKey());
+        regionMap.computeIfAbsent(pair, t -> new ArrayList<>()).add(kvPair);
       }
-    }
-    if (!remainingPairs.isEmpty()) {
+
+      for (Map.Entry<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> entry :
+          regionMap.entrySet()) {
+        RegionStoreClient client =
+            RegionStoreClient.create(entry.getKey().first, entry.getKey().second, session);
+        try {
+          client.rawBatchPut(defaultBackOff(), entry.getValue());
+        } catch (final TiKVException e) {
+          remainingPairs.addAll(entry.getValue());
+        }
+      }
+      if (remainingPairs.isEmpty()) {
+        return;
+      }
       // re-splitting ranges
-      batchPut(remainingPairs);
+      backOffer.doBackOff(
+          BackOffFunction.BackOffFuncType.BoRegionMiss,
+          new TiKVException("BatchPut encounter exception, need re-split the ranges"));
+      kvPairs.clear();
     }
   }
 
@@ -83,9 +124,16 @@ public class RawKVClient {
    * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
    */
   public ByteString get(ByteString key) {
-    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
-    RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
-    return client.rawGet(defaultBackOff(), key);
+    BackOffer backOffer = defaultBackOff();
+    while (true) {
+      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
+      RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
+      try {
+        return client.rawGet(defaultBackOff(), key);
+      } catch (final TiKVException e) {
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+      }
+    }
   }
 
   /**
@@ -122,16 +170,24 @@ public class RawKVClient {
    * @param key raw key to be deleted
    */
   public void delete(ByteString key) {
-    TiRegion region = regionManager.getRegionByKey(key);
-    Kvrpcpb.Context context =
-        Kvrpcpb.Context.newBuilder()
-            .setRegionId(region.getId())
-            .setRegionEpoch(region.getRegionEpoch())
-            .setPeer(region.getLeader())
-            .build();
-    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
-    RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
-    client.rawDelete(defaultBackOff(), key, context);
+    BackOffer backOffer = defaultBackOff();
+    while (true) {
+      TiRegion region = regionManager.getRegionByKey(key);
+      Kvrpcpb.Context context =
+          Kvrpcpb.Context.newBuilder()
+              .setRegionId(region.getId())
+              .setRegionEpoch(region.getRegionEpoch())
+              .setPeer(region.getLeader())
+              .build();
+      Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
+      RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
+      try {
+        client.rawDelete(defaultBackOff(), key, context);
+        return;
+      } catch (final TiKVException e) {
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+      }
+    }
   }
 
   private Iterator<Kvrpcpb.KvPair> rawScanIterator(ByteString startKey, ByteString endKey) {
