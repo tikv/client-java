@@ -1,5 +1,7 @@
 package org.tikv.raw;
 
+import static org.tikv.raw.RawKVClient.mapKeysToValues;
+
 import com.google.protobuf.ByteString;
 import java.util.*;
 import java.util.concurrent.*;
@@ -244,7 +246,7 @@ public class RawKVClientTest {
   }
 
   private void rawBatchPutTest(int putCases, boolean benchmark) {
-    System.out.println("put testing");
+    System.out.println("batchPut testing");
     if (benchmark) {
       for (int i = 0; i < putCases; i++) {
         ByteString key = orderedKeys.get(i), value = values.get(i);
@@ -257,13 +259,15 @@ public class RawKVClientTest {
         int i = cnt;
         completionService.submit(
             () -> {
-              List<Kvrpcpb.KvPair> list = new ArrayList<>();
+              List<ByteString> keyList = new ArrayList<>();
+              List<ByteString> valueList = new ArrayList<>();
               for (int j = 0; j < base; j++) {
                 int num = i * base + j;
                 ByteString key = orderedKeys.get(num), value = values.get(num);
-                list.add(Kvrpcpb.KvPair.newBuilder().setKey(key).setValue(value).build());
+                keyList.add(key);
+                valueList.add(value);
               }
-              client.batchPut(list);
+              client.batchPut(keyList, valueList);
               return null;
             });
       }
@@ -278,13 +282,15 @@ public class RawKVClientTest {
               + " put="
               + rawKeys().size());
     } else {
-      List<Kvrpcpb.KvPair> list = new ArrayList<>();
+      List<ByteString> keyList = new ArrayList<>();
+      List<ByteString> valueList = new ArrayList<>();
       for (int i = 0; i < putCases; i++) {
         ByteString key = randomKeys.get(i), value = values.get(r.nextInt(KEY_POOL_SIZE));
         data.put(key, value);
-        list.add(Kvrpcpb.KvPair.newBuilder().setKey(key).setValue(value).build());
+        keyList.add(key);
+        valueList.add(value);
       }
-      checkBatchPut(list);
+      checkBatchPut(keyList, valueList);
     }
   }
 
@@ -396,10 +402,11 @@ public class RawKVClientTest {
     assert client.get(key).equals(value);
   }
 
-  private void checkBatchPut(List<Kvrpcpb.KvPair> pairs) {
-    client.batchPut(pairs);
-    for (Kvrpcpb.KvPair pair : pairs) {
-      assert client.get(pair.getKey()).equals(pair.getValue());
+  private void checkBatchPut(List<ByteString> keyList, List<ByteString> valueList) {
+    client.batchPut(keyList, valueList);
+    Map<ByteString, ByteString> keysToValues = mapKeysToValues(keyList, valueList);
+    for (ByteString key : keyList) {
+      assert client.get(key).equals(keysToValues.get(key));
     }
   }
 

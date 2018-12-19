@@ -45,6 +45,7 @@ public class TiConfiguration implements Serializable {
   private static final boolean DEF_SHOW_ROWID = false;
   private static final String DEF_DB_PREFIX = "";
   private static final String DEF_KV_MODE = "KV";
+  private static final int DEF_RAW_CLIENT_CONCURRENCY = 200;
 
   private int timeout = DEF_TIMEOUT;
   private TimeUnit timeoutUnit = DEF_TIMEOUT_UNIT;
@@ -63,6 +64,7 @@ public class TiConfiguration implements Serializable {
   private boolean showRowId = DEF_SHOW_ROWID;
   private String dbPrefix = DEF_DB_PREFIX;
   private String kvMode = DEF_KV_MODE;
+  private int rawClientConcurrency = DEF_RAW_CLIENT_CONCURRENCY;
 
   public static TiConfiguration createDefault(String pdAddrsStr) {
     Objects.requireNonNull(pdAddrsStr, "pdAddrsStr is null");
@@ -233,5 +235,13 @@ public class TiConfiguration implements Serializable {
 
   public void setKvMode(String kvMode) {
     this.kvMode = kvMode;
+  }
+
+  public int getRawClientConcurrency() {
+    return rawClientConcurrency;
+  }
+
+  public void setRawClientConcurrency(int rawClientConcurrency) {
+    this.rawClientConcurrency = rawClientConcurrency;
   }
 }
