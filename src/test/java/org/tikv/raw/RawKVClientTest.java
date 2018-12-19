@@ -275,7 +275,7 @@ public class RawKVClientTest {
       long end = System.currentTimeMillis();
       System.out.println(
           putCases
-              + " put: "
+              + " batchPut: "
               + (end - start) / 1000.0
               + "s workers="
               + WORKER_CNT
@@ -384,7 +384,7 @@ public class RawKVClientTest {
       }
       awaitTimeOut(100);
       long end = System.currentTimeMillis();
-      System.out.println(deleteCases + " get: " + (end - start) / 1000.0 + "s");
+      System.out.println(deleteCases + " delete: " + (end - start) / 1000.0 + "s");
     } else {
       int i = 0;
       for (ByteString key : data.keySet()) {
