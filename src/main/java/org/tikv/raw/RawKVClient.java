@@ -88,17 +88,17 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  public void batchPut(List<ByteString> keys, List<ByteString> values) {
-    batchPut(ConcreteBackOffer.newRawKVBackOff(), keys, values);
-  }
-
   /**
    * Put a list of raw key-value pair to TiKV
    *
    * @param keys keys
    * @param values values
    */
-  public void batchPut(BackOffer backOffer, List<ByteString> keys, List<ByteString> values) {
+  public void batchPut(List<ByteString> keys, List<ByteString> values) {
+    batchPut(ConcreteBackOffer.newRawKVBackOff(), keys, values);
+  }
+
+  private void batchPut(BackOffer backOffer, List<ByteString> keys, List<ByteString> values) {
     assert keys.size() == values.size();
     Map<ByteString, ByteString> keysToValues = mapKeysToValues(keys, values);
     Map<Long, List<ByteString>> groupKeys = groupKeysByRegion(keys);
