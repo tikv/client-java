@@ -1,6 +1,5 @@
 package org.tikv.raw;
 
-import static org.tikv.raw.RawKVClient.mapKeysToValues;
 
 import com.google.protobuf.ByteString;
 import java.util.*;
@@ -259,15 +258,13 @@ public class RawKVClientTest {
         int i = cnt;
         completionService.submit(
             () -> {
-              List<ByteString> keyList = new ArrayList<>();
-              List<ByteString> valueList = new ArrayList<>();
+              Map<ByteString, ByteString> kvPairs = new HashMap<>();
               for (int j = 0; j < base; j++) {
                 int num = i * base + j;
                 ByteString key = orderedKeys.get(num), value = values.get(num);
-                keyList.add(key);
-                valueList.add(value);
+                kvPairs.put(key, value);
               }
-              client.batchPut(keyList, valueList);
+              client.batchPut(kvPairs);
               return null;
             });
       }
@@ -282,15 +279,13 @@ public class RawKVClientTest {
               + " put="
               + rawKeys().size());
     } else {
-      List<ByteString> keyList = new ArrayList<>();
-      List<ByteString> valueList = new ArrayList<>();
+      Map<ByteString, ByteString> kvPairs = new HashMap<>();
       for (int i = 0; i < putCases; i++) {
         ByteString key = randomKeys.get(i), value = values.get(r.nextInt(KEY_POOL_SIZE));
         data.put(key, value);
-        keyList.add(key);
-        valueList.add(value);
+        kvPairs.put(key, value);
       }
-      checkBatchPut(keyList, valueList);
+      checkBatchPut(kvPairs);
     }
   }
 
@@ -402,11 +397,10 @@ public class RawKVClientTest {
     assert client.get(key).equals(value);
   }
 
-  private void checkBatchPut(List<ByteString> keyList, List<ByteString> valueList) {
-    client.batchPut(keyList, valueList);
-    Map<ByteString, ByteString> keysToValues = mapKeysToValues(keyList, valueList);
-    for (ByteString key : keyList) {
-      assert client.get(key).equals(keysToValues.get(key));
+  private void checkBatchPut(Map<ByteString, ByteString> kvPairs) {
+    client.batchPut(kvPairs);
+    for (Map.Entry<ByteString, ByteString> kvPair : kvPairs.entrySet()) {
+      assert client.get(kvPair.getKey()).equals(kvPair.getValue());
     }
   }
 

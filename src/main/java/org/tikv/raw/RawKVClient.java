@@ -89,20 +89,21 @@ public class RawKVClient implements AutoCloseable {
   }
 
   /**
-   * Put a list of raw key-value pair to TiKV
+   * Put a set of raw key-value pair to TiKV
    *
-   * @param keys keys
-   * @param values values
+   * @param kvPairs kvPairs
    */
-  public void batchPut(List<ByteString> keys, List<ByteString> values) {
-    batchPut(ConcreteBackOffer.newRawKVBackOff(), keys, values);
+  public void batchPut(Map<ByteString, ByteString> kvPairs) {
+    batchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs);
   }
 
   private void batchPut(BackOffer backOffer, List<ByteString> keys, List<ByteString> values) {
-    assert keys.size() == values.size();
     Map<ByteString, ByteString> keysToValues = mapKeysToValues(keys, values);
-    Map<Long, List<ByteString>> groupKeys = groupKeysByRegion(keys);
-    keys.clear();
+    batchPut(backOffer, keysToValues);
+  }
+
+  private void batchPut(BackOffer backOffer, Map<ByteString, ByteString> kvPairs) {
+    Map<Long, List<ByteString>> groupKeys = groupKeysByRegion(kvPairs.keySet());
     List<Batch> batches = new ArrayList<>();
 
     for (Map.Entry<Long, List<ByteString>> entry : groupKeys.entrySet()) {
@@ -110,7 +111,7 @@ public class RawKVClient implements AutoCloseable {
           batches,
           entry.getKey(),
           entry.getValue(),
-          entry.getValue().stream().map(keysToValues::get).collect(Collectors.toList()),
+          entry.getValue().stream().map(kvPairs::get).collect(Collectors.toList()),
           RAW_BATCH_PUT_SIZE);
     }
     sendBatchPut(backOffer, batches);
@@ -238,7 +239,7 @@ public class RawKVClient implements AutoCloseable {
    * @param keys keys
    * @return a mapping of keys and their regionId
    */
-  private Map<Long, List<ByteString>> groupKeysByRegion(List<ByteString> keys) {
+  private Map<Long, List<ByteString>> groupKeysByRegion(Set<ByteString> keys) {
     Map<Long, List<ByteString>> groups = new HashMap<>();
     TiRegion lastRegion = null;
     for (ByteString key : keys) {
