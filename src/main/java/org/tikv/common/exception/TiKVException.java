@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2018 PingCAP, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,19 @@
 
 package org.tikv.common.exception;
 
-public class TiClientInternalException extends TiKVException {
+public class TiKVException extends RuntimeException {
 
-  private static final long serialVersionUID = -4841312649312881270L;
+  private static final long serialVersionUID = -5162704963942276016L;
 
-  public TiClientInternalException(String msg) {
+  public TiKVException(Throwable e) {
+    super(e);
+  }
+
+  public TiKVException(String msg) {
     super(msg);
   }
 
-  public TiClientInternalException(String msg, Throwable t) {
-    super(msg, t);
+  public TiKVException(String msg, Throwable e) {
+    super(msg, e);
   }
 }

@@ -34,6 +34,7 @@ import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.PDErrorHandler;
 import org.tikv.common.region.TiRegion;
@@ -177,7 +178,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   @Override
-  public void close() throws InterruptedException {
+  public void close() {
     if (service != null) {
       service.shutdownNow();
     }
@@ -366,7 +367,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       if (client != null) {
         try {
           client.close();
-        } catch (InterruptedException ignore) {
+        } catch (TiKVException ignore) {
         }
       }
       throw e;

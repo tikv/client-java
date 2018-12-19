@@ -61,9 +61,6 @@ public interface ReadOnlyPDClient {
 
   Future<Store> getStoreAsync(BackOffer backOffer, long storeId);
 
-  /** Close underlining resources */
-  void close() throws InterruptedException;
-
   /** Get associated session * @return the session associated to client */
   TiSession getSession();
 }
