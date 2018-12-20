@@ -1,5 +1,6 @@
 package org.tikv.raw;
 
+
 import com.google.protobuf.ByteString;
 import java.util.*;
 import java.util.concurrent.*;
@@ -244,7 +245,7 @@ public class RawKVClientTest {
   }
 
   private void rawBatchPutTest(int putCases, boolean benchmark) {
-    System.out.println("put testing");
+    System.out.println("batchPut testing");
     if (benchmark) {
       for (int i = 0; i < putCases; i++) {
         ByteString key = orderedKeys.get(i), value = values.get(i);
@@ -257,13 +258,13 @@ public class RawKVClientTest {
         int i = cnt;
         completionService.submit(
             () -> {
-              List<Kvrpcpb.KvPair> list = new ArrayList<>();
+              Map<ByteString, ByteString> kvPairs = new HashMap<>();
               for (int j = 0; j < base; j++) {
                 int num = i * base + j;
                 ByteString key = orderedKeys.get(num), value = values.get(num);
-                list.add(Kvrpcpb.KvPair.newBuilder().setKey(key).setValue(value).build());
+                kvPairs.put(key, value);
               }
-              client.batchPut(list);
+              client.batchPut(kvPairs);
               return null;
             });
       }
@@ -271,20 +272,20 @@ public class RawKVClientTest {
       long end = System.currentTimeMillis();
       System.out.println(
           putCases
-              + " put: "
+              + " batchPut: "
               + (end - start) / 1000.0
               + "s workers="
               + WORKER_CNT
               + " put="
               + rawKeys().size());
     } else {
-      List<Kvrpcpb.KvPair> list = new ArrayList<>();
+      Map<ByteString, ByteString> kvPairs = new HashMap<>();
       for (int i = 0; i < putCases; i++) {
         ByteString key = randomKeys.get(i), value = values.get(r.nextInt(KEY_POOL_SIZE));
         data.put(key, value);
-        list.add(Kvrpcpb.KvPair.newBuilder().setKey(key).setValue(value).build());
+        kvPairs.put(key, value);
       }
-      checkBatchPut(list);
+      checkBatchPut(kvPairs);
     }
   }
 
@@ -378,7 +379,7 @@ public class RawKVClientTest {
       }
       awaitTimeOut(100);
       long end = System.currentTimeMillis();
-      System.out.println(deleteCases + " get: " + (end - start) / 1000.0 + "s");
+      System.out.println(deleteCases + " delete: " + (end - start) / 1000.0 + "s");
     } else {
       int i = 0;
       for (ByteString key : data.keySet()) {
@@ -396,10 +397,10 @@ public class RawKVClientTest {
     assert client.get(key).equals(value);
   }
 
-  private void checkBatchPut(List<Kvrpcpb.KvPair> pairs) {
-    client.batchPut(pairs);
-    for (Kvrpcpb.KvPair pair : pairs) {
-      assert client.get(pair.getKey()).equals(pair.getValue());
+  private void checkBatchPut(Map<ByteString, ByteString> kvPairs) {
+    client.batchPut(kvPairs);
+    for (Map.Entry<ByteString, ByteString> kvPair : kvPairs.entrySet()) {
+      assert client.get(kvPair.getKey()).equals(kvPair.getValue());
     }
   }
 

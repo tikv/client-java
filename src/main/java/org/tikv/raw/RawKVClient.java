@@ -16,6 +16,10 @@
 package org.tikv.raw;
 
 import com.google.protobuf.ByteString;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
+import org.apache.log4j.Logger;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.TiKVException;
@@ -30,16 +34,21 @@ import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 
-import java.util.*;
-
 public class RawKVClient implements AutoCloseable {
   private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
   private final TiSession session;
   private final RegionManager regionManager;
+  private final ExecutorCompletionService<Object> completionService;
+  private static final Logger logger = Logger.getLogger(RawKVClient.class);
+
+  private static final int RAW_BATCH_PUT_SIZE = 16 * 1024;
 
   private RawKVClient(String addresses) {
     session = TiSession.create(TiConfiguration.createRawDefault(addresses));
     regionManager = session.getRegionManager();
+    ExecutorService executors =
+        Executors.newFixedThreadPool(session.getConf().getRawClientConcurrency());
+    completionService = new ExecutorCompletionService<>(executors);
   }
 
   private RawKVClient() {
@@ -80,41 +89,32 @@ public class RawKVClient implements AutoCloseable {
   }
 
   /**
-   * Put a list of raw key-value pair to TiKV
+   * Put a set of raw key-value pair to TiKV
    *
    * @param kvPairs kvPairs
    */
-  public void batchPut(List<Kvrpcpb.KvPair> kvPairs) {
-    BackOffer backOffer = defaultBackOff();
-    List<Kvrpcpb.KvPair> remainingPairs = new ArrayList<>();
-    while (true) {
-      kvPairs.addAll(remainingPairs);
-      remainingPairs.clear();
-      Map<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> regionMap = new HashMap<>();
-      for (Kvrpcpb.KvPair kvPair : kvPairs) {
-        Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(kvPair.getKey());
-        regionMap.computeIfAbsent(pair, t -> new ArrayList<>()).add(kvPair);
-      }
+  public void batchPut(Map<ByteString, ByteString> kvPairs) {
+    batchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs);
+  }
 
-      for (Map.Entry<Pair<TiRegion, Metapb.Store>, List<Kvrpcpb.KvPair>> entry :
-          regionMap.entrySet()) {
-        RegionStoreClient client =
-            RegionStoreClient.create(entry.getKey().first, entry.getKey().second, session);
-        try {
-          client.rawBatchPut(defaultBackOff(), entry.getValue());
-        } catch (final TiKVException e) {
-          remainingPairs.addAll(entry.getValue());
-        }
-      }
-      if (remainingPairs.isEmpty()) {
-        return;
-      }
-      // re-splitting ranges
-      backOffer.doBackOff(
-          BackOffFunction.BackOffFuncType.BoRegionMiss,
-          new TiKVException("BatchPut encounter exception, need re-split the ranges"));
-      kvPairs.clear();
+  private void batchPut(BackOffer backOffer, List<ByteString> keys, List<ByteString> values) {
+    Map<ByteString, ByteString> keysToValues = mapKeysToValues(keys, values);
+    batchPut(backOffer, keysToValues);
+  }
+
+  private void batchPut(BackOffer backOffer, Map<ByteString, ByteString> kvPairs) {
+    Map<Long, List<ByteString>> groupKeys = groupKeysByRegion(kvPairs.keySet());
+    List<Batch> batches = new ArrayList<>();
+
+    for (Map.Entry<Long, List<ByteString>> entry : groupKeys.entrySet()) {
+      appendBatches(
+          batches,
+          entry.getKey(),
+          entry.getValue(),
+          entry.getValue().stream().map(kvPairs::get).collect(Collectors.toList()),
+          RAW_BATCH_PUT_SIZE);
     }
+    sendBatchPut(backOffer, batches);
   }
 
   /**
@@ -187,6 +187,123 @@ public class RawKVClient implements AutoCloseable {
       } catch (final TiKVException e) {
         backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       }
+    }
+  }
+
+  private class Batch {
+    private long regionId;
+    private List<ByteString> keys;
+    private List<ByteString> values;
+
+    public Batch(long regionId, List<ByteString> keys, List<ByteString> values) {
+      this.regionId = regionId;
+      this.keys = keys;
+      this.values = values;
+    }
+  }
+
+  /**
+   * Append batch to list and split them according to batch limit
+   *
+   * @param batches a grouped batch
+   * @param regionId region ID
+   * @param keys keys
+   * @param values values
+   * @param limit batch max limit
+   */
+  private void appendBatches(
+      List<Batch> batches,
+      long regionId,
+      List<ByteString> keys,
+      List<ByteString> values,
+      int limit) {
+    List<ByteString> tmpKeys = new ArrayList<>();
+    List<ByteString> tmpValues = new ArrayList<>();
+    for (int i = 0; i < keys.size(); i++) {
+      if (i >= limit) {
+        batches.add(new Batch(regionId, tmpKeys, tmpValues));
+        tmpKeys.clear();
+        tmpValues.clear();
+      }
+      tmpKeys.add(keys.get(i));
+      tmpValues.add(values.get(i));
+    }
+    if (!tmpKeys.isEmpty()) {
+      batches.add(new Batch(regionId, tmpKeys, tmpValues));
+    }
+  }
+
+  /**
+   * Group by list of keys according to its region
+   *
+   * @param keys keys
+   * @return a mapping of keys and their regionId
+   */
+  private Map<Long, List<ByteString>> groupKeysByRegion(Set<ByteString> keys) {
+    Map<Long, List<ByteString>> groups = new HashMap<>();
+    TiRegion lastRegion = null;
+    for (ByteString key : keys) {
+      if (lastRegion == null || !lastRegion.contains(key)) {
+        lastRegion = regionManager.getRegionByKey(key);
+      }
+      groups.computeIfAbsent(lastRegion.getId(), k -> new ArrayList<>()).add(key);
+    }
+    return groups;
+  }
+
+  static Map<ByteString, ByteString> mapKeysToValues(
+      List<ByteString> keys, List<ByteString> values) {
+    Map<ByteString, ByteString> map = new HashMap<>();
+    for (int i = 0; i < keys.size(); i++) {
+      map.put(keys.get(i), values.get(i));
+    }
+    return map;
+  }
+
+  /**
+   * Send batchPut request concurrently
+   *
+   * @param backOffer current backOffer
+   * @param batches list of batch to send
+   */
+  private void sendBatchPut(BackOffer backOffer, List<Batch> batches) {
+    for (Batch batch : batches) {
+      completionService.submit(
+          () -> {
+            Pair<TiRegion, Metapb.Store> pair =
+                regionManager.getRegionStorePairByRegionId(batch.regionId);
+            RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
+            List<Kvrpcpb.KvPair> kvPairs = new ArrayList<>();
+            for (int i = 0; i < batch.keys.size(); i++) {
+              kvPairs.add(
+                  Kvrpcpb.KvPair.newBuilder()
+                      .setKey(batch.keys.get(i))
+                      .setValue(batch.values.get(i))
+                      .build());
+            }
+            try {
+              client.rawBatchPut(backOffer, kvPairs);
+            } catch (final TiKVException e) {
+              // TODO: any elegant way to re-split the ranges if fails?
+              backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+              logger.warn("ReSplitting ranges for BatchPutRequest");
+              // recursive calls
+              batchPut(backOffer, batch.keys, batch.values);
+            }
+            return null;
+          });
+    }
+    try {
+      for (int i = 0; i < batches.size(); i++) {
+        completionService.take().get(BackOffer.rawkvMaxBackoff, TimeUnit.SECONDS);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new TiKVException("Current thread interrupted.", e);
+    } catch (TimeoutException e) {
+      throw new TiKVException("TimeOut Exceeded for current operation. ", e);
+    } catch (ExecutionException e) {
+      throw new TiKVException("Execution exception met.", e);
     }
   }
 
