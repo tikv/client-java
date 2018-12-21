@@ -1,6 +1,5 @@
 package org.tikv.raw;
 
-
 import com.google.protobuf.ByteString;
 import java.util.*;
 import java.util.concurrent.*;
