@@ -270,6 +270,7 @@ public class RawKVClient implements AutoCloseable {
     for (Batch batch : batches) {
       completionService.submit(
           () -> {
+            BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
             Pair<TiRegion, Metapb.Store> pair =
                 regionManager.getRegionStorePairByRegionId(batch.regionId);
             RegionStoreClient client = RegionStoreClient.create(pair.first, pair.second, session);
@@ -282,13 +283,13 @@ public class RawKVClient implements AutoCloseable {
                       .build());
             }
             try {
-              client.rawBatchPut(backOffer, kvPairs);
+              client.rawBatchPut(singleBatchBackOffer, kvPairs);
             } catch (final TiKVException e) {
               // TODO: any elegant way to re-split the ranges if fails?
-              backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+              singleBatchBackOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
               logger.warn("ReSplitting ranges for BatchPutRequest");
               // recursive calls
-              batchPut(backOffer, batch.keys, batch.values);
+              batchPut(singleBatchBackOffer, batch.keys, batch.values);
             }
             return null;
           });
