@@ -38,9 +38,7 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleResponseError(BackOffer backOffer, RespT resp) {
     if (resp == null) {
-      String msg = "Request Failed with unknown reason for PD GetRegionResponse";
-      logger.warn(msg);
-      return handleRequestError(backOffer, new GrpcException(msg));
+      return false;
     }
     Pdpb.Error error = getError.apply(resp);
     if (error != null) {
