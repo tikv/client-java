@@ -44,6 +44,7 @@ import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.PDGrpc.PDBlockingStub;
 import org.tikv.kvproto.PDGrpc.PDStub;
+import org.tikv.kvproto.Pdpb;
 import org.tikv.kvproto.Pdpb.*;
 
 public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
@@ -80,7 +81,14 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
 
     PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(
+            r ->
+                r.getHeader().hasError()
+                    ? r.getHeader().getError()
+                    : r.getRegion().getId() == 0
+                        ? Pdpb.Error.newBuilder().setMessage("RegionId is 0").build()
+                        : null,
+            this);
 
     GetRegionResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_GET_REGION, request, handler);
     return new TiRegion(

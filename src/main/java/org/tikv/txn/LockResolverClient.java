@@ -276,7 +276,7 @@ public class LockResolverClient extends AbstractGRPCClient<TikvBlockingStub, Tik
     TiRegion cachedRegion = getSession().getRegionManager().getRegionById(region.getId());
     // When switch leader fails or the region changed its key range,
     // it would be necessary to re-split task's key range for new region.
-    if (!region.switchPeer(newStore.getId())
+    if (region.switchPeer(newStore.getId()) == null
         || !region.getStartKey().equals(cachedRegion.getStartKey())
         || !region.getEndKey().equals(cachedRegion.getEndKey())) {
       return false;

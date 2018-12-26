@@ -42,7 +42,11 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
     }
     Pdpb.Error error = getError.apply(resp);
     if (error != null) {
-      client.updateLeader();
+      if (error.getMessage().equalsIgnoreCase("RegionId is 0")) {
+        logger.info("region id is 0");
+      } else {
+        client.updateLeader();
+      }
       backOffer.doBackOff(
           BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
       return true;
