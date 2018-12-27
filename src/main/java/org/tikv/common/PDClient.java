@@ -16,6 +16,7 @@
 package org.tikv.common;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.tikv.common.operation.PDErrorHandler.getRegionResponseErrorExtractor;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
@@ -37,6 +38,7 @@ import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.PDErrorHandler;
+import org.tikv.common.pd.Error;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.FutureObserver;
@@ -44,7 +46,6 @@ import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.PDGrpc.PDBlockingStub;
 import org.tikv.kvproto.PDGrpc.PDStub;
-import org.tikv.kvproto.Pdpb;
 import org.tikv.kvproto.Pdpb.*;
 
 public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
@@ -60,7 +61,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     Supplier<TsoRequest> request = () -> tsoReq;
 
     PDErrorHandler<TsoResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(
+            r ->
+                r.getHeader().hasError()
+                    ? Error.newBuilder().setError(r.getHeader().getError()).build()
+                    : null,
+            this);
 
     TsoResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_TSO, request, handler);
     Timestamp timestamp = resp.getTimestamp();
@@ -81,14 +87,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
 
     PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(
-            r ->
-                r.getHeader().hasError()
-                    ? r.getHeader().getError()
-                    : r.getRegion().getId() == 0
-                        ? Pdpb.Error.newBuilder().setMessage("RegionId is 0").build()
-                        : null,
-            this);
+        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
 
     GetRegionResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_GET_REGION, request, handler);
     return new TiRegion(
@@ -114,7 +113,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
 
     PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
 
     callAsyncWithRetry(backOffer, PDGrpc.METHOD_GET_REGION, request, responseObserver, handler);
     return responseObserver.getFuture();
@@ -125,7 +124,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     Supplier<GetRegionByIDRequest> request =
         () -> GetRegionByIDRequest.newBuilder().setHeader(header).setRegionId(id).build();
     PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
 
     GetRegionResponse resp =
         callWithRetry(backOffer, PDGrpc.METHOD_GET_REGION_BY_ID, request, handler);
@@ -153,7 +152,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     Supplier<GetRegionByIDRequest> request =
         () -> GetRegionByIDRequest.newBuilder().setHeader(header).setRegionId(id).build();
     PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
 
     callAsyncWithRetry(
         backOffer, PDGrpc.METHOD_GET_REGION_BY_ID, request, responseObserver, handler);
@@ -165,7 +164,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     Supplier<GetStoreRequest> request =
         () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
     PDErrorHandler<GetStoreResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(
+            r ->
+                r.getHeader().hasError()
+                    ? Error.newBuilder().setError(r.getHeader().getError()).build()
+                    : null,
+            this);
 
     GetStoreResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_GET_STORE, request, handler);
     return resp.getStore();
@@ -179,7 +183,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     Supplier<GetStoreRequest> request =
         () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
     PDErrorHandler<GetStoreResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(
+            r ->
+                r.getHeader().hasError()
+                    ? Error.newBuilder().setError(r.getHeader().getError()).build()
+                    : null,
+            this);
 
     callAsyncWithRetry(backOffer, PDGrpc.METHOD_GET_STORE, request, responseObserver, handler);
     return responseObserver.getFuture();

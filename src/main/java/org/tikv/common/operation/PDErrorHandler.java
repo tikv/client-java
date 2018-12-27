@@ -21,16 +21,24 @@ import java.util.function.Function;
 import org.apache.log4j.Logger;
 import org.tikv.common.PDClient;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.pd.Error;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Pdpb;
 
 public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
   private static final Logger logger = Logger.getLogger(PDErrorHandler.class);
-  private final Function<RespT, Pdpb.Error> getError;
+  private final Function<RespT, Error> getError;
   private final PDClient client;
 
-  public PDErrorHandler(Function<RespT, Pdpb.Error> errorExtractor, PDClient client) {
+  public static final Function<Pdpb.GetRegionResponse, Error> getRegionResponseErrorExtractor =
+      r ->
+          r.getHeader().hasError()
+              ? Error.newBuilder().setError(r.getHeader().getError()).build()
+              : r.getRegion().getId() == 0 ? Error.RegionPeerNotElected.DEFAULT_INSTANCE : null;
+
+  public PDErrorHandler(Function<RespT, Error> errorExtractor, PDClient client) {
     this.getError = errorExtractor;
     this.client = client;
   }
@@ -40,16 +48,22 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
     if (resp == null) {
       return false;
     }
-    Pdpb.Error error = getError.apply(resp);
+    Error error = getError.apply(resp);
     if (error != null) {
-      if (error.getMessage().equalsIgnoreCase("RegionId is 0")) {
-        logger.info("region id is 0");
-      } else {
-        client.updateLeader();
+      switch (error.getErrorType()) {
+        case PD_ERROR:
+          client.updateLeader();
+          backOffer.doBackOff(
+              BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
+          return true;
+        case REGION_PEER_NOT_ELECTED:
+          logger.info(error.getMessage());
+          backOffer.doBackOff(
+              BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
+          return true;
+        default:
+          throw new TiClientInternalException("Unknown error type encountered: " + error);
       }
-      backOffer.doBackOff(
-          BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
-      return true;
     }
     return false;
   }
