@@ -85,38 +85,41 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
 
       GetResponse resp = callWithRetry(backOffer, TikvGrpc.METHOD_KV_GET, factory, handler);
 
-      if (resp == null) {
-        this.regionManager.onRequestFail(
-            region.getContext().getRegionId(), region.getContext().getPeer().getStoreId());
-        throw new TiClientInternalException("GetResponse failed without a cause");
+      if (getHelper(backOffer, resp, region.getContext())) {
+        return resp.getValue();
       }
-
-      if (resp.hasRegionError()) {
-        backOffer.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
-        continue;
-      }
-
-      if (resp.hasError()) {
-        if (resp.getError().hasLocked()) {
-          Lock lock = new Lock(resp.getError().getLocked());
-          boolean ok =
-              lockResolverClient.resolveLocks(backOffer, new ArrayList<>(Arrays.asList(lock)));
-          if (!ok) {
-            // if not resolve all locks, we wait and retry
-            backOffer.doBackOff(
-                BoTxnLockFast, new KeyException((resp.getError().getLocked().toString())));
-          }
-
-          continue;
-        } else {
-          // retry or abort
-          // this should trigger Spark to retry the txn
-          throw new KeyException(resp.getError());
-        }
-      }
-
-      return resp.getValue();
     }
+  }
+
+  private boolean getHelper(BackOffer backOffer, GetResponse resp, Context context) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(context.getRegionId(), context.getPeer().getStoreId());
+      throw new TiClientInternalException("GetResponse failed without a cause");
+    }
+
+    if (resp.hasRegionError()) {
+      backOffer.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
+      return false;
+    }
+
+    if (resp.hasError()) {
+      if (resp.getError().hasLocked()) {
+        Lock lock = new Lock(resp.getError().getLocked());
+        boolean ok =
+            lockResolverClient.resolveLocks(backOffer, new ArrayList<>(Arrays.asList(lock)));
+        if (!ok) {
+          // if not resolve all locks, we wait and retry
+          backOffer.doBackOff(
+              BoTxnLockFast, new KeyException((resp.getError().getLocked().toString())));
+        }
+        return false;
+      } else {
+        // retry or abort
+        // this should trigger Spark to retry the txn
+        throw new KeyException(resp.getError());
+      }
+    }
+    return true;
   }
 
   // TODO: batch get should consider key range split
@@ -191,19 +194,19 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
             region,
             resp -> resp.hasRegionError() ? resp.getRegionError() : null);
     ScanResponse resp = callWithRetry(backOffer, TikvGrpc.METHOD_KV_SCAN, request, handler);
-    if (resp == null) {
-      this.regionManager.onRequestFail(
-          region.getContext().getRegionId(), region.getContext().getPeer().getStoreId());
-      throw new TiClientInternalException("ScanResponse failed without a cause");
-    }
-    return scanHelper(resp, backOffer);
+    return scanHelper(resp, backOffer, region.getContext());
   }
 
   // TODO: remove helper and change to while style
   // needs to be fixed as batchGet
   // which we shoule retry not throw
   // exception
-  private List<KvPair> scanHelper(ScanResponse resp, BackOffer bo) {
+  private List<KvPair> scanHelper(ScanResponse resp, BackOffer bo, Context context) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(context.getRegionId(), context.getPeer().getStoreId());
+      throw new TiClientInternalException("ScanResponse failed without a cause");
+    }
+
     List<Lock> locks = new ArrayList<>();
 
     for (KvPair pair : resp.getPairsList()) {
@@ -217,7 +220,7 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
       }
     }
 
-    if (locks.size() > 0) {
+    if (!locks.isEmpty()) {
       boolean ok = lockResolverClient.resolveLocks(bo, locks);
       if (!ok) {
         // if not resolve all locks, we wait and retry
@@ -462,13 +465,11 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
     TiRegion cachedRegion = regionManager.getRegionById(region.getId());
     // When switch leader fails or the region changed its key range,
     // it would be necessary to re-split task's key range for new region.
-    // region = region.switchPeer(newStore.getId());
     if (!region.getStartKey().equals(cachedRegion.getStartKey())
         || !region.getEndKey().equals(cachedRegion.getEndKey())) {
       return false;
     }
     region = cachedRegion;
-    logger.warn("onNotLeader " + region.getLeader().getStoreId());
     String addressStr = regionManager.getStoreById(region.getLeader().getStoreId()).getAddress();
     ManagedChannel channel = getSession().getChannel(addressStr);
     blockingStub = TikvGrpc.newBlockingStub(channel);

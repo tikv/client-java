@@ -85,7 +85,7 @@ public class RegionManager {
         logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
       }
 
-      return region.copy();
+      return region;
     }
 
     private synchronized boolean putRegion(TiRegion region) {
@@ -108,7 +108,7 @@ public class RegionManager {
           throw new TiClientInternalException("Invalid Region: " + region.toString());
         }
       }
-      return region.copy();
+      return region;
     }
 
     /** Removes region associated with regionId from regionCache. */
@@ -179,7 +179,7 @@ public class RegionManager {
     return cache.getRegionById(regionId);
   }
 
-  public synchronized Pair<TiRegion, Store> getRegionStorePairByKey(ByteString key) {
+  public Pair<TiRegion, Store> getRegionStorePairByKey(ByteString key) {
     TiRegion region = cache.getRegionByKey(key);
     if (region == null) {
       throw new TiClientInternalException("Region not exist for key:" + formatBytes(key));
@@ -189,17 +189,17 @@ public class RegionManager {
     }
     Peer leader = region.getLeader();
     long storeId = leader.getStoreId();
-    return Pair.create(region.copy(), cache.getStoreById(storeId));
+    return Pair.create(region, cache.getStoreById(storeId));
   }
 
-  public synchronized Pair<TiRegion, Store> getRegionStorePairByRegionId(long id) {
+  public Pair<TiRegion, Store> getRegionStorePairByRegionId(long id) {
     TiRegion region = cache.getRegionById(id);
     if (!region.isValid()) {
       throw new TiClientInternalException("Region invalid: " + region.toString());
     }
     Peer leader = region.getLeader();
     long storeId = leader.getStoreId();
-    return Pair.create(region.copy(), cache.getStoreById(storeId));
+    return Pair.create(region, cache.getStoreById(storeId));
   }
 
   public Store getStoreById(long id) {

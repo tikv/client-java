@@ -183,10 +183,11 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  private class Batch {
-    private TiRegion region;
-    private List<ByteString> keys;
-    private List<ByteString> values;
+  /** A Batch containing the region, a list of keys and/or values to send */
+  private final class Batch {
+    private final TiRegion region;
+    private final List<ByteString> keys;
+    private final List<ByteString> values;
 
     public Batch(TiRegion region, List<ByteString> keys, List<ByteString> values) {
       this.region = region;
@@ -230,7 +231,7 @@ public class RawKVClient implements AutoCloseable {
    * Group by list of keys according to its region
    *
    * @param keys keys
-   * @return a mapping of keys and their regionId
+   * @return a mapping of keys and their region
    */
   private Map<TiRegion, List<ByteString>> groupKeysByRegion(Set<ByteString> keys) {
     Map<TiRegion, List<ByteString>> groups = new HashMap<>();
@@ -267,7 +268,7 @@ public class RawKVClient implements AutoCloseable {
             RegionStoreClient client =
                 RegionStoreClient.create(
                     batch.region,
-                    regionManager.getStoreById(batch.region.getContext().getPeer().getStoreId()),
+                    regionManager.getStoreById(batch.region.getLeader().getStoreId()),
                     session);
             List<Kvrpcpb.KvPair> kvPairs = new ArrayList<>();
             for (int i = 0; i < batch.keys.size(); i++) {

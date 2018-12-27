@@ -66,10 +66,6 @@ public class TiRegion implements Serializable {
     this.commandPri = commandPri;
   }
 
-  public TiRegion copy() {
-    return new TiRegion(this.meta, this.peer, this.isolationLevel, this.commandPri);
-  }
-
   private TiRegion withNewLeader(Peer p) {
     return new TiRegion(this.meta, p, this.isolationLevel, this.commandPri);
   }
@@ -119,8 +115,8 @@ public class TiRegion implements Serializable {
     builder.setIsolationLevel(this.isolationLevel);
     builder.setPriority(this.commandPri);
     builder
-        .setRegionId(meta.getId())
-        .setPeer(this.getLeader())
+        .setRegionId(this.meta.getId())
+        .setPeer(this.peer)
         .setRegionEpoch(this.meta.getRegionEpoch());
     return builder.build();
   }
