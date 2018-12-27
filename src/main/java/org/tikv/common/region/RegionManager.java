@@ -210,7 +210,7 @@ public class RegionManager {
     cache.invalidateRegion(regionId);
   }
 
-  public synchronized boolean updateLeader(long regionId, long storeId) {
+  public boolean checkAndDropLeader(long regionId, long storeId) {
     TiRegion r = cache.regionCache.get(regionId);
     if (r != null) {
       TiRegion r2 = r.switchPeer(storeId);
@@ -229,12 +229,11 @@ public class RegionManager {
   /**
    * Clears all cache when a TiKV server does not respond
    *
-   * @param regionId region's id
-   * @param storeId TiKV store's id
+   * @param region region
    */
-  public void onRequestFail(long regionId, long storeId) {
-    cache.invalidateRegion(regionId);
-    cache.invalidateAllRegionForStore(storeId);
+  public void onRequestFail(TiRegion region) {
+    cache.invalidateRegion(region.getId());
+    cache.invalidateAllRegionForStore(region.getLeader().getStoreId());
   }
 
   public void invalidateStore(long storeId) {

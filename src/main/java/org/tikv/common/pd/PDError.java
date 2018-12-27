@@ -1,8 +1,25 @@
+/*
+ *
+ * Copyright 2018 PingCAP, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package org.tikv.common.pd;
 
 import org.tikv.kvproto.Pdpb;
 
-public final class Error {
+public final class PDError {
   private final Pdpb.Error error;
 
   private final ErrorType errorType;
@@ -12,18 +29,18 @@ public final class Error {
     REGION_PEER_NOT_ELECTED
   }
 
-  private Error(Pdpb.Error error) {
+  private PDError(Pdpb.Error error) {
     this.error = error;
     this.errorType = ErrorType.PD_ERROR;
   }
 
-  private Error(Pdpb.Error error, ErrorType errorType) {
+  private PDError(Pdpb.Error error, ErrorType errorType) {
     this.error = error;
     this.errorType = errorType;
   }
 
-  public static Error buildFromPdpbError(Pdpb.Error error) {
-    return new Error(error);
+  public static PDError buildFromPdpbError(Pdpb.Error error) {
+    return new PDError(error);
   }
 
   public static Builder newBuilder() {
@@ -56,8 +73,8 @@ public final class Error {
     private static final Pdpb.Error DEFAULT_ERROR =
         Pdpb.Error.newBuilder().setMessage(ERROR_MESSAGE).build();
     private static final ErrorType ERROR_TYPE = ErrorType.REGION_PEER_NOT_ELECTED;
-    public static final Error DEFAULT_INSTANCE =
-        Error.newBuilder(DEFAULT_ERROR).setErrorType(ERROR_TYPE).build();
+    public static final PDError DEFAULT_INSTANCE =
+        PDError.newBuilder(DEFAULT_ERROR).setErrorType(ERROR_TYPE).build();
   }
 
   public static final class Builder {
@@ -80,8 +97,8 @@ public final class Error {
       return this;
     }
 
-    public org.tikv.common.pd.Error build() {
-      return new Error(error_, errorType_);
+    public PDError build() {
+      return new PDError(error_, errorType_);
     }
   }
 }

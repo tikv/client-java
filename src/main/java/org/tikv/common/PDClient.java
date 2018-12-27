@@ -17,7 +17,7 @@ package org.tikv.common;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.tikv.common.operation.PDErrorHandler.getRegionResponseErrorExtractor;
-import static org.tikv.common.pd.Error.buildFromPdpbError;
+import static org.tikv.common.pd.PDError.buildFromPdpbError;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;

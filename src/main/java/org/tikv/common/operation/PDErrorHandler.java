@@ -17,30 +17,30 @@
 
 package org.tikv.common.operation;
 
-import static org.tikv.common.pd.Error.buildFromPdpbError;
+import static org.tikv.common.pd.PDError.buildFromPdpbError;
 
 import java.util.function.Function;
 import org.apache.log4j.Logger;
 import org.tikv.common.PDClient;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
-import org.tikv.common.pd.Error;
+import org.tikv.common.pd.PDError;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Pdpb;
 
 public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
   private static final Logger logger = Logger.getLogger(PDErrorHandler.class);
-  private final Function<RespT, Error> getError;
+  private final Function<RespT, PDError> getError;
   private final PDClient client;
 
-  public static final Function<Pdpb.GetRegionResponse, Error> getRegionResponseErrorExtractor =
+  public static final Function<Pdpb.GetRegionResponse, PDError> getRegionResponseErrorExtractor =
       r ->
           r.getHeader().hasError()
               ? buildFromPdpbError(r.getHeader().getError())
-              : r.getRegion().getId() == 0 ? Error.RegionPeerNotElected.DEFAULT_INSTANCE : null;
+              : r.getRegion().getId() == 0 ? PDError.RegionPeerNotElected.DEFAULT_INSTANCE : null;
 
-  public PDErrorHandler(Function<RespT, Error> errorExtractor, PDClient client) {
+  public PDErrorHandler(Function<RespT, PDError> errorExtractor, PDClient client) {
     this.getError = errorExtractor;
     this.client = client;
   }
@@ -50,7 +50,7 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
     if (resp == null) {
       return false;
     }
-    Error error = getError.apply(resp);
+    PDError error = getError.apply(resp);
     if (error != null) {
       switch (error.getErrorType()) {
         case PD_ERROR:
