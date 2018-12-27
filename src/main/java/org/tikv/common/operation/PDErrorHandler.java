@@ -17,6 +17,8 @@
 
 package org.tikv.common.operation;
 
+import static org.tikv.common.pd.Error.buildFromPdpbError;
+
 import java.util.function.Function;
 import org.apache.log4j.Logger;
 import org.tikv.common.PDClient;
@@ -35,7 +37,7 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
   public static final Function<Pdpb.GetRegionResponse, Error> getRegionResponseErrorExtractor =
       r ->
           r.getHeader().hasError()
-              ? Error.newBuilder().setError(r.getHeader().getError()).build()
+              ? buildFromPdpbError(r.getHeader().getError())
               : r.getRegion().getId() == 0 ? Error.RegionPeerNotElected.DEFAULT_INSTANCE : null;
 
   public PDErrorHandler(Function<RespT, Error> errorExtractor, PDClient client) {

@@ -12,9 +12,18 @@ public final class Error {
     REGION_PEER_NOT_ELECTED
   }
 
+  private Error(Pdpb.Error error) {
+    this.error = error;
+    this.errorType = ErrorType.PD_ERROR;
+  }
+
   private Error(Pdpb.Error error, ErrorType errorType) {
     this.error = error;
     this.errorType = errorType;
+  }
+
+  public static Error buildFromPdpbError(Pdpb.Error error) {
+    return new Error(error);
   }
 
   public static Builder newBuilder() {

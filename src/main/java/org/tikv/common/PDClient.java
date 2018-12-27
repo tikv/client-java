@@ -17,6 +17,7 @@ package org.tikv.common;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.tikv.common.operation.PDErrorHandler.getRegionResponseErrorExtractor;
+import static org.tikv.common.pd.Error.buildFromPdpbError;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
@@ -38,7 +39,6 @@ import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.PDErrorHandler;
-import org.tikv.common.pd.Error;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.FutureObserver;
@@ -62,10 +62,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
     PDErrorHandler<TsoResponse> handler =
         new PDErrorHandler<>(
-            r ->
-                r.getHeader().hasError()
-                    ? Error.newBuilder().setError(r.getHeader().getError()).build()
-                    : null,
+            r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
             this);
 
     TsoResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_TSO, request, handler);
@@ -165,10 +162,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
     PDErrorHandler<GetStoreResponse> handler =
         new PDErrorHandler<>(
-            r ->
-                r.getHeader().hasError()
-                    ? Error.newBuilder().setError(r.getHeader().getError()).build()
-                    : null,
+            r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
             this);
 
     GetStoreResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_GET_STORE, request, handler);
@@ -184,10 +178,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
     PDErrorHandler<GetStoreResponse> handler =
         new PDErrorHandler<>(
-            r ->
-                r.getHeader().hasError()
-                    ? Error.newBuilder().setError(r.getHeader().getError()).build()
-                    : null,
+            r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
             this);
 
     callAsyncWithRetry(backOffer, PDGrpc.METHOD_GET_STORE, request, responseObserver, handler);
