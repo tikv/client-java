@@ -37,6 +37,7 @@ public class TiRegion implements Serializable {
   private final Peer peer;
   private final IsolationLevel isolationLevel;
   private final Kvrpcpb.CommandPri commandPri;
+  private Kvrpcpb.Context cachedContext;
 
   public TiRegion(
       Region meta,
@@ -111,14 +112,18 @@ public class TiRegion implements Serializable {
   }
 
   public Kvrpcpb.Context getContext() {
-    Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
-    builder.setIsolationLevel(this.isolationLevel);
-    builder.setPriority(this.commandPri);
-    builder
-        .setRegionId(this.meta.getId())
-        .setPeer(this.peer)
-        .setRegionEpoch(this.meta.getRegionEpoch());
-    return builder.build();
+    if (cachedContext == null) {
+      Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
+      builder.setIsolationLevel(this.isolationLevel);
+      builder.setPriority(this.commandPri);
+      builder
+          .setRegionId(this.meta.getId())
+          .setPeer(this.peer)
+          .setRegionEpoch(this.meta.getRegionEpoch());
+      cachedContext = builder.build();
+      return cachedContext;
+    }
+    return cachedContext;
   }
 
   public class RegionVerID {
@@ -144,9 +149,9 @@ public class TiRegion implements Serializable {
    * storeID.
    *
    * @param leaderStoreID is leader peer id.
-   * @return false if no peers matches the store id.
+   * @return a copy of current region with new leader store id
    */
-  public TiRegion switchPeer(long leaderStoreID) {
+  public TiRegion withNewLeader(long leaderStoreID) {
     List<Peer> peers = meta.getPeersList();
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {

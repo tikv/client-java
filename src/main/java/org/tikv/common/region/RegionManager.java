@@ -213,7 +213,7 @@ public class RegionManager {
   public boolean checkAndDropLeader(long regionId, long storeId) {
     TiRegion r = cache.regionCache.get(regionId);
     if (r != null) {
-      TiRegion r2 = r.switchPeer(storeId);
+      TiRegion r2 = r.withNewLeader(storeId);
       // drop region cache using verId
       cache.invalidateRegion(regionId);
       if (r2.getLeader().getStoreId() != storeId) {
