@@ -276,12 +276,13 @@ public class LockResolverClient extends AbstractGRPCClient<TikvBlockingStub, Tik
     TiRegion cachedRegion = getSession().getRegionManager().getRegionById(region.getId());
     // When switch leader fails or the region changed its key range,
     // it would be necessary to re-split task's key range for new region.
-    if (!region.switchPeer(newStore.getId())
-        || !region.getStartKey().equals(cachedRegion.getStartKey())
+    if (!region.getStartKey().equals(cachedRegion.getStartKey())
         || !region.getEndKey().equals(cachedRegion.getEndKey())) {
       return false;
     }
-    String addressStr = newStore.getAddress();
+    region = cachedRegion;
+    String addressStr =
+        getSession().getRegionManager().getStoreById(region.getLeader().getStoreId()).getAddress();
     ManagedChannel channel = getSession().getChannel(addressStr);
     blockingStub = TikvGrpc.newBlockingStub(channel);
     asyncStub = TikvGrpc.newStub(channel);
@@ -294,14 +295,5 @@ public class LockResolverClient extends AbstractGRPCClient<TikvBlockingStub, Tik
     ManagedChannel channel = getSession().getChannel(addressStr);
     blockingStub = TikvGrpc.newBlockingStub(channel);
     asyncStub = TikvGrpc.newStub(channel);
-    if (logger.isDebugEnabled() && region.getLeader().getStoreId() != store.getId()) {
-      logger.debug(
-          "store_not_match may occur? "
-              + region
-              + ", original store = "
-              + store.getId()
-              + " address = "
-              + addressStr);
-    }
   }
 }

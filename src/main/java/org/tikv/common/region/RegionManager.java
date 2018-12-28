@@ -73,7 +73,7 @@ public class RegionManager {
       }
 
       if (regionId == null) {
-        logger.debug("Key not find in keyToRegionIdCache:" + formatBytes(key));
+        logger.debug("Key not found in keyToRegionIdCache:" + formatBytes(key));
         TiRegion region = pdClient.getRegionByKey(ConcreteBackOffer.newGetBackOff(), key);
         if (!putRegion(region)) {
           throw new TiClientInternalException("Invalid Region: " + region.toString());
@@ -210,15 +210,16 @@ public class RegionManager {
     cache.invalidateRegion(regionId);
   }
 
-  public boolean updateLeader(long regionId, long storeId) {
+  public boolean checkAndDropLeader(long regionId, long storeId) {
     TiRegion r = cache.regionCache.get(regionId);
     if (r != null) {
-      if (!r.switchPeer(storeId)) {
+      TiRegion r2 = r.withNewLeader(storeId);
+      // drop region cache using verId
+      cache.invalidateRegion(regionId);
+      if (r2.getLeader().getStoreId() != storeId) {
         // failed to switch leader, possibly region is outdated, we need to drop region cache from
         // regionCache
         logger.warn("Cannot find peer when updating leader (" + regionId + "," + storeId + ")");
-        // drop region cache using verId
-        cache.invalidateRegion(regionId);
         return false;
       }
     }
@@ -228,12 +229,11 @@ public class RegionManager {
   /**
    * Clears all cache when a TiKV server does not respond
    *
-   * @param regionId region's id
-   * @param storeId TiKV store's id
+   * @param region region
    */
-  public void onRequestFail(long regionId, long storeId) {
-    cache.invalidateRegion(regionId);
-    cache.invalidateAllRegionForStore(storeId);
+  public void onRequestFail(TiRegion region) {
+    cache.invalidateRegion(region.getId());
+    cache.invalidateAllRegionForStore(region.getLeader().getStoreId());
   }
 
   public void invalidateStore(long storeId) {
