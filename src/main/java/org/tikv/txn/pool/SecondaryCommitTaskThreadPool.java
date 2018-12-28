@@ -7,7 +7,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-public class SecondaryCommitTaskThreadPool implements AutoCloseable {
+/**
+ * 2PC: Secondary commit thread pool
+ */
+public final class SecondaryCommitTaskThreadPool implements AutoCloseable {
     private final static Logger LOG = LoggerFactory.getLogger(SecondaryCommitTaskThreadPool.class);
 
     private ExecutorService taskThreadsPool;
@@ -21,7 +24,8 @@ public class SecondaryCommitTaskThreadPool implements AutoCloseable {
             this.taskThreadsPool.submit(task);
             return null;
         } catch (Exception e) {
-            return String.format("submit secondary task failed");
+            LOG.error("Submit secondary task failed");
+            return String.format("Submit secondary task failed");
         }
     }
     @Override

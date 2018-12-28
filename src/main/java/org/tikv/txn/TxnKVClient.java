@@ -1,286 +1,347 @@
 package org.tikv.txn;
 
+import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
+import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
-import org.tikv.common.region.RegionStoreClient;
+import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
+import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.RegionException;
+import org.tikv.common.exception.TiKVException;
+import org.tikv.common.meta.TiTimestamp;
+import org.tikv.common.operation.iterator.ConcreteScanIterator;
+import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TxnRegionStoreClient;
+import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
-import org.tikv.common.util.FastByteComparisons;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
-import org.tikv.txn.pool.SecondaryCommitTaskThreadPool;
-import org.tikv.txn.type.BatchKeys;
-import org.tikv.txn.type.GroupKeyResult;
-import org.tikv.txn.type.TwoPhaseCommitType;
+import org.tikv.kvproto.Metapb;
+import org.tikv.txn.type.ClientRPCResult;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.function.Function;
 
-public class TxnKVClient {
+/**
+ * KV client of transaction
+ * APIs for GET/PUT/DELETE/SCAN
+ */
+public class TxnKVClient implements AutoCloseable{
     private final static Logger LOG = LoggerFactory.getLogger(TxnKVClient.class);
 
-    // TiKV recommends each RPC packet should be less than ~1MB. We keep each packet's
-    // Key+Value size below 16KB.
-    private static final int txnCommitBatchSize = 16 * 1024;
-    private static final SecondaryCommitTaskThreadPool secondaryCommitPool = new SecondaryCommitTaskThreadPool();
-
-    private Map<String, Kvrpcpb.Mutation> mutations = new HashMap<>();
-    private List<byte[]> keysList;
+    private final TiSession session;
+    private final RegionManager regionManager;
     private ReadOnlyPDClient pdClient;
-    private RegionStoreClient regionStoreClient;
 
-    private volatile boolean prewriteTaskError = false;
-    private volatile AtomicInteger seondaryThreadIdGenerator = new AtomicInteger(0);
+    private TxnKVClient(String addresses) {
+        this.session = TiSession.create(TiConfiguration.createRawDefault(addresses));
+        this.regionManager = session.getRegionManager();
+        this.pdClient = session.getPDClient();
+    }
 
+    public static TxnKVClient createClient(String addresses) {
+        return new TxnKVClient(addresses);
+    }
 
-    private GroupKeyResult groupKeysByRegion(BackOffer backOffer, byte[][] keys) {
-        Map<Long, List<byte[]>> groups = new HashMap<>();
-        long first = 0;
-        int index = 0;
-        String error = null;
+    public TiSession getSession() {
+        return session;
+    }
+
+    public TiTimestamp getTimestamp() {
+        BackOffer bo = ConcreteBackOffer.newTsoBackOff();
+        TiTimestamp timestamp = new TiTimestamp(0, 0);
         try {
-            for(; index < keys.length; index ++) {
-                byte[] key = keys[index];
-                TiRegion tiRegion = this.pdClient.getRegionByKey(backOffer, ByteString.copyFrom(key));
-                if(tiRegion != null){
-                    Long regionId = tiRegion.getId();
-                    if(index == 0) {
-                        first = regionId;
-                    }
-                    List<byte[]> groupItem = groups.get(regionId);
-                    if(groupItem != null) {
-                        groupItem = new LinkedList<>();
-                    }
-                    groupItem.add(key);
-                    groups.put(tiRegion.getId(), groupItem);
+            while(true) {
+                try {
+                    timestamp = pdClient.getTimestamp(bo);
+                    break;
+                } catch (final TiKVException e) {//retry is exhausted
+                    bo.doBackOff(BackOffFunction.BackOffFuncType.BoPDRPC, e);
                 }
             }
-        } catch (Exception e) {
-            error = String.format("groupKeysByRegion error, %s", e.getMessage());
+        } catch (GrpcException e1) {
+            LOG.error("Get tso from pd failed,", e1);
         }
-        GroupKeyResult result = new GroupKeyResult();
-        if(error == null) {
-            result.setFirstRegion(first);
-            result.setGroupsResult(groups);
+        return timestamp;
+    }
+
+    /**
+     * Begin a new transaction
+     * @return
+     */
+    public ITransaction begin() {
+        return new TikvTransaction(this);
+    }
+
+    public ITransaction begin(Function<ITransaction,Boolean> function) {
+        return new TikvTransaction(this, function);
+    }
+
+    //add backoff logic when encountered region error,ErrBodyMissing, and other errors
+    public ClientRPCResult prewrite(BackOffer backOffer, List<Kvrpcpb.Mutation> mutations, byte[] primary, long lockTTL, long startTs, long regionId) {
+        ClientRPCResult result = new ClientRPCResult(true, false, null);
+        //send request
+        Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
+        TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
+        try {
+            client.prewrite(backOffer,  ByteString.copyFrom(primary), mutations, startTs, lockTTL);
+        } catch (final TiKVException | StatusRuntimeException e) {
+            result.setSuccess(false);
+            result.setRetry(e instanceof RegionException);//mark retryable, region error, should retry prewrite again
+            result.setError(e.getMessage());
         }
-        result.setErrorMsg(error);
         return result;
     }
 
-    private void appendBatchBySize(List<BatchKeys> batchKeyList, Long regionId, List<byte[]> keys, boolean sizeKeyValue, int limit) {
-        int start, end ;
-        int len = keys.size();
-        for(start = 0, end =0; start < len; start = end) {
-            int size = 0;
-            for(end = start; end < len && size < limit; end ++) {
-                if(sizeKeyValue) {
-                    size += this.keyValueSize(keys.get(end));
-                } else {
-                    size += this.keyize(keys.get(end));
-                }
-            }
-            BatchKeys batchKeys = new BatchKeys(regionId, keys.subList(start, end));
-            batchKeyList.add(batchKeys);
+    /**
+     * Commit request of 2pc,
+     * add backoff logic when encountered region error, ErrBodyMissing, and other errors
+     * @param backOffer
+     * @param keys
+     * @param startTs
+     * @param commitTs
+     * @param regionId
+     * @return
+     */
+    public ClientRPCResult commit(BackOffer backOffer, byte[][] keys, long startTs, long commitTs, long regionId) {
+        ClientRPCResult result = new ClientRPCResult(true, false, null);
+        //send request
+        Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
+        TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
+        List<ByteString> byteList = Lists.newArrayList();
+        for(byte[] key : keys) {
+            byteList.add(ByteString.copyFrom(key));
         }
-    }
-
-    private boolean isPrimaryKey(byte[] key) {
-        return this.keysList != null && FastByteComparisons.compareTo(this.keysList.get(0), key) == 0;
-    }
-
-    protected String doActionOnKeys(BackOffer backOffer, TwoPhaseCommitType actionType, byte[][] keys) {
-        if(keys == null || keys.length == 0) {
-            return null;
+        try {
+            client.commit(backOffer, byteList, startTs, commitTs);
+        } catch (final TiKVException | StatusRuntimeException e) {
+            result.setSuccess(false);
+            result.setRetry(e instanceof RegionException);//mark retryable, region error, should retry prewrite again
+            result.setError(e.getMessage());
         }
-        GroupKeyResult groupResult = this.groupKeysByRegion(backOffer, keys);
-        if(groupResult.hasError()) {
-            return groupResult.getErrorMsg();
-        }
-        boolean sizeKeyValue = false;
-        if(actionType == TwoPhaseCommitType.actionPrewrite) {
-            sizeKeyValue = true;
-        }
-        List<BatchKeys> batchKeyList = new LinkedList<>();
-        Map<Long, List<byte[]>>  groupKeyMap = groupResult.getGroupsResult();
-        long firstRegion = groupResult.getFirstRegion();
-        this.appendBatchBySize(batchKeyList, firstRegion, groupKeyMap.get(firstRegion),
-                sizeKeyValue, txnCommitBatchSize);
-
-        for(Long regionId : groupKeyMap.keySet()) {
-            this.appendBatchBySize(batchKeyList, regionId, groupKeyMap.get(regionId),
-                    sizeKeyValue, txnCommitBatchSize);
-        }
-        boolean firstIsPrimary =  this.isPrimaryKey(keys[0]);
-
-        if (firstIsPrimary && (actionType == TwoPhaseCommitType.actionCommit
-                || actionType == TwoPhaseCommitType.actionCleanup)) {
-            String error = this.doActionOnBatches(backOffer, actionType, batchKeyList.subList(0, 1));
-            if(error != null) {
-                return error;
-            }
-            batchKeyList.remove(0);
-        }
-        String error = null;
-        if(actionType == TwoPhaseCommitType.actionCommit) {
-            // Commit secondary batches in background goroutine to reduce latency.
-            secondaryCommitPool.submitSecondaryTask(() -> {
-                if(prewriteTaskError) {
-                    LOG.error("2PC async doActionOnBatches canceled, other secondary thread failed");
-                    return;
-                }
-                String errorInner = doActionOnBatches(backOffer, actionType, batchKeyList);
-                if(errorInner != null) {
-                    LOG.warn("2PC async doActionOnBatches error: {}", errorInner);
-                    prewriteTaskError = true;
-                }
-            });
-        } else {
-            error = this.doActionOnBatches(backOffer, actionType, batchKeyList);
-        }
-        return error;
-    }
-
-    //doActionOnBatches does action to batches in parallel.
-    public String doActionOnBatches(BackOffer backOffer, TwoPhaseCommitType actionType, List<BatchKeys> batchKeys) {
-        if(batchKeys.size() == 0) {
-            LOG.debug("2PC doActionOnBatches batch keys is empty: type={}", actionType);
-            return null;
-        }
-        switch(actionType) {
-            case actionPrewrite: {
-                this.doPrewriteActionOnBatches(backOffer, batchKeys);
-            } break;
-            case actionCommit: {
-                this.doCommitActionOnBatches(backOffer, batchKeys);
-            } break;
-            case actionCleanup: {
-                this.doCleanupActionOnBatches(backOffer, batchKeys);
-            } break;
-        }
-        return null;
-    }
-
-    private String doPrewriteActionOnBatches(BackOffer backOffer, List<BatchKeys> batchKeysList) {
-        if(batchKeysList.size() == 1) {
-            String error = this.prewriteSingleBatch(backOffer, batchKeysList.get(0));
-            LOG.warn("2PC doPrewriteActionOnBatches failed, one batch size, error: {}", error);
-            return error;
-        }
-        // For prewrite, stop sending other requests after receiving first error.
-        for(BatchKeys batchKeys : batchKeysList) {
-            String error = prewriteSingleBatch(backOffer, batchKeys);
-            if(error != null) {
-                //single to other thread error happened
-                prewriteTaskError = true;
-                LOG.warn("2PC doPrewriteActionOnBatches failed, send to other request: {}", error);
-                return error;
-            }
-        }
-        return null;
-    }
-
-    private String doCommitActionOnBatches(BackOffer backOffer, List<BatchKeys> batchKeysList) {
-        if(batchKeysList.size() == 1) {
-            String error = this.prewriteSingleBatch(backOffer, batchKeysList.get(0));
-            LOG.warn("2PC doCommitActionOnBatches failed, one batch size, error: {}", error);
-            return error;
-        }
-        // For prewrite, stop sending other requests after receiving first error.
-        for(BatchKeys batchKeys : batchKeysList) {
-            String error = prewriteSingleBatch(backOffer, batchKeys);
-            if(error != null) {
-                LOG.warn("2PC doCommitActionOnBatches failed, send to other request: {}", error);
-                return error;
-            }
-        }
-        return null;
-    }
-
-    private String doCleanupActionOnBatches(BackOffer backOffer, List<BatchKeys> batchKeysList) {
-        if(batchKeysList.size() == 1) {
-            String error = this.prewriteSingleBatch(backOffer, batchKeysList.get(0));
-            LOG.warn("2PC doCleanupActionOnBatches failed, one batch size, error: {}", error);
-            return error;
-        }
-        // For prewrite, stop sending other requests after receiving first error.
-        for(BatchKeys batchKeys : batchKeysList) {
-            String error = prewriteSingleBatch(backOffer, batchKeys);
-            if(error != null) {
-                //single to other thread error happened
-                prewriteTaskError = true;
-                LOG.warn("2PC doCleanupActionOnBatches failed, send to other request: {}", error);
-                return error;
-            }
-        }
-        return null;
-    }
-
-    public long keyValueSize(byte[] key) {
-        long size = key.length;
-        String keyStr = new String(key);
-        Kvrpcpb.Mutation mutation = this.mutations.get(keyStr);
-        if(mutation != null) {
-            size += mutation.getValue().toByteArray().length;
-        }
-
-        return size;
-    }
-
-    public long keyize(byte[] key) {
-        return key.length;
-    }
-
-    public String prewriteSingleBatch(BackOffer backOffer, BatchKeys batchKeys) {
-        List<byte[]> keyList = batchKeys.getKeys();
-        int batchSize = keyList.size();
-        List<Kvrpcpb.Mutation> mutationList = new ArrayList<>(batchSize);
-        for(byte[] key : keyList) {
-            mutationList.add(mutations.get(new String(key)));
-        }
-        return null;
-    }
-
-    public String commitSingleBatch(BackOffer backOffer, BatchKeys batchKeys) {
-
-        return null;
-    }
-
-    public String cleanupSingleBatch(BackOffer backOffer, BatchKeys batchKeys) {
-
-        return null;
+        return result;
     }
 
     /**
-     * 2pc - prewrite phase
+     * Cleanup request of 2pc
      * @param backOffer
-     * @param keys
+     * @param key
+     * @param startTs
+     * @param regionId
      * @return
      */
-    public String prewriteKeys(BackOffer backOffer, byte[][] keys) {
-
-        return this.doActionOnKeys(backOffer, TwoPhaseCommitType.actionPrewrite, keys);
+    public boolean cleanup(BackOffer backOffer, byte[] key, long startTs, long regionId) {
+        try {
+            Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
+            TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
+            //send rpc request to tikv server
+            client.cleanup(backOffer, ByteString.copyFrom(key), startTs);
+            return true;
+        } catch (final TiKVException e) {
+            LOG.error("Cleanup process error, retry end, key={}, startTs={}, regionId=%s", new String(key), startTs, regionId);
+            return false;
+        }
     }
 
     /**
-     * 2pc - commit phase
+     * Request for batch rollback on TiKV, retry operation should be deal with Caller
      * @param backOffer
      * @param keys
+     * @param startTs
+     * @param regionId
      * @return
      */
-    public String commitKeys(BackOffer backOffer, byte[][] keys) {
-
-        return this.doActionOnKeys(backOffer, TwoPhaseCommitType.actionCommit, keys);
+    public ClientRPCResult batchRollbackReq(BackOffer backOffer, byte[][] keys, long startTs, long regionId) {
+        ClientRPCResult result = new ClientRPCResult(true, false, null);
+        List<ByteString> byteList = Lists.newArrayList();
+        for(byte[] key : keys) {
+            byteList.add(ByteString.copyFrom(key));
+        }
+        try {
+            Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
+            TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
+            //send request
+            client.batchRollback(backOffer, byteList, startTs);
+        } catch (final Exception e) {
+            result.setSuccess(false);
+            result.setRetry(e instanceof RegionException);//mark retryable, region error, should retry prewrite again
+            result.setError(e.getMessage());
+        }
+        return result;
     }
 
     /**
-     * 2pc - cleanup phase
-     * @param backOffer
-     * @param keys
+     * Get value of key from TiKV
+     * @param key
      * @return
      */
-    public String cleanupKeys(BackOffer backOffer, byte[][] keys) {
+    public byte[] get(byte[] key) {
+        ByteString byteKey = ByteString.copyFrom(key);
+        BackOffer bo = ConcreteBackOffer.newGetBackOff();
+        long version = 0;
+        ByteString value = null;
+        try {
+            Pair<TiRegion,Metapb.Store> region = regionManager.getRegionStorePairByKey(byteKey);
+            TxnRegionStoreClient client = TxnRegionStoreClient.create(region.first, region.second, session);
+            version =  getTimestamp().getVersion();
+            value = client.get(bo, byteKey, version);
+        } catch (final TiKVException | StatusRuntimeException e) {
+            LOG.error("Get process error, key={}, version={}", new String(key), version);
+        }
 
-        return this.doActionOnKeys(backOffer, TwoPhaseCommitType.actionCleanup, keys);
+        return value != null ? value.toByteArray() : new byte[0];
+    }
+
+    /**
+     * Put a new key-value pair to TiKV
+     * @param key
+     * @param value
+     * @return
+     */
+    public boolean put(byte[] key, byte[] value) {
+        boolean putResult = false;
+        ByteString byteKey = ByteString.copyFrom(key);
+        ByteString byteValue = ByteString.copyFrom(value);
+        BackOffer bo = ConcreteBackOffer.newCustomBackOff(BackOffer.prewriteMaxBackoff);
+        List<Kvrpcpb.Mutation> mutations = Lists.newArrayList(
+                Kvrpcpb.Mutation.newBuilder()
+                        .setKey(byteKey).setValue(byteValue).setOp(Kvrpcpb.Op.Put)
+                        .build()
+        );
+        long lockTTL = 2000;
+        long startTS;
+        TiRegion region = regionManager.getRegionByKey(byteKey);
+        boolean prewrite = false;
+        while(true) {
+            try {
+                startTS = this.getTimestamp().getVersion();
+                ClientRPCResult prewriteResp = this.prewrite(bo, mutations, key, lockTTL, startTS, region.getId());
+                if(prewriteResp.isSuccess() || (!prewriteResp.isSuccess() && !prewriteResp.isRetry())) {
+                    if(prewriteResp.isSuccess()) {
+                        prewrite = true;
+                    }
+                    break;
+                }
+                LOG.error("Put process error, prewrite try next time, error={}", prewriteResp.getError());
+                bo.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new TiKVException(prewriteResp.getError()));
+            } catch (final TiKVException e) {
+                LOG.error("Put process error, 2pc prewrite failed,", e);
+            }
+        }
+        if(prewrite) {
+            long commitTs;
+            byte[][] keys = new byte[1][];
+            keys[0] = key;
+            while(true) {
+                try {
+                    commitTs = this.getTimestamp().getVersion();
+                    region = regionManager.getRegionByKey(byteKey);
+                    ClientRPCResult commitResp = this.commit(bo, keys, startTS, commitTs, region.getId());
+                    if(commitResp.isSuccess() || (!commitResp.isSuccess() && !commitResp.isRetry())) {
+                        if(commitResp.isSuccess()) {
+                            putResult = true;
+                        }
+                        break;
+                    }
+                    LOG.error("Put process failed, commit try next time, error={}", commitResp.getError());
+                    bo.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new TiKVException(commitResp.getError()));
+                } catch (final TiKVException e) {
+                    LOG.error("Put process error, 2pc commit failed,", e);
+                }
+            }
+        }
+        return putResult;
+    }
+
+    /**
+     * Delete a key value from TiKV
+     * @param key the key will be deleted
+     */
+    public boolean delete(byte[] key) {
+        boolean putResult = false;
+        ByteString byteKey = ByteString.copyFrom(key);
+        BackOffer bo = ConcreteBackOffer.newCustomBackOff(BackOffer.prewriteMaxBackoff);
+        List<Kvrpcpb.Mutation> mutations = Lists.newArrayList(
+                Kvrpcpb.Mutation.newBuilder()
+                        .setKey(byteKey).setOp(Kvrpcpb.Op.Del)
+                        .build()
+        );
+        long lockTTL = 2000;
+        long startTS;
+        TiRegion region = regionManager.getRegionByKey(byteKey);
+        boolean prewrite = false;
+        while(true) {
+            try {
+                startTS = this.getTimestamp().getVersion();
+                ClientRPCResult prewriteResp = this.prewrite(bo, mutations, key, lockTTL, startTS, region.getId());
+                if(prewriteResp.isSuccess() || (!prewriteResp.isSuccess() && !prewriteResp.isRetry())) {
+                    if(prewriteResp.isSuccess()) {
+                        prewrite = true;
+                    }
+                    break;
+                }
+                LOG.error("Delete process error, prewrite try next time, error={}", prewriteResp.getError());
+                bo.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new TiKVException(prewriteResp.getError()));
+            } catch (final TiKVException e) {
+                LOG.error("Delete process error, 2pc prewrite failed,", e);
+            }
+        }
+        if(prewrite) {
+            long commitTs;
+            byte[][] keys = new byte[1][];
+            keys[0] = key;
+            while(true) {
+                try {
+                    commitTs = this.getTimestamp().getVersion();
+                    region = regionManager.getRegionByKey(byteKey);
+                    ClientRPCResult commitResp = this.commit(bo, keys, startTS, commitTs, region.getId());
+                    if(commitResp.isSuccess() || (!commitResp.isSuccess() && !commitResp.isRetry())) {
+                        if(commitResp.isSuccess()) {
+                            putResult = true;
+                        }
+                        break;
+                    }
+                    LOG.error("Delete process failed, commit try next time, error={}", commitResp.getError());
+                    bo.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new TiKVException(commitResp.getError()));
+                } catch (final TiKVException e) {
+                    LOG.error("Put process error, 2pc commit failed,", e);
+                }
+            }
+        }
+        return putResult;
+    }
+
+    /**
+     * Scan key-value pair from TiKV
+     * @param startKey start key
+     * @param limit max limit count
+     * @return
+     */
+    public List<Pair<byte[], byte[]>> scan(byte[] startKey, int limit) {
+        ByteString byteKey = ByteString.copyFrom(startKey);
+        long version = getTimestamp().getVersion();
+        ConcreteScanIterator iterator = new ConcreteScanIterator(byteKey, session, version);
+        List<Pair<byte[], byte[]>> result = new LinkedList<>();
+        int count = 0;
+        while(iterator.hasNext() && count ++ < limit) {
+            Kvrpcpb.KvPair pair = iterator.next();
+            result.add(Pair.create(pair.getKey().toByteArray(), pair.getValue().toByteArray()));
+        }
+        return result;
+    }
+
+    private BackOffer defaultBackOff() {
+        return ConcreteBackOffer.newCustomBackOff(1000);
+    }
+
+    @Override
+    public void close() throws Exception {
+        session.close();
     }
 }

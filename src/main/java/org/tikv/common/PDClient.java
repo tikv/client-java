@@ -16,6 +16,8 @@
 package org.tikv.common;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.tikv.common.operation.PDErrorHandler.getRegionResponseErrorExtractor;
+import static org.tikv.common.pd.PDError.buildFromPdpbError;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
@@ -30,6 +32,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.GrpcException;
@@ -39,6 +42,7 @@ import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.PDErrorHandler;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.FutureObserver;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.PDGrpc;
@@ -46,6 +50,7 @@ import org.tikv.kvproto.PDGrpc.PDBlockingStub;
 import org.tikv.kvproto.PDGrpc.PDStub;
 import org.tikv.kvproto.Pdpb.*;
 
+/** PDClient is thread-safe and suggested to be shared threads */
 public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     implements ReadOnlyPDClient {
   private RequestHeader header;
@@ -59,7 +64,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     Supplier<TsoRequest> request = () -> tsoReq;
 
     PDErrorHandler<TsoResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(
+            r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
+            this);
 
     TsoResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_TSO, request, handler);
     Timestamp timestamp = resp.getTimestamp();
@@ -69,7 +76,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   @Override
   public TiRegion getRegionByKey(BackOffer backOffer, ByteString key) {
     Supplier<GetRegionRequest> request;
-    if (conf.getKvMode().equalsIgnoreCase("RAW")) {
+    if (conf.getKvMode() == KVMode.RAW) {
       request = () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
     } else {
       CodecDataOutput cdo = new CodecDataOutput();
@@ -80,7 +87,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
 
     PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
 
     GetRegionResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_GET_REGION, request, handler);
     return new TiRegion(
@@ -106,7 +113,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
 
     PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
 
     callAsyncWithRetry(backOffer, PDGrpc.METHOD_GET_REGION, request, responseObserver, handler);
     return responseObserver.getFuture();
@@ -117,7 +124,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     Supplier<GetRegionByIDRequest> request =
         () -> GetRegionByIDRequest.newBuilder().setHeader(header).setRegionId(id).build();
     PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
 
     GetRegionResponse resp =
         callWithRetry(backOffer, PDGrpc.METHOD_GET_REGION_BY_ID, request, handler);
@@ -145,7 +152,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     Supplier<GetRegionByIDRequest> request =
         () -> GetRegionByIDRequest.newBuilder().setHeader(header).setRegionId(id).build();
     PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
 
     callAsyncWithRetry(
         backOffer, PDGrpc.METHOD_GET_REGION_BY_ID, request, responseObserver, handler);
@@ -157,7 +164,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     Supplier<GetStoreRequest> request =
         () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
     PDErrorHandler<GetStoreResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(
+            r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
+            this);
 
     GetStoreResponse resp = callWithRetry(backOffer, PDGrpc.METHOD_GET_STORE, request, handler);
     return resp.getStore();
@@ -171,7 +180,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     Supplier<GetStoreRequest> request =
         () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
     PDErrorHandler<GetStoreResponse> handler =
-        new PDErrorHandler<>(r -> r.getHeader().hasError() ? r.getHeader().getError() : null, this);
+        new PDErrorHandler<>(
+            r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
+            this);
 
     callAsyncWithRetry(backOffer, PDGrpc.METHOD_GET_STORE, request, responseObserver, handler);
     return responseObserver.getFuture();
@@ -187,8 +198,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
   }
 
-  public static ReadOnlyPDClient create(TiSession session) {
-    return createRaw(session);
+  public static ReadOnlyPDClient create(TiConfiguration conf, ChannelFactory channelFactory) {
+    return createRaw(conf, channelFactory);
   }
 
   @VisibleForTesting
@@ -239,7 +250,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   public GetMembersResponse getMembers(HostAndPort url) {
     try {
-      ManagedChannel probChan = session.getChannel(url.getHostText() + ":" + url.getPort());
+      ManagedChannel probChan = channelFactory.getChannel(url.getHostText() + ":" + url.getPort());
       PDGrpc.PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
       GetMembersRequest request =
           GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
@@ -271,7 +282,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
 
       // create new Leader
-      ManagedChannel clientChannel = session.getChannel(leaderUrlStr);
+      ManagedChannel clientChannel = channelFactory.getChannel(leaderUrlStr);
       leaderWrapper =
           new LeaderWrapper(
               leaderUrlStr,
@@ -322,13 +333,13 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         .withDeadlineAfter(getConf().getTimeout(), getConf().getTimeoutUnit());
   }
 
-  private PDClient(TiSession session) {
-    super(session);
+  private PDClient(TiConfiguration conf, ChannelFactory channelFactory) {
+    super(conf, channelFactory);
   }
 
   private void initCluster() {
     GetMembersResponse resp = null;
-    List<HostAndPort> pdAddrs = getSession().getConf().getPdAddrs();
+    List<HostAndPort> pdAddrs = getConf().getPdAddrs();
     for (HostAndPort u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
@@ -358,10 +369,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         TimeUnit.MINUTES);
   }
 
-  static PDClient createRaw(TiSession session) {
+  static PDClient createRaw(TiConfiguration conf, ChannelFactory channelFactory) {
     PDClient client = null;
     try {
-      client = new PDClient(session);
+      client = new PDClient(conf, channelFactory);
       client.initCluster();
     } catch (Exception e) {
       if (client != null) {
