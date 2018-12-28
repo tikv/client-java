@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.log4j.Logger;
 import org.tikv.common.ReadOnlyPDClient;
-import org.tikv.common.TiSession;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
@@ -42,13 +41,11 @@ import org.tikv.kvproto.Metapb.StoreState;
 public class RegionManager {
   private static final Logger logger = Logger.getLogger(RegionManager.class);
   private RegionCache cache;
-  private final ReadOnlyPDClient pdClient;
 
   // To avoid double retrieval, we used the async version of grpc
   // When rpc not returned, instead of call again, it wait for previous one done
   public RegionManager(ReadOnlyPDClient pdClient) {
     this.cache = new RegionCache(pdClient);
-    this.pdClient = pdClient;
   }
 
   public static class RegionCache {
@@ -73,7 +70,7 @@ public class RegionManager {
       }
 
       if (regionId == null) {
-        logger.debug("Key not find in keyToRegionIdCache:" + formatBytes(key));
+        logger.debug("Key not found in keyToRegionIdCache:" + formatBytes(key));
         TiRegion region = pdClient.getRegionByKey(ConcreteBackOffer.newGetBackOff(), key);
         if (!putRegion(region)) {
           throw new TiClientInternalException("Invalid Region: " + region.toString());
@@ -167,10 +164,6 @@ public class RegionManager {
     }
   }
 
-  public TiSession getSession() {
-    return pdClient.getSession();
-  }
-
   public TiRegion getRegionByKey(ByteString key) {
     return cache.getRegionByKey(key);
   }
@@ -210,15 +203,16 @@ public class RegionManager {
     cache.invalidateRegion(regionId);
   }
 
-  public boolean updateLeader(long regionId, long storeId) {
+  public boolean checkAndDropLeader(long regionId, long storeId) {
     TiRegion r = cache.regionCache.get(regionId);
     if (r != null) {
-      if (!r.switchPeer(storeId)) {
+      TiRegion r2 = r.withNewLeader(storeId);
+      // drop region cache using verId
+      cache.invalidateRegion(regionId);
+      if (r2.getLeader().getStoreId() != storeId) {
         // failed to switch leader, possibly region is outdated, we need to drop region cache from
         // regionCache
         logger.warn("Cannot find peer when updating leader (" + regionId + "," + storeId + ")");
-        // drop region cache using verId
-        cache.invalidateRegion(regionId);
         return false;
       }
     }
@@ -228,12 +222,11 @@ public class RegionManager {
   /**
    * Clears all cache when a TiKV server does not respond
    *
-   * @param regionId region's id
-   * @param storeId TiKV store's id
+   * @param region region
    */
-  public void onRequestFail(long regionId, long storeId) {
-    cache.invalidateRegion(regionId);
-    cache.invalidateAllRegionForStore(storeId);
+  public void onRequestFail(TiRegion region) {
+    cache.invalidateRegion(region.getId());
+    cache.invalidateAllRegionForStore(region.getLeader().getStoreId());
   }
 
   public void invalidateStore(long storeId) {

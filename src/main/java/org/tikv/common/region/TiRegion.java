@@ -19,10 +19,9 @@ package org.tikv.common.region;
 
 import com.google.protobuf.ByteString;
 import java.io.Serializable;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
+import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.KeyUtils;
@@ -36,19 +35,19 @@ import org.tikv.kvproto.Metapb.Region;
 
 public class TiRegion implements Serializable {
   private final Region meta;
-  private final Set<Long> unreachableStores;
-  private Peer peer;
+  private final Peer peer;
   private final IsolationLevel isolationLevel;
   private final Kvrpcpb.CommandPri commandPri;
+  private Kvrpcpb.Context cachedContext;
 
   public TiRegion(
       Region meta,
       Peer peer,
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
-      String kvMode) {
+      KVMode kvMode) {
     Objects.requireNonNull(meta, "meta is null");
-    this.meta = decodeRegion(meta, kvMode.equalsIgnoreCase("RAW"));
+    this.meta = decodeRegion(meta, kvMode == KVMode.RAW);
     if (peer == null || peer.getId() == 0) {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());
@@ -57,9 +56,20 @@ public class TiRegion implements Serializable {
     } else {
       this.peer = peer;
     }
-    this.unreachableStores = new HashSet<>();
     this.isolationLevel = isolationLevel;
     this.commandPri = commandPri;
+  }
+
+  private TiRegion(
+      Region meta, Peer peer, IsolationLevel isolationLevel, Kvrpcpb.CommandPri commandPri) {
+    this.meta = meta;
+    this.peer = peer;
+    this.isolationLevel = isolationLevel;
+    this.commandPri = commandPri;
+  }
+
+  private TiRegion withNewLeader(Peer p) {
+    return new TiRegion(this.meta, p, this.isolationLevel, this.commandPri);
   }
 
   private Region decodeRegion(Region region, boolean isRawRegion) {
@@ -103,11 +113,18 @@ public class TiRegion implements Serializable {
   }
 
   public Kvrpcpb.Context getContext() {
-    Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
-    builder.setIsolationLevel(this.isolationLevel);
-    builder.setPriority(this.commandPri);
-    builder.setRegionId(meta.getId()).setPeer(this.peer).setRegionEpoch(this.meta.getRegionEpoch());
-    return builder.build();
+    if (cachedContext == null) {
+      Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
+      builder.setIsolationLevel(this.isolationLevel);
+      builder.setPriority(this.commandPri);
+      builder
+          .setRegionId(this.meta.getId())
+          .setPeer(this.peer)
+          .setRegionEpoch(this.meta.getRegionEpoch());
+      cachedContext = builder.build();
+      return cachedContext;
+    }
+    return cachedContext;
   }
 
   public class RegionVerID {
@@ -133,17 +150,16 @@ public class TiRegion implements Serializable {
    * storeID.
    *
    * @param leaderStoreID is leader peer id.
-   * @return false if no peers matches the store id.
+   * @return a copy of current region with new leader store id
    */
-  public boolean switchPeer(long leaderStoreID) {
+  public TiRegion withNewLeader(long leaderStoreID) {
     List<Peer> peers = meta.getPeersList();
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
-        this.peer = p;
-        return true;
+        return withNewLeader(p);
       }
     }
-    return false;
+    return this;
   }
 
   public boolean contains(ByteString key) {

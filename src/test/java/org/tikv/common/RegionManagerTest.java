@@ -34,6 +34,7 @@ public class RegionManagerTest {
   private static final long CLUSTER_ID = 1024;
   private static final String LOCAL_ADDR = "127.0.0.1";
   private RegionManager mgr;
+  private TiSession session;
 
   @Before
   public void setup() throws IOException {
@@ -47,13 +48,14 @@ public class RegionManagerTest {
             GrpcUtils.makeMember(2, "http://" + LOCAL_ADDR + ":" + (server.port + 2))));
 
     TiConfiguration conf = TiConfiguration.createDefault("127.0.0.1:" + server.port);
-    TiSession session = TiSession.create(conf);
-    mgr = session.getRegionManager();
+    session = TiSession.create(conf);
+    mgr = new RegionManager(session.getPDClient());
   }
 
   @After
   public void tearDown() {
     server.stop();
+    session.close();
   }
 
   @Test
@@ -86,7 +88,7 @@ public class RegionManagerTest {
     try {
       mgr.getRegionByKey(searchKeyNotExists);
       fail();
-    } catch (Exception e) {
+    } catch (Exception ignored) {
     }
   }
 
@@ -116,7 +118,7 @@ public class RegionManagerTest {
             GrpcUtils.makeStore(
                 storeId,
                 testAddress,
-                Metapb.StoreState.Up,
+                StoreState.Up,
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
     Pair<TiRegion, Store> pair = mgr.getRegionStorePairByKey(searchKey);
@@ -169,7 +171,7 @@ public class RegionManagerTest {
             GrpcUtils.makeStore(
                 storeId,
                 testAddress,
-                Metapb.StoreState.Up,
+                StoreState.Up,
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
     Store store = mgr.getStoreById(storeId);
@@ -190,7 +192,7 @@ public class RegionManagerTest {
     try {
       mgr.getStoreById(storeId);
       fail();
-    } catch (Exception e) {
+    } catch (Exception ignored) {
     }
   }
 }
