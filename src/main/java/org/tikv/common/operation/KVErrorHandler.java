@@ -96,13 +96,13 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         // if there's current no leader, we do not trigger update pd cache logic
         // since issuing store = NO_LEADER_STORE_ID requests to pd will definitely fail.
         if (newStoreId != NO_LEADER_STORE_ID) {
-          if (!this.regionManager.updateLeader(ctxRegion.getId(), newStoreId)
+          if (!this.regionManager.checkAndDropLeader(ctxRegion.getId(), newStoreId)
               || !recv.onNotLeader(this.regionManager.getStoreById(newStoreId))) {
             // If update leader fails, we need to fetch new region info from pd,
             // and re-split key range for new region. Setting retry to false will
             // stop retry and enter handleCopResponse logic, which would use RegionMiss
             // backOff strategy to wait, fetch new region and re-split key range.
-            // onNotLeader is only needed when updateLeader succeeds, thus switch
+            // onNotLeader is only needed when checkAndDropLeader succeeds, thus switch
             // to a new store address.
             retry = false;
           }
@@ -181,7 +181,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
 
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
-    regionManager.onRequestFail(ctxRegion.getId(), ctxRegion.getLeader().getStoreId());
+    regionManager.onRequestFail(ctxRegion);
 
     backOffer.doBackOff(
         BackOffFunction.BackOffFuncType.BoTiKVRPC,
