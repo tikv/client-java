@@ -96,10 +96,10 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private void batchPut(BackOffer backOffer, Map<ByteString, ByteString> kvPairs) {
-    Map<Long, List<ByteString>> groupKeys = groupKeysByRegion(kvPairs.keySet());
+    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(kvPairs.keySet());
     List<Batch> batches = new ArrayList<>();
 
-    for (Map.Entry<Long, List<ByteString>> entry : groupKeys.entrySet()) {
+    for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
       appendBatches(
           batches,
           entry.getKey(),
@@ -176,12 +176,12 @@ public class RawKVClient implements AutoCloseable {
 
   /** A Batch containing the region, a list of keys and/or values to send */
   private final class Batch {
-    private final long regionId;
+    private final TiRegion region;
     private final List<ByteString> keys;
     private final List<ByteString> values;
 
-    public Batch(long regionId, List<ByteString> keys, List<ByteString> values) {
-      this.regionId = regionId;
+    public Batch(TiRegion region, List<ByteString> keys, List<ByteString> values) {
+      this.region = region;
       this.keys = keys;
       this.values = values;
     }
@@ -191,14 +191,14 @@ public class RawKVClient implements AutoCloseable {
    * Append batch to list and split them according to batch limit
    *
    * @param batches a grouped batch
-   * @param regionId region
+   * @param region region
    * @param keys keys
    * @param values values
    * @param limit batch max limit
    */
   private void appendBatches(
       List<Batch> batches,
-      long regionId,
+      TiRegion region,
       List<ByteString> keys,
       List<ByteString> values,
       int limit) {
@@ -206,7 +206,7 @@ public class RawKVClient implements AutoCloseable {
     List<ByteString> tmpValues = new ArrayList<>();
     for (int i = 0; i < keys.size(); i++) {
       if (i >= limit) {
-        batches.add(new Batch(regionId, tmpKeys, tmpValues));
+        batches.add(new Batch(region, tmpKeys, tmpValues));
         tmpKeys.clear();
         tmpValues.clear();
       }
@@ -214,7 +214,7 @@ public class RawKVClient implements AutoCloseable {
       tmpValues.add(values.get(i));
     }
     if (!tmpKeys.isEmpty()) {
-      batches.add(new Batch(regionId, tmpKeys, tmpValues));
+      batches.add(new Batch(region, tmpKeys, tmpValues));
     }
   }
 
@@ -224,14 +224,14 @@ public class RawKVClient implements AutoCloseable {
    * @param keys keys
    * @return a mapping of keys and their region
    */
-  private Map<Long, List<ByteString>> groupKeysByRegion(Set<ByteString> keys) {
-    Map<Long, List<ByteString>> groups = new HashMap<>();
+  private Map<TiRegion, List<ByteString>> groupKeysByRegion(Set<ByteString> keys) {
+    Map<TiRegion, List<ByteString>> groups = new HashMap<>();
     TiRegion lastRegion = null;
     for (ByteString key : keys) {
       if (lastRegion == null || !lastRegion.contains(key)) {
         lastRegion = clientBuilder.getRegionManager().getRegionByKey(key);
       }
-      groups.computeIfAbsent(lastRegion.getId(), k -> new ArrayList<>()).add(key);
+      groups.computeIfAbsent(lastRegion, k -> new ArrayList<>()).add(key);
     }
     return groups;
   }
@@ -255,7 +255,7 @@ public class RawKVClient implements AutoCloseable {
     for (Batch batch : batches) {
       completionService.submit(
           () -> {
-            RegionStoreClient client = clientBuilder.build(batch.regionId);
+            RegionStoreClient client = clientBuilder.build(batch.region);
             BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
             List<Kvrpcpb.KvPair> kvPairs = new ArrayList<>();
             for (int i = 0; i < batch.keys.size(); i++) {

@@ -469,9 +469,9 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
       return build(pair.first, pair.second);
     }
 
-    public RegionStoreClient build(long regionId) {
-      Pair<TiRegion, Store> pair = regionManager.getRegionStorePairByRegionId(regionId);
-      return build(pair.first, pair.second);
+    public RegionStoreClient build(TiRegion region) {
+      Store store = regionManager.getStoreById(region.getLeader().getStoreId());
+      return build(region, store);
     }
 
     public RegionManager getRegionManager() {
