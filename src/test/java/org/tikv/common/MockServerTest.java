@@ -1,11 +1,9 @@
 package org.tikv.common;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import org.junit.After;
 import org.junit.Before;
 import org.tikv.common.region.TiRegion;
-import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
@@ -52,10 +50,6 @@ public class MockServerTest {
   @After
   public void tearDown() throws Exception {
     server.stop();
-  }
-
-  @VisibleForTesting
-  protected static Coprocessor.KeyRange createByteStringRange(ByteString sKey, ByteString eKey) {
-    return Coprocessor.KeyRange.newBuilder().setStart(sKey).setEnd(eKey).build();
+    session.close();
   }
 }
