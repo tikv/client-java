@@ -3,6 +3,7 @@ package org.tikv.common;
 import com.google.protobuf.ByteString;
 import org.junit.After;
 import org.junit.Before;
+import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
@@ -38,7 +39,8 @@ public class MockServerTest {
             .build();
 
     region =
-        new TiRegion(r, r.getPeers(0), Kvrpcpb.IsolationLevel.RC, Kvrpcpb.CommandPri.Low, "KV");
+        new TiRegion(
+            r, r.getPeers(0), Kvrpcpb.IsolationLevel.RC, Kvrpcpb.CommandPri.Low, KVMode.TXN);
     pdServer.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
     server = new KVMockServer();
     port = server.start(region);

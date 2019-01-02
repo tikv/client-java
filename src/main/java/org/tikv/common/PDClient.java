@@ -32,6 +32,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.GrpcException;
@@ -75,7 +76,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   @Override
   public TiRegion getRegionByKey(BackOffer backOffer, ByteString key) {
     Supplier<GetRegionRequest> request;
-    if (conf.getKvMode().equalsIgnoreCase("RAW")) {
+    if (conf.getKvMode() == KVMode.RAW) {
       request = () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
     } else {
       CodecDataOutput cdo = new CodecDataOutput();
