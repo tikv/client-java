@@ -22,7 +22,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import java.util.ArrayList;
@@ -71,10 +70,13 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
   private static final Logger logger = Logger.getLogger(RegionStoreClient.class);
   private TiRegion region;
   private final RegionManager regionManager;
-
-
-  @VisibleForTesting private final LockResolverClient lockResolverClient;
-
+  // TODO: change from public to private
+  // because our test needs to implement the
+  // preWrite and commit which needs to use
+  // lockResolverClient, after implements the
+  // write implementation of tispark, we can change
+  // it to private
+  public final LockResolverClient lockResolverClient;
   private TikvBlockingStub blockingStub;
   private TikvStub asyncStub;
 
@@ -85,6 +87,9 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
   // APIs for KV Scan/Put/Get/Delete
   public ByteString get(BackOffer backOffer, ByteString key, long version) {
     while (true) {
+      // we should refresh region
+      region = regionManager.getRegionByKey(key);
+
       Supplier<GetRequest> factory =
           () ->
               GetRequest.newBuilder()
@@ -105,9 +110,6 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
       if (getHelper(backOffer, resp)) {
         return resp.getValue();
       }
-
-      // we should refresh region
-      region = regionManager.getRegionByKey(key);
     }
   }
 
