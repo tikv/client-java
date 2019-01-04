@@ -15,57 +15,84 @@
 
 package org.tikv.common;
 
-import com.google.common.annotations.VisibleForTesting;
+import com.google.common.net.HostAndPort;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.tikv.common.region.RegionManager;
-import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
-import org.tikv.common.util.ChannelFactory;
-import org.tikv.raw.RawKVClient;
 
-/**
- * TiSession is the holder for PD Client, Store pdClient and PD Cache All sessions share common
- * region store connection pool but separated PD conn and cache for better concurrency TiSession is
- * thread-safe but it's also recommended to have multiple session avoiding lock contention
- */
 public class TiSession implements AutoCloseable {
+  private static final Map<String, ManagedChannel> connPool = new HashMap<>();
   private final TiConfiguration conf;
-  private final PDClient pdClient;
-  private final ChannelFactory channelFactory;
+  // below object creation is either heavy or making connection (pd), pending for lazy loading
+  private volatile RegionManager regionManager;
+  private volatile PDClient client;
 
   public TiSession(TiConfiguration conf) {
     this.conf = conf;
-    this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
-    this.pdClient = PDClient.createRaw(conf, channelFactory);
   }
 
   public TiConfiguration getConf() {
     return conf;
   }
 
+  public PDClient getPDClient() {
+    PDClient res = client;
+    if (res == null) {
+      synchronized (this) {
+        if (client == null) {
+          client = PDClient.createRaw(this);
+        }
+        res = client;
+      }
+    }
+    return res;
+  }
+
+  public synchronized RegionManager getRegionManager() {
+    RegionManager res = regionManager;
+    if (res == null) {
+      synchronized (this) {
+        if (regionManager == null) {
+          regionManager = new RegionManager(getPDClient());
+        }
+        res = regionManager;
+      }
+    }
+    return res;
+  }
+
+  public synchronized ManagedChannel getChannel(String addressStr) {
+    ManagedChannel channel = connPool.get(addressStr);
+    if (channel == null) {
+      HostAndPort address;
+      try {
+        address = HostAndPort.fromString(addressStr);
+      } catch (Exception e) {
+        throw new IllegalArgumentException("failed to form address");
+      }
+
+      // Channel should be lazy without actual connection until first call
+      // So a coarse grain lock is ok here
+      channel =
+          ManagedChannelBuilder.forAddress(address.getHostText(), address.getPort())
+              .maxInboundMessageSize(conf.getMaxFrameSize())
+              .usePlaintext(true)
+              .idleTimeout(60, TimeUnit.SECONDS)
+              .build();
+      connPool.put(addressStr, channel);
+    }
+    return channel;
+  }
+
   public static TiSession create(TiConfiguration conf) {
     return new TiSession(conf);
   }
 
-  public RawKVClient createRawClient() {
-    // Create new Region Manager avoiding thread contentions
-    RegionManager regionMgr = new RegionManager(pdClient);
-    RegionStoreClientBuilder builder =
-        new RegionStoreClientBuilder(conf, channelFactory, regionMgr);
-    return new RawKVClient(conf, builder);
-  }
-
-  @VisibleForTesting
-  public PDClient getPDClient() {
-    return pdClient;
-  }
-
-  @VisibleForTesting
-  public ChannelFactory getChannelFactory() {
-    return channelFactory;
-  }
-
   @Override
   public void close() {
-    pdClient.close();
-    channelFactory.close();
+    getPDClient().close();
   }
 }

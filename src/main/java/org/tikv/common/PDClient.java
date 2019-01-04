@@ -32,7 +32,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.GrpcException;
@@ -42,7 +41,6 @@ import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.PDErrorHandler;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
-import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.FutureObserver;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.PDGrpc;
@@ -50,7 +48,6 @@ import org.tikv.kvproto.PDGrpc.PDBlockingStub;
 import org.tikv.kvproto.PDGrpc.PDStub;
 import org.tikv.kvproto.Pdpb.*;
 
-/** PDClient is thread-safe and suggested to be shared threads */
 public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     implements ReadOnlyPDClient {
   private RequestHeader header;
@@ -76,7 +73,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   @Override
   public TiRegion getRegionByKey(BackOffer backOffer, ByteString key) {
     Supplier<GetRegionRequest> request;
-    if (conf.getKvMode() == KVMode.RAW) {
+    if (conf.getKvMode().equalsIgnoreCase("RAW")) {
       request = () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
     } else {
       CodecDataOutput cdo = new CodecDataOutput();
@@ -198,8 +195,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
   }
 
-  public static ReadOnlyPDClient create(TiConfiguration conf, ChannelFactory channelFactory) {
-    return createRaw(conf, channelFactory);
+  public static ReadOnlyPDClient create(TiSession session) {
+    return createRaw(session);
   }
 
   @VisibleForTesting
@@ -250,7 +247,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   public GetMembersResponse getMembers(HostAndPort url) {
     try {
-      ManagedChannel probChan = channelFactory.getChannel(url.getHostText() + ":" + url.getPort());
+      ManagedChannel probChan = session.getChannel(url.getHostText() + ":" + url.getPort());
       PDGrpc.PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
       GetMembersRequest request =
           GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
@@ -282,7 +279,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
 
       // create new Leader
-      ManagedChannel clientChannel = channelFactory.getChannel(leaderUrlStr);
+      ManagedChannel clientChannel = session.getChannel(leaderUrlStr);
       leaderWrapper =
           new LeaderWrapper(
               leaderUrlStr,
@@ -333,13 +330,13 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         .withDeadlineAfter(getConf().getTimeout(), getConf().getTimeoutUnit());
   }
 
-  private PDClient(TiConfiguration conf, ChannelFactory channelFactory) {
-    super(conf, channelFactory);
+  private PDClient(TiSession session) {
+    super(session);
   }
 
   private void initCluster() {
     GetMembersResponse resp = null;
-    List<HostAndPort> pdAddrs = getConf().getPdAddrs();
+    List<HostAndPort> pdAddrs = getSession().getConf().getPdAddrs();
     for (HostAndPort u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
@@ -369,10 +366,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         TimeUnit.MINUTES);
   }
 
-  static PDClient createRaw(TiConfiguration conf, ChannelFactory channelFactory) {
+  static PDClient createRaw(TiSession session) {
     PDClient client = null;
     try {
-      client = new PDClient(conf, channelFactory);
+      client = new PDClient(session);
       client.initCluster();
     } catch (Exception e) {
       if (client != null) {

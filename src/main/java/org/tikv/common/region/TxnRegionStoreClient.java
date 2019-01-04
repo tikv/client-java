@@ -186,7 +186,7 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
     }
 
 
-    // TODO: batch get should consider key range split
+
     public List<Kvrpcpb.KvPair> batchGet(BackOffer backOffer, Iterable<ByteString> keys, long version) {
         while(true) {
             Supplier<BatchGetRequest> request =
@@ -210,7 +210,7 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         }
     }
 
-    // TODO: deal with resolve locks and region errors
+
     private boolean batchGetHelper(BackOffer bo, BatchGetResponse resp) {
         List<Lock> locks = new ArrayList<>();
 
@@ -232,17 +232,17 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
                 bo.doBackOff(BoTxnLockFast, new KeyException((resp.getPairsList().get(0).getError())));
             }
 
-            // TODO: we should retry
-            // fix me
+
             return false;
         }
 
         if (resp.hasRegionError()) {
-            // TODO, we should redo the split and redo the batchGet
+
             throw new RegionException(resp.getRegionError());
         }
         return true;
     }
+
 
     public void deleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
         while(true) {
@@ -302,10 +302,8 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         return scanHelper(resp, backOffer);
     }
 
-    // TODO: remove helper and change to while style
-    // needs to be fixed as batchGet
-    // which we shoule retry not throw
-    // exception
+
+
     private List<KvPair> scanHelper(ScanResponse resp, BackOffer bo) {
         if (resp == null) {
             this.regionManager.onRequestFail(region);
@@ -332,8 +330,7 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
                 bo.doBackOff(BoTxnLockFast, new KeyException((resp.getPairsList().get(0).getError())));
             }
 
-            // TODO: we should retry
-            // fix me
+
         }
         if (resp.hasRegionError()) {
             throw new RegionException(resp.getRegionError());
