@@ -56,7 +56,6 @@ public class PDClientTest {
 
   @After
   public void tearDown() {
-    session.close();
     server.stop();
   }
 

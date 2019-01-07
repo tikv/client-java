@@ -16,27 +16,28 @@
 package org.tikv.common.operation.iterator;
 
 import com.google.protobuf.ByteString;
-import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
 import org.tikv.common.region.RegionStoreClient;
-import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Metapb;
 
 public class ConcreteScanIterator extends ScanIterator {
   private final long version;
 
-  public ConcreteScanIterator(
-      TiConfiguration conf, RegionStoreClientBuilder builder, ByteString startKey, long version) {
+  public ConcreteScanIterator(ByteString startKey, TiSession session, long version) {
     // Passing endKey as ByteString.EMPTY means that endKey is +INF by default,
-    super(conf, builder, startKey, ByteString.EMPTY, Integer.MAX_VALUE);
+    super(startKey, ByteString.EMPTY, Integer.MAX_VALUE, session);
     this.version = version;
   }
 
   TiRegion loadCurrentRegionToCache() throws Exception {
-    TiRegion region;
-    try (RegionStoreClient client = builder.build(startKey)) {
-      region = client.getRegion();
+    Pair<TiRegion, Metapb.Store> pair = regionCache.getRegionStorePairByKey(startKey);
+    TiRegion region = pair.first;
+    Metapb.Store store = pair.second;
+    try (RegionStoreClient client = RegionStoreClient.create(region, store, session)) {
       BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
       currentCache = client.scan(backOffer, startKey, version);
       return region;
