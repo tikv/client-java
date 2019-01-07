@@ -22,6 +22,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import java.util.ArrayList;
@@ -70,13 +71,7 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
   private static final Logger logger = Logger.getLogger(RegionStoreClient.class);
   private TiRegion region;
   private final RegionManager regionManager;
-  // TODO: change from public to private
-  // because our test needs to implement the
-  // preWrite and commit which needs to use
-  // lockResolverClient, after implements the
-  // write implementation of tispark, we can change
-  // it to private
-  public final LockResolverClient lockResolverClient;
+  @VisibleForTesting private final LockResolverClient lockResolverClient;
   private TikvBlockingStub blockingStub;
   private TikvStub asyncStub;
 
