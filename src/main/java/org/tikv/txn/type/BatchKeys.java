@@ -36,4 +36,10 @@ public class BatchKeys {
     public void setRegioId(Long regioId) {
         this.regioId = regioId;
     }
+
+    public byte[][] getKeysArray() {
+        byte[][] result = new byte[keys.size()][];
+        keys.toArray(result);
+        return result;
+    }
 }

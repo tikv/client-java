@@ -40,4 +40,8 @@ public class TiTimestamp implements Serializable {
   public long getLogical() {
     return this.logical;
   }
+
+  public static long extraPhysical(long tso) {
+    return (tso >> PHYSICAL_SHIFT_BITS);
+  }
 }
