@@ -2,6 +2,7 @@ package org.tikv.txn;
 
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.tikv.common.region.TiRegion;
@@ -9,18 +10,30 @@ import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
 
+import java.io.InputStream;
 import java.security.SecureRandom;
 import java.util.List;
+import java.util.Properties;
 import java.util.function.Function;
 
 public class TxnKVClientTest {
 
     TxnKVClient txnClient;
 
+    final String configPath = "kv-config.properties";
+
+    Properties configPros;
+
     @Before
     public void setClient() {
         try {
-            txnClient = TxnKVClient.createClient("10.255.0.183:2479,10.255.0.105:2479,10.255.0.178:2479");
+            InputStream is = getClass().getClassLoader().getResourceAsStream(configPath);
+            this.configPros = new Properties();
+            this.configPros.load(is);
+            String pdAddress = this.configPros.getProperty("kv.pd.address");
+            System.out.println("pdAddress is: " + pdAddress);
+            Assert.assertNotNull("pd address should not null", pdAddress);
+            txnClient = TxnKVClient.createClient(pdAddress);
         } catch (Exception e) {
             System.out.println("Cannot initialize txn client. Test skipped.");
         }
