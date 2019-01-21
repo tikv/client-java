@@ -25,12 +25,12 @@ buildscript {
 sourceSets {
     main {
         proto {
-            srcDir './proto'
+            srcDir 'src/main/proto'
 			include '**/*.proto'
         }
         java {
             // include self written and generated code
-            srcDirs 'src/main/java', 'target/generated-sources/main/java'            
+            srcDirs 'src/main/java', 'target/generated-sources/main/java' , 'target/generated-sources/main/grpc-java'
         }
     }
 	test {
@@ -76,7 +76,6 @@ protobuf {
 
         // (Java only) returns tasks for a sourceSet
         ofSourceSet('main')
-
     }   
 }
 
@@ -103,14 +102,16 @@ dependencies {
     compile group: 'joda-time', name: 'joda-time', version:'2.9.9'
     compile group: 'org.joda', name: 'joda-convert', version:'1.9.2'
     testCompile group: 'io.grpc', name: 'grpc-testing', version:'1.7.0'
-    compile group: 'org.apache.logging.log4j', name: 'log4j-api', version:'2.8.1'
+    //remove unused hadoop dependencies
+    /*compile group: 'org.apache.logging.log4j', name: 'log4j-api', version:'2.8.1'
     compile group: 'org.apache.logging.log4j', name: 'log4j-core', version:'2.8.1'
     compile group: 'org.apache.spark', name: 'spark-core_2.11', version:'2.3.2'
     compile group: 'org.apache.spark', name: 'spark-catalyst_2.11', version:'2.3.2'
     compile group: 'org.apache.spark', name: 'spark-sql_2.11', version:'2.3.2'
     compile group: 'org.apache.spark', name: 'spark-hive_2.11', version:'2.3.2'
     compile group: 'org.apache.spark', name: 'spark-hive-thriftserver_2.11', version:'2.3.2'
-    compile group: 'org.apache.spark', name: 'spark-unsafe_2.11', version:'2.3.2'
+    compile group: 'org.apache.spark', name: 'spark-unsafe_2.11', version:'2.3.2'*/
+    compile group: 'org.apache.commons', name: 'commons-lang3', version:'3.5'
     compile group: 'org.slf4j', name: 'slf4j-api', version:'1.7.16'
     compile group: 'org.slf4j', name: 'slf4j-log4j12', version:'1.7.16'
     compile group: 'org.slf4j', name: 'jul-to-slf4j', version:'1.7.16'
@@ -120,7 +121,7 @@ dependencies {
 
 task updateProtoModule(type: Exec) {
     if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
-        commandLine 'cmd', '/c', './scripts/proto.sh'
+        commandLine 'cmd', './scripts/proto.sh'
     } else {
         commandLine 'sh', '-c', './scripts/proto.sh'
     }
@@ -133,13 +134,13 @@ compileJava << {
 task copyResources(type: Copy) {
 	includeEmptyDirs = false
 	copy {
-		from "./kvproto/vendor/github.com/gogo/protobuf/"
-		include "**/gogoproto/**"
-		into "./proto/"
+		from "./scripts/kvproto/include/"
+	    include "**/gogoproto/**"
+		into "src/main/proto"
 	}
 	copy {
-		from "./kvproto/proto/", "./raft-rs/proto/", "./tipb/proto"
-		into "./proto/"
+		from "./scripts/kvproto/proto/", "./scripts/raft-rs/proto/", "./scripts/tipb/proto"
+		into "src/main/proto"
 	}
 }
 
