@@ -82,9 +82,6 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
   // APIs for KV Scan/Put/Get/Delete
   public ByteString get(BackOffer backOffer, ByteString key, long version) {
     while (true) {
-      // we should refresh region
-      region = regionManager.getRegionByKey(key);
-
       Supplier<GetRequest> factory =
           () ->
               GetRequest.newBuilder()
@@ -105,6 +102,9 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
       if (getHelper(backOffer, resp)) {
         return resp.getValue();
       }
+
+      // we should refresh region
+      region = regionManager.getRegionByKey(key);
     }
   }
 
