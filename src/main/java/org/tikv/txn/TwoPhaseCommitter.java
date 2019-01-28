@@ -19,8 +19,6 @@ import org.tikv.txn.type.GroupKeyResult;
 import org.tikv.txn.type.TwoPhaseCommitType;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 2PC implementation of TiKV
@@ -191,7 +189,7 @@ public class TwoPhaseCommitter {
         if(keys == null || keys.length == 0) {
             return null;
         }
-        //split to groups
+        //groups keys by region
         GroupKeyResult groupResult = this.groupKeysByRegion(backOffer, keys);
         if(groupResult.hasError()) {
             return groupResult.getErrorMsg();
@@ -296,7 +294,7 @@ public class TwoPhaseCommitter {
 
     private String doCleanupActionOnBatches(BackOffer backOffer, List<BatchKeys> batchKeysList) {
         if(batchKeysList.size() == 1) {
-            return this.prewriteSingleBatch(backOffer, batchKeysList.get(0));
+            return this.cleanupSingleBatch(backOffer, batchKeysList.get(0));
             /*if(error != null) {
                 LOG.error("Txn 2PC doCleanupActionOnBatches failed, one batch size, error: {}", error);
             }
@@ -346,10 +344,10 @@ public class TwoPhaseCommitter {
         }
         //send rpc request to tikv server
         long regionId = batchKeys.getRegioId();
-        ClientRPCResult prewriteResult = this.kvClient.prewriteReq(backOffer, mutationList, primaryKey(),
+        ClientRPCResult prewriteResult = this.kvClient.prewrite(backOffer, mutationList, primaryKey(),
                 this.lockTTL, this.startTs, regionId);
         if(!prewriteResult.isSuccess() && !prewriteResult.isRetry()) {
-            return String.format("Txn prewriteSingleBatch error, regionId=%s", batchKeys.getKeys());
+            return prewriteResult.getError();
         }
         if(!prewriteResult.isSuccess() && prewriteResult.isRetry()) {
             try {
@@ -374,7 +372,7 @@ public class TwoPhaseCommitter {
         keysCommit.toArray(keys);
         //send rpc request to tikv server
         long regionId = batchKeys.getRegioId();
-        ClientRPCResult commitResult = this.kvClient.commitReq(backOffer, keys,
+        ClientRPCResult commitResult = this.kvClient.commit(backOffer, keys,
                 this.startTs, this.commitTs, regionId);
         if(!commitResult.isSuccess() && !commitResult.isRetry()) {
             String error = String.format("Txn commitSingleBatch error, regionId=%s", batchKeys.getRegioId());
@@ -472,12 +470,12 @@ public class TwoPhaseCommitter {
     }
 
     public boolean execute() {
-        BackOffer prewriteBackoff =ConcreteBackOffer.newCustomBackOff(3000);//ConcreteBackOffer.prewriteMaxBackoff
+        BackOffer prewriteBackoff = ConcreteBackOffer.newCustomBackOff(3000);//ConcreteBackOffer.prewriteMaxBackoff
         byte[][] keys = new byte[keysList.size()][];
         keysList.toArray(keys);
         String prewriteError = this.prewriteKeys(prewriteBackoff, keys);
         if(prewriteError != null) {
-            LOG.error("failed on prewrite, startTs={}, commitTs={}, detail={}", this.startTs, this.commitTs, prewriteError);
+            LOG.error("failed on prewrite, startTs={}, detail={}", this.startTs, prewriteError);
             return false;
         }
         TiTimestamp commitTso = kvClient.getTimestamp();
@@ -491,7 +489,7 @@ public class TwoPhaseCommitter {
             LOG.error("transaction takes too much time, startTs={}, commitTs={}", this.startTs, commitTso.getVersion());
             return false;
         }
-        BackOffer commitBackoff =ConcreteBackOffer.newCustomBackOff(BackOffer.commitMaxBackoff);
+        BackOffer commitBackoff = ConcreteBackOffer.newCustomBackOff(BackOffer.commitMaxBackoff);
         String commitError = this.commitKeys(commitBackoff, keys);
         if(commitError != null) {
             LOG.error("failed on commit, startTs={}, commitTs={}", this.startTs, commitError);

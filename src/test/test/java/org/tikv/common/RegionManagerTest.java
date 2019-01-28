@@ -116,7 +116,7 @@ public class RegionManagerTest {
             GrpcUtils.makeStore(
                 storeId,
                 testAddress,
-                StoreState.Up,
+                Metapb.StoreState.Up,
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
     Pair<TiRegion, Store> pair = mgr.getRegionStorePairByKey(searchKey);
@@ -169,7 +169,7 @@ public class RegionManagerTest {
             GrpcUtils.makeStore(
                 storeId,
                 testAddress,
-                StoreState.Up,
+                Metapb.StoreState.Up,
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
     Store store = mgr.getStoreById(storeId);

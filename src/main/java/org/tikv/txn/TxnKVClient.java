@@ -9,6 +9,7 @@ import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.iterator.ConcreteScanIterator;
@@ -25,6 +26,7 @@ import org.tikv.txn.type.ClientRPCResult;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * KV client of transaction
@@ -77,8 +79,12 @@ public class TxnKVClient implements AutoCloseable{
         return new TikvTransaction(this);
     }
 
+    public ITransaction begin(Function<ITransaction,Boolean> function) {
+        return new TikvTransaction(this, function);
+    }
+
     //add backoff logic when encountered region error,ErrBodyMissing, and other errors
-    public ClientRPCResult prewriteReq(BackOffer backOffer, List<Kvrpcpb.Mutation> mutations, byte[] primary, long lockTTL, long startTs, long regionId) {
+    public ClientRPCResult prewrite(BackOffer backOffer, List<Kvrpcpb.Mutation> mutations, byte[] primary, long lockTTL, long startTs, long regionId) {
         ClientRPCResult result = new ClientRPCResult(true, false, null);
         //send request
         Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
@@ -87,11 +93,9 @@ public class TxnKVClient implements AutoCloseable{
             client.prewrite(backOffer,  ByteString.copyFrom(primary), mutations, startTs, lockTTL);
         } catch (final TiKVException | StatusRuntimeException e) {
             result.setSuccess(false);
-            result.setRetry(!(e instanceof StatusRuntimeException));
+            result.setRetry(e instanceof RegionException);//mark retryable, region error, should retry prewrite again
             result.setError(e.getMessage());
         }
-        //backoff: region error
-        //resolve locks: encounter locks, resolve them
         return result;
     }
 
@@ -105,7 +109,7 @@ public class TxnKVClient implements AutoCloseable{
      * @param regionId
      * @return
      */
-    public ClientRPCResult commitReq(BackOffer backOffer, byte[][] keys, long startTs, long commitTs, long regionId) {
+    public ClientRPCResult commit(BackOffer backOffer, byte[][] keys, long startTs, long commitTs, long regionId) {
         ClientRPCResult result = new ClientRPCResult(true, false, null);
         //send request
         Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
@@ -118,11 +122,9 @@ public class TxnKVClient implements AutoCloseable{
             client.commit(backOffer, byteList, startTs, commitTs);
         } catch (final TiKVException | StatusRuntimeException e) {
             result.setSuccess(false);
-            result.setRetry(!(e instanceof StatusRuntimeException));
+            result.setRetry(e instanceof RegionException);//mark retryable, region error, should retry prewrite again
             result.setError(e.getMessage());
         }
-        //backoff: region error
-        //resolve locks: encounter locks, resolve them
         return result;
     }
 
@@ -134,29 +136,17 @@ public class TxnKVClient implements AutoCloseable{
      * @param regionId
      * @return
      */
-    public boolean cleanupReq(BackOffer backOffer, byte[] key, long startTs, long regionId) {
-        //send request
+    public boolean cleanup(BackOffer backOffer, byte[] key, long startTs, long regionId) {
         try {
-            while(true) {
-                try {
-                    Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
-                    TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
-                    client.cleanup(backOffer, ByteString.copyFrom(key), startTs);
-                    break;
-                } catch (final TiKVException | StatusRuntimeException e) {
-                    LOG.error("Cleanup process error, key={}, startTs={}, regionId=%s", new String(key), startTs, regionId);
-                    if(e instanceof StatusRuntimeException) {
-                        throw new TiKVException(String.format("Cleanup failed with retry error, status=%s", ((StatusRuntimeException) e).getStatus()));
-                    } else {
-                        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoTxnLock, e);
-                    }
-                }
-            }
+            Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
+            TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
+            //send rpc request to tikv server
+            client.cleanup(backOffer, ByteString.copyFrom(key), startTs);
+            return true;
         } catch (final TiKVException e) {
             LOG.error("Cleanup process error, retry end, key={}, startTs={}, regionId=%s", new String(key), startTs, regionId);
             return false;
         }
-        return true;
     }
 
     /**
@@ -169,7 +159,6 @@ public class TxnKVClient implements AutoCloseable{
      */
     public ClientRPCResult batchRollbackReq(BackOffer backOffer, byte[][] keys, long startTs, long regionId) {
         ClientRPCResult result = new ClientRPCResult(true, false, null);
-        //send request
         List<ByteString> byteList = Lists.newArrayList();
         for(byte[] key : keys) {
             byteList.add(ByteString.copyFrom(key));
@@ -177,10 +166,11 @@ public class TxnKVClient implements AutoCloseable{
         try {
             Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
             TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
+            //send request
             client.batchRollback(backOffer, byteList, startTs);
         } catch (final Exception e) {
             result.setSuccess(false);
-            result.setRetry(true);
+            result.setRetry(e instanceof RegionException);//mark retryable, region error, should retry prewrite again
             result.setError(e.getMessage());
         }
         return result;
@@ -196,21 +186,13 @@ public class TxnKVClient implements AutoCloseable{
         BackOffer bo = ConcreteBackOffer.newGetBackOff();
         long version = 0;
         ByteString value = null;
-        while(true) {
-            try {
-                Pair<TiRegion,Metapb.Store> region = regionManager.getRegionStorePairByKey(byteKey);
-                TxnRegionStoreClient client = TxnRegionStoreClient.create(region.first, region.second, session);
-                version =  getTimestamp().getVersion();
-                value = client.get(bo, byteKey, version);
-                break;
-            } catch (final TiKVException | StatusRuntimeException e) {
-                LOG.error("Get process error, key={}, version={}", new String(key), version);
-                if(e instanceof StatusRuntimeException) {
-                    throw new TiKVException(String.format("Get failed with retry error, status=%s", ((StatusRuntimeException) e).getStatus()));
-                } else {
-                    bo.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-                }
-            }
+        try {
+            Pair<TiRegion,Metapb.Store> region = regionManager.getRegionStorePairByKey(byteKey);
+            TxnRegionStoreClient client = TxnRegionStoreClient.create(region.first, region.second, session);
+            version =  getTimestamp().getVersion();
+            value = client.get(bo, byteKey, version);
+        } catch (final TiKVException | StatusRuntimeException e) {
+            LOG.error("Get process error, key={}, version={}", new String(key), version);
         }
 
         return value != null ? value.toByteArray() : new byte[0];
@@ -232,14 +214,14 @@ public class TxnKVClient implements AutoCloseable{
                         .setKey(byteKey).setValue(byteValue).setOp(Kvrpcpb.Op.Put)
                         .build()
         );
-        long lockTTL = 1000;
+        long lockTTL = 2000;
         long startTS;
         TiRegion region = regionManager.getRegionByKey(byteKey);
         boolean prewrite = false;
         while(true) {
             try {
                 startTS = this.getTimestamp().getVersion();
-                ClientRPCResult prewriteResp = this.prewriteReq(bo, mutations, key, lockTTL, startTS, region.getId());
+                ClientRPCResult prewriteResp = this.prewrite(bo, mutations, key, lockTTL, startTS, region.getId());
                 if(prewriteResp.isSuccess() || (!prewriteResp.isSuccess() && !prewriteResp.isRetry())) {
                     if(prewriteResp.isSuccess()) {
                         prewrite = true;
@@ -260,7 +242,7 @@ public class TxnKVClient implements AutoCloseable{
                 try {
                     commitTs = this.getTimestamp().getVersion();
                     region = regionManager.getRegionByKey(byteKey);
-                    ClientRPCResult commitResp = this.commitReq(bo, keys, startTS, commitTs, region.getId());
+                    ClientRPCResult commitResp = this.commit(bo, keys, startTS, commitTs, region.getId());
                     if(commitResp.isSuccess() || (!commitResp.isSuccess() && !commitResp.isRetry())) {
                         if(commitResp.isSuccess()) {
                             putResult = true;
@@ -281,24 +263,58 @@ public class TxnKVClient implements AutoCloseable{
      * Delete a key value from TiKV
      * @param key the key will be deleted
      */
-    public void delete(byte[] key) {
+    public boolean delete(byte[] key) {
+        boolean putResult = false;
         ByteString byteKey = ByteString.copyFrom(key);
-        BackOffer bo = ConcreteBackOffer.newGetBackOff();
+        BackOffer bo = ConcreteBackOffer.newCustomBackOff(BackOffer.prewriteMaxBackoff);
+        List<Kvrpcpb.Mutation> mutations = Lists.newArrayList(
+                Kvrpcpb.Mutation.newBuilder()
+                        .setKey(byteKey).setOp(Kvrpcpb.Op.Del)
+                        .build()
+        );
+        long lockTTL = 2000;
+        long startTS;
+        TiRegion region = regionManager.getRegionByKey(byteKey);
+        boolean prewrite = false;
         while(true) {
             try {
-                Pair<TiRegion, Metapb.Store> region = regionManager.getRegionStorePairByKey(byteKey);
-                TxnRegionStoreClient client = TxnRegionStoreClient.create(region.first, region.second, session);
-                client.delete(bo, byteKey);
-                break;
-            } catch (final TiKVException | StatusRuntimeException e) {
-                LOG.error("Delete process error, key={}, version={}", new String(key));
-                if(e instanceof StatusRuntimeException) {
-                    throw new TiKVException(String.format("Delete failed with retry error, status=%s", ((StatusRuntimeException) e).getStatus()));
-                } else {
-                    bo.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+                startTS = this.getTimestamp().getVersion();
+                ClientRPCResult prewriteResp = this.prewrite(bo, mutations, key, lockTTL, startTS, region.getId());
+                if(prewriteResp.isSuccess() || (!prewriteResp.isSuccess() && !prewriteResp.isRetry())) {
+                    if(prewriteResp.isSuccess()) {
+                        prewrite = true;
+                    }
+                    break;
+                }
+                LOG.error("Delete process error, prewrite try next time, error={}", prewriteResp.getError());
+                bo.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new TiKVException(prewriteResp.getError()));
+            } catch (final TiKVException e) {
+                LOG.error("Delete process error, 2pc prewrite failed,", e);
+            }
+        }
+        if(prewrite) {
+            long commitTs;
+            byte[][] keys = new byte[1][];
+            keys[0] = key;
+            while(true) {
+                try {
+                    commitTs = this.getTimestamp().getVersion();
+                    region = regionManager.getRegionByKey(byteKey);
+                    ClientRPCResult commitResp = this.commit(bo, keys, startTS, commitTs, region.getId());
+                    if(commitResp.isSuccess() || (!commitResp.isSuccess() && !commitResp.isRetry())) {
+                        if(commitResp.isSuccess()) {
+                            putResult = true;
+                        }
+                        break;
+                    }
+                    LOG.error("Delete process failed, commit try next time, error={}", commitResp.getError());
+                    bo.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new TiKVException(commitResp.getError()));
+                } catch (final TiKVException e) {
+                    LOG.error("Put process error, 2pc commit failed,", e);
                 }
             }
         }
+        return putResult;
     }
 
     /**

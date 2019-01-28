@@ -1,16 +1,17 @@
 package org.tikv.txn;
 
 import com.google.common.collect.Lists;
-import com.sun.corba.se.impl.orbutil.concurrent.ReentrantMutex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.Snapshot;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
 
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Transaction implementation of TiKV client
@@ -32,7 +33,7 @@ public class TikvTransaction implements ITransaction {
      */
     private boolean valid;
 
-    private ReentrantMutex mutex = new ReentrantMutex();
+    //private ReentrantMutex mutex = new ReentrantMutex();
 
     private Map<byte[], byte[]> memoryKvStore = new HashMap<>();
 
@@ -40,13 +41,30 @@ public class TikvTransaction implements ITransaction {
 
     private Snapshot snapshot;
 
+    private final Function<ITransaction, Boolean> transactionFunction;
+
+    private static final int retryBackOffCap = 100;
+    private static final int retryBackOffBase = 1;
+    private static final int maxRetryCnt = 100;
+
+    private SecureRandom random = new SecureRandom();
+
     public TikvTransaction(TxnKVClient client) {
+        this(client, null);
+    }
+
+    public TikvTransaction(TxnKVClient client, Function<ITransaction, Boolean> function) {
         this.kvClient = client;
+        this.startTime = System.currentTimeMillis();
+        this.transactionFunction = function;
         this.lockKeys = Lists.newLinkedList();
+        this.init(client);
+    }
+
+    private void init(TxnKVClient client) {
         this.valid = true;
         TiTimestamp tiTimestamp = kvClient.getTimestamp();
         this.startTS = tiTimestamp.getVersion();
-        this.startTime = System.currentTimeMillis();
         this.snapshot = new Snapshot(tiTimestamp, client.getSession());
     }
 
@@ -72,11 +90,44 @@ public class TikvTransaction implements ITransaction {
 
     @Override
     public boolean commit() {
-        TwoPhaseCommitter committer = new TwoPhaseCommitter(this);
-        // latches enabled
-        // for transactions which need to acquire latchess
-        //TODO latch ??
-        return committer.execute();
+        boolean result;
+        if(this.transactionFunction != null) {
+            //commit with restart execute txn when encountered write conflict;
+            result = this.commitWithRetry();
+        } else {
+            TwoPhaseCommitter committer = new TwoPhaseCommitter(this);
+            // latches enabled
+            // for transactions which need to acquire latchess
+            //TODO latch ??
+            result = committer.execute();
+        }
+        long endTime = System.currentTimeMillis();
+        LOG.debug("txn startTime at {}, endTime at {}, spend whole time {}s", this.startTime, (endTime - this.startTime) / 1000);
+        return result;
+    }
+
+    private boolean commitWithRetry() {
+        for(int i = 0 ; i < maxRetryCnt; i++) {
+            Function<ITransaction, Boolean> retryFunction = transactionFunction;
+            Boolean result = retryFunction.apply(this);
+            if(!result) {
+                this.rollback();
+                continue;
+            }
+
+            TwoPhaseCommitter committer = new TwoPhaseCommitter(this);
+            boolean commit = committer.execute();
+            if(commit) {
+                return true;
+            }
+            this.lockKeys.clear();
+            this.memoryKvStore.clear();
+            this.init(kvClient);
+            LOG.warn("txn commit failed with attempts {} times, startTs={}", i + 1, startTime);
+            backoff(i);
+        }
+        LOG.warn("txn commit failed at finally, startTs={}", startTime);
+        return false;
     }
 
     @Override
@@ -151,5 +202,20 @@ public class TikvTransaction implements ITransaction {
             keys[i++] = key;
         }
         return keys;
+    }
+
+    // BackOff Implements exponential backoff with full jitter.
+    // Returns real back off time in microsecond.
+    // See http://www.awsarchitectureblog.com/2015/03/backoff.html.
+    private int backoff(int attempts) {
+        int upper = (int)(Math.min(retryBackOffCap, retryBackOffBase * Math.pow(2.0, attempts)));
+        int sleep = random.nextInt(upper);
+        try {
+            Thread.sleep(sleep);
+            LOG.debug("txn sleep {}s at attempts " , sleep, attempts);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return sleep;
     }
 }

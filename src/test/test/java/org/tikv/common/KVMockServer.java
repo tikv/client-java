@@ -101,15 +101,15 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
   @Override
   public void rawGet(
-      Kvrpcpb.RawGetRequest request,
-      io.grpc.stub.StreamObserver<Kvrpcpb.RawGetResponse> responseObserver) {
+      org.tikv.kvproto.Kvrpcpb.RawGetRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawGetResponse> responseObserver) {
     try {
       verifyContext(request.getContext());
       ByteString key = request.getKey();
 
       Kvrpcpb.RawGetResponse.Builder builder = Kvrpcpb.RawGetResponse.newBuilder();
       Integer errorCode = errorMap.remove(key);
-      Error.Builder errBuilder = Error.newBuilder();
+      Errorpb.Error.Builder errBuilder = Errorpb.Error.newBuilder();
       if (errorCode != null) {
         setErrorInfo(errorCode, errBuilder);
         builder.setRegionError(errBuilder.build());
@@ -125,15 +125,15 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
   /** */
   public void rawPut(
-      Kvrpcpb.RawPutRequest request,
-      io.grpc.stub.StreamObserver<Kvrpcpb.RawPutResponse> responseObserver) {
+      org.tikv.kvproto.Kvrpcpb.RawPutRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawPutResponse> responseObserver) {
     try {
       verifyContext(request.getContext());
       ByteString key = request.getKey();
 
       Kvrpcpb.RawPutResponse.Builder builder = Kvrpcpb.RawPutResponse.newBuilder();
       Integer errorCode = errorMap.remove(key);
-      Error.Builder errBuilder = Error.newBuilder();
+      Errorpb.Error.Builder errBuilder = Errorpb.Error.newBuilder();
       if (errorCode != null) {
         setErrorInfo(errorCode, errBuilder);
         builder.setRegionError(errBuilder.build());
@@ -146,19 +146,19 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     }
   }
 
-  private void setErrorInfo(int errorCode, Error.Builder errBuilder) {
+  private void setErrorInfo(int errorCode, Errorpb.Error.Builder errBuilder) {
     if (errorCode == NOT_LEADER) {
-      errBuilder.setNotLeader(NotLeader.getDefaultInstance());
+      errBuilder.setNotLeader(Errorpb.NotLeader.getDefaultInstance());
     } else if (errorCode == REGION_NOT_FOUND) {
       errBuilder.setRegionNotFound(Errorpb.RegionNotFound.getDefaultInstance());
     } else if (errorCode == KEY_NOT_IN_REGION) {
       errBuilder.setKeyNotInRegion(Errorpb.KeyNotInRegion.getDefaultInstance());
     } else if (errorCode == STALE_EPOCH) {
-      errBuilder.setStaleEpoch(StaleEpoch.getDefaultInstance());
+      errBuilder.setStaleEpoch(Errorpb.StaleEpoch.getDefaultInstance());
     } else if (errorCode == STALE_COMMAND) {
       errBuilder.setStaleCommand(Errorpb.StaleCommand.getDefaultInstance());
     } else if (errorCode == SERVER_IS_BUSY) {
-      errBuilder.setServerIsBusy(ServerIsBusy.getDefaultInstance());
+      errBuilder.setServerIsBusy(Errorpb.ServerIsBusy.getDefaultInstance());
     } else if (errorCode == STORE_NOT_MATCH) {
       errBuilder.setStoreNotMatch(Errorpb.StoreNotMatch.getDefaultInstance());
     } else if (errorCode == RAFT_ENTRY_TOO_LARGE) {
@@ -168,15 +168,15 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
   /** */
   public void rawDelete(
-      Kvrpcpb.RawDeleteRequest request,
-      io.grpc.stub.StreamObserver<Kvrpcpb.RawDeleteResponse> responseObserver) {
+      org.tikv.kvproto.Kvrpcpb.RawDeleteRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawDeleteResponse> responseObserver) {
     try {
       verifyContext(request.getContext());
       ByteString key = request.getKey();
 
       Kvrpcpb.RawDeleteResponse.Builder builder = Kvrpcpb.RawDeleteResponse.newBuilder();
       Integer errorCode = errorMap.remove(key);
-      Error.Builder errBuilder = Error.newBuilder();
+      Errorpb.Error.Builder errBuilder = Errorpb.Error.newBuilder();
       if (errorCode != null) {
         setErrorInfo(errorCode, errBuilder);
         builder.setRegionError(errBuilder.build());
@@ -190,8 +190,8 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
   @Override
   public void kvGet(
-      Kvrpcpb.GetRequest request,
-      io.grpc.stub.StreamObserver<Kvrpcpb.GetResponse> responseObserver) {
+      org.tikv.kvproto.Kvrpcpb.GetRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.GetResponse> responseObserver) {
     try {
       verifyContext(request.getContext());
       if (request.getVersion() == 0) {
@@ -222,8 +222,8 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
   @Override
   public void kvScan(
-      Kvrpcpb.ScanRequest request,
-      io.grpc.stub.StreamObserver<Kvrpcpb.ScanResponse> responseObserver) {
+      org.tikv.kvproto.Kvrpcpb.ScanRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.ScanResponse> responseObserver) {
     try {
       verifyContext(request.getContext());
       if (request.getVersion() == 0) {
@@ -236,7 +236,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       Integer errorCode = errorMap.remove(key);
       if (errorCode != null) {
         if (errorCode == ABORT) {
-          errBuilder.setServerIsBusy(ServerIsBusy.getDefaultInstance());
+          errBuilder.setServerIsBusy(Errorpb.ServerIsBusy.getDefaultInstance());
         }
         builder.setRegionError(errBuilder.build());
       } else {
@@ -262,8 +262,8 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
   @Override
   public void kvBatchGet(
-      Kvrpcpb.BatchGetRequest request,
-      io.grpc.stub.StreamObserver<Kvrpcpb.BatchGetResponse> responseObserver) {
+      org.tikv.kvproto.Kvrpcpb.BatchGetRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.BatchGetResponse> responseObserver) {
     try {
       verifyContext(request.getContext());
       if (request.getVersion() == 0) {
@@ -278,7 +278,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         Integer errorCode = errorMap.remove(key);
         if (errorCode != null) {
           if (errorCode == ABORT) {
-            errBuilder.setServerIsBusy(ServerIsBusy.getDefaultInstance());
+            errBuilder.setServerIsBusy(Errorpb.ServerIsBusy.getDefaultInstance());
           }
           builder.setRegionError(errBuilder.build());
           break;
@@ -297,8 +297,8 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
   @Override
   public void coprocessor(
-      Coprocessor.Request requestWrap,
-      io.grpc.stub.StreamObserver<Coprocessor.Response> responseObserver) {
+      org.tikv.kvproto.Coprocessor.Request requestWrap,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Coprocessor.Response> responseObserver) {
     try {
       verifyContext(requestWrap.getContext());
 
@@ -311,8 +311,8 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
       Coprocessor.Response.Builder builderWrap = Coprocessor.Response.newBuilder();
       SelectResponse.Builder builder = SelectResponse.newBuilder();
-      Error.Builder errBuilder =
-          Error.newBuilder();
+      org.tikv.kvproto.Errorpb.Error.Builder errBuilder =
+          org.tikv.kvproto.Errorpb.Error.newBuilder();
 
       for (Coprocessor.KeyRange keyRange : keyRanges) {
         Integer errorCode = errorMap.remove(keyRange.getStart());

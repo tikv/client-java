@@ -31,7 +31,7 @@ public interface ITransaction {
 
     boolean rollback();
 
-    boolean lockKeys(Key ...lockedKeys);
+    boolean lockKeys(Key... lockedKeys);
     /**
      *
      * @return returns if the transaction is valid
