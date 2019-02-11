@@ -25,12 +25,12 @@ buildscript {
 sourceSets {
     main {
         proto {
-            srcDir 'src/main/proto'
-			include '**/*.proto'
+            srcDir {'proto'}
+            include {'**/*.proto'}
         }
         java {
             // include self written and generated code
-            srcDirs 'src/main/java', 'target/generated-sources/main/java' , 'target/generated-sources/main/grpc-java'
+            srcDirs 'src/main/java', 'target/generated-sources/protobuf/java' , 'target/generated-sources/protobuf/grpc-java'
         }
     }
 	test {
