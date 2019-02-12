@@ -1,13 +1,17 @@
 package org.tikv.raw;
 
 import com.google.protobuf.ByteString;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.log4j.Logger;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
@@ -15,6 +19,7 @@ import org.tikv.common.util.FastByteComparisons;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest {
+  private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
   private static final String RAW_PREFIX = "raw_\\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -33,6 +38,7 @@ public class RawKVClientTest {
   private final ExecutorCompletionService<Object> completionService =
       new ExecutorCompletionService<>(executors);
   private static final Logger logger = Logger.getLogger(RawKVClientTest.class);
+  private TiSession session;
 
   static {
     orderedKeys = new ArrayList<>();
@@ -58,17 +64,23 @@ public class RawKVClientTest {
   }
 
   @Before
-  public void setClient() {
+  public void setup() throws IOException {
     try {
+      session = TiSession.create(TiConfiguration.createDefault(DEFAULT_PD_ADDRESS));
       initialized = false;
       if (client == null) {
-        client = RawKVClient.create();
+        client = session.createRawClient();
       }
       data = new TreeMap<>(bsc);
       initialized = true;
     } catch (Exception e) {
       System.out.println("Cannot initialize raw client. Test skipped.");
     }
+  }
+
+  @After
+  public void tearDown() {
+    session.close();
   }
 
   @Test
