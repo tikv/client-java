@@ -20,16 +20,17 @@ import static java.util.Objects.requireNonNull;
 import com.google.protobuf.ByteString;
 import java.util.Iterator;
 import java.util.List;
-import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
-import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
+import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Kvrpcpb;
 
 public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
-  protected final TiConfiguration conf;
-  protected final RegionStoreClientBuilder builder;
+  protected final TiSession session;
+  protected final RegionManager regionCache;
+
   protected List<Kvrpcpb.KvPair> currentCache;
   protected ByteString startKey;
   protected int index = -1;
@@ -40,12 +41,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
   protected boolean hasEndKey;
   protected boolean lastBatch = false;
 
-  ScanIterator(
-      TiConfiguration conf,
-      RegionStoreClientBuilder builder,
-      ByteString startKey,
-      ByteString endKey,
-      int limit) {
+  ScanIterator(ByteString startKey, ByteString endKey, int limit, TiSession session) {
     this.startKey = requireNonNull(startKey, "start key is null");
     if (startKey.isEmpty()) {
       throw new IllegalArgumentException("start key cannot be empty");
@@ -53,8 +49,8 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
     this.endKey = Key.toRawKey(requireNonNull(endKey, "end key is null"));
     this.hasEndKey = !endKey.equals(ByteString.EMPTY);
     this.limit = limit;
-    this.conf = conf;
-    this.builder = builder;
+    this.session = session;
+    this.regionCache = session.getRegionManager();
   }
 
   abstract TiRegion loadCurrentRegionToCache() throws Exception;
@@ -84,7 +80,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
       // Session should be single-threaded itself
       // so that we don't worry about conf change in the middle
       // of a transaction. Otherwise below code might lose data
-      if (currentCache.size() < conf.getScanBatchSize()) {
+      if (currentCache.size() < session.getConf().getScanBatchSize()) {
         startKey = curRegionEndKey;
       } else {
         // Start new scan from exact next key in current region

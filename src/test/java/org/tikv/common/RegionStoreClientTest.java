@@ -21,9 +21,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.util.List;
 import org.junit.Test;
-import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
-import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
@@ -39,13 +37,7 @@ public class RegionStoreClientTest extends MockServerTest {
             .setState(Metapb.StoreState.Up)
             .build();
 
-    RegionStoreClientBuilder builder =
-        new RegionStoreClientBuilder(
-            session.getConf(),
-            session.getChannelFactory(),
-            new RegionManager(session.getPDClient()));
-
-    return builder.build(region, store);
+    return RegionStoreClient.create(region, store, session);
   }
 
   @Test
