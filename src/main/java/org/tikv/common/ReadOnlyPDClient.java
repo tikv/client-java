@@ -60,7 +60,4 @@ public interface ReadOnlyPDClient {
   Store getStore(BackOffer backOffer, long storeId);
 
   Future<Store> getStoreAsync(BackOffer backOffer, long storeId);
-
-  /** Get associated session * @return the session associated to client */
-  TiSession getSession();
 }
