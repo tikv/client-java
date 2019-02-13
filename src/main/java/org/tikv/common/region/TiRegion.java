@@ -21,6 +21,7 @@ import com.google.protobuf.ByteString;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
+import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.KeyUtils;
@@ -44,9 +45,9 @@ public class TiRegion implements Serializable {
       Peer peer,
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
-      String kvMode) {
+      KVMode kvMode) {
     Objects.requireNonNull(meta, "meta is null");
-    this.meta = decodeRegion(meta, kvMode.equalsIgnoreCase("RAW"));
+    this.meta = decodeRegion(meta, kvMode == KVMode.RAW);
     if (peer == null || peer.getId() == 0) {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());

@@ -28,16 +28,35 @@ import io.grpc.ManagedChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
 import org.apache.log4j.Logger;
 import org.tikv.common.AbstractGRPCClient;
-import org.tikv.common.TiSession;
+import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.KeyException;
 import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.operation.KVErrorHandler;
 import org.tikv.common.util.BackOffer;
-import org.tikv.kvproto.Kvrpcpb.*;
+import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Kvrpcpb.BatchGetRequest;
+import org.tikv.kvproto.Kvrpcpb.BatchGetResponse;
+import org.tikv.kvproto.Kvrpcpb.GetRequest;
+import org.tikv.kvproto.Kvrpcpb.GetResponse;
+import org.tikv.kvproto.Kvrpcpb.KvPair;
+import org.tikv.kvproto.Kvrpcpb.RawBatchPutRequest;
+import org.tikv.kvproto.Kvrpcpb.RawBatchPutResponse;
+import org.tikv.kvproto.Kvrpcpb.RawDeleteRequest;
+import org.tikv.kvproto.Kvrpcpb.RawDeleteResponse;
+import org.tikv.kvproto.Kvrpcpb.RawGetRequest;
+import org.tikv.kvproto.Kvrpcpb.RawGetResponse;
+import org.tikv.kvproto.Kvrpcpb.RawPutRequest;
+import org.tikv.kvproto.Kvrpcpb.RawPutResponse;
+import org.tikv.kvproto.Kvrpcpb.RawScanRequest;
+import org.tikv.kvproto.Kvrpcpb.RawScanResponse;
+import org.tikv.kvproto.Kvrpcpb.ScanRequest;
+import org.tikv.kvproto.Kvrpcpb.ScanResponse;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
@@ -52,19 +71,20 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
   private static final Logger logger = Logger.getLogger(RegionStoreClient.class);
   private TiRegion region;
   private final RegionManager regionManager;
-  //TODO change public to private
-  @VisibleForTesting
-  public final LockResolverClient lockResolverClient;
+
+
+  @VisibleForTesting private final LockResolverClient lockResolverClient;
+
   private TikvBlockingStub blockingStub;
   private TikvStub asyncStub;
 
-  // APIs for KV Scan/Put/Get/Delete
+  public TiRegion getRegion() {
+    return region;
+  }
 
+  // APIs for KV Scan/Put/Get/Delete
   public ByteString get(BackOffer backOffer, ByteString key, long version) {
     while (true) {
-      // we should refresh region
-      region = regionManager.getRegionByKey(key);
-
       Supplier<GetRequest> factory =
           () ->
               GetRequest.newBuilder()
@@ -85,6 +105,9 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
       if (getHelper(backOffer, resp)) {
         return resp.getValue();
       }
+
+      // we should refresh region
+      region = regionManager.getRegionByKey(key);
     }
   }
 
@@ -407,32 +430,71 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
     return resp.getKvsList();
   }
 
-  public static RegionStoreClient create(TiRegion region, Store store, TiSession session) {
-    RegionStoreClient client;
-    String addressStr = store.getAddress();
-    if (logger.isDebugEnabled()) {
-      logger.debug(String.format("Create region store client on address %s", addressStr));
+  public static class RegionStoreClientBuilder {
+    private final TiConfiguration conf;
+    private final ChannelFactory channelFactory;
+    private final RegionManager regionManager;
+
+    public RegionStoreClientBuilder(
+        TiConfiguration conf, ChannelFactory channelFactory, RegionManager regionManager) {
+      Objects.requireNonNull(conf, "conf is null");
+      Objects.requireNonNull(channelFactory, "channelFactory is null");
+      Objects.requireNonNull(regionManager, "regionManager is null");
+      this.conf = conf;
+      this.channelFactory = channelFactory;
+      this.regionManager = regionManager;
     }
-    ManagedChannel channel = session.getChannel(addressStr);
 
-    TikvBlockingStub blockingStub = TikvGrpc.newBlockingStub(channel);
+    public RegionStoreClient build(TiRegion region, Store store) {
+      Objects.requireNonNull(region, "region is null");
+      Objects.requireNonNull(store, "store is null");
 
-    TikvStub asyncStub = TikvGrpc.newStub(channel);
-    client = new RegionStoreClient(region, session, blockingStub, asyncStub);
-    return client;
+      String addressStr = store.getAddress();
+      if (logger.isDebugEnabled()) {
+        logger.debug(String.format("Create region store client on address %s", addressStr));
+      }
+      ManagedChannel channel = channelFactory.getChannel(addressStr);
+
+      TikvBlockingStub blockingStub = TikvGrpc.newBlockingStub(channel);
+      TikvStub asyncStub = TikvGrpc.newStub(channel);
+
+      return new RegionStoreClient(
+          conf, region, channelFactory, blockingStub, asyncStub, regionManager);
+    }
+
+    public RegionStoreClient build(ByteString key) {
+      Pair<TiRegion, Store> pair = regionManager.getRegionStorePairByKey(key);
+      return build(pair.first, pair.second);
+    }
+
+    public RegionStoreClient build(TiRegion region) {
+      Store store = regionManager.getStoreById(region.getLeader().getStoreId());
+      return build(region, store);
+    }
+
+    public RegionManager getRegionManager() {
+      return regionManager;
+    }
   }
 
   private RegionStoreClient(
-      TiRegion region, TiSession session, TikvBlockingStub blockingStub, TikvStub asyncStub) {
-    super(session);
+      TiConfiguration conf,
+      TiRegion region,
+      ChannelFactory channelFactory,
+      TikvBlockingStub blockingStub,
+      TikvStub asyncStub,
+      RegionManager regionManager) {
+    super(conf, channelFactory);
     checkNotNull(region, "Region is empty");
     checkNotNull(region.getLeader(), "Leader Peer is null");
     checkArgument(region.getLeader() != null, "Leader Peer is null");
-    this.regionManager = session.getRegionManager();
+    this.regionManager = regionManager;
     this.region = region;
     this.blockingStub = blockingStub;
     this.asyncStub = asyncStub;
-    this.lockResolverClient = new LockResolverClient(session, this.blockingStub, this.asyncStub);
+    this.lockResolverClient =
+        new LockResolverClient(
+            conf, this.blockingStub, this.asyncStub, channelFactory, regionManager);
   }
 
   @Override
@@ -468,7 +530,7 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
     }
     region = cachedRegion;
     String addressStr = regionManager.getStoreById(region.getLeader().getStoreId()).getAddress();
-    ManagedChannel channel = getSession().getChannel(addressStr);
+    ManagedChannel channel = channelFactory.getChannel(addressStr);
     blockingStub = TikvGrpc.newBlockingStub(channel);
     asyncStub = TikvGrpc.newStub(channel);
     return true;
@@ -477,7 +539,7 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
   @Override
   public void onStoreNotMatch(Store store) {
     String addressStr = store.getAddress();
-    ManagedChannel channel = getSession().getChannel(addressStr);
+    ManagedChannel channel = channelFactory.getChannel(addressStr);
     blockingStub = TikvGrpc.newBlockingStub(channel);
     asyncStub = TikvGrpc.newStub(channel);
     if (logger.isDebugEnabled() && region.getLeader().getStoreId() != store.getId()) {
