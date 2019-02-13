@@ -51,7 +51,7 @@ metastore_db/
 # ignore tikv-client proto files
 kvproto
 tipb
-#proto
+proto
 raft-rs
 
 # ignore tikv-client bazel build
