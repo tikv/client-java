@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.log4j.Logger;
 import org.tikv.common.ReadOnlyPDClient;
+import org.tikv.common.TiSession;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
@@ -41,11 +42,13 @@ import org.tikv.kvproto.Metapb.StoreState;
 public class RegionManager {
   private static final Logger logger = Logger.getLogger(RegionManager.class);
   private RegionCache cache;
+  private final ReadOnlyPDClient pdClient;
 
   // To avoid double retrieval, we used the async version of grpc
   // When rpc not returned, instead of call again, it wait for previous one done
   public RegionManager(ReadOnlyPDClient pdClient) {
     this.cache = new RegionCache(pdClient);
+    this.pdClient = pdClient;
   }
 
   public static class RegionCache {
@@ -162,6 +165,10 @@ public class RegionManager {
         throw new GrpcException(e);
       }
     }
+  }
+
+  public TiSession getSession() {
+    return pdClient.getSession();
   }
 
   public TiRegion getRegionByKey(ByteString key) {

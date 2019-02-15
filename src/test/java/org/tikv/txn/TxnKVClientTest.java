@@ -16,6 +16,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.function.Function;
 
+/**
+ * Unit test for 2pc txn api
+ */
 public class TxnKVClientTest {
 
     TxnKVClient txnClient;
