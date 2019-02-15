@@ -196,14 +196,14 @@ public class PDClientTest {
             GrpcUtils.makeStore(
                 storeId,
                 testAddress,
-                Metapb.StoreState.Up,
+                StoreState.Up,
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
     try (PDClient client = session.getPDClient()) {
       Store r = client.getStore(defaultBackOff(), 0);
       assertEquals(r.getId(), storeId);
       assertEquals(r.getAddress(), testAddress);
-      assertEquals(r.getState(), Metapb.StoreState.Up);
+      assertEquals(r.getState(), StoreState.Up);
       assertEquals(r.getLabels(0).getKey(), "k1");
       assertEquals(r.getLabels(1).getKey(), "k2");
       assertEquals(r.getLabels(0).getValue(), "v1");
@@ -212,7 +212,7 @@ public class PDClientTest {
       server.addGetStoreResp(
           GrpcUtils.makeGetStoreResponse(
               server.getClusterId(),
-              GrpcUtils.makeStore(storeId, testAddress, Metapb.StoreState.Tombstone)));
+              GrpcUtils.makeStore(storeId, testAddress, StoreState.Tombstone)));
       assertEquals(StoreState.Tombstone, client.getStore(defaultBackOff(), 0).getState());
     }
   }
@@ -227,14 +227,14 @@ public class PDClientTest {
             GrpcUtils.makeStore(
                 storeId,
                 testAddress,
-                Metapb.StoreState.Up,
+                StoreState.Up,
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
     try (PDClient client = session.getPDClient()) {
       Store r = client.getStoreAsync(defaultBackOff(), 0).get();
       assertEquals(r.getId(), storeId);
       assertEquals(r.getAddress(), testAddress);
-      assertEquals(r.getState(), Metapb.StoreState.Up);
+      assertEquals(r.getState(), StoreState.Up);
       assertEquals(r.getLabels(0).getKey(), "k1");
       assertEquals(r.getLabels(1).getKey(), "k2");
       assertEquals(r.getLabels(0).getValue(), "v1");
@@ -243,7 +243,7 @@ public class PDClientTest {
       server.addGetStoreResp(
           GrpcUtils.makeGetStoreResponse(
               server.getClusterId(),
-              GrpcUtils.makeStore(storeId, testAddress, Metapb.StoreState.Tombstone)));
+              GrpcUtils.makeStore(storeId, testAddress, StoreState.Tombstone)));
       assertEquals(
           StoreState.Tombstone, client.getStoreAsync(defaultBackOff(), 0).get().getState());
     }
@@ -261,7 +261,7 @@ public class PDClientTest {
     server.addGetStoreResp(null);
     server.addGetStoreResp(
         GrpcUtils.makeGetStoreResponse(
-            server.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up)));
+            server.getClusterId(), GrpcUtils.makeStore(storeId, "", StoreState.Up)));
     try (PDClient client = session.getPDClient()) {
       Callable<Store> storeCallable =
           () -> client.getStore(ConcreteBackOffer.newCustomBackOff(5000), 0);
@@ -283,7 +283,7 @@ public class PDClientTest {
 
       server.addGetStoreResp(
           GrpcUtils.makeGetStoreResponse(
-              server.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up)));
+              server.getClusterId(), GrpcUtils.makeStore(storeId, "", StoreState.Up)));
       try {
         client.getStore(defaultBackOff(), 0);
       } catch (GrpcException e) {

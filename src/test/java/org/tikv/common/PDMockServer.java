@@ -37,8 +37,8 @@ public class PDMockServer extends PDGrpc.PDImplBase {
     getMembersResp.addLast(Optional.ofNullable(r));
   }
 
-  private final Deque<java.util.Optional<GetMembersResponse>> getMembersResp =
-      new LinkedBlockingDeque<java.util.Optional<GetMembersResponse>>();
+  private final Deque<Optional<GetMembersResponse>> getMembersResp =
+      new LinkedBlockingDeque<Optional<GetMembersResponse>>();
 
   @Override
   public void getMembers(GetMembersRequest request, StreamObserver<GetMembersResponse> resp) {
