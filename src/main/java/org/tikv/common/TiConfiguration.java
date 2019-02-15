@@ -44,7 +44,7 @@ public class TiConfiguration implements Serializable {
   private static final IsolationLevel DEF_ISOLATION_LEVEL = IsolationLevel.RC;
   private static final boolean DEF_SHOW_ROWID = false;
   private static final String DEF_DB_PREFIX = "";
-  private static final KVMode DEF_KV_MODE = KVMode.TXN;
+  private static final String DEF_KV_MODE = "KV";
   private static final int DEF_RAW_CLIENT_CONCURRENCY = 200;
 
   private int timeout = DEF_TIMEOUT;
@@ -63,13 +63,8 @@ public class TiConfiguration implements Serializable {
   private int maxRequestKeyRangeSize = MAX_REQUEST_KEY_RANGE_SIZE;
   private boolean showRowId = DEF_SHOW_ROWID;
   private String dbPrefix = DEF_DB_PREFIX;
-  private KVMode kvMode = DEF_KV_MODE;
+  private String kvMode = DEF_KV_MODE;
   private int rawClientConcurrency = DEF_RAW_CLIENT_CONCURRENCY;
-
-  public enum KVMode {
-    TXN,
-    RAW
-  }
 
   public static TiConfiguration createDefault(String pdAddrsStr) {
     Objects.requireNonNull(pdAddrsStr, "pdAddrsStr is null");
@@ -82,7 +77,7 @@ public class TiConfiguration implements Serializable {
     Objects.requireNonNull(pdAddrsStr, "pdAddrsStr is null");
     TiConfiguration conf = new TiConfiguration();
     conf.pdAddrs = strToHostAndPort(pdAddrsStr);
-    conf.kvMode = KVMode.RAW;
+    conf.kvMode = "RAW";
     return conf;
   }
 
@@ -234,12 +229,12 @@ public class TiConfiguration implements Serializable {
     this.dbPrefix = dbPrefix;
   }
 
-  public KVMode getKvMode() {
+  public String getKvMode() {
     return kvMode;
   }
 
   public void setKvMode(String kvMode) {
-    this.kvMode = KVMode.valueOf(kvMode);
+    this.kvMode = kvMode;
   }
 
   public int getRawClientConcurrency() {

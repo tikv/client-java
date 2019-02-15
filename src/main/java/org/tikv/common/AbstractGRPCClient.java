@@ -29,21 +29,24 @@ import org.tikv.common.policy.RetryMaxMs.Builder;
 import org.tikv.common.policy.RetryPolicy;
 import org.tikv.common.streaming.StreamingResponse;
 import org.tikv.common.util.BackOffer;
-import org.tikv.common.util.ChannelFactory;
 
 public abstract class AbstractGRPCClient<
         BlockingStubT extends AbstractStub<BlockingStubT>, StubT extends AbstractStub<StubT>>
     implements AutoCloseable {
   protected final Logger logger = Logger.getLogger(this.getClass());
-  protected final TiConfiguration conf;
-  protected final ChannelFactory channelFactory;
+  protected TiSession session;
+  protected TiConfiguration conf;
 
-  protected AbstractGRPCClient(TiConfiguration conf, ChannelFactory channelFactory) {
-    this.conf = conf;
-    this.channelFactory = channelFactory;
+  protected AbstractGRPCClient(TiSession session) {
+    this.session = session;
+    this.conf = session.getConf();
   }
 
-  protected TiConfiguration getConf() {
+  public TiSession getSession() {
+    return session;
+  }
+
+  public TiConfiguration getConf() {
     return conf;
   }
 
