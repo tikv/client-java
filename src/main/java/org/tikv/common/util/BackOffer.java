@@ -44,6 +44,7 @@ public interface BackOffer {
   int GcDeleteRangeMaxBackoff = 100000;
   int rawkvMaxBackoff = 40000;
   int splitRegionBackoff = 20000;
+  int commitMaxBackoff = 3000;
 
   /**
    * doBackOff sleeps a while base on the BackOffType and records the error message. Will stop until
