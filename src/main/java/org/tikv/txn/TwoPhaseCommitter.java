@@ -3,9 +3,9 @@ package org.tikv.txn;
 import com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.meta.TiTimestamp;
+import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
@@ -39,8 +39,10 @@ public class TwoPhaseCommitter {
 
     private Map<String, Kvrpcpb.Mutation> mutations = new LinkedHashMap<>();
     private List<byte[]> keysList;
-    private ReadOnlyPDClient pdClient;
+    //private ReadOnlyPDClient pdClient;
     private TxnKVClient kvClient;
+
+    private RegionManager regionManager;
 
     private long lockTTL = 0;
     /**
@@ -58,7 +60,8 @@ public class TwoPhaseCommitter {
     private TwoPhaseCommitter() {}
 
     public TwoPhaseCommitter(ITransaction transaction) {
-        this.pdClient = transaction.getKVClient().getSession().getPDClient();
+        //this.pdClient = transaction.getKVClient().getSession().getPDClient();
+        this.regionManager = transaction.getKVClient().getRegionManager();
         this.keysList = new LinkedList<>();
         this.kvClient = transaction.getKVClient();
         this.startTs = transaction.getStartTS();
@@ -137,7 +140,7 @@ public class TwoPhaseCommitter {
         try {
             for(; index < keys.length; index ++) {
                 byte[] key = keys[index];
-                TiRegion tiRegion = this.pdClient.getRegionByKey(backOffer, ByteString.copyFrom(key));
+                TiRegion tiRegion = this.regionManager.getRegionByKey(ByteString.copyFrom(key));
                 if(tiRegion != null){
                     Long regionId = tiRegion.getId();
                     if(index == 0) {

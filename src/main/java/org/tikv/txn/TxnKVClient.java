@@ -5,23 +5,22 @@ import com.google.protobuf.ByteString;
 import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.PDClient;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.TiConfiguration;
-import org.tikv.common.TiSession;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.iterator.ConcreteScanIterator;
 import org.tikv.common.region.RegionManager;
+import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.TiRegion;
-import org.tikv.common.region.TxnRegionStoreClient;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
-import org.tikv.kvproto.Metapb;
 import org.tikv.txn.type.ClientRPCResult;
 
 import java.util.LinkedList;
@@ -35,23 +34,36 @@ import java.util.function.Function;
 public class TxnKVClient implements AutoCloseable{
     private final static Logger LOG = LoggerFactory.getLogger(TxnKVClient.class);
 
-    private final TiSession session;
+    private final RegionStoreClient.RegionStoreClientBuilder clientBuilder;
+    private final TiConfiguration conf;
     private final RegionManager regionManager;
     private ReadOnlyPDClient pdClient;
 
-    private TxnKVClient(String addresses) {
-        this.session = TiSession.create(TiConfiguration.createRawDefault(addresses));
-        this.regionManager = session.getRegionManager();
-        this.pdClient = session.getPDClient();
+    public RegionStoreClient.RegionStoreClientBuilder getClientBuilder() {
+        return clientBuilder;
     }
 
-    public static TxnKVClient createClient(String addresses) {
+    public TiConfiguration getConf() {
+        return conf;
+    }
+
+    public ReadOnlyPDClient getPdClient() {
+        return pdClient;
+    }
+
+    public TxnKVClient(TiConfiguration conf,
+                       RegionStoreClient.RegionStoreClientBuilder clientBuilder, PDClient pdClient) {
+        this.conf = conf;
+        this.clientBuilder = clientBuilder;
+        this.regionManager = clientBuilder.getRegionManager();
+        //this.session = TiSession.create(TiConfiguration.createRawDefault(addresses));
+        //this.regionManager = new RegionManager(session.getPDClient());
+        this.pdClient = pdClient;
+    }
+
+    /*public static TxnKVClient createClient(String addresses) {
         return new TxnKVClient(addresses);
-    }
-
-    public TiSession getSession() {
-        return session;
-    }
+    }*/
 
     public TiTimestamp getTimestamp() {
         BackOffer bo = ConcreteBackOffer.newTsoBackOff();
@@ -87,8 +99,8 @@ public class TxnKVClient implements AutoCloseable{
     public ClientRPCResult prewrite(BackOffer backOffer, List<Kvrpcpb.Mutation> mutations, byte[] primary, long lockTTL, long startTs, long regionId) {
         ClientRPCResult result = new ClientRPCResult(true, false, null);
         //send request
-        Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
-        TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
+        TiRegion region = regionManager.getRegionById(regionId);
+        RegionStoreClient client = clientBuilder.build(region);
         try {
             client.prewrite(backOffer,  ByteString.copyFrom(primary), mutations, startTs, lockTTL);
         } catch (final TiKVException | StatusRuntimeException e) {
@@ -112,8 +124,8 @@ public class TxnKVClient implements AutoCloseable{
     public ClientRPCResult commit(BackOffer backOffer, byte[][] keys, long startTs, long commitTs, long regionId) {
         ClientRPCResult result = new ClientRPCResult(true, false, null);
         //send request
-        Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
-        TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
+        TiRegion region = regionManager.getRegionById(regionId);
+        RegionStoreClient client = clientBuilder.build(region);
         List<ByteString> byteList = Lists.newArrayList();
         for(byte[] key : keys) {
             byteList.add(ByteString.copyFrom(key));
@@ -138,8 +150,8 @@ public class TxnKVClient implements AutoCloseable{
      */
     public boolean cleanup(BackOffer backOffer, byte[] key, long startTs, long regionId) {
         try {
-            Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
-            TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
+            TiRegion region = regionManager.getRegionById(regionId);
+            RegionStoreClient client = clientBuilder.build(region);
             //send rpc request to tikv server
             client.cleanup(backOffer, ByteString.copyFrom(key), startTs);
             return true;
@@ -164,8 +176,8 @@ public class TxnKVClient implements AutoCloseable{
             byteList.add(ByteString.copyFrom(key));
         }
         try {
-            Pair<TiRegion,Metapb.Store> regionStore = regionManager.getRegionStorePairByRegionId(regionId);
-            TxnRegionStoreClient client = TxnRegionStoreClient.create(regionStore.first, regionStore.second, session);
+            TiRegion region = regionManager.getRegionById(regionId);
+            RegionStoreClient client = clientBuilder.build(region);
             //send request
             client.batchRollback(backOffer, byteList, startTs);
         } catch (final Exception e) {
@@ -187,8 +199,7 @@ public class TxnKVClient implements AutoCloseable{
         long version = 0;
         ByteString value = null;
         try {
-            Pair<TiRegion,Metapb.Store> region = regionManager.getRegionStorePairByKey(byteKey);
-            TxnRegionStoreClient client = TxnRegionStoreClient.create(region.first, region.second, session);
+            RegionStoreClient client = clientBuilder.build(byteKey);
             version =  getTimestamp().getVersion();
             value = client.get(bo, byteKey, version);
         } catch (final TiKVException | StatusRuntimeException e) {
@@ -326,7 +337,8 @@ public class TxnKVClient implements AutoCloseable{
     public List<Pair<byte[], byte[]>> scan(byte[] startKey, int limit) {
         ByteString byteKey = ByteString.copyFrom(startKey);
         long version = getTimestamp().getVersion();
-        ConcreteScanIterator iterator = new ConcreteScanIterator(byteKey, session, version);
+        ConcreteScanIterator iterator = new ConcreteScanIterator(this.conf,
+                clientBuilder, byteKey, version);
         List<Pair<byte[], byte[]>> result = new LinkedList<>();
         int count = 0;
         while(iterator.hasNext() && count ++ < limit) {
@@ -340,8 +352,12 @@ public class TxnKVClient implements AutoCloseable{
         return ConcreteBackOffer.newCustomBackOff(1000);
     }
 
+    public RegionManager getRegionManager() {
+        return regionManager;
+    }
+
     @Override
     public void close() throws Exception {
-        session.close();
+
     }
 }

@@ -58,14 +58,14 @@ public class TikvTransaction implements ITransaction {
         this.startTime = System.currentTimeMillis();
         this.transactionFunction = function;
         this.lockKeys = Lists.newLinkedList();
-        this.init(client);
+        this.init();
     }
 
-    private void init(TxnKVClient client) {
+    private void init() {
         this.valid = true;
         TiTimestamp tiTimestamp = kvClient.getTimestamp();
         this.startTS = tiTimestamp.getVersion();
-        this.snapshot = new Snapshot(tiTimestamp, client.getSession());
+        this.snapshot = new Snapshot(kvClient.getConf(), kvClient.getPdClient(), kvClient.getClientBuilder(), tiTimestamp);
     }
 
     @Override
@@ -122,7 +122,7 @@ public class TikvTransaction implements ITransaction {
             }
             this.lockKeys.clear();
             this.memoryKvStore.clear();
-            this.init(kvClient);
+            this.init();
             LOG.warn("txn commit failed with attempts {} times, startTs={}", i + 1, startTime);
             backoff(i);
         }

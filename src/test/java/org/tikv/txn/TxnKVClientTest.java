@@ -5,6 +5,8 @@ import com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
@@ -22,21 +24,21 @@ import java.util.function.Function;
 public class TxnKVClientTest {
 
     TxnKVClient txnClient;
-
-    final String configPath = "kv-config.properties";
-
     Properties configPros;
+    final String filePath = "kv-config.properties";
 
     @Before
     public void setClient() {
         try {
-            InputStream is = getClass().getClassLoader().getResourceAsStream(configPath);
+            InputStream is = getClass().getClassLoader().getResourceAsStream(filePath);
             this.configPros = new Properties();
-            this.configPros.load(is);
+            if(is != null) {
+                this.configPros.load(is);
+            }
             String pdAddress = this.configPros.getProperty("kv.pd.address");
-            System.out.println("pdAddress is: " + pdAddress);
             Assert.assertNotNull("pd address should not null", pdAddress);
-            txnClient = TxnKVClient.createClient(pdAddress);
+            TiSession session = TiSession.create(TiConfiguration.createDefault(pdAddress));
+            txnClient = session.createTxnClient();
         } catch (Exception e) {
             System.out.println("Cannot initialize txn client. Test skipped.");
         }
@@ -64,7 +66,7 @@ public class TxnKVClientTest {
     @Test
     public void testPut() {
         String key = "test_AAAAGAaJwbZnjgaPvypwZTiuMBFirzPf";
-        String value = "put_value";
+        String value = "put_value666";
         boolean result = txnClient.put(key.getBytes(), value.getBytes());
         System.out.println("Put result=" + result);
     }
@@ -101,7 +103,7 @@ public class TxnKVClientTest {
                     .setOp(Kvrpcpb.Op.Put)
                     .build();
             System.out.println("startVersion=" + startVersion);
-            TiRegion region = txnClient.getSession().getRegionManager().getRegionByKey(key);
+            TiRegion region = txnClient.getRegionManager().getRegionByKey(key);
             txnClient.prewrite(ConcreteBackOffer.newCustomBackOff(2000), Lists.newArrayList(mutation), key.toByteArray(),
                     1000, startVersion, region.getId());
             boolean result = txn.commit();

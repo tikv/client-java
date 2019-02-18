@@ -220,8 +220,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
     LeaderWrapper(
         String leaderInfo,
-        PDGrpc.PDBlockingStub blockingStub,
-        PDGrpc.PDStub asyncStub,
+        PDBlockingStub blockingStub,
+        PDStub asyncStub,
         long createTime) {
       this.leaderInfo = leaderInfo;
       this.blockingStub = blockingStub;
@@ -251,7 +251,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   public GetMembersResponse getMembers(HostAndPort url) {
     try {
       ManagedChannel probChan = channelFactory.getChannel(url.getHostText() + ":" + url.getPort());
-      PDGrpc.PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
+      PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
       GetMembersRequest request =
           GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
       return stub.getMembers(request);

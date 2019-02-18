@@ -5,23 +5,25 @@ import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import org.apache.log4j.Logger;
 import org.tikv.common.AbstractGRPCClient;
-import org.tikv.common.TiSession;
+import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.KeyException;
 import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.operation.KVErrorHandler;
-import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
+import org.tikv.kvproto.Kvrpcpb.*;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.txn.Lock;
 import org.tikv.txn.LockResolverClient;
-import org.tikv.kvproto.Kvrpcpb.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -44,20 +46,73 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
     private TikvGrpc.TikvBlockingStub blockingStub;
     private TikvGrpc.TikvStub asyncStub;
 
+    public static class TxnRegionStoreClientBuilder {
+        private final TiConfiguration conf;
+        private final ChannelFactory channelFactory;
+        private final RegionManager regionManager;
+
+        public TxnRegionStoreClientBuilder(
+                TiConfiguration conf, ChannelFactory channelFactory, RegionManager regionManager) {
+            Objects.requireNonNull(conf, "conf is null");
+            Objects.requireNonNull(channelFactory, "channelFactory is null");
+            Objects.requireNonNull(regionManager, "regionManager is null");
+            this.conf = conf;
+            this.channelFactory = channelFactory;
+            this.regionManager = regionManager;
+        }
+
+        public TxnRegionStoreClient build(TiRegion region, Metapb.Store store) {
+            Objects.requireNonNull(region, "region is null");
+            Objects.requireNonNull(store, "store is null");
+
+            String addressStr = store.getAddress();
+            if (logger.isDebugEnabled()) {
+                logger.debug(String.format("Create region store client on address %s", addressStr));
+            }
+            ManagedChannel channel = channelFactory.getChannel(addressStr);
+
+            TikvGrpc.TikvBlockingStub blockingStub = TikvGrpc.newBlockingStub(channel);
+            TikvGrpc.TikvStub asyncStub = TikvGrpc.newStub(channel);
+
+            return new TxnRegionStoreClient(
+                    conf, region, channelFactory, blockingStub, asyncStub, regionManager);
+        }
+
+        public TxnRegionStoreClient build(ByteString key) {
+            Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(key);
+            return build(pair.first, pair.second);
+        }
+
+        public TxnRegionStoreClient build(TiRegion region) {
+            Metapb.Store store = regionManager.getStoreById(region.getLeader().getStoreId());
+            return build(region, store);
+        }
+
+        public RegionManager getRegionManager() {
+            return regionManager;
+        }
+    }
+
     private TxnRegionStoreClient(
-            TiRegion region, TiSession session, TikvGrpc.TikvBlockingStub blockingStub, TikvGrpc.TikvStub asyncStub) {
-        super(session);
+            TiConfiguration conf,
+            TiRegion region,
+            ChannelFactory channelFactory,
+            TikvGrpc.TikvBlockingStub blockingStub,
+            TikvGrpc.TikvStub asyncStub,
+            RegionManager regionManager) {
+        super(conf, channelFactory);
         checkNotNull(region, "Region is empty");
         checkNotNull(region.getLeader(), "Leader Peer is null");
         checkArgument(region.getLeader() != null, "Leader Peer is null");
-        this.regionManager = session.getRegionManager();
+        this.regionManager = regionManager;
         this.region = region;
         this.blockingStub = blockingStub;
         this.asyncStub = asyncStub;
-        this.lockResolverClient = new LockResolverClient(session, this.blockingStub, this.asyncStub);
+        this.lockResolverClient = new LockResolverClient(conf,
+                this.blockingStub, this.asyncStub, channelFactory, regionManager);
     }
 
-    public static TxnRegionStoreClient create(TiRegion region, Metapb.Store store, TiSession session) {
+    /*public static TxnRegionStoreClient create(TiRegion region, Metapb.Store store, TiSession session) {
         TxnRegionStoreClient client;
         String addressStr = store.getAddress();
         if (logger.isDebugEnabled()) {
@@ -70,7 +125,7 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         TikvGrpc.TikvStub asyncStub = TikvGrpc.newStub(channel);
         client = new TxnRegionStoreClient(region, session, blockingStub, asyncStub);
         return client;
-    }
+    }*/
 
     @Override
     protected TikvGrpc.TikvBlockingStub getBlockingStub() {
@@ -101,7 +156,7 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         }
         region = cachedRegion;
         String addressStr = regionManager.getStoreById(region.getLeader().getStoreId()).getAddress();
-        ManagedChannel channel = getSession().getChannel(addressStr);
+        ManagedChannel channel = channelFactory.getChannel(addressStr);
         blockingStub = TikvGrpc.newBlockingStub(channel);
         asyncStub = TikvGrpc.newStub(channel);
         return true;
@@ -110,7 +165,7 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
     @Override
     public void onStoreNotMatch(Metapb.Store store) {
         String addressStr = store.getAddress();
-        ManagedChannel channel = getSession().getChannel(addressStr);
+        ManagedChannel channel = channelFactory.getChannel(addressStr);
         blockingStub = TikvGrpc.newBlockingStub(channel);
         asyncStub = TikvGrpc.newStub(channel);
         if (logger.isDebugEnabled() && region.getLeader().getStoreId() != store.getId()) {
@@ -186,8 +241,8 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
     }
 
 
-
-    public List<Kvrpcpb.KvPair> batchGet(BackOffer backOffer, Iterable<ByteString> keys, long version) {
+    // TODO: batch get should consider key range split
+    public List<KvPair> batchGet(BackOffer backOffer, Iterable<ByteString> keys, long version) {
         while(true) {
             Supplier<BatchGetRequest> request =
                     () ->
@@ -210,7 +265,7 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         }
     }
 
-
+    // TODO: deal with resolve locks and region errors
     private boolean batchGetHelper(BackOffer bo, BatchGetResponse resp) {
         List<Lock> locks = new ArrayList<>();
 
@@ -232,17 +287,17 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
                 bo.doBackOff(BoTxnLockFast, new KeyException((resp.getPairsList().get(0).getError())));
             }
 
-
+            // TODO: we should retry
+            // fix me
             return false;
         }
 
         if (resp.hasRegionError()) {
-
+            // TODO, we should redo the split and redo the batchGet
             throw new RegionException(resp.getRegionError());
         }
         return true;
     }
-
 
     public void deleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
         while(true) {
@@ -276,11 +331,11 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         return true;
     }
 
-    public List<Kvrpcpb.KvPair> scan(BackOffer backOffer, ByteString startKey, long version) {
+    public List<KvPair> scan(BackOffer backOffer, ByteString startKey, long version) {
         return scan(backOffer, startKey, version, false);
     }
 
-    public List<Kvrpcpb.KvPair> scan(
+    public List<KvPair> scan(
             BackOffer backOffer, ByteString startKey, long version, boolean keyOnly) {
         Supplier<ScanRequest> request =
                 () ->
@@ -302,8 +357,10 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         return scanHelper(resp, backOffer);
     }
 
-
-
+    // TODO: remove helper and change to while style
+    // needs to be fixed as batchGet
+    // which we shoule retry not throw
+    // exception
     private List<KvPair> scanHelper(ScanResponse resp, BackOffer bo) {
         if (resp == null) {
             this.regionManager.onRequestFail(region);
@@ -330,7 +387,8 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
                 bo.doBackOff(BoTxnLockFast, new KeyException((resp.getPairsList().get(0).getError())));
             }
 
-
+            // TODO: we should retry
+            // fix me
         }
         if (resp.hasRegionError()) {
             throw new RegionException(resp.getRegionError());
@@ -338,6 +396,15 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         return resp.getPairsList();
     }
 
+    /**
+     * Prewrite batch keys
+     * @param bo
+     * @param primaryLock
+     * @param mutations
+     * @param startVersion
+     * @param ttl
+     * @param skipConstraintCheck
+     */
     public void prewrite(BackOffer bo, ByteString primaryLock, Iterable<Mutation> mutations, long startVersion, long ttl, boolean skipConstraintCheck){
         while(true) {
             Supplier<PrewriteRequest> factory =
@@ -367,8 +434,10 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
             throw new TiClientInternalException("PrewriteResponse failed without a cause");
         }
         if (resp.hasRegionError()) {
-            bo.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
-            return false;
+            //bo.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
+            //return false;
+            //Caller method should retry start prewrite
+            throw new RegionException(resp.getRegionError());
         }
         for(KeyError err : resp.getErrorsList()){
             if(err.hasLocked()){
@@ -377,6 +446,7 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
                 if(!ok){
                     bo.doBackOff(BoTxnLockFast, new KeyException((err.getLocked().toString())));
                 }
+                //retry prewrite directly in current method
                 return false;
             }
             else{
@@ -386,10 +456,17 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         return true;
     }
 
-    public void prewrite(BackOffer backOffer, ByteString primary, Iterable<Kvrpcpb.Mutation> mutations, long startTs, long lockTTL) {
+    public void prewrite(BackOffer backOffer, ByteString primary, Iterable<Mutation> mutations, long startTs, long lockTTL) {
         this.prewrite(backOffer, primary, mutations, startTs, lockTTL, false);
     }
 
+    /**
+     * Commit batch keys
+     * @param backOffer
+     * @param keys
+     * @param startVersion
+     * @param commitVersion
+     */
     public void commit(BackOffer backOffer, Iterable<ByteString> keys, long startVersion, long commitVersion) {
         while(true) {
             Supplier<CommitRequest> factory =
@@ -417,8 +494,10 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
             throw new TiClientInternalException("CommitResponse failed without a cause");
         }
         if(resp.hasRegionError()){
-            bo.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
-            return false;
+            //bo.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
+            //return false;
+            //Caller method should restart commit
+            throw new RegionException(resp.getRegionError());
         }
         //if hasLock, need to resolveLocks and retry?
         if(resp.hasError()) {
@@ -436,6 +515,13 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         return true;
     }
 
+    /**
+     * Clean up the uncommitted kv data with the specified key which version equals to startTs
+     * @param backOffer
+     * @param key
+     * @param startTs
+     * @return
+     */
     public long cleanup(BackOffer backOffer, ByteString key, long startTs) {
         while(true) {
             Supplier<CleanupRequest> factory =
@@ -453,6 +539,8 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
             if(cleanUpHelper(backOffer, resp)) {
                 return resp.getCommitVersion();
             }
+            // we should refresh region
+            region = regionManager.getRegionByKey(key);
         }
     }
 
@@ -480,10 +568,17 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         return true;
     }
 
+    /**
+     * Batch roll back, clean up the lock information of the related key list with version equals to startVersion
+     * @param backOffer
+     * @param keys
+     * @param startVersion
+     */
     public void batchRollback(BackOffer backOffer, Iterable<ByteString> keys, long startVersion){
         while(true) {
             Supplier<BatchRollbackRequest> factory =
-                    () -> BatchRollbackRequest.newBuilder().setStartVersion(startVersion).setContext(region.getContext()).addAllKeys(keys).build();
+                    () -> BatchRollbackRequest.newBuilder().setStartVersion(startVersion)
+                            .setContext(region.getContext()).addAllKeys(keys).build();
             KVErrorHandler<BatchRollbackResponse> handler =
                     new KVErrorHandler<>(
                             regionManager,
@@ -503,8 +598,10 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
             throw new TiClientInternalException("BatchRollbackResponse failed without a cause");
         }
         if(resp.hasRegionError()){
-            bo.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
-            return false;
+            //bo.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
+            //return false;
+            //Caller method should restart rollback
+            throw new RegionException(resp.getRegionError());
         }
         if(resp.hasError()) {
             if (resp.getError().hasLocked()) {
@@ -521,6 +618,11 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         return true;
     }
 
+    /**
+     * Delete all expired history kv data which version less than specific safePoint
+     * @param bo
+     * @param safePoint
+     */
     public void gc(BackOffer bo, long safePoint){
         while(true) {
             Supplier<GCRequest> factory =
@@ -562,10 +664,19 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
         return true;
     }
 
-    private List<LockInfo> scanLock(BackOffer bo, ByteString startkey ,long maxVersion, int limit){
+    /**
+     * Scan all locks which version less than a specific version
+     * @param bo
+     * @param startKey
+     * @param maxVersion
+     * @param limit
+     * @return
+     */
+    public List<LockInfo> scanLock(BackOffer bo, ByteString startKey ,long maxVersion, int limit){
         while(true) {
             Supplier<ScanLockRequest> factory =
-                    () -> ScanLockRequest.newBuilder().setContext(region.getContext()).setMaxVersion(maxVersion).setStartKey(startkey).setLimit(limit).build();
+                    () -> ScanLockRequest.newBuilder().setContext(region.getContext())
+                            .setMaxVersion(maxVersion).setStartKey(startKey).setLimit(limit).build();
             KVErrorHandler<ScanLockResponse> handler =
                     new KVErrorHandler<>(
                             regionManager,
@@ -576,6 +687,9 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
             if (scanLockHelper(bo, resp)) {
                 return resp.getLocksList();
             }
+
+            // we should refresh region
+            region = regionManager.getRegionByKey(startKey);
         }
     }
 
@@ -601,9 +715,5 @@ public class TxnRegionStoreClient extends AbstractGRPCClient<TikvGrpc.TikvBlocki
             }
         }
         return true;
-    }
-
-    public void delete(BackOffer backOffer, ByteString key) {
-
     }
 }
