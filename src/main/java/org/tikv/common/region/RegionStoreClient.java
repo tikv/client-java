@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
+import static org.tikv.txn.gc.GCWorker.GCWorkerConst.gcScanLockLimit;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
@@ -36,10 +37,12 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.KeyException;
 import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.operation.KVErrorHandler;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.BatchGetRequest;
 import org.tikv.kvproto.Kvrpcpb.BatchGetResponse;
 import org.tikv.kvproto.Kvrpcpb.GetRequest;
@@ -57,6 +60,8 @@ import org.tikv.kvproto.Kvrpcpb.RawScanRequest;
 import org.tikv.kvproto.Kvrpcpb.RawScanResponse;
 import org.tikv.kvproto.Kvrpcpb.ScanRequest;
 import org.tikv.kvproto.Kvrpcpb.ScanResponse;
+import org.tikv.kvproto.Kvrpcpb.ScanLockRequest;
+import org.tikv.kvproto.Kvrpcpb.ScanLockResponse;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
@@ -255,6 +260,37 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
 
   public List<KvPair> scan(BackOffer backOffer, ByteString startKey, long version) {
     return scan(backOffer, startKey, version, false);
+  }
+
+  public List<Kvrpcpb.LockInfo> scanLocks(BackOffer backOffer, ByteString startKey, long safePoint) {
+    Supplier<ScanLockRequest> factory = () -> ScanLockRequest.newBuilder().setContext(region.getContext()).setMaxVersion(safePoint).setLimit(gcScanLockLimit).setStartKey(startKey).build();
+    KVErrorHandler<ScanLockResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+
+    ScanLockResponse resp = callWithRetry(backOffer, TikvGrpc.METHOD_KV_SCAN_LOCK, factory, handler);
+
+    if (resp.hasError()) {
+      throw new TiKVException(String.format("unexpected ScanLock error: %s", resp.getError()));
+    }
+    if (resp.hasRegionError()) {
+      throw new RegionException(resp.getRegionError());
+    }
+    return resp.getLocksList();
+  }
+
+  public void doGC(BackOffer backOffer, long safePoint) {
+    Kvrpcpb.GCRequest req = Kvrpcpb.GCRequest.newBuilder().setContext(region.getContext()).setSafePoint(safePoint).build();
+    KVErrorHandler<Kvrpcpb.GCResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+    callWithRetry(backOffer, TikvGrpc.METHOD_KV_GC, () -> req, handler);
   }
 
   // APIs for Raw Scan/Put/Get/Delete
@@ -492,6 +528,10 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
     this.lockResolverClient =
         new LockResolverClient(
             conf, this.blockingStub, this.asyncStub, channelFactory, regionManager);
+  }
+
+  public LockResolverClient getLockResolverClient() {
+    return lockResolverClient;
   }
 
   @Override

@@ -45,6 +45,9 @@ hs_err_pid*
 # ignore gradle
 .gradle
 
+# ignore gradle out
+out/
+
 metastore_db/
 .java-version
 

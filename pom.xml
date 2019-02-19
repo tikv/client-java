@@ -79,6 +79,11 @@
             <artifactId>trove4j</artifactId>
             <version>${trove4j.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.etcd</groupId>
+            <artifactId>jetcd-core</artifactId>
+            <version>${jetcd-version}</version>
+        </dependency>
     </dependencies>
     <build>
         <resources>

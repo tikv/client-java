@@ -20,6 +20,7 @@ import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.raw.RawKVClient;
+import org.tikv.txn.TxnKVClient;
 
 /**
  * TiSession is the holder for PD Client, Store pdClient and PD Cache All sessions share common
@@ -51,6 +52,11 @@ public class TiSession implements AutoCloseable {
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(conf, channelFactory, regionMgr);
     return new RawKVClient(conf, builder);
+  }
+
+  public TxnKVClient createTxnClient() {
+    // Create new Region Manager avoiding thread contentions
+    return new TxnKVClient(this);
   }
 
   @VisibleForTesting

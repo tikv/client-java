@@ -23,15 +23,17 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
+import io.etcd.jetcd.*;
+import io.etcd.jetcd.kv.GetResponse;
+import io.etcd.jetcd.lock.LockResponse;
+import io.etcd.jetcd.lock.UnlockResponse;
 import io.grpc.ManagedChannel;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.function.Supplier;
+
 import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
@@ -58,6 +60,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private volatile LeaderWrapper leaderWrapper;
   private ScheduledExecutorService service;
   private List<HostAndPort> pdAddrs;
+  private Client client;
+  private KV etcdKV;
+  private Lock lockClient;
+  private Lease leaseClient;
 
   @Override
   public TiTimestamp getTimestamp(BackOffer backOffer) {
@@ -212,6 +218,88 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return leaderWrapper;
   }
 
+  private String getLeaderUrl() {
+    return "http://" + getLeaderWrapper().getLeaderInfo();
+  }
+
+  public ByteString get(ByteString key) {
+    try {
+      GetResponse resp = etcdKV.get(ByteSequence.from(key)).get(500, TimeUnit.MILLISECONDS);
+      List<KeyValue> kvs = resp.getKvs();
+      if (kvs.size() == 0 || kvs.get(0) == null) {
+        return null;
+      }
+      ByteSequence value = kvs.get(0).getValue();
+      return ByteString.copyFrom(value.getBytes());
+    } catch (Exception e) {
+      throw new TiKVException("Unhandled");
+    }
+  }
+
+  public ByteString get(ByteString key, ByteString defaultValue) {
+    ByteString value = get(key);
+    if (value == null) {
+      return defaultValue;
+    }
+    return value;
+  }
+
+  public void put(ByteString key, ByteString value) {
+    try {
+      etcdKV.put(ByteSequence.from(key), ByteSequence.from(value)).get(500, TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      throw new TiKVException("Unhandled");
+    }
+  }
+
+  /**
+   * Tries to acquire lock with given name from PD
+   *
+   * @param key name of lock
+   * @param lease lease when lock expires
+   * @return whether the lock is acquired successfully
+   */
+  public boolean lock(ByteString key, long lease) {
+    try {
+      logger.info("locking " + key.toStringUtf8() + " lease=" + lease);
+      LockResponse resp = lockClient.lock(ByteSequence.from(key), lease).get(500, TimeUnit.MILLISECONDS);
+      logger.info("locked " + key.toStringUtf8());
+      logger.info("returnKey" + ByteString.copyFrom(resp.getKey().getBytes()).toStringUtf8());
+      return true;
+    } catch (Exception e) {
+      logger.warn("lock fails", e);
+      return false;
+    }
+  }
+
+  public void unlock(ByteString key) {
+    try {
+      logger.info("unlocking " + key.toStringUtf8());
+      UnlockResponse resp = lockClient.unlock(ByteSequence.from(key)).get(500, TimeUnit.MILLISECONDS);
+      logger.info("unlocked " + key.toStringUtf8());
+    } catch (Exception e) {
+      logger.warn("unlock fails", e);
+    }
+  }
+
+  public long grantLease(long ttl) {
+    try {
+      logger.info("granting lease");
+      return leaseClient.grant(ttl).get(500, TimeUnit.MILLISECONDS).getID();
+    } catch (Exception e) {
+      logger.warn("granting lease failed", e);
+      return 0;
+    }
+  }
+
+  public void revoke(long leaseId) {
+    try {
+      leaseClient.revoke(leaseId).get(500, TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      logger.warn("revoke fails", e);
+    }
+  }
+
   class LeaderWrapper {
     private final String leaderInfo;
     private final PDBlockingStub blockingStub;
@@ -250,7 +338,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   public GetMembersResponse getMembers(HostAndPort url) {
     try {
-      ManagedChannel probChan = channelFactory.getChannel(url.getHostText() + ":" + url.getPort());
+      ManagedChannel probChan = channelFactory.getChannel(url.getHost() + ":" + url.getPort());
       PDGrpc.PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
       GetMembersRequest request =
           GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
@@ -367,6 +455,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         1,
         1,
         TimeUnit.MINUTES);
+    client = Client.builder().endpoints(getLeaderUrl()).build();
+    etcdKV = client.getKVClient();
+    lockClient = client.getLockClient();
+    leaseClient = client.getLeaseClient();
   }
 
   static PDClient createRaw(TiConfiguration conf, ChannelFactory channelFactory) {

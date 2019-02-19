@@ -1,16 +1,25 @@
 apply plugin: 'java'
 apply plugin: 'maven'
+apply plugin: 'idea'
 apply plugin: "com.google.protobuf"
 
 group = 'org.tikv'
 version = '2.0-SNAPSHOT'
 
-description = """TiSpark Project TiKV Java Client"""
+description = """TiKV Java Client"""
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 tasks.withType(JavaCompile) {
 	options.encoding = 'UTF-8'
+}
+
+idea {
+    module {
+        // Marks the already(!) added srcDir as "generated"
+        generatedSourceDirs += file('target/generated-sources/protobuf/java')
+        generatedSourceDirs += file('target/generated-sources/protobuf/grpc-java')
+    }
 }
 
 buildscript {
@@ -34,7 +43,9 @@ sourceSets {
         }
     }
 	test {
-		java {}
+		java {
+            srcDirs 'src/test/java', 'target/generated-sources/protobuf/java' , 'target/generated-sources/protobuf/grpc-java'
+        }
 	}
     // remove the test configuration - at least in your example you don't have a special test proto file
 }
@@ -84,7 +95,8 @@ clean {
 }
 
 repositories {
-     maven { url "http://repo.maven.apache.org/maven2" }
+    maven { url "https://clojars.org/repo" }
+    maven { url "http://repo.maven.apache.org/maven2" }
 }
 
 dependencies {
@@ -102,6 +114,7 @@ dependencies {
     compile group: 'joda-time', name: 'joda-time', version:'2.9.9'
     compile group: 'org.joda', name: 'joda-convert', version:'1.9.2'
     testCompile group: 'io.grpc', name: 'grpc-testing', version:'1.7.0'
+    compile group: 'io.etcd', name: 'jetcd-core', version:'0.3.0'
     //remove unused hadoop dependencies
     /*compile group: 'org.apache.logging.log4j', name: 'log4j-api', version:'2.8.1'
     compile group: 'org.apache.logging.log4j', name: 'log4j-core', version:'2.8.1'
@@ -125,10 +138,6 @@ task updateProtoModule(type: Exec) {
     } else {
         commandLine 'sh', '-c', './scripts/proto.sh'
     }
-}
-
-compileJava << {
-	println 'Compiling'
 }
 
 task copyResources(type: Copy) {
