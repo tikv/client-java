@@ -15,28 +15,19 @@
 
 package org.tikv.common;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static org.tikv.common.operation.PDErrorHandler.getRegionResponseErrorExtractor;
-import static org.tikv.common.pd.PDError.buildFromPdpbError;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
 import io.etcd.jetcd.*;
 import io.etcd.jetcd.kv.GetResponse;
+import io.etcd.jetcd.lease.LeaseGrantResponse;
 import io.etcd.jetcd.lock.LockResponse;
-import io.etcd.jetcd.lock.UnlockResponse;
 import io.grpc.ManagedChannel;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.List;
-import java.util.concurrent.*;
-import java.util.function.Supplier;
-
 import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
+import org.tikv.common.exception.GCException;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.exception.TiKVException;
@@ -52,7 +43,24 @@ import org.tikv.kvproto.PDGrpc.PDBlockingStub;
 import org.tikv.kvproto.PDGrpc.PDStub;
 import org.tikv.kvproto.Pdpb.*;
 
-/** PDClient is thread-safe and suggested to be shared threads */
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+import static org.tikv.common.operation.PDErrorHandler.getRegionResponseErrorExtractor;
+import static org.tikv.common.pd.PDError.buildFromPdpbError;
+
+/**
+ * PDClient is thread-safe and suggested to be shared threads
+ */
 public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     implements ReadOnlyPDClient {
   private RequestHeader header;
@@ -165,10 +173,13 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return responseObserver.getFuture();
   }
 
+  private Supplier<GetStoreRequest> getStoreRequest(long storeId) {
+    return () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
+  }
+
   @Override
   public Store getStore(BackOffer backOffer, long storeId) {
-    Supplier<GetStoreRequest> request =
-        () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
+    Supplier<GetStoreRequest> request = getStoreRequest(storeId);
     PDErrorHandler<GetStoreResponse> handler =
         new PDErrorHandler<>(
             r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
@@ -183,8 +194,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     FutureObserver<Store, GetStoreResponse> responseObserver =
         new FutureObserver<>(GetStoreResponse::getStore);
 
-    Supplier<GetStoreRequest> request =
-        () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
+    Supplier<GetStoreRequest> request = getStoreRequest(storeId);
     PDErrorHandler<GetStoreResponse> handler =
         new PDErrorHandler<>(
             r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
@@ -218,8 +228,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return leaderWrapper;
   }
 
-  private String getLeaderUrl() {
-    return "http://" + getLeaderWrapper().getLeaderInfo();
+  private List<URI> getMemberUrI() {
+    return pdAddrs.stream().map(x -> URI.create("http://" + x.toString())).collect(Collectors.toList());
   }
 
   public ByteString get(ByteString key) {
@@ -232,7 +242,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       ByteSequence value = kvs.get(0).getValue();
       return ByteString.copyFrom(value.getBytes());
     } catch (Exception e) {
-      throw new TiKVException("Unhandled");
+      throw new TiKVException("get etcd key fails", e);
     }
   }
 
@@ -248,23 +258,24 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     try {
       etcdKV.put(ByteSequence.from(key), ByteSequence.from(value)).get(500, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
-      throw new TiKVException("Unhandled");
+      throw new TiKVException("put etcd key fails", e);
     }
+  }
+
+  public Txn txn() {
+    return etcdKV.txn();
   }
 
   /**
    * Tries to acquire lock with given name from PD
    *
-   * @param key name of lock
+   * @param key   name of lock
    * @param lease lease when lock expires
    * @return whether the lock is acquired successfully
    */
   public boolean lock(ByteString key, long lease) {
     try {
-      logger.info("locking " + key.toStringUtf8() + " lease=" + lease);
       LockResponse resp = lockClient.lock(ByteSequence.from(key), lease).get(500, TimeUnit.MILLISECONDS);
-      logger.info("locked " + key.toStringUtf8());
-      logger.info("returnKey" + ByteString.copyFrom(resp.getKey().getBytes()).toStringUtf8());
       return true;
     } catch (Exception e) {
       logger.warn("lock fails", e);
@@ -272,31 +283,57 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
   }
 
+  /**
+   * Unlock lock with given name from PD
+   *
+   * @param key lock name
+   */
   public void unlock(ByteString key) {
     try {
-      logger.info("unlocking " + key.toStringUtf8());
-      UnlockResponse resp = lockClient.unlock(ByteSequence.from(key)).get(500, TimeUnit.MILLISECONDS);
-      logger.info("unlocked " + key.toStringUtf8());
+      lockClient.unlock(ByteSequence.from(key)).get(500, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       logger.warn("unlock fails", e);
     }
   }
 
+  /**
+   * Grant lease with ttl in PD
+   *
+   * @param ttl purposed time to live
+   * @return a unique lease key
+   */
   public long grantLease(long ttl) {
     try {
-      logger.info("granting lease");
-      return leaseClient.grant(ttl).get(500, TimeUnit.MILLISECONDS).getID();
+      LeaseGrantResponse resp = leaseClient.grant(ttl).get(500, TimeUnit.MILLISECONDS);
+      return resp.getID();
     } catch (Exception e) {
-      logger.warn("granting lease failed", e);
-      return 0;
+      throw new GCException("GC worker failed to start because granting lease fails", e);
     }
   }
 
+  /**
+   * Keep lease alive
+   *
+   * @param leaseId lease ID
+   */
+  public void keepLeaseAlive(long leaseId) {
+    try {
+      leaseClient.keepAliveOnce(leaseId).get(500, TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      logger.warn("keep alive failed", e);
+    }
+  }
+
+  /**
+   * Revoke lease
+   *
+   * @param leaseId lease ID
+   */
   public void revoke(long leaseId) {
     try {
       leaseClient.revoke(leaseId).get(500, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
-      logger.warn("revoke fails", e);
+      logger.warn(String.format("revoke %s fails", Long.toHexString(leaseId)), e);
     }
   }
 
@@ -333,7 +370,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       return createTime;
     }
 
-    void close() {}
+    void close() {
+    }
   }
 
   public GetMembersResponse getMembers(HostAndPort url) {
@@ -455,7 +493,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         1,
         1,
         TimeUnit.MINUTES);
-    client = Client.builder().endpoints(getLeaderUrl()).build();
+    client = Client.builder().endpoints(getMemberUrI()).build();
     etcdKV = client.getKVClient();
     lockClient = client.getLockClient();
     leaseClient = client.getLeaseClient();

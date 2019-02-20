@@ -1,8 +1,28 @@
+/*
+ * Copyright 2019 The TiKV Project Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.tikv.txn.gc;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
-import io.etcd.jetcd.api.lock.LockRequest;
+import io.etcd.jetcd.ByteSequence;
+import io.etcd.jetcd.Txn;
+import io.etcd.jetcd.op.Cmp;
+import io.etcd.jetcd.op.Op;
+import io.etcd.jetcd.options.GetOption;
+import io.etcd.jetcd.options.PutOption;
 import org.apache.log4j.Logger;
 import org.tikv.common.PDClient;
 import org.tikv.common.TiSession;
@@ -29,26 +49,35 @@ import static org.tikv.txn.gc.GCWorker.GCWorkerConst.*;
 
 public class GCWorker implements AutoCloseable {
   private final String uuid;
+  private final long l_uuid;
   private final PDClient pdClient;
   private boolean gcIsRunning;
   private long lastFinish;
   private Logger logger = Logger.getLogger(this.getClass());
   private final RegionStoreClientBuilder regionStoreClientBuilder;
   private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setDaemon(true).build());
+  private final ScheduledExecutorService gcWorkerScheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setDaemon(true).build());
+  private ExecutorService gcTaskThreadPool;
   private ExecutorCompletionService<GCTask> gcTaskService;
 
   public GCWorker(TiSession session) {
     this.pdClient = session.getPDClient();
-//    long startTs = getTimestamp().getPhysical();
-    this.uuid = Long.toHexString(pdClient.grantLease(gcWorkerLease));
-    logger.info("uuid = " + uuid + " " + Long.valueOf(uuid, 16));
+    this.l_uuid = pdClient.grantLease(gcWorkerLease / 1000);
+    this.uuid = Long.toHexString(l_uuid);
+    logger.info("uuid = " + uuid + " " + l_uuid);
     this.lastFinish = 0;
     this.regionStoreClientBuilder = new RegionStoreClientBuilder(session.getConf(), session.getChannelFactory(), new RegionManager(session.getPDClient()));
   }
 
   @Override
   public void close() throws Exception {
+    pdClient.unlock(gcLeaderUUIDKey);
+    pdClient.revoke(l_uuid);
+    if (gcTaskThreadPool != null) {
+      gcTaskThreadPool.shutdown();
+    }
     scheduler.shutdown();
+    gcWorkerScheduler.shutdown();
   }
 
   public static class GCWorkerConst {
@@ -58,7 +87,6 @@ public class GCWorker implements AutoCloseable {
     static final ByteString gcSafePointKey = ByteString.copyFromUtf8("tikv_gc_safe_point");
     static final ByteString gcConcurrencyKey = ByteString.copyFromUtf8("tikv_gc_concurrency");
     static final ByteString gcLeaderUUIDKey = ByteString.copyFromUtf8("tikv_gc_leader_uuid");
-    static final ByteString gcLeaderDescKey = ByteString.copyFromUtf8("tikv_gc_leader_desc");
     static final ByteString gcLeaderLeaseKey = ByteString.copyFromUtf8("tikv_gc_leader_lease");
     static final int gcDefaultRunInterval = 10 * 60 * 1000;
     static final int gcDefaultLifeTime = 2 * 1000;//10 * 60 * 1000;
@@ -74,15 +102,17 @@ public class GCWorker implements AutoCloseable {
     return pdClient.getTimestamp(ConcreteBackOffer.newTsoBackOff());
   }
 
+  // Note: Should not call run() more than once
   public void run() {
-    new Thread(this::start).start();
+    gcWorkerScheduler.schedule(this::start, 0, TimeUnit.MILLISECONDS);
   }
 
   public void start() {
     logger.info(String.format("[gc worker] %s starts", uuid));
-    scheduler.scheduleWithFixedDelay(() -> {
+    scheduler.scheduleAtFixedRate(() -> {
       try {
-        logger.info("tick");
+        logger.debug("[gc worker] tick");
+        pdClient.keepLeaseAlive(l_uuid);
         tick();
       } catch (Exception e) {
         logger.warn("[gc worker] gc fails to proceed", e);
@@ -134,40 +164,36 @@ public class GCWorker implements AutoCloseable {
 
   private boolean checkLeader() {
     // acquire lock
-    if (!pdClient.lock(gcLeaderUUIDKey, Long.valueOf(uuid, 16))) {
-      logger.info("not leader");
-      return false;
-    }
+    boolean ok = pdClient.lock(gcLeaderUUIDKey, l_uuid) && doCheckLeader();
+    // release lock
+    pdClient.unlock(gcLeaderUUIDKey);
+    return ok;
+  }
 
-    String leader = getString(gcLeaderUUIDKey);
-    logger.debug(String.format("[gc worker] got leader: %s", leader));
-    if (leader != null && leader.equals(uuid)) {
+  private boolean doCheckLeader() {
+    long leader = getLong(gcLeaderUUIDKey);
+    logger.debug(String.format("[gc worker] got leader: %s", Long.toHexString(leader)));
+    if (leader == l_uuid) {
       try {
         putLong(gcLeaderLeaseKey, System.currentTimeMillis() + gcWorkerLease);
       } catch (Exception e) {
-        pdClient.unlock(gcLeaderUUIDKey);
         return false;
       }
-      // release lock
-      pdClient.unlock(gcLeaderUUIDKey);
       return true;
     }
     long lease = getLong(gcLeaderLeaseKey);
     if (lease == 0 || lease < System.currentTimeMillis()) {
       logger.debug(String.format("[gc worker] register %s as leader", uuid));
       try {
-        putString(gcLeaderUUIDKey, uuid);
-        putLong(gcLeaderLeaseKey, System.currentTimeMillis() + gcWorkerLease);
+        pdClient.txn().Then(
+            toPutOp(gcLeaderUUIDKey, uuid),
+            toPutOp(gcLeaderLeaseKey, System.currentTimeMillis() + gcWorkerLease)
+        ).commit().get(500, TimeUnit.MILLISECONDS);
       } catch (Exception e) {
-        pdClient.unlock(gcLeaderUUIDKey);
         return false;
       }
-      // release lock
-      pdClient.unlock(gcLeaderUUIDKey);
       return true;
     }
-    // release lock
-    pdClient.unlock(gcLeaderUUIDKey);
     return false;
   }
 
@@ -197,7 +223,8 @@ public class GCWorker implements AutoCloseable {
     putLong(gcSafePointKey, safePoint);
     logger.info(String.format("[gc worker] %s start gc, concurrency %d, safePoint: %d.", uuid, concurrency, safePoint));
 
-    gcTaskService = new ExecutorCompletionService<>(Executors.newFixedThreadPool((int) concurrency));
+    gcTaskThreadPool = Executors.newFixedThreadPool((int) concurrency);
+    gcTaskService = new ExecutorCompletionService<>(gcTaskThreadPool);
     for (int i = 0; i < concurrency; i++) {
       new Thread(() -> newGCTaskWorker(uuid).run()).start();
     }
@@ -208,7 +235,6 @@ public class GCWorker implements AutoCloseable {
       gcTaskService.submit(() -> task);
       key = task.endKey;
       if (key.equals(ByteString.EMPTY)) {
-        logger.info("reach end of all regions");
         return;
       }
     }
@@ -236,15 +262,17 @@ public class GCWorker implements AutoCloseable {
     void run() {
       GCTask task;
       try {
-        logger.info("run gc task worker");
+        logger.info("[gc worker] run gc task worker");
         while (true) {
           Future<GCTask> gcTaskFuture;
           if ((gcTaskFuture = gcTaskService.take()) == null) {
-            logger.error("No tasks remain");
+            logger.error("[gc worker] No tasks remain");
             return;
           }
           task = gcTaskFuture.get();
-          logger.info("receive " + KeyUtils.formatBytes(task.startKey) + " " + KeyUtils.formatBytes(task.endKey) + " " + task.safePoint);
+          if (logger.isDebugEnabled()) {
+            logger.debug("[gc worker] receive " + KeyUtils.formatBytes(task.startKey) + " " + KeyUtils.formatBytes(task.endKey) + " " + task.safePoint);
+          }
           try {
             doGCForRange(task.startKey, task.endKey, task.safePoint);
           } catch (Exception e) {
@@ -255,14 +283,13 @@ public class GCWorker implements AutoCloseable {
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        logger.warn("Current thread interrupted.", e);
+        logger.warn("[gc worker] Current thread interrupted.", e);
       } catch (ExecutionException e) {
-        logger.warn("Execution exception met.", e);
+        logger.warn("[gc worker] Execution exception met.", e);
       }
-      logger.info("run end");
     }
 
-    void doGCForRange(ByteString startKey, ByteString endKey, long safePoint) {
+    private void doGCForRange(ByteString startKey, ByteString endKey, long safePoint) {
       ByteString key = startKey;
       while (true) {
         BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.GcOneRegionMaxBackoff);
@@ -276,17 +303,17 @@ public class GCWorker implements AutoCloseable {
         }
         key = region.getEndKey();
         if (key.equals(ByteString.EMPTY) || FastByteComparisons.compareTo(key.toByteArray(), endKey.toByteArray()) >= 0) {
-          logger.info("doGCForRange complete.");
+          logger.info("[gc worker] doGCForRange complete.");
           return;
         }
       }
     }
 
-    void doGCForRegion(BackOffer backOffer, long safePoint, TiRegion region) {
+    private void doGCForRegion(BackOffer backOffer, long safePoint, TiRegion region) {
       RegionStoreClient client = regionStoreClientBuilder.build(region);
-      logger.info("doGCForRegion");
+      logger.debug("[gc worker] doGCForRegion");
       client.doGC(backOffer, safePoint);
-      logger.info("~doGCForRegion");
+      logger.debug("[gc worker] ~doGCForRegion");
     }
   }
 
@@ -333,7 +360,7 @@ public class GCWorker implements AutoCloseable {
     long lastSafePoint = getLong(gcSafePointKey);
     long safePoint = now - lifeTime;
     if (safePoint < lastSafePoint) {
-      logger.info(String.format("[gc worker] leaderTick on %s: last safe point (%d) is later than current one (%d). no need to gc. "+
+      logger.info(String.format("[gc worker] leaderTick on %s: last safe point (%d) is later than current one (%d). no need to gc. " +
           "this might be caused by manually enlarging gc lifetime.", uuid, lastSafePoint, safePoint));
       return 0;
     }
@@ -392,6 +419,19 @@ public class GCWorker implements AutoCloseable {
 
   private void putString(ByteString key, String value) {
     pdClient.put(key, ByteString.copyFromUtf8(value));
+  }
+
+
+  private static Op toPutOp(ByteString key, String value) {
+    return Op.put(
+        ByteSequence.from(key),
+        ByteSequence.from(value.getBytes()),
+        PutOption.DEFAULT
+    );
+  }
+
+  private static Op toPutOp(ByteString key, long value) {
+    return toPutOp(key, String.valueOf(value));
   }
 
   private void resolveLocks(long safePoint) {
