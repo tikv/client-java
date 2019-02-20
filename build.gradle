@@ -95,7 +95,6 @@ clean {
 }
 
 repositories {
-    maven { url "https://clojars.org/repo" }
     maven { url "http://repo.maven.apache.org/maven2" }
 }
 
