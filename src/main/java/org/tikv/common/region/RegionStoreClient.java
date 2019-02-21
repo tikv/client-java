@@ -21,7 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
-import static org.tikv.txn.gc.GCWorker.GCWorkerConst.gcScanLockLimit;
+import static org.tikv.txn.gc.GCWorker.gcScanLockLimit;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;

@@ -28,7 +28,13 @@ public class TxnKVClientTest {
   @Before
   public void setUp() {
     try {
-      TiSession session = TiSession.create(TiConfiguration.createDefault(DEFAULT_PD_ADDRESS));
+      TiConfiguration conf = TiConfiguration.createDefault(DEFAULT_PD_ADDRESS);
+      // might be overwritten by saved values in pd.
+      conf.setGCRunInterval(6 * 1000);
+      conf.setGCLifeTime(2 * 1000);
+      conf.setGCWaitTime(3 * 1000);
+      conf.setGCWorkerLease(2 * 1000);
+      TiSession session = TiSession.create(conf);
       initialized = false;
       if (client == null) {
         client = session.createTxnClient();

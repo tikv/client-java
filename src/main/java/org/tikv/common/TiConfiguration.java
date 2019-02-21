@@ -46,6 +46,11 @@ public class TiConfiguration implements Serializable {
   private static final String DEF_DB_PREFIX = "";
   private static final KVMode DEF_KV_MODE = KVMode.TXN;
   private static final int DEF_RAW_CLIENT_CONCURRENCY = 200;
+  private static final int DEF_GC_RUN_INTERVAL = 10 * 60 * 1000;
+  private static final int DEF_GC_LIFE_TIME = 10 * 60 * 1000;;
+  private static final int DEF_GC_CONCURRENCY = 2;
+  private static final int DEF_GC_WAIT_TIME = 60 * 1000;
+  private static final int DEF_GC_WORKER_LEASE = 2 * 60 * 1000;
 
   private int timeout = DEF_TIMEOUT;
   private TimeUnit timeoutUnit = DEF_TIMEOUT_UNIT;
@@ -65,6 +70,11 @@ public class TiConfiguration implements Serializable {
   private String dbPrefix = DEF_DB_PREFIX;
   private KVMode kvMode = DEF_KV_MODE;
   private int rawClientConcurrency = DEF_RAW_CLIENT_CONCURRENCY;
+  private int gcRunInterval = DEF_GC_RUN_INTERVAL;
+  private int gcLifeTime = DEF_GC_LIFE_TIME;
+  private int gcConcurrency = DEF_GC_CONCURRENCY;
+  private int gcWaitTime = DEF_GC_WAIT_TIME;
+  private int gcWorkerLease = DEF_GC_WORKER_LEASE;
 
   public enum KVMode {
     TXN,
@@ -79,9 +89,7 @@ public class TiConfiguration implements Serializable {
   }
 
   public static TiConfiguration createRawDefault(String pdAddrsStr) {
-    Objects.requireNonNull(pdAddrsStr, "pdAddrsStr is null");
-    TiConfiguration conf = new TiConfiguration();
-    conf.pdAddrs = strToHostAndPort(pdAddrsStr);
+    TiConfiguration conf = createDefault(pdAddrsStr);
     conf.kvMode = KVMode.RAW;
     return conf;
   }
@@ -248,5 +256,45 @@ public class TiConfiguration implements Serializable {
 
   public void setRawClientConcurrency(int rawClientConcurrency) {
     this.rawClientConcurrency = rawClientConcurrency;
+  }
+
+  public int getGCRunInterval() {
+    return gcRunInterval;
+  }
+
+  public void setGCRunInterval(int gcRunInterval) {
+    this.gcRunInterval = gcRunInterval;
+  }
+
+  public int getGCLifeTime() {
+    return gcLifeTime;
+  }
+
+  public void setGCLifeTime(int gcLifeTime) {
+    this.gcLifeTime = gcLifeTime;
+  }
+
+  public int getGCConcurrency() {
+    return gcConcurrency;
+  }
+
+  public void setGCConcurrency(int gcConcurrency) {
+    this.gcConcurrency = gcConcurrency;
+  }
+
+  public int getGCWaitTime() {
+    return gcWaitTime;
+  }
+
+  public void setGCWaitTime(int gcWaitTime) {
+    this.gcWaitTime = gcWaitTime;
+  }
+
+  public int getGCWorkerLease() {
+    return gcWorkerLease;
+  }
+
+  public void setGCWorkerLease(int gcWorkerLease) {
+    this.gcWorkerLease = gcWorkerLease;
   }
 }

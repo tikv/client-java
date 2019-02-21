@@ -18,13 +18,11 @@ package org.tikv.txn.gc;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
 import io.etcd.jetcd.ByteSequence;
-import io.etcd.jetcd.Txn;
-import io.etcd.jetcd.op.Cmp;
 import io.etcd.jetcd.op.Op;
-import io.etcd.jetcd.options.GetOption;
 import io.etcd.jetcd.options.PutOption;
 import org.apache.log4j.Logger;
 import org.tikv.common.PDClient;
+import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GCException;
@@ -45,8 +43,6 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
-import static org.tikv.txn.gc.GCWorker.GCWorkerConst.*;
-
 public class GCWorker implements AutoCloseable {
   private final String uuid;
   private final long l_uuid;
@@ -60,8 +56,30 @@ public class GCWorker implements AutoCloseable {
   private ExecutorService gcTaskThreadPool;
   private ExecutorCompletionService<GCTask> gcTaskService;
 
+  private static final ByteString GC_LAST_RUN_TIME_KEY = ByteString.copyFromUtf8("tikv_gc_last_run_time");
+  private static final ByteString GC_RUN_INTERVAL_KEY = ByteString.copyFromUtf8("tikv_gc_run_interval");
+  private static final ByteString GC_LIFE_TIME_KEY = ByteString.copyFromUtf8("tikv_gc_life_time");
+  private static final ByteString GC_SAFE_POINT_KEY = ByteString.copyFromUtf8("tikv_gc_safe_point");
+  private static final ByteString GC_CONCURRENCY_KEY = ByteString.copyFromUtf8("tikv_gc_concurrency");
+  private static final ByteString GC_LEADER_UUID_KEY = ByteString.copyFromUtf8("tikv_gc_leader_uuid");
+  private static final ByteString GC_LEADER_LEASE_KEY = ByteString.copyFromUtf8("tikv_gc_leader_lease");
+  public static final int gcScanLockLimit = 1024;
+  private final int gcDefaultRunInterval;// = 6 * 1000
+  private final int gcDefaultLifeTime;// = 2 * 1000;
+  private final int gcDefaultConcurrency;
+  private static final int gcMinConcurrency = 1;
+  private static final int gcMaxConcurrency = 128;
+  private final int gcWaitTime;// = 3 * 1000;
+  private final int gcWorkerLease;// = 2 * 1000;
+
   public GCWorker(TiSession session) {
     this.pdClient = session.getPDClient();
+    TiConfiguration conf = session.getConf();
+    this.gcDefaultRunInterval = conf.getGCRunInterval();
+    this.gcDefaultLifeTime = conf.getGCLifeTime();
+    this.gcDefaultConcurrency = conf.getGCConcurrency();
+    this.gcWaitTime = conf.getGCWaitTime();
+    this.gcWorkerLease = conf.getGCWorkerLease();
     this.l_uuid = pdClient.grantLease(gcWorkerLease / 1000);
     this.uuid = Long.toHexString(l_uuid);
     logger.info("uuid = " + uuid + " " + l_uuid);
@@ -71,31 +89,13 @@ public class GCWorker implements AutoCloseable {
 
   @Override
   public void close() throws Exception {
-    pdClient.unlock(gcLeaderUUIDKey);
+    pdClient.unlock(GC_LEADER_UUID_KEY);
     pdClient.revoke(l_uuid);
     if (gcTaskThreadPool != null) {
       gcTaskThreadPool.shutdown();
     }
     scheduler.shutdown();
     gcWorkerScheduler.shutdown();
-  }
-
-  public static class GCWorkerConst {
-    static final ByteString gcLastRunTimeKey = ByteString.copyFromUtf8("tikv_gc_last_run_time");
-    static final ByteString gcRunIntervalKey = ByteString.copyFromUtf8("tikv_gc_run_interval");
-    static final ByteString gcLifeTimeKey = ByteString.copyFromUtf8("tikv_gc_life_time");
-    static final ByteString gcSafePointKey = ByteString.copyFromUtf8("tikv_gc_safe_point");
-    static final ByteString gcConcurrencyKey = ByteString.copyFromUtf8("tikv_gc_concurrency");
-    static final ByteString gcLeaderUUIDKey = ByteString.copyFromUtf8("tikv_gc_leader_uuid");
-    static final ByteString gcLeaderLeaseKey = ByteString.copyFromUtf8("tikv_gc_leader_lease");
-    static final int gcDefaultRunInterval = 10 * 60 * 1000;
-    static final int gcDefaultLifeTime = 2 * 1000;//10 * 60 * 1000;
-    static final int gcDefaultConcurrency = 2;
-    static final int gcWaitTime = 3 * 1000;//60 * 1000;
-    public static final int gcScanLockLimit = 1024;
-    static final int gcMinConcurrency = 1;
-    static final int gcMaxConcurrency = 128;
-    static final int gcWorkerLease = 2 * 1000;//2 * 60 * 1000;
   }
 
   private TiTimestamp getTimestamp() {
@@ -164,30 +164,30 @@ public class GCWorker implements AutoCloseable {
 
   private boolean checkLeader() {
     // acquire lock
-    boolean ok = pdClient.lock(gcLeaderUUIDKey, l_uuid) && doCheckLeader();
+    boolean ok = pdClient.lock(GC_LEADER_UUID_KEY, l_uuid) && doCheckLeader();
     // release lock
-    pdClient.unlock(gcLeaderUUIDKey);
+    pdClient.unlock(GC_LEADER_UUID_KEY);
     return ok;
   }
 
   private boolean doCheckLeader() {
-    long leader = getLong(gcLeaderUUIDKey);
+    long leader = getLong(GC_LEADER_UUID_KEY);
     logger.debug(String.format("[gc worker] got leader: %s", Long.toHexString(leader)));
     if (leader == l_uuid) {
       try {
-        putLong(gcLeaderLeaseKey, System.currentTimeMillis() + gcWorkerLease);
+        putLong(GC_LEADER_LEASE_KEY, System.currentTimeMillis() + gcWorkerLease);
       } catch (Exception e) {
         return false;
       }
       return true;
     }
-    long lease = getLong(gcLeaderLeaseKey);
+    long lease = getLong(GC_LEADER_LEASE_KEY);
     if (lease == 0 || lease < System.currentTimeMillis()) {
       logger.debug(String.format("[gc worker] register %s as leader", uuid));
       try {
         pdClient.txn().Then(
-            toPutOp(gcLeaderUUIDKey, uuid),
-            toPutOp(gcLeaderLeaseKey, System.currentTimeMillis() + gcWorkerLease)
+            toPutOp(GC_LEADER_UUID_KEY, uuid),
+            toPutOp(GC_LEADER_LEASE_KEY, System.currentTimeMillis() + gcWorkerLease)
         ).commit().get(500, TimeUnit.MILLISECONDS);
       } catch (Exception e) {
         return false;
@@ -208,7 +208,7 @@ public class GCWorker implements AutoCloseable {
   }
 
   private void doGC(long safePoint) {
-    long concurrency = getLongOrElse(gcConcurrencyKey, gcDefaultConcurrency);
+    long concurrency = getLongOrElse(GC_CONCURRENCY_KEY, gcDefaultConcurrency);
     if (concurrency < gcMinConcurrency) {
       concurrency = gcMinConcurrency;
     }
@@ -220,7 +220,7 @@ public class GCWorker implements AutoCloseable {
   }
 
   private void doGCInternal(long safePoint, long concurrency) {
-    putLong(gcSafePointKey, safePoint);
+    putLong(GC_SAFE_POINT_KEY, safePoint);
     logger.info(String.format("[gc worker] %s start gc, concurrency %d, safePoint: %d.", uuid, concurrency, safePoint));
 
     gcTaskThreadPool = Executors.newFixedThreadPool((int) concurrency);
@@ -336,17 +336,16 @@ public class GCWorker implements AutoCloseable {
     long newSafePoint = calculateNewSafePoint(now);
     if (newSafePoint != 0) {
       // save last run time
-      putLong(gcLastRunTimeKey, now);
+      putLong(GC_LAST_RUN_TIME_KEY, now);
       // save new safe point
-      putLong(gcSafePointKey, newSafePoint);
+      putLong(GC_SAFE_POINT_KEY, newSafePoint);
     }
     return newSafePoint;
   }
 
   private boolean checkGCInterval(long now) {
-//    long runInterval = loadAndSaveLongWithDefault(gcRunIntervalKey, gcDefaultRunInterval);
-    long runInterval = 6 * 1000;
-    long lastRun = getLong(gcLastRunTimeKey);
+    long runInterval = loadAndSaveLongWithDefault(GC_RUN_INTERVAL_KEY, gcDefaultRunInterval);
+    long lastRun = getLong(GC_LAST_RUN_TIME_KEY);
 
     if (lastRun != 0 && lastRun + runInterval > now) {
       logger.info(String.format("[gc worker] leaderTick on %s: until now (%d), gc interval (%d) haven't past since last run (%d). no need to gc", uuid, now, runInterval, lastRun));
@@ -356,8 +355,8 @@ public class GCWorker implements AutoCloseable {
   }
 
   private long calculateNewSafePoint(long now) {
-    long lifeTime = loadAndSaveLongWithDefault(gcLifeTimeKey, gcDefaultLifeTime);
-    long lastSafePoint = getLong(gcSafePointKey);
+    long lifeTime = loadAndSaveLongWithDefault(GC_LIFE_TIME_KEY, gcDefaultLifeTime);
+    long lastSafePoint = getLong(GC_SAFE_POINT_KEY);
     long safePoint = now - lifeTime;
     if (safePoint < lastSafePoint) {
       logger.info(String.format("[gc worker] leaderTick on %s: last safe point (%d) is later than current one (%d). no need to gc. " +

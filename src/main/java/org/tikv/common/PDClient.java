@@ -68,10 +68,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private volatile LeaderWrapper leaderWrapper;
   private ScheduledExecutorService service;
   private List<HostAndPort> pdAddrs;
-  private Client client;
   private KV etcdKV;
   private Lock lockClient;
   private Lease leaseClient;
+  private static final int pdTimeOutLimit = 200;
 
   @Override
   public TiTimestamp getTimestamp(BackOffer backOffer) {
@@ -234,7 +234,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   public ByteString get(ByteString key) {
     try {
-      GetResponse resp = etcdKV.get(ByteSequence.from(key)).get(500, TimeUnit.MILLISECONDS);
+      GetResponse resp = etcdKV.get(ByteSequence.from(key)).get(pdTimeOutLimit, TimeUnit.MILLISECONDS);
       List<KeyValue> kvs = resp.getKvs();
       if (kvs.size() == 0 || kvs.get(0) == null) {
         return null;
@@ -256,7 +256,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   public void put(ByteString key, ByteString value) {
     try {
-      etcdKV.put(ByteSequence.from(key), ByteSequence.from(value)).get(500, TimeUnit.MILLISECONDS);
+      etcdKV.put(ByteSequence.from(key), ByteSequence.from(value)).get(pdTimeOutLimit, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       throw new TiKVException("put etcd key fails", e);
     }
@@ -275,7 +275,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
    */
   public boolean lock(ByteString key, long lease) {
     try {
-      LockResponse resp = lockClient.lock(ByteSequence.from(key), lease).get(500, TimeUnit.MILLISECONDS);
+      LockResponse resp = lockClient.lock(ByteSequence.from(key), lease).get(pdTimeOutLimit, TimeUnit.MILLISECONDS);
       return true;
     } catch (Exception e) {
       logger.warn("lock fails", e);
@@ -290,7 +290,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
    */
   public void unlock(ByteString key) {
     try {
-      lockClient.unlock(ByteSequence.from(key)).get(500, TimeUnit.MILLISECONDS);
+      lockClient.unlock(ByteSequence.from(key)).get(pdTimeOutLimit, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       logger.warn("unlock fails", e);
     }
@@ -304,7 +304,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
    */
   public long grantLease(long ttl) {
     try {
-      LeaseGrantResponse resp = leaseClient.grant(ttl).get(500, TimeUnit.MILLISECONDS);
+      LeaseGrantResponse resp = leaseClient.grant(ttl).get(pdTimeOutLimit, TimeUnit.MILLISECONDS);
       return resp.getID();
     } catch (Exception e) {
       throw new GCException("GC worker failed to start because granting lease fails", e);
@@ -318,7 +318,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
    */
   public void keepLeaseAlive(long leaseId) {
     try {
-      leaseClient.keepAliveOnce(leaseId).get(500, TimeUnit.MILLISECONDS);
+      leaseClient.keepAliveOnce(leaseId).get(pdTimeOutLimit, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       logger.warn("keep alive failed", e);
     }
@@ -331,7 +331,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
    */
   public void revoke(long leaseId) {
     try {
-      leaseClient.revoke(leaseId).get(500, TimeUnit.MILLISECONDS);
+      leaseClient.revoke(leaseId).get(pdTimeOutLimit, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       logger.warn(String.format("revoke %s fails", Long.toHexString(leaseId)), e);
     }
@@ -493,7 +493,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         1,
         1,
         TimeUnit.MINUTES);
-    client = Client.builder().endpoints(getMemberUrI()).build();
+    Client client = Client.builder().endpoints(getMemberUrI()).build();
     etcdKV = client.getKVClient();
     lockClient = client.getLockClient();
     leaseClient = client.getLeaseClient();
