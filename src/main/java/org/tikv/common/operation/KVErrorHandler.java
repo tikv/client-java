@@ -131,7 +131,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         backOffer.doBackOff(
             BackOffFunction.BackOffFuncType.BoStoreNotMatch, new GrpcException(error.toString()));
         return true;
-      } else if (error.hasStaleEpoch()) {
+      } else if (error.hasEpochNotMatch()) {
         // this error is reported from raftstore:
         // region has outdated version，please try later.
         logger.warn(String.format("Stale Epoch encountered for region [%s]", ctxRegion));
