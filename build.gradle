@@ -44,8 +44,8 @@ sourceSets {
     }
 	test {
 		java {
-            srcDirs 'src/test/java', 'target/generated-sources/protobuf/java' , 'target/generated-sources/protobuf/grpc-java'
-        }
+			srcDirs 'src/test/java', 'target/generated-sources/protobuf/java' , 'target/generated-sources/protobuf/grpc-java'
+		}
 	}
     // remove the test configuration - at least in your example you don't have a special test proto file
 }
@@ -142,13 +142,13 @@ task updateProtoModule(type: Exec) {
 task copyResources(type: Copy) {
 	includeEmptyDirs = false
 	copy {
-		from "./scripts/kvproto/include/"
+		from "./kvproto/include/"
 	    include "**/gogoproto/**"
-		into "src/main/proto"
+		into "proto"
 	}
 	copy {
-		from "./scripts/kvproto/proto/", "./scripts/raft-rs/proto/", "./scripts/tipb/proto"
-		into "src/main/proto"
+		from "./kvproto/proto/", "./raft-rs/proto/", "./tipb/proto"
+		into "proto"
 	}
 }
 
