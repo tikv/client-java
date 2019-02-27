@@ -228,7 +228,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return leaderWrapper;
   }
 
-  private List<URI> getMemberUrI() {
+  private List<URI> getMemberURI() {
     return pdAddrs.stream().map(x -> URI.create("http://" + x.toString())).collect(Collectors.toList());
   }
 
@@ -493,7 +493,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         1,
         1,
         TimeUnit.MINUTES);
-    Client client = Client.builder().endpoints(getMemberUrI()).build();
+    Client client = Client.builder().endpoints(getMemberURI()).build();
     etcdKV = client.getKVClient();
     lockClient = client.getLockClient();
     leaseClient = client.getLeaseClient();
