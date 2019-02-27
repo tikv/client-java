@@ -36,7 +36,7 @@ import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Errorpb.Error;
 import org.tikv.kvproto.Errorpb.NotLeader;
 import org.tikv.kvproto.Errorpb.ServerIsBusy;
-import org.tikv.kvproto.Errorpb.StaleEpoch;
+import org.tikv.kvproto.Errorpb.EpochNotMatch;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.Context;
 import org.tikv.kvproto.TikvGrpc;
@@ -154,7 +154,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     } else if (errorCode == KEY_NOT_IN_REGION) {
       errBuilder.setKeyNotInRegion(Errorpb.KeyNotInRegion.getDefaultInstance());
     } else if (errorCode == STALE_EPOCH) {
-      errBuilder.setStaleEpoch(Errorpb.StaleEpoch.getDefaultInstance());
+      errBuilder.setEpochNotMatch(Errorpb.EpochNotMatch.getDefaultInstance());
     } else if (errorCode == STALE_COMMAND) {
       errBuilder.setStaleCommand(Errorpb.StaleCommand.getDefaultInstance());
     } else if (errorCode == SERVER_IS_BUSY) {
@@ -318,7 +318,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         Integer errorCode = errorMap.remove(keyRange.getStart());
         if (errorCode != null) {
           if (STALE_EPOCH == errorCode) {
-            errBuilder.setStaleEpoch(StaleEpoch.getDefaultInstance());
+            errBuilder.setEpochNotMatch(EpochNotMatch.getDefaultInstance());
           } else if (NOT_LEADER == errorCode) {
             errBuilder.setNotLeader(NotLeader.getDefaultInstance());
           } else {
