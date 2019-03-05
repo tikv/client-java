@@ -42,7 +42,7 @@ public class ChannelFactory implements AutoCloseable {
           }
           // Channel should be lazy without actual connection until first call
           // So a coarse grain lock is ok here
-          return ManagedChannelBuilder.forAddress(address.getHostText(), address.getPort())
+          return ManagedChannelBuilder.forAddress(address.getHost(), address.getPort())
               .maxInboundMessageSize(maxFrameSize)
               .usePlaintext(true)
               .idleTimeout(60, TimeUnit.SECONDS)

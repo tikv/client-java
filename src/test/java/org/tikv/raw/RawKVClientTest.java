@@ -20,7 +20,7 @@ import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest {
   private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
-  private static final String RAW_PREFIX = "raw_\\u0001_";
+  private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
   private static final int WORKER_CNT = 100;
@@ -66,7 +66,7 @@ public class RawKVClientTest {
   @Before
   public void setup() throws IOException {
     try {
-      session = TiSession.create(TiConfiguration.createDefault(DEFAULT_PD_ADDRESS));
+      session = TiSession.create(TiConfiguration.createRawDefault(DEFAULT_PD_ADDRESS));
       initialized = false;
       if (client == null) {
         client = session.createRawClient();
@@ -74,13 +74,15 @@ public class RawKVClientTest {
       data = new TreeMap<>(bsc);
       initialized = true;
     } catch (Exception e) {
-      System.out.println("Cannot initialize raw client. Test skipped.");
+      logger.warn("Cannot initialize raw client. Test skipped.", e);
     }
   }
 
   @After
   public void tearDown() {
-    session.close();
+    if (session != null) {
+      session.close();
+    }
   }
 
   @Test
@@ -141,13 +143,11 @@ public class RawKVClientTest {
       boolean benchmark,
       boolean batchPut) {
     if (putCases > KEY_POOL_SIZE) {
-      System.out.println(
-          "Number of distinct orderedKeys required exceeded pool size " + KEY_POOL_SIZE);
+      logger.info("Number of distinct orderedKeys required exceeded pool size " + KEY_POOL_SIZE);
       return;
     }
     if (deleteCases > putCases) {
-      System.out.println(
-          "Number of orderedKeys to delete is more than total number of orderedKeys");
+      logger.info("Number of orderedKeys to delete is more than total number of orderedKeys");
       return;
     }
 
@@ -167,14 +167,14 @@ public class RawKVClientTest {
     } catch (final TiKVException e) {
       logger.warn("Test fails with Exception " + e);
     }
-    System.out.println("ok, test done");
+    logger.info("ok, test done");
   }
 
   private void prepare() {
-    System.out.println("Initializing test");
+    logger.info("Initializing test");
     List<Kvrpcpb.KvPair> remainingKeys = rawKeys();
     int sz = remainingKeys.size();
-    System.out.println("deleting " + sz);
+    logger.info("deleting " + sz);
     int base = sz / WORKER_CNT;
     remainingKeys.forEach(
         kvPair -> {
@@ -206,16 +206,16 @@ public class RawKVClientTest {
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      System.out.println("Current thread interrupted. Test fail.");
+      logger.info("Current thread interrupted. Test fail.");
     } catch (TimeoutException e) {
-      System.out.println("TimeOut Exceeded for current test. " + timeOutLimit + "s");
+      logger.info("TimeOut Exceeded for current test. " + timeOutLimit + "s");
     } catch (ExecutionException e) {
-      System.out.println("Execution exception met. Test fail.");
+      logger.info("Execution exception met. Test fail.");
     }
   }
 
   private void rawPutTest(int putCases, boolean benchmark) {
-    System.out.println("put testing");
+    logger.info("put testing");
     if (benchmark) {
       for (int i = 0; i < putCases; i++) {
         ByteString key = orderedKeys.get(i), value = values.get(i);
@@ -238,7 +238,7 @@ public class RawKVClientTest {
       }
       awaitTimeOut(100);
       long end = System.currentTimeMillis();
-      System.out.println(
+      logger.info(
           putCases
               + " put: "
               + (end - start) / 1000.0
@@ -256,7 +256,7 @@ public class RawKVClientTest {
   }
 
   private void rawBatchPutTest(int putCases, boolean benchmark) {
-    System.out.println("batchPut testing");
+    logger.info("batchPut testing");
     if (benchmark) {
       for (int i = 0; i < putCases; i++) {
         ByteString key = orderedKeys.get(i), value = values.get(i);
@@ -281,7 +281,7 @@ public class RawKVClientTest {
       }
       awaitTimeOut(100);
       long end = System.currentTimeMillis();
-      System.out.println(
+      logger.info(
           putCases
               + " batchPut: "
               + (end - start) / 1000.0
@@ -301,7 +301,7 @@ public class RawKVClientTest {
   }
 
   private void rawGetTest(int getCases, boolean benchmark) {
-    System.out.println("get testing");
+    logger.info("get testing");
     if (benchmark) {
       long start = System.currentTimeMillis();
       int base = getCases / WORKER_CNT;
@@ -319,7 +319,7 @@ public class RawKVClientTest {
       }
       awaitTimeOut(200);
       long end = System.currentTimeMillis();
-      System.out.println(getCases + " get: " + (end - start) / 1000.0 + "s");
+      logger.info(getCases + " get: " + (end - start) / 1000.0 + "s");
     } else {
       int i = 0;
       for (Map.Entry<ByteString, ByteString> pair : data.entrySet()) {
@@ -333,7 +333,7 @@ public class RawKVClientTest {
   }
 
   private void rawScanTest(int scanCases, boolean benchmark) {
-    System.out.println("rawScan testing");
+    logger.info("rawScan testing");
     if (benchmark) {
       long start = System.currentTimeMillis();
       int base = scanCases / WORKER_CNT;
@@ -356,7 +356,7 @@ public class RawKVClientTest {
       }
       awaitTimeOut(200);
       long end = System.currentTimeMillis();
-      System.out.println(scanCases + " scan: " + (end - start) / 1000.0 + "s");
+      logger.info(scanCases + " scan: " + (end - start) / 1000.0 + "s");
     } else {
       for (int i = 0; i < scanCases; i++) {
         ByteString startKey = randomKeys.get(r.nextInt(KEY_POOL_SIZE)),
@@ -372,7 +372,7 @@ public class RawKVClientTest {
   }
 
   private void rawDeleteTest(int deleteCases, boolean benchmark) {
-    System.out.println("delete testing");
+    logger.info("delete testing");
     if (benchmark) {
       long start = System.currentTimeMillis();
       int base = deleteCases / WORKER_CNT;
@@ -390,7 +390,7 @@ public class RawKVClientTest {
       }
       awaitTimeOut(100);
       long end = System.currentTimeMillis();
-      System.out.println(deleteCases + " delete: " + (end - start) / 1000.0 + "s");
+      logger.info(deleteCases + " delete: " + (end - start) / 1000.0 + "s");
     } else {
       int i = 0;
       for (ByteString key : data.keySet()) {
