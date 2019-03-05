@@ -13,17 +13,17 @@
  * limitations under the License.
  */
 
-package org.tikv.txn;
+package org.tikv.txn.gc;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 
-public class TxnKVClientTest {
+public class GCClientTest {
   private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
   private static boolean initialized;
-  private static TxnKVClient client = null;
+  private static GCClient client = null;
 
   @Before
   public void setUp() {
@@ -37,11 +37,11 @@ public class TxnKVClientTest {
       TiSession session = TiSession.create(conf);
       initialized = false;
       if (client == null) {
-        client = session.createTxnClient();
+        client = session.createGCClient();
       }
       initialized = true;
     } catch (Exception e) {
-      System.out.println("Cannot initialize txn client. Test skipped.");
+      System.out.println("Cannot initialize gc client. Test skipped.");
       e.printStackTrace();
     }
   }

@@ -13,14 +13,12 @@
  * limitations under the License.
  */
 
-package org.tikv.txn;
+package org.tikv.txn.gc;
 
 import org.tikv.common.TiSession;
-import org.tikv.txn.gc.GCWorker;
 
-public class TxnKVClient {
-  // TODO: To be done.
-  public TxnKVClient(TiSession session) {
+public class GCClient {
+  public GCClient(TiSession session) {
     GCWorker worker = new GCWorker(session);
     worker.run();
   }
