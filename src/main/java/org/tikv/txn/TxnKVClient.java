@@ -1,3 +1,18 @@
+/*
+ * Copyright 2019 The TiKV Project Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.tikv.txn;
 
 import com.google.common.collect.Lists;
@@ -39,6 +54,8 @@ public class TxnKVClient implements AutoCloseable{
     private final RegionManager regionManager;
     private ReadOnlyPDClient pdClient;
 
+    private long lockTTL = 2000;
+
     public RegionStoreClient.RegionStoreClientBuilder getClientBuilder() {
         return clientBuilder;
     }
@@ -56,14 +73,8 @@ public class TxnKVClient implements AutoCloseable{
         this.conf = conf;
         this.clientBuilder = clientBuilder;
         this.regionManager = clientBuilder.getRegionManager();
-        //this.session = TiSession.create(TiConfiguration.createRawDefault(addresses));
-        //this.regionManager = new RegionManager(session.getPDClient());
         this.pdClient = pdClient;
     }
-
-    /*public static TxnKVClient createClient(String addresses) {
-        return new TxnKVClient(addresses);
-    }*/
 
     public TiTimestamp getTimestamp() {
         BackOffer bo = ConcreteBackOffer.newTsoBackOff();
@@ -95,7 +106,9 @@ public class TxnKVClient implements AutoCloseable{
         return new TikvTransaction(this, function);
     }
 
-    //add backoff logic when encountered region error,ErrBodyMissing, and other errors
+    /**
+     * when encountered region error,ErrBodyMissing, and other errors
+     */
     public ClientRPCResult prewrite(BackOffer backOffer, List<Kvrpcpb.Mutation> mutations, byte[] primary, long lockTTL, long startTs, long regionId) {
         ClientRPCResult result = new ClientRPCResult(true, false, null);
         //send request
@@ -225,7 +238,6 @@ public class TxnKVClient implements AutoCloseable{
                         .setKey(byteKey).setValue(byteValue).setOp(Kvrpcpb.Op.Put)
                         .build()
         );
-        long lockTTL = 2000;
         long startTS;
         TiRegion region = regionManager.getRegionByKey(byteKey);
         boolean prewrite = false;

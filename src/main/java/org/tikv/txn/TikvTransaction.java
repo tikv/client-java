@@ -1,3 +1,18 @@
+/*
+ * Copyright 2019 The TiKV Project Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.tikv.txn;
 
 import com.google.common.collect.Lists;
@@ -5,10 +20,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.Snapshot;
 import org.tikv.common.key.Key;
+import org.tikv.common.memdb.MemDbBuffer;
+import org.tikv.common.memdb.UnionStore;
 import org.tikv.common.meta.TiTimestamp;
 
 import java.security.SecureRandom;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -35,7 +53,11 @@ public class TikvTransaction implements ITransaction {
 
     //private ReentrantMutex mutex = new ReentrantMutex();
 
-    private Map<byte[], byte[]> memoryKvStore = new HashMap<>();
+    //private Map<byte[], byte[]> memoryKvStore = new HashMap<>();
+
+    //private MemDbBuffer memDb = new MemDbBuffer(1000);
+
+    private final UnionStore memdb;
 
     private List<byte[]> lockKeys;
 
@@ -59,6 +81,7 @@ public class TikvTransaction implements ITransaction {
         this.transactionFunction = function;
         this.lockKeys = Lists.newLinkedList();
         this.init();
+        this.memdb = new UnionStore(this.snapshot);
     }
 
     private void init() {
@@ -70,21 +93,22 @@ public class TikvTransaction implements ITransaction {
 
     @Override
     public boolean set(byte[] key, byte[] value) {
-        memoryKvStore.put(key, value);
+        memdb.set(Key.toRawKey(key), value);
         return true;
     }
 
     @Override
     public byte[] get(byte[] key) {
-        if(memoryKvStore.get(key) != null) {
-            return memoryKvStore.get(key);
+        byte[] value = memdb.get(Key.toRawKey(key));
+        if(value != null) {
+            return value;
         }
         return snapshot.get(key);
     }
 
     @Override
     public boolean delete(byte[] key) {
-        memoryKvStore.put(key, new byte[0]);
+        memdb.set(Key.toRawKey(key), new byte[0]);
         return true;
     }
 
@@ -121,7 +145,7 @@ public class TikvTransaction implements ITransaction {
                 return true;
             }
             this.lockKeys.clear();
-            this.memoryKvStore.clear();
+            this.memdb.reset();
             this.init();
             LOG.warn("txn commit failed with attempts {} times, startTs={}", i + 1, startTime);
             backoff(i);
@@ -181,7 +205,13 @@ public class TikvTransaction implements ITransaction {
 
     @Override
     public Map<byte[], byte[]> getStoredKeys() {
-        return memoryKvStore;
+        Iterator it = memdb.iterator(null, null);
+        Map<byte[], byte[]> result = new HashMap<>();
+        while(it != null && it.hasNext()) {
+            Map.Entry<Key, Key> entry = (Map.Entry<Key, Key>)it.next();
+            result.put(entry.getKey().getBytes(), entry.getValue().getBytes());
+        }
+        return result;
     }
 
     @Override
@@ -192,16 +222,7 @@ public class TikvTransaction implements ITransaction {
     private void close() {
         this.valid = false;
         this.lockKeys.clear();
-        this.memoryKvStore.clear();
-    }
-
-    private byte[][] toKeys() {
-        byte[][] keys = new byte[memoryKvStore.size()][];
-        int i = 0;
-        for(byte[] key : memoryKvStore.keySet()) {
-            keys[i++] = key;
-        }
-        return keys;
+        this.memdb.reset();
     }
 
     // BackOff Implements exponential backoff with full jitter.

@@ -1,3 +1,18 @@
+/*
+ * Copyright 2019 The TiKV Project Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.tikv.txn;
 
 import com.google.protobuf.ByteString;
@@ -93,8 +108,13 @@ public class TwoPhaseCommitter {
         }
         List<byte[]> lockedKeys = transaction.getLockedKeys();
         for(byte[] lockedKey : lockedKeys) {
+            ByteString key = ByteString.copyFrom(lockedKey);
+            if(this.mutations.get(key) != null) {
+                //locked key exist already, omit it.
+                continue;
+            }
             Kvrpcpb.Mutation mutation = Kvrpcpb.Mutation.newBuilder()
-                    .setKey(ByteString.copyFrom(lockedKey))
+                    .setKey(key)
                     .setOp(Kvrpcpb.Op.Lock)
                     .build();
             mutations.put(new String(lockedKey), mutation);
@@ -495,7 +515,15 @@ public class TwoPhaseCommitter {
         BackOffer commitBackoff = ConcreteBackOffer.newCustomBackOff(BackOffer.commitMaxBackoff);
         String commitError = this.commitKeys(commitBackoff, keys);
         if(commitError != null) {
-            LOG.error("failed on commit, startTs={}, commitTs={}", this.startTs, commitError);
+            LOG.error("failed on commit, startTs={}, error={}", this.startTs, commitError);
+            //Always clean up all written keys if the txn does not commit.
+            BackOffer cleanupBackoff = ConcreteBackOffer.newCustomBackOff(BackOffer.commitMaxBackoff);
+            String cleanupError = this.cleanupKeys(cleanupBackoff, keys);
+            if(cleanupError != null) {
+                LOG.error("cleanup error, startTs={}, error={}", this.startTs, cleanupError);
+            } else {
+                LOG.info("cleanup done, startTs={}", this.startTs);
+            }
             return false;
         }
 

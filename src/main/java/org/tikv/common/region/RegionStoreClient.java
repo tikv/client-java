@@ -40,6 +40,7 @@ import org.tikv.common.operation.KVErrorHandler;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.BatchGetRequest;
 import org.tikv.kvproto.Kvrpcpb.BatchGetResponse;
 import org.tikv.kvproto.Kvrpcpb.GetRequest;
@@ -71,7 +72,7 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
   private static final Logger logger = Logger.getLogger(RegionStoreClient.class);
   private TiRegion region;
   private final RegionManager regionManager;
-  @VisibleForTesting private final LockResolverClient lockResolverClient;
+  @VisibleForTesting public final LockResolverClient lockResolverClient;
   private TikvBlockingStub blockingStub;
   private TikvStub asyncStub;
 
@@ -438,13 +439,13 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
               region,
               resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       Kvrpcpb.DeleteRangeResponse resp = callWithRetry(backOffer, TikvGrpc.METHOD_KV_DELETE_RANGE, factory, handler);
-      if(deleteHelper(backOffer, resp)){
+      if(deleteRangeHelper(backOffer, resp)){
         break;
       }
     }
   }
 
-  private boolean deleteHelper(BackOffer bo, Kvrpcpb.DeleteRangeResponse resp) {
+  private boolean deleteRangeHelper(BackOffer bo, Kvrpcpb.DeleteRangeResponse resp) {
     if (resp == null){
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("DeleteRangeResponse failed without a cause");

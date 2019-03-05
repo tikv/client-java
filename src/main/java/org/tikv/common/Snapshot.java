@@ -19,6 +19,7 @@ import com.google.common.collect.Range;
 import com.google.protobuf.ByteString;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
+import org.tikv.common.memdb.iterator.IRetriever;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.iterator.ConcreteScanIterator;
 import org.tikv.common.region.RegionStoreClient;
@@ -33,7 +34,7 @@ import java.util.List;
 
 import static org.tikv.common.util.KeyRangeUtils.makeRange;
 
-public class Snapshot {
+public class Snapshot implements IRetriever {
   private final TiTimestamp timestamp;
   //private final TiSession session;
   private final TiConfiguration conf;
@@ -65,13 +66,11 @@ public class Snapshot {
   public ByteString get(ByteString key) {
     RegionStoreClient client = clientBuilder.build(key);
     // TODO: Need to deal with lock error after grpc stable
-    return client.get(ConcreteBackOffer.newGetBackOff(), key, timestamp.getVersion());
+    return client.get(ConcreteBackOffer.newGetBackOff(), key, this.timestamp.getVersion());
   }
 
   public Iterator<KvPair> scan(ByteString startKey) {
-    BackOffer bo = ConcreteBackOffer.newTsoBackOff();
-    long version = pdClient.getTimestamp(bo).getVersion();
-    return new ConcreteScanIterator(conf, clientBuilder, startKey, version);
+    return new ConcreteScanIterator(conf, clientBuilder, startKey, this.timestamp.getVersion());
   }
 
   // TODO: Need faster implementation, say concurrent version
@@ -101,5 +100,20 @@ public class Snapshot {
       }
     }
     return result;
+  }
+
+  @Override
+  public byte[] get(Key key) {
+    return new byte[0];
+  }
+
+  @Override
+  public Iterator iterator(Key key, Key upperBound) {
+    return null;
+  }
+
+  @Override
+  public Iterator iteratorReverse(Key key) {
+    return null;
   }
 }

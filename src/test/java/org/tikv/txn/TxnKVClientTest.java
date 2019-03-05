@@ -57,7 +57,7 @@ public class TxnKVClientTest {
 
     @Test
     public void testGet(){
-        String key = "txn_test_set_0001";
+        String key = "test_AAAAGAaJwbZnjgaPvypwZTiuMBFirzPf_primary_001";
         byte[] rawValue = txnClient.get(key.getBytes());
         String value = new String(rawValue);
         System.out.println("Value=" + value);
@@ -73,8 +73,8 @@ public class TxnKVClientTest {
 
     @Test
     public void testTxnCommitSuccess() {
-        String key = "test_AAAAGAaJwbZnjgaPvypwZTiuMBFirzPf";
-        String value = "put_value 2222";
+        String key = "test_AAAAGAaJwbZnjgaPvypwZTiuMBFirzPf_primary_001";
+        String value = "put_value 3333";
         ITransaction txn = this.txnClient.begin();
         try {
             txn.set(key.getBytes(), value.getBytes());
@@ -89,7 +89,7 @@ public class TxnKVClientTest {
     @Test
     public void testTxnCommitWithConflict() {
         ByteString key = ByteString.copyFromUtf8("test_AAAAGAaJwbZnjgaPvypwZTiuMBFirzPf_primary_001");
-        ByteString value = ByteString.copyFromUtf8("put_value primary");
+        ByteString value = ByteString.copyFromUtf8("put_value primary 1");
         ByteString key2 = ByteString.copyFromUtf8("txn_test_secondary_0001");
         ByteString value2 = ByteString.copyFromUtf8("put_value secondary");
         long startVersion = txnClient.getTimestamp().getVersion();
