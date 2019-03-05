@@ -15,9 +15,10 @@
 
 package org.tikv.common.util;
 
-import com.google.common.net.HostAndPort;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+
+import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -34,15 +35,15 @@ public class ChannelFactory implements AutoCloseable {
     return connPool.computeIfAbsent(
         addressStr,
         key -> {
-          HostAndPort address;
+          URI address;
           try {
-            address = HostAndPort.fromString(key);
+            address = URI.create("http://" + key);
           } catch (Exception e) {
-            throw new IllegalArgumentException("failed to form address");
+            throw new IllegalArgumentException("failed to form address " + key);
           }
           // Channel should be lazy without actual connection until first call
           // So a coarse grain lock is ok here
-          return ManagedChannelBuilder.forAddress(address.getHostText(), address.getPort())
+          return ManagedChannelBuilder.forAddress(address.getHost(), address.getPort())
               .maxInboundMessageSize(maxFrameSize)
               .usePlaintext(true)
               .idleTimeout(60, TimeUnit.SECONDS)
