@@ -53,13 +53,19 @@ public class UnionStore implements IUnionStore, IMemBuffer{
     }
 
     @Override
+    public Snapshot getSnapshot() {
+        return null;
+    }
+
+    @Override
     public ConditionPair lookupConditionPair(Key key) {
         return this.lazyConditionPairs.get(key.toString());
     }
 
     @Override
-    public void walkBuffer(Function<Map.Entry<Key, Key>, String> fun) {
-        throw new RuntimeException("Method not supported, no implementation");
+    public boolean walkBuffer(Function<Map.Entry<Key, Key>, String> fun) {
+        //throw new RuntimeException("Method not supported, no implementation");
+        return bufferStore.walkBuffer(fun);
     }
 
     @Override

@@ -15,6 +15,7 @@
 
 package org.tikv.common.memdb;
 
+import org.tikv.common.Snapshot;
 import org.tikv.common.key.Key;
 
 import java.util.Map;
@@ -31,6 +32,8 @@ public interface IUnionStore {
      */
     IMemBuffer getMemBuffer();
 
+    Snapshot getSnapshot();
+
     /**
      * Returns related condition pair
      * @param key
@@ -41,7 +44,7 @@ public interface IUnionStore {
     /**
      * WalkBuffer iterates all buffered kv pairs.
      */
-    void walkBuffer(Function<Map.Entry<Key, Key>, String> fun);
+    boolean walkBuffer(Function<Map.Entry<Key, Key>, String> fun);
 
     class ConditionPair {
 

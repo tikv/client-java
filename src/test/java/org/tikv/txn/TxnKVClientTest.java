@@ -74,13 +74,15 @@ public class TxnKVClientTest {
     @Test
     public void testTxnCommitSuccess() {
         String key = "test_AAAAGAaJwbZnjgaPvypwZTiuMBFirzPf_primary_001";
-        String value = "put_value 3333";
+        String value = "put_value 6666";
         ITransaction txn = this.txnClient.begin();
         try {
             txn.set(key.getBytes(), value.getBytes());
             txn.set("txn_test_set_0001".getBytes(), value.getBytes());
+            String snapshotValue = new String(txn.get("test_AAAAGAaJwbZnjgaPvypwZTiuMBFirzPf_primary_002".getBytes()));
             boolean result = txn.commit();
             System.out.println("commit result=" + result);
+            System.out.println("snapshotValue=" + snapshotValue);
         } catch (Exception e) {
             txn.rollback();
         }
@@ -276,5 +278,22 @@ public class TxnKVClientTest {
         System.out.println("commit result2=" + commit2);
 
         System.out.println("new value=" + new String(txnClient.get(key.toByteArray())));
+    }
+
+
+    @Test
+    public void testTxnIterator() {
+        String key = "test_AAAAGAaJwbZnjgaPvypwZTiuMBFirzPf_primary_001";
+        String value = "put_value 777";
+        ITransaction txn = this.txnClient.begin();
+        try {
+            txn.set(key.getBytes(), value.getBytes());
+            String snapshotValue = new String(txn.get("test_AAAAGAaJwbZnjgaPvypwZTiuMBFirzPf_primary_002".getBytes()));
+            boolean result = txn.commit();
+            System.out.println("commit result=" + result);
+            System.out.println("snapshotValue=" + snapshotValue);
+        } catch (Exception e) {
+            txn.rollback();
+        }
     }
 }

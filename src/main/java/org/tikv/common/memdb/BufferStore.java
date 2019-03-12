@@ -19,6 +19,7 @@ import org.tikv.common.Snapshot;
 import org.tikv.common.key.Key;
 import org.tikv.common.memdb.iterator.IMutator;
 import org.tikv.common.memdb.iterator.IRetriever;
+import org.tikv.common.memdb.iterator.UnionStoreIterator;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -97,28 +98,16 @@ public class BufferStore implements IMemBuffer{
      */
     @Override
     public Iterator iterator(Key key, Key upperBound) {
-        Iterator it = this.memBuffer.iterator(key, upperBound);
-        if(it == null) {
-            return null;
-        }
-        /*it = this.retriever.iterator(key, upperBound);
-        if(it != null) {
-            return it;
-        }*/
-        return it;
+        Iterator bufferIt = this.memBuffer.iterator(key, upperBound);
+        Iterator snapshotIt = this.retriever.iterator(key, upperBound);
+        return new UnionStoreIterator(bufferIt, snapshotIt);
     }
 
     @Override
     public Iterator iteratorReverse(Key key) {
-        Iterator reverseIt = this.memBuffer.iteratorReverse(key);
-        if(reverseIt == null) {
-            return null;
-        }
-        reverseIt = this.retriever.iteratorReverse(key);
-        if(reverseIt != null) {
-            return reverseIt;
-        }
-        return null;
+        Iterator bufferIt = this.memBuffer.iteratorReverse(key);
+        Iterator snapshotIt = this.retriever.iteratorReverse(key);
+        return new UnionStoreIterator(bufferIt, snapshotIt, true);
     }
 
     /**

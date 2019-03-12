@@ -20,13 +20,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.Snapshot;
 import org.tikv.common.key.Key;
-import org.tikv.common.memdb.MemDbBuffer;
 import org.tikv.common.memdb.UnionStore;
 import org.tikv.common.meta.TiTimestamp;
 
 import java.security.SecureRandom;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -57,7 +55,7 @@ public class TikvTransaction implements ITransaction {
 
     //private MemDbBuffer memDb = new MemDbBuffer(1000);
 
-    private final UnionStore memdb;
+    private final UnionStore us;
 
     private List<byte[]> lockKeys;
 
@@ -80,8 +78,9 @@ public class TikvTransaction implements ITransaction {
         this.startTime = System.currentTimeMillis();
         this.transactionFunction = function;
         this.lockKeys = Lists.newLinkedList();
+        //initial snapshot startTS field value
         this.init();
-        this.memdb = new UnionStore(this.snapshot);
+        this.us = new UnionStore(this.snapshot);
     }
 
     private void init() {
@@ -93,22 +92,22 @@ public class TikvTransaction implements ITransaction {
 
     @Override
     public boolean set(byte[] key, byte[] value) {
-        memdb.set(Key.toRawKey(key), value);
+        us.set(Key.toRawKey(key), value);
         return true;
     }
 
     @Override
     public byte[] get(byte[] key) {
-        byte[] value = memdb.get(Key.toRawKey(key));
+        byte[] value = us.get(Key.toRawKey(key));
         if(value != null) {
             return value;
         }
-        return snapshot.get(key);
+        return null;
     }
 
     @Override
     public boolean delete(byte[] key) {
-        memdb.set(Key.toRawKey(key), new byte[0]);
+        us.set(Key.toRawKey(key), new byte[0]);
         return true;
     }
 
@@ -130,6 +129,10 @@ public class TikvTransaction implements ITransaction {
         return result;
     }
 
+    /**
+     * Commit with retry operating when txn meets write conflict error;
+     * @return
+     */
     private boolean commitWithRetry() {
         for(int i = 0 ; i < maxRetryCnt; i++) {
             Function<ITransaction, Boolean> retryFunction = transactionFunction;
@@ -145,7 +148,7 @@ public class TikvTransaction implements ITransaction {
                 return true;
             }
             this.lockKeys.clear();
-            this.memdb.reset();
+            this.us.reset();
             this.init();
             LOG.warn("txn commit failed with attempts {} times, startTs={}", i + 1, startTime);
             backoff(i);
@@ -205,12 +208,12 @@ public class TikvTransaction implements ITransaction {
 
     @Override
     public Map<byte[], byte[]> getStoredKeys() {
-        Iterator it = memdb.iterator(null, null);
-        Map<byte[], byte[]> result = new HashMap<>();
-        while(it != null && it.hasNext()) {
-            Map.Entry<Key, Key> entry = (Map.Entry<Key, Key>)it.next();
+        final Map<byte[], byte[]> result = new HashMap<>();
+        us.walkBuffer(entry -> {
             result.put(entry.getKey().getBytes(), entry.getValue().getBytes());
-        }
+            return null;
+        });
+
         return result;
     }
 
@@ -222,7 +225,7 @@ public class TikvTransaction implements ITransaction {
     private void close() {
         this.valid = false;
         this.lockKeys.clear();
-        this.memdb.reset();
+        this.us.reset();
     }
 
     // BackOff Implements exponential backoff with full jitter.
