@@ -1,5 +1,6 @@
 apply plugin: 'java'
 apply plugin: 'maven'
+apply plugin: 'idea'
 apply plugin: "com.google.protobuf"
 
 group = 'org.tikv'
@@ -11,6 +12,14 @@ sourceCompatibility = 1.8
 targetCompatibility = 1.8
 tasks.withType(JavaCompile) {
 	options.encoding = 'UTF-8'
+}
+
+idea {
+    module {
+        // Marks the already(!) added srcDir as "generated"
+        generatedSourceDirs += file('target/generated-sources/protobuf/java')
+        generatedSourceDirs += file('target/generated-sources/protobuf/grpc-java')
+    }
 }
 
 buildscript {
@@ -25,16 +34,18 @@ buildscript {
 sourceSets {
     main {
         proto {
-            srcDir 'src/main/proto'
-			include '**/*.proto'
+            srcDir {'proto'}
+            include {'**/*.proto'}
         }
         java {
             // include self written and generated code
-            srcDirs 'src/main/java', 'target/generated-sources/main/java' , 'target/generated-sources/main/grpc-java'
+            srcDirs 'src/main/java', 'target/generated-sources/protobuf/java' , 'target/generated-sources/protobuf/grpc-java'
         }
     }
 	test {
-		java {}
+		java {
+			srcDirs 'src/test/java', 'target/generated-sources/protobuf/java' , 'target/generated-sources/protobuf/grpc-java'
+		}
 	}
     // remove the test configuration - at least in your example you don't have a special test proto file
 }
@@ -64,7 +75,7 @@ protobuf {
         // all() returns the collection of all protoc tasks
         all().each { task ->
 			task.plugins {
-				grpc {
+	 			grpc {
 					outputSubDir = 'grpc-java'
 				}
 			}
@@ -84,7 +95,7 @@ clean {
 }
 
 repositories {
-     maven { url "http://repo.maven.apache.org/maven2" }
+    maven { url "http://repo.maven.apache.org/maven2" }
 }
 
 dependencies {
@@ -127,20 +138,16 @@ task updateProtoModule(type: Exec) {
     }
 }
 
-compileJava << {
-	println 'Compiling'
-}
-
 task copyResources(type: Copy) {
 	includeEmptyDirs = false
 	copy {
-		from "./scripts/kvproto/include/"
+		from "./kvproto/include/"
 	    include "**/gogoproto/**"
-		into "src/main/proto"
+		into "proto"
 	}
 	copy {
-		from "./scripts/kvproto/proto/", "./scripts/raft-rs/proto/", "./scripts/tipb/proto"
-		into "src/main/proto"
+		from "./kvproto/proto/", "./raft-rs/proto/", "./tipb/proto"
+		into "proto"
 	}
 }
 

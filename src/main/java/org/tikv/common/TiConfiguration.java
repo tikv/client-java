@@ -16,8 +16,9 @@
 package org.tikv.common;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.net.HostAndPort;
+
 import java.io.Serializable;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -54,7 +55,7 @@ public class TiConfiguration implements Serializable {
   private TimeUnit metaReloadUnit = DEF_META_RELOAD_UNIT;
   private int metaReloadPeriod = DEF_META_RELOAD_PERIOD;
   private int maxFrameSize = DEF_MAX_FRAME_SIZE;
-  private List<HostAndPort> pdAddrs = new ArrayList<>();
+  private List<URI> pdAddrs = new ArrayList<>();
   private int indexScanBatchSize = DEF_INDEX_SCAN_BATCH_SIZE;
   private int indexScanConcurrency = DEF_INDEX_SCAN_CONCURRENCY;
   private int tableScanConcurrency = DEF_TABLE_SCAN_CONCURRENCY;
@@ -74,24 +75,24 @@ public class TiConfiguration implements Serializable {
   public static TiConfiguration createDefault(String pdAddrsStr) {
     Objects.requireNonNull(pdAddrsStr, "pdAddrsStr is null");
     TiConfiguration conf = new TiConfiguration();
-    conf.pdAddrs = strToHostAndPort(pdAddrsStr);
+    conf.pdAddrs = strToURI(pdAddrsStr);
     return conf;
   }
 
   public static TiConfiguration createRawDefault(String pdAddrsStr) {
     Objects.requireNonNull(pdAddrsStr, "pdAddrsStr is null");
     TiConfiguration conf = new TiConfiguration();
-    conf.pdAddrs = strToHostAndPort(pdAddrsStr);
+    conf.pdAddrs = strToURI(pdAddrsStr);
     conf.kvMode = KVMode.RAW;
     return conf;
   }
 
-  private static List<HostAndPort> strToHostAndPort(String addressStr) {
+  private static List<URI> strToURI(String addressStr) {
     Objects.requireNonNull(addressStr);
     String[] addrs = addressStr.split(",");
-    ImmutableList.Builder<HostAndPort> addrsBuilder = ImmutableList.builder();
+    ImmutableList.Builder<URI> addrsBuilder = ImmutableList.builder();
     for (String addr : addrs) {
-      addrsBuilder.add(HostAndPort.fromString(addr));
+      addrsBuilder.add(URI.create("http://" + addr));
     }
     return addrsBuilder.build();
   }
@@ -132,7 +133,7 @@ public class TiConfiguration implements Serializable {
     return this;
   }
 
-  public List<HostAndPort> getPdAddrs() {
+  public List<URI> getPdAddrs() {
     return pdAddrs;
   }
 

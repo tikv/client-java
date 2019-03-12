@@ -60,6 +60,7 @@ bazel-*
 # ignore gradle
 .gradle
 build/
+out/
 
 # Cache of project
 .gradletasknamecache

@@ -18,6 +18,7 @@ package org.tikv.common;
 import static org.junit.Assert.*;
 import static org.tikv.common.GrpcUtils.encodeKey;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.concurrent.*;
@@ -38,6 +39,7 @@ public class PDClientTest {
   private PDMockServer server;
   private static final long CLUSTER_ID = 1024;
   private static final String LOCAL_ADDR = "127.0.0.1";
+  private static final String LOCAL_ADDR_IPV6 = "[::]";
   private static TiSession session;
 
   @Before
@@ -50,7 +52,7 @@ public class PDClientTest {
             GrpcUtils.makeMember(1, "http://" + LOCAL_ADDR + ":" + server.port),
             GrpcUtils.makeMember(2, "http://" + LOCAL_ADDR + ":" + (server.port + 1)),
             GrpcUtils.makeMember(2, "http://" + LOCAL_ADDR + ":" + (server.port + 2))));
-    TiConfiguration conf = TiConfiguration.createDefault("127.0.0.1:" + server.port);
+    TiConfiguration conf = TiConfiguration.createDefault(LOCAL_ADDR + ":" + server.port);
     session = TiSession.create(conf);
   }
 
@@ -65,6 +67,29 @@ public class PDClientTest {
     try (PDClient client = session.getPDClient()) {
       assertEquals(client.getLeaderWrapper().getLeaderInfo(), LOCAL_ADDR + ":" + server.port);
       assertEquals(client.getHeader().getClusterId(), CLUSTER_ID);
+    }
+  }
+
+  @Test
+  public void testSwitchLeader() throws Exception {
+    try (PDClient client = session.getPDClient()) {
+      client.switchLeader(ImmutableList.of("http://" + LOCAL_ADDR + ":" + (server.port + 1)));
+      assertEquals(client.getLeaderWrapper().getLeaderInfo(), LOCAL_ADDR + ":" + (server.port + 1));
+    }
+    tearDown();
+    server = new PDMockServer();
+    server.start(CLUSTER_ID);
+    server.addGetMemberResp(
+        GrpcUtils.makeGetMembersResponse(
+            server.getClusterId(),
+            GrpcUtils.makeMember(1, "http://" + LOCAL_ADDR_IPV6 + ":" + server.port),
+            GrpcUtils.makeMember(2, "http://" + LOCAL_ADDR_IPV6 + ":" + (server.port + 1)),
+            GrpcUtils.makeMember(2, "http://" + LOCAL_ADDR_IPV6 + ":" + (server.port + 2))));
+    TiConfiguration conf = TiConfiguration.createDefault(LOCAL_ADDR_IPV6 + ":" + server.port);
+    session = TiSession.create(conf);
+    try (PDClient client = session.getPDClient()) {
+      client.switchLeader(ImmutableList.of("http://" + LOCAL_ADDR_IPV6 + ":" + (server.port + 2)));
+      assertEquals(client.getLeaderWrapper().getLeaderInfo(), LOCAL_ADDR_IPV6 + ":" + (server.port + 2));
     }
   }
 

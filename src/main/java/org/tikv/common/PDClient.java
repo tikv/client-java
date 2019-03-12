@@ -20,12 +20,10 @@ import static org.tikv.common.operation.PDErrorHandler.getRegionResponseErrorExt
 import static org.tikv.common.pd.PDError.buildFromPdpbError;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -57,7 +55,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private TsoRequest tsoReq;
   private volatile LeaderWrapper leaderWrapper;
   private ScheduledExecutorService service;
-  private List<HostAndPort> pdAddrs;
+  private List<URI> pdAddrs;
 
   @Override
   public TiTimestamp getTimestamp(BackOffer backOffer) {
@@ -246,22 +244,27 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
 
     void close() {}
+
+    @Override
+    public String toString() {
+      return "[" + leaderInfo + "]";
+    }
   }
 
-  public GetMembersResponse getMembers(HostAndPort url) {
+  public GetMembersResponse getMembers(URI url) {
     try {
-      ManagedChannel probChan = channelFactory.getChannel(url.getHostText() + ":" + url.getPort());
-      PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
+      ManagedChannel probChan = channelFactory.getChannel(url.getHost() + ":" + url.getPort());
+      PDGrpc.PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
       GetMembersRequest request =
           GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
       return stub.getMembers(request);
     } catch (Exception e) {
-      logger.warn("failed to get member from pd server.", e);
+      logger.warn("failed to get member from pd server " + url + ".", e);
     }
     return null;
   }
 
-  private synchronized boolean switchLeader(List<String> leaderURLs) {
+  synchronized boolean switchLeader(List<String> leaderURLs) {
     if (leaderURLs.isEmpty()) return false;
     String leaderUrlStr = leaderURLs.get(0);
     // TODO: Why not strip protocol info on server side since grpc does not need it
@@ -274,9 +277,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   private boolean createLeaderWrapper(String leaderUrlStr) {
     try {
-      URL tURL = new URL(leaderUrlStr);
-      HostAndPort newLeader = HostAndPort.fromParts(tURL.getHost(), tURL.getPort());
-      leaderUrlStr = newLeader.toString();
+      URI newLeader = URI.create(leaderUrlStr);
+      leaderUrlStr = newLeader.getHost() + ":" + newLeader.getPort();
       if (leaderWrapper != null && leaderUrlStr.equals(leaderWrapper.getLeaderInfo())) {
         return true;
       }
@@ -289,7 +291,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
               PDGrpc.newBlockingStub(clientChannel),
               PDGrpc.newStub(clientChannel),
               System.nanoTime());
-    } catch (MalformedURLException e) {
+    } catch (IllegalArgumentException e) {
       logger.error("Error updating leader.", e);
       return false;
     }
@@ -298,7 +300,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   public void updateLeader() {
-    for (HostAndPort url : this.pdAddrs) {
+    for (URI url : this.pdAddrs) {
       // since resp is null, we need update leader's address by walking through all pd server.
       GetMembersResponse resp = getMembers(url);
       if (resp == null) {
@@ -339,8 +341,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   private void initCluster() {
     GetMembersResponse resp = null;
-    List<HostAndPort> pdAddrs = getConf().getPdAddrs();
-    for (HostAndPort u : pdAddrs) {
+    List<URI> pdAddrs = getConf().getPdAddrs();
+    for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
         break;
