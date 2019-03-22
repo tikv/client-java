@@ -102,12 +102,14 @@ public class GCWorker implements AutoCloseable {
     return pdClient.getTimestamp(ConcreteBackOffer.newTsoBackOff());
   }
 
-  // Note: Should not call run() more than once
-  public void run() {
-    gcWorkerScheduler.schedule(this::start, 0, TimeUnit.MILLISECONDS);
+  private long getNow() { return getTimestamp().getPhysical(); }
+
+  // Note: Should not call start() more than once
+  public void start() {
+    gcWorkerScheduler.schedule(this::run, 0, TimeUnit.MILLISECONDS);
   }
 
-  public void start() {
+  private void run() {
     logger.info(String.format("[gc worker] %s starts", uuid));
     scheduler.scheduleAtFixedRate(() -> {
       try {
@@ -137,7 +139,7 @@ public class GCWorker implements AutoCloseable {
       return;
     }
 
-    if (getTimestamp().getPhysical() < lastFinish + gcWaitTime) {
+    if (getNow() < lastFinish + gcWaitTime) {
       gcIsRunning = false;
       logger.info(String.format("[gc worker] leader tick on %s: another gc job has just finished. skipped.", uuid));
       return;
@@ -158,7 +160,7 @@ public class GCWorker implements AutoCloseable {
     gcIsRunning = true;
     logger.info(String.format("[gc worker] %s starts the whole job, safePoint: %d", uuid, safePoint));
     runGCJob(safePoint);
-    lastFinish = System.currentTimeMillis();
+    lastFinish = getNow();
     gcIsRunning = false;
   }
 
@@ -175,21 +177,24 @@ public class GCWorker implements AutoCloseable {
     logger.debug(String.format("[gc worker] got leader: %s", Long.toHexString(leader)));
     if (leader == l_uuid) {
       try {
-        putLong(GC_LEADER_LEASE_KEY, System.currentTimeMillis() + gcWorkerLease);
+        putLong(GC_LEADER_LEASE_KEY, getNow() + gcWorkerLease);
       } catch (Exception e) {
+        logger.warn("[gc worker] gc leader lease key update fails.", e);
         return false;
       }
       return true;
     }
     long lease = getLong(GC_LEADER_LEASE_KEY);
-    if (lease == 0 || lease < System.currentTimeMillis()) {
+    long now = getNow();
+    if (lease == 0 || lease < now) {
       logger.debug(String.format("[gc worker] register %s as leader", uuid));
       try {
         pdClient.txn().Then(
             toPutOp(GC_LEADER_UUID_KEY, uuid),
-            toPutOp(GC_LEADER_LEASE_KEY, System.currentTimeMillis() + gcWorkerLease)
+            toPutOp(GC_LEADER_LEASE_KEY, now + gcWorkerLease)
         ).commit().get(500, TimeUnit.MILLISECONDS);
       } catch (Exception e) {
+        logger.warn("[gc worker] gc leader lease key init fails.", e);
         return false;
       }
       return true;
@@ -327,7 +332,7 @@ public class GCWorker implements AutoCloseable {
   }
 
   private long prepare() {
-    long now = getTimestamp().getPhysical();
+    long now = getNow();
     boolean ok = checkGCInterval(now);
     if (!ok) {
       return 0;

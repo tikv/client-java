@@ -20,6 +20,6 @@ import org.tikv.common.TiSession;
 public class GCClient {
   public GCClient(TiSession session) {
     GCWorker worker = new GCWorker(session);
-    worker.run();
+    worker.start();
   }
 }

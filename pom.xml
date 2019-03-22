@@ -26,6 +26,7 @@
         <scala.binary.version>2.11</scala.binary.version>
         <scala.version>2.11</scala.version>
         <scalatest.version>3.0.4</scalatest.version>
+        <jetcd.version>0.0.3</jetcd.version>
         <gpg.skip>true</gpg.skip>
         <javadoc.skip>true</javadoc.skip>
     </properties>
@@ -82,7 +83,7 @@
         <dependency>
             <groupId>io.etcd</groupId>
             <artifactId>jetcd-core</artifactId>
-            <version>${jetcd-version}</version>
+            <version>${jetcd.version}</version>
         </dependency>
     </dependencies>
     <build>
