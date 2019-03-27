@@ -230,20 +230,36 @@ public class GCWorker implements AutoCloseable {
     putLong(GC_SAFE_POINT_KEY, safePoint);
     logger.info(String.format("[gc worker] %s start gc, concurrency %d, safePoint: %d.", uuid, concurrency, safePoint));
 
-    gcTaskThreadPool = Executors.newFixedThreadPool((int) concurrency);
-    gcTaskService = new ExecutorCompletionService<>(gcTaskThreadPool);
-    for (int i = 0; i < concurrency; i++) {
-      new Thread(() -> newGCTaskWorker(uuid).run()).start();
-    }
-    ByteString key = ByteString.EMPTY;
-    while (true) {
-      BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.GcOneRegionMaxBackoff);
-      GCTask task = genNextGCTask(backOffer, safePoint, key);
-      gcTaskService.submit(() -> task);
-      key = task.endKey;
-      if (key.equals(ByteString.EMPTY)) {
-        return;
+    try {
+      gcTaskThreadPool = Executors.newFixedThreadPool((int) concurrency);
+      gcTaskService = new ExecutorCompletionService<>(gcTaskThreadPool);
+      for (int i = 0; i < concurrency; i++) {
+        new Thread(() -> newGCTaskWorker(uuid).run()).start();
       }
+      ByteString key = ByteString.EMPTY;
+      while (true) {
+        BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.GcOneRegionMaxBackoff);
+        GCTask task = genNextGCTask(backOffer, safePoint, key);
+        gcTaskService.submit(() -> task);
+        key = task.endKey;
+        if (key.equals(ByteString.EMPTY)) {
+          awaitGCComplete();
+          return;
+        }
+      }
+    } catch (Exception e) {
+      awaitGCComplete();
+    }
+  }
+
+  private void awaitGCComplete() {
+    try {
+      if (gcTaskThreadPool != null) {
+        gcTaskThreadPool.awaitTermination(gcWorkerLease, TimeUnit.MILLISECONDS);
+      }
+      logger.info("[gc worker] gc job complete");
+    } catch (InterruptedException e) {
+      logger.error("[gc worker] gc aborted with expired lease");
     }
   }
 
@@ -310,7 +326,9 @@ public class GCWorker implements AutoCloseable {
         }
         key = region.getEndKey();
         if (key.equals(ByteString.EMPTY) || (!endKey.equals(ByteString.EMPTY) && FastByteComparisons.compareTo(key.toByteArray(), endKey.toByteArray()) >= 0)) {
-          logger.info("[gc worker] doGCForRange complete.");
+          if (logger.isDebugEnabled()) {
+            logger.debug(String.format("[gc worker] doGCForRange [%s, %s) complete.", KeyUtils.formatBytes(startKey), KeyUtils.formatBytes(endKey)));
+          }
           return;
         }
       }
