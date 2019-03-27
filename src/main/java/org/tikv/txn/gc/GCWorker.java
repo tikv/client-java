@@ -102,7 +102,9 @@ public class GCWorker implements AutoCloseable {
     return pdClient.getTimestamp(ConcreteBackOffer.newTsoBackOff());
   }
 
-  private long getNow() { return getTimestamp().getPhysical(); }
+  private long getNow() {
+    return getTimestamp().getPhysical();
+  }
 
   // Note: Should not call start() more than once
   public void start() {
@@ -307,7 +309,7 @@ public class GCWorker implements AutoCloseable {
           logger.warn(String.format("[gc worker] %s gc for range [%s, %s) safepoint: %d, failed", identifier, KeyUtils.formatBytes(startKey), KeyUtils.formatBytes(endKey), safePoint), e);
         }
         key = region.getEndKey();
-        if (key.equals(ByteString.EMPTY) || FastByteComparisons.compareTo(key.toByteArray(), endKey.toByteArray()) >= 0) {
+        if (key.equals(ByteString.EMPTY) || (!endKey.equals(ByteString.EMPTY) && FastByteComparisons.compareTo(key.toByteArray(), endKey.toByteArray()) >= 0)) {
           logger.info("[gc worker] doGCForRange complete.");
           return;
         }

@@ -16,6 +16,8 @@
 package org.tikv.common;
 
 import com.google.common.collect.ImmutableList;
+import org.tikv.kvproto.Kvrpcpb.CommandPri;
+import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
 import java.io.Serializable;
 import java.net.URI;
@@ -23,8 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import org.tikv.kvproto.Kvrpcpb.CommandPri;
-import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
 public class TiConfiguration implements Serializable {
   private static final int DEF_TIMEOUT = 10;
@@ -48,7 +48,7 @@ public class TiConfiguration implements Serializable {
   private static final KVMode DEF_KV_MODE = KVMode.TXN;
   private static final int DEF_RAW_CLIENT_CONCURRENCY = 200;
   private static final int DEF_GC_RUN_INTERVAL = 10 * 60 * 1000;
-  private static final int DEF_GC_LIFE_TIME = 10 * 60 * 1000;;
+  private static final int DEF_GC_LIFE_TIME = 10 * 60 * 1000;
   private static final int DEF_GC_CONCURRENCY = 2;
   private static final int DEF_GC_WAIT_TIME = 60 * 1000;
   private static final int DEF_GC_WORKER_LEASE = 2 * 60 * 1000;

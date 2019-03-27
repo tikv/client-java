@@ -23,14 +23,6 @@ import io.etcd.jetcd.kv.GetResponse;
 import io.etcd.jetcd.lease.LeaseGrantResponse;
 import io.etcd.jetcd.lock.LockResponse;
 import io.grpc.ManagedChannel;
-import java.net.URI;
-import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
@@ -49,6 +41,15 @@ import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.PDGrpc.PDBlockingStub;
 import org.tikv.kvproto.PDGrpc.PDStub;
 import org.tikv.kvproto.Pdpb.*;
+
+import java.net.URI;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.tikv.common.operation.PDErrorHandler.getRegionResponseErrorExtractor;
@@ -366,7 +367,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       return createTime;
     }
 
-    void close() {}
+    void close() {
+    }
 
     @Override
     public String toString() {

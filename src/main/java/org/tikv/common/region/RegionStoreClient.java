@@ -17,20 +17,8 @@
 
 package org.tikv.common.region;
 
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
-import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
-import static org.tikv.txn.gc.GCWorker.gcScanLockLimit;
-
-import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.function.Supplier;
 import org.apache.log4j.Logger;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
@@ -43,31 +31,25 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
-import org.tikv.kvproto.Kvrpcpb.BatchGetRequest;
-import org.tikv.kvproto.Kvrpcpb.BatchGetResponse;
-import org.tikv.kvproto.Kvrpcpb.GetRequest;
-import org.tikv.kvproto.Kvrpcpb.GetResponse;
-import org.tikv.kvproto.Kvrpcpb.KvPair;
-import org.tikv.kvproto.Kvrpcpb.RawBatchPutRequest;
-import org.tikv.kvproto.Kvrpcpb.RawBatchPutResponse;
-import org.tikv.kvproto.Kvrpcpb.RawDeleteRequest;
-import org.tikv.kvproto.Kvrpcpb.RawDeleteResponse;
-import org.tikv.kvproto.Kvrpcpb.RawGetRequest;
-import org.tikv.kvproto.Kvrpcpb.RawGetResponse;
-import org.tikv.kvproto.Kvrpcpb.RawPutRequest;
-import org.tikv.kvproto.Kvrpcpb.RawPutResponse;
-import org.tikv.kvproto.Kvrpcpb.RawScanRequest;
-import org.tikv.kvproto.Kvrpcpb.RawScanResponse;
-import org.tikv.kvproto.Kvrpcpb.ScanRequest;
-import org.tikv.kvproto.Kvrpcpb.ScanResponse;
-import org.tikv.kvproto.Kvrpcpb.ScanLockRequest;
-import org.tikv.kvproto.Kvrpcpb.ScanLockResponse;
+import org.tikv.kvproto.Kvrpcpb.*;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvStub;
 import org.tikv.txn.Lock;
 import org.tikv.txn.LockResolverClient;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Supplier;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
+import static org.tikv.txn.gc.GCWorker.gcScanLockLimit;
 
 // RegionStore itself is not thread-safe
 public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, TikvStub>
@@ -76,7 +58,7 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
   private static final Logger logger = Logger.getLogger(RegionStoreClient.class);
   private TiRegion region;
   private final RegionManager regionManager;
-  @VisibleForTesting private final LockResolverClient lockResolverClient;
+  private final LockResolverClient lockResolverClient;
   private TikvBlockingStub blockingStub;
   private TikvStub asyncStub;
 
@@ -420,8 +402,8 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
    * the same region
    *
    * @param backOffer BackOffer
-   * @param key startKey
-   * @param keyOnly true if value of KvPair is not needed
+   * @param key       startKey
+   * @param keyOnly   true if value of KvPair is not needed
    * @return KvPair list
    */
   private List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
@@ -545,7 +527,8 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
   }
 
   @Override
-  public void close() throws Exception {}
+  public void close() throws Exception {
+  }
 
   /**
    * onNotLeader deals with NotLeaderError and returns whether re-splitting key range is needed
