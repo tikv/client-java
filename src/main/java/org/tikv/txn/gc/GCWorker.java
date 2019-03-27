@@ -64,13 +64,13 @@ public class GCWorker implements AutoCloseable {
   private static final ByteString GC_LEADER_UUID_KEY = ByteString.copyFromUtf8("tikv_gc_leader_uuid");
   private static final ByteString GC_LEADER_LEASE_KEY = ByteString.copyFromUtf8("tikv_gc_leader_lease");
   public static final int gcScanLockLimit = 1024;
-  private final int gcDefaultRunInterval;// = 6 * 1000
-  private final int gcDefaultLifeTime;// = 2 * 1000;
+  private final int gcDefaultRunInterval;
+  private final int gcDefaultLifeTime;
   private final int gcDefaultConcurrency;
   private static final int gcMinConcurrency = 1;
   private static final int gcMaxConcurrency = 128;
-  private final int gcWaitTime;// = 3 * 1000;
-  private final int gcWorkerLease;// = 2 * 1000;
+  private final int gcWaitTime;
+  private final int gcWorkerLease;
 
   public GCWorker(TiSession session) {
     this.pdClient = session.getPDClient();
@@ -82,7 +82,6 @@ public class GCWorker implements AutoCloseable {
     this.gcWorkerLease = conf.getGCWorkerLease();
     this.l_uuid = pdClient.grantLease(gcWorkerLease / 1000);
     this.uuid = Long.toHexString(l_uuid);
-    logger.info("uuid = " + uuid + " " + l_uuid);
     this.lastFinish = 0;
     this.regionStoreClientBuilder = new RegionStoreClientBuilder(session.getConf(), session.getChannelFactory(), new RegionManager(session.getPDClient()));
   }
@@ -161,9 +160,7 @@ public class GCWorker implements AutoCloseable {
 
     gcIsRunning = true;
     logger.info(String.format("[gc worker] %s starts the whole job, safePoint: %d", uuid, safePoint));
-    runGCJob(safePoint);
-    lastFinish = getNow();
-    gcIsRunning = false;
+    new Thread(() -> runGCJob(safePoint)).start();
   }
 
   private boolean checkLeader() {
@@ -257,10 +254,12 @@ public class GCWorker implements AutoCloseable {
       if (gcTaskThreadPool != null) {
         gcTaskThreadPool.awaitTermination(gcWorkerLease, TimeUnit.MILLISECONDS);
       }
+      lastFinish = getNow();
       logger.info("[gc worker] gc job complete");
     } catch (InterruptedException e) {
       logger.error("[gc worker] gc aborted with expired lease");
     }
+    gcIsRunning = false;
   }
 
   private class GCTask {
@@ -289,7 +288,7 @@ public class GCWorker implements AutoCloseable {
         while (true) {
           Future<GCTask> gcTaskFuture;
           if ((gcTaskFuture = gcTaskService.take()) == null) {
-            logger.error("[gc worker] No tasks remain");
+            logger.info("[gc worker] No tasks remain");
             return;
           }
           task = gcTaskFuture.get();
