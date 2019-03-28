@@ -128,6 +128,7 @@
                                <directory>${basedir}/kvproto/include</directory>
                                <includes>
                                     <include>**/gogoproto/**</include>
+                                    <include>**/*.proto</include>
                                </includes>
                             </resource>
                             <resource>
