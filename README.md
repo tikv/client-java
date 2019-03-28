@@ -1,6 +1,6 @@
 ## Ti-Client in Java [Under Construction]
 
-A Java client for [TiDB](https://github.com/pingcap/tidb)/[TiKV](https://github.com/pingcap/tikv).
+A Java client for [TiDB](https://github.com/pingcap/tidb)/[TiKV](https://github.com/tikv/tikv).
 It is supposed to:
 + Communicate via [gRPC](http://www.grpc.io/)
 + Talk to Placement Driver searching for a region
@@ -126,7 +126,7 @@ After building, add following lines into your `pom.xml`
 
 
 ## TODO
-Contributions are welcomed. Here is a [TODO](https://github.com/pingcap/tikv-client-java/wiki/TODO-Lists) and you might contact maxiaoyu@pingcap.com if needed.
+Contributions are welcomed. Here is a [TODO](https://github.com/tikv/client-java/wiki/TODO-Lists) and you might contact maxiaoyu@pingcap.com if needed.
 
 ## License
 Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.
