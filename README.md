@@ -35,7 +35,7 @@ run test cases:
 make test
 ```
 
-this project is designed to hook with `pd` and `tikv` which you can find in `PingCap` github page.
+this project is designed to hook with `pd` and `tikv` which you can find in `PingCAP` github page.
 
 When you work with this project, you have to communicate with `pd` and `tikv`. Please run TiKV and PD in advance.
 
