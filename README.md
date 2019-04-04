@@ -13,7 +13,7 @@ It is supposed to:
 
 Alternatively, you can build `tikv-client-java` with gradle.
 
-The following command will build and test the project.
+The following command will build the project.
 
 ```
 gradle init
