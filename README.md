@@ -26,7 +26,7 @@ To make a jar with dependencies
 gradle clean fatJar -x test
 ```
 
-The jar can be found in `./build/lib/`
+The jar can be found in `./build/libs/`
 
 ### Maven
 
