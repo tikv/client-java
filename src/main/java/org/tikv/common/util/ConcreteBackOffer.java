@@ -86,7 +86,7 @@ public class ConcreteBackOffer implements BackOffer {
     BackOffFunction backOffFunction = null;
     switch (funcType) {
       case BoUpdateLeader:
-        //fix: reference from go client
+        // fix: reference from go client
         backOffFunction = BackOffFunction.create(1, 10, BackOffStrategy.NoJitter);
         break;
       case BoTxnLockFast:
@@ -96,7 +96,7 @@ public class ConcreteBackOffer implements BackOffer {
         backOffFunction = BackOffFunction.create(2000, 10000, BackOffStrategy.EqualJitter);
         break;
       case BoRegionMiss:
-        //fix: reference from go client
+        // fix: reference from go client
         // change base time to 2ms, because it may recover soon.
         backOffFunction = BackOffFunction.create(2, 500, BackOffStrategy.NoJitter);
         break;
@@ -108,7 +108,7 @@ public class ConcreteBackOffer implements BackOffer {
         backOffFunction = BackOffFunction.create(500, 3000, BackOffStrategy.EqualJitter);
         break;
       case BoTiKVRPC:
-        //fix: reference from go client
+        // fix: reference from go client
         backOffFunction = BackOffFunction.create(100, 2000, BackOffStrategy.EqualJitter);
         break;
       case BoStoreNotMatch:
