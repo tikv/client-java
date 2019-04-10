@@ -89,7 +89,8 @@ public class PDClientTest {
     session = TiSession.create(conf);
     try (PDClient client = session.getPDClient()) {
       client.switchLeader(ImmutableList.of("http://" + LOCAL_ADDR_IPV6 + ":" + (server.port + 2)));
-      assertEquals(client.getLeaderWrapper().getLeaderInfo(), LOCAL_ADDR_IPV6 + ":" + (server.port + 2));
+      assertEquals(
+          client.getLeaderWrapper().getLeaderInfo(), LOCAL_ADDR_IPV6 + ":" + (server.port + 2));
     }
   }
 

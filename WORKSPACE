@@ -1,3 +1,11 @@
+workspace(name = "tispark")
+
+maven_jar(
+      name = "org_apache_commons_commons_lang3",
+      artifact = "org.apache.commons:commons-lang3:3.5",
+      sha1 = "6c6c702c89bfff3cd9e80b04d668c5e190d588c6",
+)
+
 maven_jar(
     name = "com_fasterxml_jackson_core_jackson_annotations",
     artifact = "com.fasterxml.jackson.core:jackson-annotations:2.6.6",
@@ -79,6 +87,11 @@ maven_jar(
 )
 
 maven_jar(
+    name = "com_sangupta_murmur",
+    artifact = "com.sangupta:murmur:1.0.0"
+)
+
+maven_jar(
     name = "org_powermock_powermock_api_support",
     artifact = "org.powermock:powermock-api-support:1.6.6",
 )
@@ -87,17 +100,18 @@ maven_jar(
    name = "net_sf_trove4j_trove4j",
    artifact = "net.sf.trove4j:trove4j:3.0.1",
 )
-
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 git_repository(
-  name = "org_pubref_rules_protobuf",
-  remote = "https://github.com/pubref/rules_protobuf",
-  tag = "v0.8.1",
+  name = "org_zhexuany_rule_proto_java",
+  remote = "https://github.com/zhexuany/rule_proto_java",
+  commit = "093a9a0338411b9d64db99a3ab1c7ed7aa6b2637",
 )
 
-load("@org_pubref_rules_protobuf//java:rules.bzl", "java_proto_repositories")
+load("@org_zhexuany_rule_proto_java//java:rules.bzl", "java_proto_repositories")
 java_proto_repositories()
 
 bazel_shade_version = "master"
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 http_archive(
              name = "com_github_zhexuany_bazel_shade",
              url = "https://github.com/zhexuany/bazel_shade_plugin/archive/%s.zip"%bazel_shade_version,
@@ -110,3 +124,4 @@ load(
     "java_shade"
 )
 java_shade_repositories()
+

@@ -9,7 +9,7 @@ import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
 
-public class MockServerTest {
+public class MockServer {
   public KVMockServer server;
   public PDMockServer pdServer;
   public static final String LOCAL_ADDR = "127.0.0.1";

@@ -1,6 +1,6 @@
 def junit_suite_test(name, srcs, deps, size="small", resources=[], classpath_resources=[], jvm_flags=[], tags=[], data=[]):
   tests = []
-  package = PACKAGE_NAME.replace("src/test/java/", "").replace("/", ".")
+  package = native.package_name().replace("src/test/java/", "").replace("/", ".")
   for src in srcs:
     if src.endswith("Test.java"):
       if "/" in src:

@@ -1,6 +1,6 @@
 run:
-	bazel run :tikv-java-client
+	bazelisk run :tikv_java_client
 uber_jar:
-	bazel build :tikv-java-client_deploy.jar
+	bazelisk build :tikv_java_client_deploy.jar
 test:
-	bazel test //src/test/java/com/pingcap/tikv:tikv-client-java-test --test_output=errors  --test_timeout=3600
+	bazelisk test //src/test/java/org/tikv:tikv_client_java_test --test_output=errors  --test_timeout=3600

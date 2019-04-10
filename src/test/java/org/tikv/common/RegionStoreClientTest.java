@@ -29,7 +29,7 @@ import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 
-public class RegionStoreClientTest extends MockServerTest {
+public class RegionStoreClientTest extends MockServer {
 
   private RegionStoreClient createClient() {
     Metapb.Store store =

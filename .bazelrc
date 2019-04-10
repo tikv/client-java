@@ -1,0 +1,2 @@
+build --incompatible_disallow_dict_plus=false
+build --strategy=CoreCompile=standalone

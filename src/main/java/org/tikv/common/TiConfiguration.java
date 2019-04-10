@@ -16,7 +16,6 @@
 package org.tikv.common;
 
 import com.google.common.collect.ImmutableList;
-
 import java.io.Serializable;
 import java.net.URI;
 import java.util.ArrayList;
