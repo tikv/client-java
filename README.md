@@ -20,7 +20,8 @@ mvn package
 ```
 
 Alternatively, you can use `bazel` for much faster build. When you try this approach, you should run `git submodule update --init --recursive` before you build project.
-
+Because bazel often has incompatiable issue acrros different version, we use `bazelisk` to use specific bazel to build our project. You can
+download `bazelisk` by `go get github.com/philwo/bazelisk` if you already have `GO` setup.
 Making a uber jar:
 ```
 make uber_jar
