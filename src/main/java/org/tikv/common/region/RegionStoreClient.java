@@ -334,6 +334,26 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
     rawPutHelper(resp);
   }
 
+  public void rawPut(BackOffer backOffer, ByteString key, ByteString value, ByteString cf) {
+    Supplier<RawPutRequest> factory =
+        () ->
+            RawPutRequest.newBuilder()
+                .setContext(region.getContext())
+                .setCfBytes(cf)
+                .setKey(key)
+                .setValue(value)
+                .build();
+
+    KVErrorHandler<RawPutResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+    RawPutResponse resp = callWithRetry(backOffer, TikvGrpc.METHOD_RAW_PUT, factory, handler);
+    rawPutHelper(resp);
+  }
+
   private void rawPutHelper(RawPutResponse resp) {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
@@ -369,6 +389,28 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
     handleRawBatchPut(resp);
   }
 
+  public void rawBatchPut(BackOffer backOffer, List<KvPair> kvPairs, ByteString cf) {
+    if (kvPairs.isEmpty()) {
+      return;
+    }
+    Supplier<RawBatchPutRequest> factory =
+        () ->
+            RawBatchPutRequest.newBuilder()
+                .setContext(region.getContext())
+                .setCfBytes(cf)
+                .addAllPairs(kvPairs)
+                .build();
+    KVErrorHandler<RawBatchPutResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+    RawBatchPutResponse resp =
+        callWithRetry(backOffer, TikvGrpc.METHOD_RAW_BATCH_PUT, factory, handler);
+    handleRawBatchPut(resp);
+  }
+
   private void handleRawBatchPut(RawBatchPutResponse resp) {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
@@ -388,11 +430,13 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
    * @param keyOnly true if value of KvPair is not needed
    * @return KvPair list
    */
-  private List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
+  private List<KvPair> rawScan(
+      BackOffer backOffer, ByteString key, ByteString cf, int limit, boolean keyOnly) {
     Supplier<RawScanRequest> factory =
         () ->
             RawScanRequest.newBuilder()
                 .setContext(region.getContext())
+                .setCfBytes(cf)
                 .setStartKey(key)
                 .setKeyOnly(keyOnly)
                 .setLimit(limit)
@@ -408,12 +452,12 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
     return rawScanHelper(resp);
   }
 
-  public List<KvPair> rawScan(BackOffer backOffer, ByteString key) {
-    return rawScan(backOffer, key, getConf().getScanBatchSize());
+  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, ByteString cf) {
+    return rawScan(backOffer, key, cf, getConf().getScanBatchSize());
   }
 
-  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit) {
-    return rawScan(backOffer, key, limit, false);
+  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, ByteString cf, int limit) {
+    return rawScan(backOffer, key, cf, limit, false);
   }
 
   private List<KvPair> rawScanHelper(RawScanResponse resp) {

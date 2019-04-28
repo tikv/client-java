@@ -135,11 +135,15 @@ public class RawKVClient implements AutoCloseable {
    * @param endKey raw end key, exclusive
    * @return list of key-value pairs in range
    */
-  public List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey) {
-    Iterator<Kvrpcpb.KvPair> iterator = rawScanIterator(conf, clientBuilder, startKey, endKey);
+  public List<Kvrpcpb.KvPair> scan(ByteString cf, ByteString startKey, ByteString endKey) {
+    Iterator<Kvrpcpb.KvPair> iterator = rawScanIterator(conf, clientBuilder, cf, startKey, endKey);
     List<Kvrpcpb.KvPair> result = new ArrayList<>();
     iterator.forEachRemaining(result::add);
     return result;
+  }
+
+  public List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey) {
+    return scan(ByteString.EMPTY, startKey, endKey);
   }
 
   /**
@@ -149,11 +153,15 @@ public class RawKVClient implements AutoCloseable {
    * @param limit limit of key-value pairs
    * @return list of key-value pairs in range
    */
-  public List<Kvrpcpb.KvPair> scan(ByteString startKey, int limit) {
-    Iterator<Kvrpcpb.KvPair> iterator = rawScanIterator(conf, clientBuilder, startKey, limit);
+  public List<Kvrpcpb.KvPair> scan(ByteString cf, ByteString startKey, int limit) {
+    Iterator<Kvrpcpb.KvPair> iterator = rawScanIterator(conf, clientBuilder, cf, startKey, limit);
     List<Kvrpcpb.KvPair> result = new ArrayList<>();
     iterator.forEachRemaining(result::add);
     return result;
+  }
+
+  public List<Kvrpcpb.KvPair> scan(ByteString startKey, int limit) {
+    return scan(ByteString.EMPTY, startKey, limit);
   }
 
   /**
@@ -294,14 +302,19 @@ public class RawKVClient implements AutoCloseable {
   private Iterator<Kvrpcpb.KvPair> rawScanIterator(
       TiConfiguration conf,
       RegionStoreClientBuilder builder,
+      ByteString cf,
       ByteString startKey,
       ByteString endKey) {
-    return new RawScanIterator(conf, builder, startKey, endKey, Integer.MAX_VALUE);
+    return new RawScanIterator(conf, builder, cf, startKey, endKey, Integer.MAX_VALUE);
   }
 
   private Iterator<Kvrpcpb.KvPair> rawScanIterator(
-      TiConfiguration conf, RegionStoreClientBuilder builder, ByteString startKey, int limit) {
-    return new RawScanIterator(conf, builder, startKey, ByteString.EMPTY, limit);
+      TiConfiguration conf,
+      RegionStoreClientBuilder builder,
+      ByteString cf,
+      ByteString startKey,
+      int limit) {
+    return new RawScanIterator(conf, builder, cf, startKey, ByteString.EMPTY, limit);
   }
 
   private BackOffer defaultBackOff() {

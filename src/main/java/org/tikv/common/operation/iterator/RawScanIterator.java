@@ -27,14 +27,17 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 
 public class RawScanIterator extends ScanIterator {
+  private ByteString cf;
 
   public RawScanIterator(
       TiConfiguration conf,
       RegionStoreClientBuilder builder,
+      ByteString cf,
       ByteString startKey,
       ByteString endKey,
       int limit) {
     super(conf, builder, startKey, endKey, limit);
+    this.cf = cf;
   }
 
   TiRegion loadCurrentRegionToCache() throws Exception {
@@ -47,7 +50,7 @@ public class RawScanIterator extends ScanIterator {
       } else {
         while (true) {
           try {
-            currentCache = client.rawScan(backOffer, startKey, limit);
+            currentCache = client.rawScan(backOffer, startKey, cf, limit);
             break;
           } catch (final TiKVException e) {
             backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
