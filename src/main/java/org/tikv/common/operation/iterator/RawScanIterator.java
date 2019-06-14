@@ -38,23 +38,22 @@ public class RawScanIterator extends ScanIterator {
   }
 
   TiRegion loadCurrentRegionToCache() throws Exception {
-    TiRegion region;
-    try (RegionStoreClient client = builder.build(startKey)) {
-      region = client.getRegion();
-      BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
-      if (limit <= 0) {
-        currentCache = null;
-      } else {
-        while (true) {
+    BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
+    while (true) {
+      try (RegionStoreClient client = builder.build(startKey)) {
+        TiRegion region = client.getRegion();
+        if (limit <= 0) {
+          currentCache = null;
+        } else {
           try {
             currentCache = client.rawScan(backOffer, startKey, limit);
-            break;
           } catch (final TiKVException e) {
             backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+            continue;
           }
         }
+        return region;
       }
-      return region;
     }
   }
 
