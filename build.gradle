@@ -143,11 +143,12 @@ task copyResources(type: Copy) {
 	includeEmptyDirs = false
 	copy {
 		from "./kvproto/include/"
-		include "**/gogoproto/**"
+		include "**/*.proto"
 		into "proto"
 	}
 	copy {
-		from "./kvproto/proto/", "./raft-rs/proto/", "./tipb/proto"
+		from "./kvproto/proto/", "./raft-rs/proto/proto/", "./tipb/proto"
+		include "**/*.proto"
 		into "proto"
 	}
 }
