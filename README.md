@@ -167,13 +167,9 @@ List<Kvrpcpb.KvPair> scan(ByteString startKey, int limit)
  * Delete a raw key-value pair from TiKV if key exists
  *
  * @param key raw key to be deleted
- */ 
-void delete(ByteString key) 
+ */
+void delete(ByteString key)
 ```
-
-
-## TODO
-Contributions are welcomed. Here is a [TODO](https://github.com/tikv/client-java/wiki/TODO-Lists) and you might contact maxiaoyu@pingcap.com if needed.
 
 ## License
 Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.
