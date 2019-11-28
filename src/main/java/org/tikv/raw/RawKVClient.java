@@ -18,7 +18,9 @@ package org.tikv.raw;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -128,6 +130,65 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
+
+  /**
+   * get a set of raw key-value pair from TiKV
+   *
+   * @param keys List<ByteString>
+   * @return List<Pair>
+   */
+  public Map<ByteString, ByteString> batchGet(List<ByteString> keys) {
+    return batchGet(ConcreteBackOffer.newRawKVBackOff(), keys);
+  }
+
+  private Map<ByteString, ByteString> batchGet(BackOffer backOffer, List<ByteString> keys) {
+    Set<ByteString> keysSet = new HashSet<>(keys);
+    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(keysSet);
+    List<Batch> batches = new ArrayList<>();
+
+    for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
+      appendBatches(batches, entry.getKey(), entry.getValue(), null, RAW_BATCH_PUT_SIZE);
+    }
+    List<Kvrpcpb.KvPair> kvPairs = sendBatchGet(backOffer, batches);
+    Map<ByteString, ByteString> resultMap = new HashMap<>();
+    for (Kvrpcpb.KvPair kvPair : kvPairs) {
+      resultMap.put(kvPair.getKey(), kvPair.getValue());
+    }
+    return resultMap;
+  }
+
+  private List<Kvrpcpb.KvPair> sendBatchGet(BackOffer backOffer, List<Batch> batches) {
+    List<Kvrpcpb.KvPair> result = new LinkedList<>();
+    for (Batch batch : batches) {
+      completionService.submit(
+          () -> {
+            RegionStoreClient client = clientBuilder.build(batch.region);
+            BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
+            try {
+              result.addAll(client.rawBatchGet(singleBatchBackOffer, batch.keys));
+            } catch (final TiKVException e) {
+              singleBatchBackOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+              logger.warn("ReSplitting ranges for BatchGetRequest");
+              batchGet(singleBatchBackOffer, batch.keys);
+            }
+            return null;
+          });
+    }
+    try {
+      for (int i = 0; i < batches.size(); i++) {
+        completionService.take().get(BackOffer.rawkvMaxBackoff, TimeUnit.SECONDS);
+      }
+      return result;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new TiKVException("Current thread interrupted.", e);
+    } catch (TimeoutException e) {
+      throw new TiKVException("TimeOut Exceeded for current operation. ", e);
+    } catch (ExecutionException e) {
+      throw new TiKVException("Execution exception met.", e);
+    }
+  }
+
   /**
    * Scan raw key-value pairs from TiKV in range [startKey, endKey)
    *
@@ -211,7 +272,9 @@ public class RawKVClient implements AutoCloseable {
         tmpValues.clear();
       }
       tmpKeys.add(keys.get(i));
-      tmpValues.add(values.get(i));
+      if (values != null && !values.isEmpty()) {
+        tmpValues.add(values.get(i));
+      }
     }
     if (!tmpKeys.isEmpty()) {
       batches.add(new Batch(region, tmpKeys, tmpValues));

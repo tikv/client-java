@@ -19,7 +19,7 @@ import org.tikv.common.util.FastByteComparisons;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest {
-  private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
+  private static final String DEFAULT_PD_ADDRESS = "10.10.44.98:2379";
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -124,15 +124,15 @@ public class RawKVClientTest {
   @Test
   public void validate() {
     if (!initialized) return;
-    baseTest(100, 100, 100, 100, false, false);
-    baseTest(100, 100, 100, 100, false, true);
+    baseTest(100, 100, 100, 100, false, false, false);
+    baseTest(100, 100, 100, 100, false, true, true);
   }
 
   /** Example of benchmarking base test */
   public void benchmark() {
     if (!initialized) return;
-    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, false);
-    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, true);
+    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, false, false);
+    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, true, true);
   }
 
   private void baseTest(
@@ -141,7 +141,8 @@ public class RawKVClientTest {
       int scanCases,
       int deleteCases,
       boolean benchmark,
-      boolean batchPut) {
+      boolean batchPut,
+      boolean batchGet) {
     if (putCases > KEY_POOL_SIZE) {
       logger.info("Number of distinct orderedKeys required exceeded pool size " + KEY_POOL_SIZE);
       return;
@@ -159,7 +160,11 @@ public class RawKVClientTest {
       } else {
         rawPutTest(putCases, benchmark);
       }
-      rawGetTest(getCases, benchmark);
+      if (batchGet) {
+        rawBatchGetTest(getCases, benchmark);
+      } else {
+        rawGetTest(getCases, benchmark);
+      }
       rawScanTest(scanCases, benchmark);
       rawDeleteTest(deleteCases, benchmark);
 
@@ -332,6 +337,38 @@ public class RawKVClientTest {
     }
   }
 
+  private void rawBatchGetTest(int getCases, boolean benchmark) {
+    logger.info("batchGet testing");
+    if (benchmark) {
+      long start = System.currentTimeMillis();
+      int base = getCases / WORKER_CNT;
+      for (int cnt = 0; cnt < WORKER_CNT; cnt++) {
+        int i = cnt;
+        completionService.submit(
+            () -> {
+              List<ByteString> keys = new ArrayList<>();
+              for (int j = 0; j < base; j++) {
+                int num = i * base + j;
+                ByteString key = orderedKeys.get(num);
+                keys.add(key);
+              }
+              client.batchGet(keys);
+              return null;
+            });
+      }
+      awaitTimeOut(200);
+      long end = System.currentTimeMillis();
+      logger.info(getCases + " batchGet: " + (end - start) / 1000.0 + "s workers=" + WORKER_CNT);
+    } else {
+      List<ByteString> keys = new ArrayList<>();
+      for (int i = 0; i < getCases; i++) {
+        keys.add(orderedKeys.get(i));
+      }
+      Map<ByteString, ByteString> pairsMap = client.batchGet(keys);
+      checkBatchGet(pairsMap, data);
+    }
+  }
+
   private void rawScanTest(int scanCases, boolean benchmark) {
     logger.info("rawScan testing");
     if (benchmark) {
@@ -412,6 +449,13 @@ public class RawKVClientTest {
     client.batchPut(kvPairs);
     for (Map.Entry<ByteString, ByteString> kvPair : kvPairs.entrySet()) {
       assert client.get(kvPair.getKey()).equals(kvPair.getValue());
+    }
+  }
+
+  private void checkBatchGet(
+      Map<ByteString, ByteString> pairsMap, TreeMap<ByteString, ByteString> data) {
+    for (ByteString key : pairsMap.keySet()) {
+      assert pairsMap.get(key).equals(data.get(key));
     }
   }
 

@@ -47,6 +47,8 @@ import org.tikv.kvproto.Kvrpcpb.GetResponse;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 import org.tikv.kvproto.Kvrpcpb.RawBatchPutRequest;
 import org.tikv.kvproto.Kvrpcpb.RawBatchPutResponse;
+import org.tikv.kvproto.Kvrpcpb.RawBatchGetRequest;
+import org.tikv.kvproto.Kvrpcpb.RawBatchGetResponse;
 import org.tikv.kvproto.Kvrpcpb.RawDeleteRequest;
 import org.tikv.kvproto.Kvrpcpb.RawDeleteResponse;
 import org.tikv.kvproto.Kvrpcpb.RawGetRequest;
@@ -378,6 +380,67 @@ public class RegionStoreClient extends AbstractGRPCClient<TikvBlockingStub, Tikv
       throw new RegionException(resp.getRegionError());
     }
   }
+
+
+  /**
+   * rawbatchGet
+   *
+   * @param backOffer
+   * @param keys
+   * @return
+   */
+  // TODO: batch get should consider key range split
+  public List<KvPair> rawBatchGet(BackOffer backOffer, Iterable<ByteString> keys) {
+    Supplier<RawBatchGetRequest> request =
+        () ->
+            RawBatchGetRequest.newBuilder()
+                .setContext(region.getContext())
+                .addAllKeys(keys)
+                .build();
+    KVErrorHandler<RawBatchGetResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+    RawBatchGetResponse resp =
+        callWithRetry(backOffer, TikvGrpc.METHOD_RAW_BATCH_GET, request, handler);
+
+    return rawBatchGetHelper(resp, backOffer);
+  }
+
+  private List<KvPair> rawBatchGetHelper(RawBatchGetResponse resp, BackOffer bo) {
+    List<Lock> locks = new ArrayList<>();
+
+    for (KvPair pair : resp.getPairsList()) {
+      if (pair.hasError()) {
+        if (pair.getError().hasLocked()) {
+          Lock lock = new Lock(pair.getError().getLocked());
+          locks.add(lock);
+        } else {
+          throw new KeyException(pair.getError());
+        }
+      }
+    }
+
+    if (!locks.isEmpty()) {
+      boolean ok = lockResolverClient.resolveLocks(bo, locks);
+      if (!ok) {
+        // if not resolve all locks, we wait and retry
+        bo.doBackOff(BoTxnLockFast, new KeyException((resp.getPairsList().get(0).getError())));
+      }
+
+      // TODO: we should retry
+      // fix me
+    }
+
+    if (resp.hasRegionError()) {
+      // TODO, we should redo the split and redo the batchGet
+      throw new RegionException(resp.getRegionError());
+    }
+    return resp.getPairsList();
+  }
+
 
   /**
    * Return a batch KvPair list containing limited key-value pairs starting from `key`, which are in
