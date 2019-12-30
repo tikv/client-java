@@ -23,7 +23,7 @@ gradle clean build -x test
 To make a jar with dependencies
 
 ```
-gradle clean fatJar -x test
+gradle clean shadowJar -x test
 ```
 
 The jar can be found in `./build/libs/`
