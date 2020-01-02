@@ -1,7 +1,8 @@
 apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'idea'
-apply plugin: "com.google.protobuf"
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'com.google.protobuf'
 
 group = 'org.tikv'
 version = '2.0-SNAPSHOT'
@@ -25,9 +26,11 @@ idea {
 buildscript {
 	repositories {
 		maven { url "http://repo.maven.apache.org/maven2" }
+		maven { url "https://plugins.gradle.org/m2/" }
 	}
 	dependencies {
 		classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.7'
+		classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
 	}
 }
 
@@ -102,32 +105,13 @@ repositories {
 dependencies {
 	compile group: 'log4j', name: 'log4j', version:'1.2.17'
 	compile group: 'net.sf.trove4j', name: 'trove4j', version:'3.0.1'
-	compile group: 'com.sangupta', name: 'murmur', version:'1.0.0'
 	compile group: 'io.grpc', name: 'grpc-netty', version:'1.7.0'
 	compile group: 'io.grpc', name: 'grpc-protobuf', version:'1.7.0'
 	compile group: 'io.grpc', name: 'grpc-stub', version:'1.7.0'
-	compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version:'2.8.11'
-	compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version:'2.8.11.1'
-	compile(group: 'com.fasterxml.jackson.module', name: 'jackson-module-scala_2.11', version:'2.8.11') {
-		exclude(module: 'guava')
-	}
 	compile group: 'joda-time', name: 'joda-time', version:'2.9.9'
 	compile group: 'org.joda', name: 'joda-convert', version:'1.9.2'
 	testCompile group: 'io.grpc', name: 'grpc-testing', version:'1.7.0'
-	//remove unused hadoop dependencies
-	/*compile group: 'org.apache.logging.log4j', name: 'log4j-api', version:'2.8.1'
-	compile group: 'org.apache.logging.log4j', name: 'log4j-core', version:'2.8.1'
-	compile group: 'org.apache.spark', name: 'spark-core_2.11', version:'2.3.2'
-	compile group: 'org.apache.spark', name: 'spark-catalyst_2.11', version:'2.3.2'
-	compile group: 'org.apache.spark', name: 'spark-sql_2.11', version:'2.3.2'
-	compile group: 'org.apache.spark', name: 'spark-hive_2.11', version:'2.3.2'
-	compile group: 'org.apache.spark', name: 'spark-hive-thriftserver_2.11', version:'2.3.2'
-	compile group: 'org.apache.spark', name: 'spark-unsafe_2.11', version:'2.3.2'*/
-	compile group: 'org.apache.commons', name: 'commons-lang3', version:'3.5'
-	compile group: 'org.slf4j', name: 'slf4j-api', version:'1.7.16'
-	compile group: 'org.slf4j', name: 'slf4j-log4j12', version:'1.7.16'
-	compile group: 'org.slf4j', name: 'jul-to-slf4j', version:'1.7.16'
-	compile group: 'org.slf4j', name: 'jcl-over-slf4j', version:'1.7.16'
+	testCompile group: 'org.apache.commons', name: 'commons-lang3', version:'3.5'
 	compile 'com.google.protobuf:protobuf-java:3.1.0'
 }
 
@@ -147,20 +131,18 @@ task copyResources(type: Copy) {
 		into "proto"
 	}
 	copy {
-		from "./kvproto/proto/", "./raft-rs/proto/", "./tipb/proto"
+		from "./kvproto/include/", "./kvproto/proto/", "./raft-rs/proto/", "./tipb/proto"
+		include "*.proto"
 		into "proto"
 	}
 }
 
-//create a single Jar with all dependencies
-task fatJar(type: Jar) {
-	manifest {
-		attributes 'Title': project.name,
-				   'Version': version
-	}
-	baseName = project.name + '-all'
-	from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
-	with jar
+// shade grpc and netty dependencies
+shadowJar {
+	relocate 'io.grpc', 'shade.io.grpc'
+	relocate 'com.google', 'shade.com.google'
+	relocate 'io.netty', 'shade.io.netty'
+	relocate 'io.opencensus', 'shade.io.opencensus'
 }
 
 compileJava.dependsOn copyResources
