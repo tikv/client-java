@@ -30,9 +30,10 @@ public class RawKVClientTest {
   private static final List<ByteString> orderedKeys;
   private static final List<ByteString> randomKeys;
   private static final List<ByteString> values;
+  private static final int limit;
   private TreeMap<ByteString, ByteString> data;
   private boolean initialized;
-  private Random r = new Random(1234);
+  private final Random r = new Random(1234);
   private static final ByteStringComparator bsc = new ByteStringComparator();
   private static final ExecutorService executors = Executors.newFixedThreadPool(WORKER_CNT);
   private final ExecutorCompletionService<Object> completionService =
@@ -44,6 +45,7 @@ public class RawKVClientTest {
     orderedKeys = new ArrayList<>();
     randomKeys = new ArrayList<>();
     values = new ArrayList<>();
+    limit = 10000;
     for (int i = 0; i < KEY_POOL_SIZE; i++) {
       orderedKeys.add(rawKey(String.valueOf(i)));
       randomKeys.add(getRandomRawKey());
@@ -106,10 +108,10 @@ public class RawKVClientTest {
       List<Kvrpcpb.KvPair> result2 = new ArrayList<>();
       result.add(kv1);
       result.add(kv2);
-      checkScan(key, key3, result);
-      checkScan(key1, key3, result);
+      checkScan(key, key3, result, limit);
+      checkScan(key1, key3, result, limit);
       result2.add(kv1);
-      checkScan(key, key2, result2);
+      checkScan(key, key2, result2, limit);
       checkDelete(key1);
       checkDelete(key2);
     } catch (final TiKVException e) {
@@ -118,7 +120,7 @@ public class RawKVClientTest {
   }
 
   private List<Kvrpcpb.KvPair> rawKeys() {
-    return client.scan(RAW_START_KEY, RAW_END_KEY);
+    return client.scan(RAW_START_KEY, RAW_END_KEY, limit);
   }
 
   @Test
@@ -349,7 +351,7 @@ public class RawKVClientTest {
                   startKey = endKey;
                   endKey = tmp;
                 }
-                client.scan(startKey, endKey);
+                client.scan(startKey, endKey, limit);
               }
               return null;
             });
@@ -366,7 +368,7 @@ public class RawKVClientTest {
           startKey = endKey;
           endKey = tmp;
         }
-        checkScan(startKey, endKey, data);
+        checkScan(startKey, endKey, data, limit);
       }
     }
   }
@@ -415,13 +417,14 @@ public class RawKVClientTest {
     }
   }
 
-  private void checkScan(ByteString startKey, ByteString endKey, List<Kvrpcpb.KvPair> ans) {
-    List<Kvrpcpb.KvPair> result = client.scan(startKey, endKey);
+  private void checkScan(
+      ByteString startKey, ByteString endKey, List<Kvrpcpb.KvPair> ans, int limit) {
+    List<Kvrpcpb.KvPair> result = client.scan(startKey, endKey, limit);
     assert result.equals(ans);
   }
 
   private void checkScan(
-      ByteString startKey, ByteString endKey, TreeMap<ByteString, ByteString> data) {
+      ByteString startKey, ByteString endKey, TreeMap<ByteString, ByteString> data, int limit) {
     checkScan(
         startKey,
         endKey,
@@ -434,7 +437,8 @@ public class RawKVClientTest {
                         .setKey(kvPair.getKey())
                         .setValue(kvPair.getValue())
                         .build())
-            .collect(Collectors.toList()));
+            .collect(Collectors.toList()),
+        limit);
   }
 
   private void checkDelete(ByteString key) {

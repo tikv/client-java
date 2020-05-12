@@ -126,9 +126,10 @@ ByteString get(ByteString key)
  *
  * @param startKey raw start key, inclusive
  * @param endKey raw end key, exclusive
+ * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
  * @return list of key-value pairs in range
  */
-List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey)
+List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey, int limit)
 ```
 
 ```java
@@ -136,7 +137,7 @@ List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey)
  * Scan raw key-value pairs from TiKV in range [startKey, endKey)
  *
  * @param startKey raw start key, inclusive
- * @param limit limit of key-value pairs
+ * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
  * @return list of key-value pairs in range
  */
 List<Kvrpcpb.KvPair> scan(ByteString startKey, int limit)

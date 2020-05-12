@@ -48,7 +48,13 @@ public class RawKVClient implements AutoCloseable {
   private final ExecutorCompletionService<Object> completionService;
   private static final Logger logger = Logger.getLogger(RawKVClient.class);
 
+  // https://www.github.com/pingcap/tidb/blob/master/store/tikv/rawkv.go
+  private static final int MAX_RAW_SCAN_LIMIT = 10240;
   private static final int RAW_BATCH_PUT_SIZE = 16 * 1024;
+  private static final int RAW_BATCH_PAIR_COUNT = 512;
+
+  private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
+      new TiKVException("limit should be less than MAX_RAW_SCAN_LIMIT");
 
   public RawKVClient(TiConfiguration conf, RegionStoreClientBuilder clientBuilder) {
     Objects.requireNonNull(conf, "conf is null");
@@ -133,10 +139,12 @@ public class RawKVClient implements AutoCloseable {
    *
    * @param startKey raw start key, inclusive
    * @param endKey raw end key, exclusive
+   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
    * @return list of key-value pairs in range
    */
-  public List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey) {
-    Iterator<Kvrpcpb.KvPair> iterator = rawScanIterator(conf, clientBuilder, startKey, endKey);
+  public List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey, int limit) {
+    Iterator<Kvrpcpb.KvPair> iterator =
+        rawScanIterator(conf, clientBuilder, startKey, endKey, limit);
     List<Kvrpcpb.KvPair> result = new ArrayList<>();
     iterator.forEachRemaining(result::add);
     return result;
@@ -146,7 +154,7 @@ public class RawKVClient implements AutoCloseable {
    * Scan raw key-value pairs from TiKV in range [startKey, endKey)
    *
    * @param startKey raw start key, inclusive
-   * @param limit limit of key-value pairs
+   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
    * @return list of key-value pairs in range
    */
   public List<Kvrpcpb.KvPair> scan(ByteString startKey, int limit) {
@@ -295,13 +303,17 @@ public class RawKVClient implements AutoCloseable {
       TiConfiguration conf,
       RegionStoreClientBuilder builder,
       ByteString startKey,
-      ByteString endKey) {
-    return new RawScanIterator(conf, builder, startKey, endKey, Integer.MAX_VALUE);
+      ByteString endKey,
+      int limit) {
+    if (limit > MAX_RAW_SCAN_LIMIT) {
+      throw ERR_MAX_SCAN_LIMIT_EXCEEDED;
+    }
+    return new RawScanIterator(conf, builder, startKey, endKey, limit);
   }
 
   private Iterator<Kvrpcpb.KvPair> rawScanIterator(
       TiConfiguration conf, RegionStoreClientBuilder builder, ByteString startKey, int limit) {
-    return new RawScanIterator(conf, builder, startKey, ByteString.EMPTY, limit);
+    return rawScanIterator(conf, builder, startKey, ByteString.EMPTY, limit);
   }
 
   private BackOffer defaultBackOff() {
