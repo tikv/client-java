@@ -4,11 +4,12 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.tikv.common.exception.GrpcException;
 
 public class BackOffFunction {
-  private int base;
-  private int cap;
+  private final int base;
+  private final int cap;
+  private final BackOffer.BackOffStrategy strategy;
+
   private int lastSleep;
   private int attempts;
-  private BackOffer.BackOffStrategy strategy;
 
   public static BackOffFunction create(int base, int cap, BackOffer.BackOffStrategy strategy) {
     return new BackOffFunction(base, cap, strategy);

@@ -32,6 +32,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.operation.iterator.RawScanIterator;
 import org.tikv.common.region.RegionStoreClient;
@@ -48,11 +49,13 @@ public class RawKVClient implements AutoCloseable {
   private final ExecutorCompletionService<Object> completionService;
   private static final Logger logger = Logger.getLogger(RawKVClient.class);
 
+  private static final int MAX_RETRY_LIMIT = 3;
   // https://www.github.com/pingcap/tidb/blob/master/store/tikv/rawkv.go
   private static final int MAX_RAW_SCAN_LIMIT = 10240;
   private static final int RAW_BATCH_PUT_SIZE = 16 * 1024;
   private static final int RAW_BATCH_PAIR_COUNT = 512;
 
+  private static final TiKVException ERR_RETRY_LIMIT_EXCEEDED = new GrpcException("retry is exhausted. retry exceeds " + MAX_RETRY_LIMIT + "attempts");
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
       new TiKVException("limit should be less than MAX_RAW_SCAN_LIMIT");
 
@@ -76,7 +79,7 @@ public class RawKVClient implements AutoCloseable {
    */
   public void put(ByteString key, ByteString value) {
     BackOffer backOffer = defaultBackOff();
-    while (true) {
+    for (int i = 0; i < MAX_RETRY_LIMIT; i++) {
       RegionStoreClient client = clientBuilder.build(key);
       try {
         client.rawPut(backOffer, key, value);
@@ -85,6 +88,7 @@ public class RawKVClient implements AutoCloseable {
         backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       }
     }
+    throw ERR_RETRY_LIMIT_EXCEEDED;
   }
 
   /**
@@ -183,7 +187,7 @@ public class RawKVClient implements AutoCloseable {
   }
 
   /** A Batch containing the region, a list of keys and/or values to send */
-  private final class Batch {
+  private static final class Batch {
     private final TiRegion region;
     private final List<ByteString> keys;
     private final List<ByteString> values;
