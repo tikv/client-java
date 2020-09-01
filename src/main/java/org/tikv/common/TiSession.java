@@ -49,7 +49,7 @@ public class TiSession implements AutoCloseable {
     // Create new Region Manager avoiding thread contentions
     RegionManager regionMgr = new RegionManager(pdClient);
     RegionStoreClientBuilder builder =
-        new RegionStoreClientBuilder(conf, channelFactory, regionMgr);
+        new RegionStoreClientBuilder(conf, channelFactory, regionMgr, pdClient);
     return new RawKVClient(conf, builder);
   }
 

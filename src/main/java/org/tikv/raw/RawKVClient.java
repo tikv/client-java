@@ -30,7 +30,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
@@ -47,7 +48,7 @@ public class RawKVClient implements AutoCloseable {
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
   private final ExecutorCompletionService<Object> completionService;
-  private static final Logger logger = Logger.getLogger(RawKVClient.class);
+  private static final Logger logger = LoggerFactory.getLogger(RawKVClient.class);
 
   private static final int MAX_RETRY_LIMIT = 3;
   // https://www.github.com/pingcap/tidb/blob/master/store/tikv/rawkv.go
@@ -55,7 +56,8 @@ public class RawKVClient implements AutoCloseable {
   private static final int RAW_BATCH_PUT_SIZE = 16 * 1024;
   private static final int RAW_BATCH_PAIR_COUNT = 512;
 
-  private static final TiKVException ERR_RETRY_LIMIT_EXCEEDED = new GrpcException("retry is exhausted. retry exceeds " + MAX_RETRY_LIMIT + "attempts");
+  private static final TiKVException ERR_RETRY_LIMIT_EXCEEDED =
+      new GrpcException("retry is exhausted. retry exceeds " + MAX_RETRY_LIMIT + "attempts");
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
       new TiKVException("limit should be less than MAX_RAW_SCAN_LIMIT");
 
@@ -291,7 +293,7 @@ public class RawKVClient implements AutoCloseable {
     }
     try {
       for (int i = 0; i < batches.size(); i++) {
-        completionService.take().get(BackOffer.rawkvMaxBackoff, TimeUnit.SECONDS);
+        completionService.take().get(BackOffer.RAWKV_MAX_BACKOFF, TimeUnit.SECONDS);
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

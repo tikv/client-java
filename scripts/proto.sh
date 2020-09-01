@@ -14,11 +14,15 @@
 #   limitations under the License.
 #
 
-kvproto_hash=a4759dfe3753ce136d252578340bb2b33633ccfa
+CURRENT_DIR=`pwd`
+TIKV_CLIENT_HOME="$(cd "`dirname "$0"`"/..; pwd)"
+cd $TIKV_CLIENT_HOME
 
-raft_rs_hash=14f007b443935aef51cb161c5b368b54fc8ed176
+kvproto_hash=2cf9a243b8d589f345de1dbaa9eeffec6afbdc06
 
-tipb_hash=c0b8f1a8c8395c319049600dc0efd278f1e26a0d
+raft_rs_hash=b9891b673573fad77ebcf9bbe0969cf945841926
+
+tipb_hash=c4d518eb1d60c21f05b028b36729e64610346dac
 
 if [ -d "kvproto" ]; then
 	cd kvproto; git fetch -p; git checkout ${kvproto_hash}; cd ..
@@ -37,3 +41,5 @@ if [ -d "tipb" ]; then
 else
 	git clone https://github.com/pingcap/tipb; cd tipb; git checkout ${tipb_hash}; cd ..
 fi
+
+cd $CURRENT_DIR

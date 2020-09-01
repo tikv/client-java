@@ -23,7 +23,8 @@ import io.grpc.stub.AbstractStub;
 import io.grpc.stub.ClientCalls;
 import io.grpc.stub.StreamObserver;
 import java.util.function.Supplier;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.operation.ErrorHandler;
 import org.tikv.common.policy.RetryMaxMs.Builder;
 import org.tikv.common.policy.RetryPolicy;
@@ -34,16 +35,29 @@ import org.tikv.common.util.ChannelFactory;
 public abstract class AbstractGRPCClient<
         BlockingStubT extends AbstractStub<BlockingStubT>, StubT extends AbstractStub<StubT>>
     implements AutoCloseable {
-  protected final Logger logger = Logger.getLogger(this.getClass());
-  protected final TiConfiguration conf;
+  protected final Logger logger = LoggerFactory.getLogger(this.getClass());
   protected final ChannelFactory channelFactory;
+  protected TiConfiguration conf;
+  protected BlockingStubT blockingStub;
+  protected StubT asyncStub;
 
   protected AbstractGRPCClient(TiConfiguration conf, ChannelFactory channelFactory) {
     this.conf = conf;
     this.channelFactory = channelFactory;
   }
 
-  protected TiConfiguration getConf() {
+  protected AbstractGRPCClient(
+      TiConfiguration conf,
+      ChannelFactory channelFactory,
+      BlockingStubT blockingStub,
+      StubT asyncStub) {
+    this.conf = conf;
+    this.channelFactory = channelFactory;
+    this.blockingStub = blockingStub;
+    this.asyncStub = asyncStub;
+  }
+
+  public TiConfiguration getConf() {
     return conf;
   }
 

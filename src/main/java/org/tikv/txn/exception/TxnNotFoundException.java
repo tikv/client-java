@@ -12,19 +12,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.tikv.txn.exception;
 
-package org.tikv.common.util;
-
-import org.tikv.common.meta.TiTimestamp;
-
-public final class TsoUtils {
-  public static boolean isExpired(long lockTS, long ttl) {
-    // Because the UNIX time in milliseconds is in long style and will
-    // not exceed to become the negative number, so the comparison is correct
-    return untilExpired(lockTS, ttl) <= 0;
-  }
-
-  public static long untilExpired(long lockTS, long ttl) {
-    return TiTimestamp.extractPhysical(lockTS) + ttl - System.currentTimeMillis();
-  }
-}
+public class TxnNotFoundException extends RuntimeException {}

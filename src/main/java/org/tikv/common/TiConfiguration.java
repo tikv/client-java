@@ -15,13 +15,14 @@
 
 package org.tikv.common;
 
-import com.google.common.collect.ImmutableList;
 import java.io.Serializable;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import org.tikv.common.pd.PDUtils;
 import org.tikv.kvproto.Kvrpcpb.CommandPri;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
@@ -31,19 +32,24 @@ public class TiConfiguration implements Serializable {
   private static final int DEF_SCAN_BATCH_SIZE = 100;
   private static final boolean DEF_IGNORE_TRUNCATE = true;
   private static final boolean DEF_TRUNCATE_AS_WARNING = false;
-  private static final int DEF_META_RELOAD_PERIOD = 10;
-  private static final TimeUnit DEF_META_RELOAD_UNIT = TimeUnit.SECONDS;
   private static final int DEF_MAX_FRAME_SIZE = 268435456 * 2; // 256 * 2 MB
   private static final int DEF_INDEX_SCAN_BATCH_SIZE = 20000;
+  private static final int DEF_REGION_SCAN_DOWNGRADE_THRESHOLD = 10000000;
   // if keyRange size per request exceeds this limit, the request might be too large to be accepted
   // by TiKV(maximum request size accepted by TiKV is around 1MB)
   private static final int MAX_REQUEST_KEY_RANGE_SIZE = 20000;
   private static final int DEF_INDEX_SCAN_CONCURRENCY = 5;
   private static final int DEF_TABLE_SCAN_CONCURRENCY = 512;
   private static final CommandPri DEF_COMMAND_PRIORITY = CommandPri.Low;
-  private static final IsolationLevel DEF_ISOLATION_LEVEL = IsolationLevel.RC;
+  private static final IsolationLevel DEF_ISOLATION_LEVEL = IsolationLevel.SI;
   private static final boolean DEF_SHOW_ROWID = false;
   private static final String DEF_DB_PREFIX = "";
+  private static final boolean DEF_WRITE_ENABLE = true;
+  private static final boolean DEF_WRITE_ALLOW_SPARK_SQL = false;
+  private static final boolean DEF_WRITE_WITHOUT_LOCK_TABLE = false;
+  private static final int DEF_TIKV_REGION_SPLIT_SIZE_IN_MB = 96;
+  private static final int DEF_PARTITION_PER_SPLIT = 1;
+  private static final int DEF_KV_CLIENT_CONCURRENCY = 10;
   private static final KVMode DEF_KV_MODE = KVMode.TXN;
   private static final int DEF_RAW_CLIENT_CONCURRENCY = 200;
 
@@ -51,11 +57,10 @@ public class TiConfiguration implements Serializable {
   private TimeUnit timeoutUnit = DEF_TIMEOUT_UNIT;
   private boolean ignoreTruncate = DEF_IGNORE_TRUNCATE;
   private boolean truncateAsWarning = DEF_TRUNCATE_AS_WARNING;
-  private TimeUnit metaReloadUnit = DEF_META_RELOAD_UNIT;
-  private int metaReloadPeriod = DEF_META_RELOAD_PERIOD;
   private int maxFrameSize = DEF_MAX_FRAME_SIZE;
   private List<URI> pdAddrs = new ArrayList<>();
   private int indexScanBatchSize = DEF_INDEX_SCAN_BATCH_SIZE;
+  private int downgradeThreshold = DEF_REGION_SCAN_DOWNGRADE_THRESHOLD;
   private int indexScanConcurrency = DEF_INDEX_SCAN_CONCURRENCY;
   private int tableScanConcurrency = DEF_TABLE_SCAN_CONCURRENCY;
   private CommandPri commandPriority = DEF_COMMAND_PRIORITY;
@@ -65,6 +70,14 @@ public class TiConfiguration implements Serializable {
   private String dbPrefix = DEF_DB_PREFIX;
   private KVMode kvMode = DEF_KV_MODE;
   private int rawClientConcurrency = DEF_RAW_CLIENT_CONCURRENCY;
+
+  private boolean writeAllowSparkSQL = DEF_WRITE_ALLOW_SPARK_SQL;
+  private boolean writeEnable = DEF_WRITE_ENABLE;
+  private boolean writeWithoutLockTable = DEF_WRITE_WITHOUT_LOCK_TABLE;
+  private int tikvRegionSplitSizeInMB = DEF_TIKV_REGION_SPLIT_SIZE_IN_MB;
+  private int partitionPerSplit = DEF_PARTITION_PER_SPLIT;
+
+  private int kvClientConcurrency = DEF_KV_CLIENT_CONCURRENCY;
 
   public enum KVMode {
     TXN,
@@ -89,11 +102,21 @@ public class TiConfiguration implements Serializable {
   private static List<URI> strToURI(String addressStr) {
     Objects.requireNonNull(addressStr);
     String[] addrs = addressStr.split(",");
-    ImmutableList.Builder<URI> addrsBuilder = ImmutableList.builder();
-    for (String addr : addrs) {
-      addrsBuilder.add(URI.create("http://" + addr));
+    Arrays.sort(addrs);
+    return PDUtils.addrsToUrls(addrs);
+  }
+
+  public static <E> String listToString(List<E> list) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("[");
+    for (int i = 0; i < list.size(); i++) {
+      sb.append(list.get(i).toString());
+      if (i != list.size() - 1) {
+        sb.append(",");
+      }
     }
-    return addrsBuilder.build();
+    sb.append("]");
+    return sb.toString();
   }
 
   public int getTimeout() {
@@ -109,24 +132,6 @@ public class TiConfiguration implements Serializable {
     return timeoutUnit;
   }
 
-  public TimeUnit getMetaReloadPeriodUnit() {
-    return metaReloadUnit;
-  }
-
-  public TiConfiguration setMetaReloadPeriodUnit(TimeUnit timeUnit) {
-    this.metaReloadUnit = timeUnit;
-    return this;
-  }
-
-  public TiConfiguration setMetaReloadPeriod(int metaReloadPeriod) {
-    this.metaReloadPeriod = metaReloadPeriod;
-    return this;
-  }
-
-  public int getMetaReloadPeriod() {
-    return metaReloadPeriod;
-  }
-
   public TiConfiguration setTimeoutUnit(TimeUnit timeoutUnit) {
     this.timeoutUnit = timeoutUnit;
     return this;
@@ -134,6 +139,10 @@ public class TiConfiguration implements Serializable {
 
   public List<URI> getPdAddrs() {
     return pdAddrs;
+  }
+
+  public String getPdAddrsString() {
+    return listToString(pdAddrs);
   }
 
   public int getScanBatchSize() {
@@ -234,6 +243,54 @@ public class TiConfiguration implements Serializable {
     this.dbPrefix = dbPrefix;
   }
 
+  public boolean isWriteEnable() {
+    return writeEnable;
+  }
+
+  public void setWriteEnable(boolean writeEnable) {
+    this.writeEnable = writeEnable;
+  }
+
+  public boolean isWriteWithoutLockTable() {
+    return writeWithoutLockTable;
+  }
+
+  public void setWriteWithoutLockTable(boolean writeWithoutLockTable) {
+    this.writeWithoutLockTable = writeWithoutLockTable;
+  }
+
+  public boolean isWriteAllowSparkSQL() {
+    return writeAllowSparkSQL;
+  }
+
+  public void setWriteAllowSparkSQL(boolean writeAllowSparkSQL) {
+    this.writeAllowSparkSQL = writeAllowSparkSQL;
+  }
+
+  public int getTikvRegionSplitSizeInMB() {
+    return tikvRegionSplitSizeInMB;
+  }
+
+  public void setTikvRegionSplitSizeInMB(int tikvRegionSplitSizeInMB) {
+    this.tikvRegionSplitSizeInMB = tikvRegionSplitSizeInMB;
+  }
+
+  public int getDowngradeThreshold() {
+    return downgradeThreshold;
+  }
+
+  public void setDowngradeThreshold(int downgradeThreshold) {
+    this.downgradeThreshold = downgradeThreshold;
+  }
+
+  public int getPartitionPerSplit() {
+    return partitionPerSplit;
+  }
+
+  public void setPartitionPerSplit(int partitionPerSplit) {
+    this.partitionPerSplit = partitionPerSplit;
+  }
+
   public KVMode getKvMode() {
     return kvMode;
   }
@@ -248,5 +305,13 @@ public class TiConfiguration implements Serializable {
 
   public void setRawClientConcurrency(int rawClientConcurrency) {
     this.rawClientConcurrency = rawClientConcurrency;
+  }
+
+  public int getKvClientConcurrency() {
+    return kvClientConcurrency;
+  }
+
+  public void setKvClientConcurrency(int kvClientConcurrency) {
+    this.kvClientConcurrency = kvClientConcurrency;
   }
 }

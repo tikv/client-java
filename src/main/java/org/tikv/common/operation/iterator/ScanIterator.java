@@ -21,6 +21,7 @@ import com.google.protobuf.ByteString;
 import java.util.Iterator;
 import java.util.List;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
@@ -38,7 +39,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
 
   protected Key endKey;
   protected boolean hasEndKey;
-  protected boolean lastBatch = false;
+  protected boolean processingLastBatch = false;
 
   ScanIterator(
       TiConfiguration conf,
@@ -57,14 +58,20 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
     this.builder = builder;
   }
 
-  abstract TiRegion loadCurrentRegionToCache() throws Exception;
+  /**
+   * Load current region to cache, returns the region if loaded.
+   *
+   * @return TiRegion of current data loaded to cache
+   * @throws GrpcException if scan still fails after backoff
+   */
+  abstract TiRegion loadCurrentRegionToCache() throws GrpcException;
 
   // return true if current cache is not loaded or empty
   boolean cacheLoadFails() {
-    if (endOfScan || lastBatch) {
+    if (endOfScan || processingLastBatch) {
       return true;
     }
-    if (startKey.isEmpty()) {
+    if (startKey == null || startKey.isEmpty()) {
       return true;
     }
     try {
@@ -84,6 +91,13 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
       // of a transaction. Otherwise below code might lose data
       if (currentCache.size() < conf.getScanBatchSize()) {
         startKey = curRegionEndKey;
+        lastKey = Key.toRawKey(curRegionEndKey);
+      } else if (currentCache.size() > conf.getScanBatchSize()) {
+        throw new IndexOutOfBoundsException(
+            "current cache size = "
+                + currentCache.size()
+                + ", larger than "
+                + conf.getScanBatchSize());
       } else {
         // Start new scan from exact next key in current region
         lastKey = Key.toRawKey(currentCache.get(currentCache.size() - 1).getKey());
@@ -91,45 +105,12 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
       }
       // notify last batch if lastKey is greater than or equal to endKey
       if (hasEndKey && lastKey.compareTo(endKey) >= 0) {
-        lastBatch = true;
+        processingLastBatch = true;
         startKey = null;
       }
     } catch (Exception e) {
       throw new TiClientInternalException("Error scanning data from region.", e);
     }
     return false;
-  }
-
-  boolean isCacheDrained() {
-    return currentCache == null || limit <= 0 || index >= currentCache.size() || index == -1;
-  }
-
-  @Override
-  public boolean hasNext() {
-    if (isCacheDrained() && cacheLoadFails()) {
-      endOfScan = true;
-      return false;
-    }
-    return true;
-  }
-
-  private Kvrpcpb.KvPair getCurrent() {
-    if (isCacheDrained()) {
-      return null;
-    }
-    --limit;
-    return currentCache.get(index++);
-  }
-
-  @Override
-  public Kvrpcpb.KvPair next() {
-    Kvrpcpb.KvPair kv;
-    // continue when cache is empty but not null
-    for (kv = getCurrent(); currentCache != null && kv == null; kv = getCurrent()) {
-      if (cacheLoadFails()) {
-        return null;
-      }
-    }
-    return kv;
   }
 }

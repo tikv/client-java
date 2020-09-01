@@ -20,7 +20,8 @@ package org.tikv.common.operation;
 import static org.tikv.common.pd.PDError.buildFromPdpbError;
 
 import java.util.function.Function;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.PDClient;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
@@ -30,15 +31,14 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Pdpb;
 
 public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
-  private static final Logger logger = Logger.getLogger(PDErrorHandler.class);
-  private final Function<RespT, PDError> getError;
-  private final PDClient client;
-
   public static final Function<Pdpb.GetRegionResponse, PDError> getRegionResponseErrorExtractor =
       r ->
           r.getHeader().hasError()
               ? buildFromPdpbError(r.getHeader().getError())
               : r.getRegion().getId() == 0 ? PDError.RegionPeerNotElected.DEFAULT_INSTANCE : null;
+  private static final Logger logger = LoggerFactory.getLogger(PDErrorHandler.class);
+  private final Function<RespT, PDError> getError;
+  private final PDClient client;
 
   public PDErrorHandler(Function<RespT, PDError> errorExtractor, PDClient client) {
     this.getError = errorExtractor;
@@ -54,12 +54,12 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
     if (error != null) {
       switch (error.getErrorType()) {
         case PD_ERROR:
-          client.updateLeader();
           backOffer.doBackOff(
               BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
+          client.updateLeader();
           return true;
         case REGION_PEER_NOT_ELECTED:
-          logger.info(error.getMessage());
+          logger.debug(error.getMessage());
           backOffer.doBackOff(
               BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
           return true;

@@ -17,6 +17,7 @@ package org.tikv.common.operation.iterator;
 
 import com.google.protobuf.ByteString;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.RegionStoreClient;
@@ -25,6 +26,7 @@ import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.kvproto.Kvrpcpb;
 
 public class RawScanIterator extends ScanIterator {
 
@@ -37,7 +39,7 @@ public class RawScanIterator extends ScanIterator {
     super(conf, builder, startKey, endKey, limit);
   }
 
-  TiRegion loadCurrentRegionToCache() throws Exception {
+  TiRegion loadCurrentRegionToCache() throws GrpcException {
     BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
     while (true) {
       try (RegionStoreClient client = builder.build(startKey)) {
@@ -59,9 +61,13 @@ public class RawScanIterator extends ScanIterator {
 
   private boolean notEndOfScan() {
     return limit > 0
-        && !(lastBatch
+        && !(processingLastBatch
             && (index >= currentCache.size()
                 || Key.toRawKey(currentCache.get(index).getKey()).compareTo(endKey) >= 0));
+  }
+
+  boolean isCacheDrained() {
+    return currentCache == null || limit <= 0 || index >= currentCache.size() || index == -1;
   }
 
   @Override
@@ -71,5 +77,25 @@ public class RawScanIterator extends ScanIterator {
       return false;
     }
     return notEndOfScan();
+  }
+
+  private Kvrpcpb.KvPair getCurrent() {
+    if (isCacheDrained()) {
+      return null;
+    }
+    --limit;
+    return currentCache.get(index++);
+  }
+
+  @Override
+  public Kvrpcpb.KvPair next() {
+    Kvrpcpb.KvPair kv;
+    // continue when cache is empty but not null
+    for (kv = getCurrent(); currentCache != null && kv == null; kv = getCurrent()) {
+      if (cacheLoadFails()) {
+        return null;
+      }
+    }
+    return kv;
   }
 }

@@ -7,13 +7,8 @@ public class BackOffFunction {
   private final int base;
   private final int cap;
   private final BackOffer.BackOffStrategy strategy;
-
-  private int lastSleep;
+  private long lastSleep;
   private int attempts;
-
-  public static BackOffFunction create(int base, int cap, BackOffer.BackOffStrategy strategy) {
-    return new BackOffFunction(base, cap, strategy);
-  }
 
   private BackOffFunction(int base, int cap, BackOffer.BackOffStrategy strategy) {
     this.base = base;
@@ -22,37 +17,34 @@ public class BackOffFunction {
     lastSleep = base;
   }
 
-  public enum BackOffFuncType {
-    BoTiKVRPC,
-    BoTxnLock,
-    BoTxnLockFast,
-    BoPDRPC,
-    BoRegionMiss,
-    BoUpdateLeader,
-    BoServerBusy,
-    BoStoreNotMatch
+  public static BackOffFunction create(int base, int cap, BackOffer.BackOffStrategy strategy) {
+    return new BackOffFunction(base, cap, strategy);
   }
 
   /**
    * Do back off in exponential with optional jitters according to different back off strategies.
    * See http://www.awsarchitectureblog.com/2015/03/backoff.html
    */
-  public int doBackOff() {
-    int sleep = 0;
-    int v = expo(base, cap, attempts);
+  long doBackOff(long maxSleepMs) {
+    long sleep = 0;
+    long v = expo(base, cap, attempts);
     switch (strategy) {
       case NoJitter:
         sleep = v;
         break;
       case FullJitter:
-        sleep = ThreadLocalRandom.current().nextInt(v);
+        sleep = ThreadLocalRandom.current().nextLong(v);
         break;
       case EqualJitter:
-        sleep = v / 2 + ThreadLocalRandom.current().nextInt(v / 2);
+        sleep = v / 2 + ThreadLocalRandom.current().nextLong(v / 2);
         break;
       case DecorrJitter:
-        sleep = Math.min(cap, base + ThreadLocalRandom.current().nextInt(lastSleep * 3 - base));
+        sleep = Math.min(cap, base + ThreadLocalRandom.current().nextLong(lastSleep * 3 - base));
         break;
+    }
+
+    if (maxSleepMs > 0 && sleep > maxSleepMs) {
+      sleep = maxSleepMs;
     }
 
     try {
@@ -67,5 +59,16 @@ public class BackOffFunction {
 
   private int expo(int base, int cap, int n) {
     return (int) Math.min(cap, base * Math.pow(2.0d, n));
+  }
+
+  public enum BackOffFuncType {
+    BoTiKVRPC,
+    BoTxnLock,
+    BoTxnLockFast,
+    BoPDRPC,
+    BoRegionMiss,
+    BoUpdateLeader,
+    BoServerBusy,
+    BoTxnNotFound
   }
 }

@@ -16,6 +16,7 @@
 package org.tikv.common.meta;
 
 import java.io.Serializable;
+import java.util.Objects;
 
 /** TiTimestamp is the timestamp returned by timestamp oracle inside placement driver */
 public class TiTimestamp implements Serializable {
@@ -29,6 +30,10 @@ public class TiTimestamp implements Serializable {
     this.logical = l;
   }
 
+  public static long extractPhysical(long ts) {
+    return ts >> PHYSICAL_SHIFT_BITS;
+  }
+
   public long getVersion() {
     return (physical << PHYSICAL_SHIFT_BITS) + logical;
   }
@@ -39,5 +44,30 @@ public class TiTimestamp implements Serializable {
 
   public long getLogical() {
     return this.logical;
+  }
+
+  public TiTimestamp getPrevious() {
+    return new TiTimestamp(physical, logical - 1);
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == this) {
+      return true;
+    }
+    if (!(other instanceof TiTimestamp)) {
+      return false;
+    }
+    return this.getVersion() == ((TiTimestamp) other).getVersion();
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getVersion());
+  }
+
+  @Override
+  public String toString() {
+    return "TiTimestamp(" + getVersion() + ")";
   }
 }

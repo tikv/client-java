@@ -6,10 +6,11 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
@@ -38,7 +39,7 @@ public class RawKVClientTest {
   private static final ExecutorService executors = Executors.newFixedThreadPool(WORKER_CNT);
   private final ExecutorCompletionService<Object> completionService =
       new ExecutorCompletionService<>(executors);
-  private static final Logger logger = Logger.getLogger(RawKVClientTest.class);
+  private static final Logger logger = LoggerFactory.getLogger(RawKVClientTest.class);
   private TiSession session;
 
   static {
