@@ -13,18 +13,15 @@
  * limitations under the License.
  */
 
-package org.tikv.common.util;
+package org.tikv.txn.exception;
 
-import org.tikv.common.meta.TiTimestamp;
+import org.tikv.common.codec.KeyUtils;
 
-public final class TsoUtils {
-  public static boolean isExpired(long lockTS, long ttl) {
-    // Because the UNIX time in milliseconds is in long style and will
-    // not exceed to become the negative number, so the comparison is correct
-    return untilExpired(lockTS, ttl) <= 0;
-  }
-
-  public static long untilExpired(long lockTS, long ttl) {
-    return TiTimestamp.extractPhysical(lockTS) + ttl - System.currentTimeMillis();
+public class WriteConflictException extends RuntimeException {
+  public WriteConflictException(long callerStartTS, long txnID, long commitTS, byte[] key) {
+    super(
+        String.format(
+            "callerStartTS=%d txnID=%d commitTS=%d key=%s",
+            callerStartTS, txnID, commitTS, KeyUtils.formatBytes(key)));
   }
 }

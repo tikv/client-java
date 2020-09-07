@@ -1,33 +1,22 @@
 package org.tikv.common;
 
 import com.google.protobuf.ByteString;
-import org.junit.After;
+import java.io.IOException;
 import org.junit.Before;
 import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.region.TiRegion;
-import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
 
-public class MockServerTest {
+public class MockServerTest extends PDMockServerTest {
   public KVMockServer server;
-  public PDMockServer pdServer;
-  public static final String LOCAL_ADDR = "127.0.0.1";
-  static final long CLUSTER_ID = 1024;
   public int port;
-  public TiSession session;
   public TiRegion region;
 
   @Before
-  public void setUp() throws Exception {
-    pdServer = new PDMockServer();
-    pdServer.start(CLUSTER_ID);
-    pdServer.addGetMemberResp(
-        GrpcUtils.makeGetMembersResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeMember(1, "http://" + LOCAL_ADDR + ":" + pdServer.port),
-            GrpcUtils.makeMember(2, "http://" + LOCAL_ADDR + ":" + (pdServer.port + 1)),
-            GrpcUtils.makeMember(2, "http://" + LOCAL_ADDR + ":" + (pdServer.port + 2))));
+  @Override
+  public void setUp() throws IOException {
+    super.setUp();
 
     Metapb.Region r =
         Metapb.Region.newBuilder()
@@ -40,18 +29,13 @@ public class MockServerTest {
 
     region =
         new TiRegion(
-            r, r.getPeers(0), Kvrpcpb.IsolationLevel.RC, Kvrpcpb.CommandPri.Low, KVMode.TXN);
+            r,
+            r.getPeers(0),
+            session.getConf().getIsolationLevel(),
+            session.getConf().getCommandPriority(),
+            KVMode.TXN);
     pdServer.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
     server = new KVMockServer();
     port = server.start(region);
-    // No PD needed in this test
-    TiConfiguration conf = TiConfiguration.createDefault("127.0.0.1:" + pdServer.port);
-    session = TiSession.create(conf);
-  }
-
-  @After
-  public void tearDown() throws Exception {
-    server.stop();
-    session.close();
   }
 }

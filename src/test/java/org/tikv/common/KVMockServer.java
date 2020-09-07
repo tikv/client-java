@@ -46,8 +46,8 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   private int port;
   private Server server;
   private TiRegion region;
-  private TreeMap<Key, ByteString> dataMap = new TreeMap<>();
-  private Map<ByteString, Integer> errorMap = new HashMap<>();
+  private final TreeMap<Key, ByteString> dataMap = new TreeMap<>();
+  private final Map<ByteString, Integer> errorMap = new HashMap<>();
 
   // for KV error
   public static final int ABORT = 1;
@@ -303,7 +303,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       verifyContext(requestWrap.getContext());
 
       DAGRequest request = DAGRequest.parseFrom(requestWrap.getData());
-      if (request.getStartTs() == 0) {
+      if (request.getStartTsFallback() == 0) {
         throw new Exception();
       }
 

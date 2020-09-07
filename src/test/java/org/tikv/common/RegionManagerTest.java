@@ -19,7 +19,6 @@ import static org.junit.Assert.*;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.tikv.common.region.RegionManager;
@@ -29,33 +28,14 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
 
-public class RegionManagerTest {
-  private PDMockServer server;
-  private static final long CLUSTER_ID = 1024;
-  private static final String LOCAL_ADDR = "127.0.0.1";
+public class RegionManagerTest extends PDMockServerTest {
   private RegionManager mgr;
-  private TiSession session;
 
   @Before
-  public void setup() throws IOException {
-    server = new PDMockServer();
-    server.start(CLUSTER_ID);
-    server.addGetMemberResp(
-        GrpcUtils.makeGetMembersResponse(
-            server.getClusterId(),
-            GrpcUtils.makeMember(1, "http://" + LOCAL_ADDR + ":" + server.port),
-            GrpcUtils.makeMember(2, "http://" + LOCAL_ADDR + ":" + (server.port + 1)),
-            GrpcUtils.makeMember(2, "http://" + LOCAL_ADDR + ":" + (server.port + 2))));
-
-    TiConfiguration conf = TiConfiguration.createDefault("127.0.0.1:" + server.port);
-    session = TiSession.create(conf);
-    mgr = new RegionManager(session.getPDClient());
-  }
-
-  @After
-  public void tearDown() {
-    server.stop();
-    session.close();
+  @Override
+  public void setUp() throws IOException {
+    super.setUp();
+    mgr = session.getRegionManager();
   }
 
   @Test
@@ -67,9 +47,9 @@ public class RegionManagerTest {
     int confVer = 1026;
     int ver = 1027;
     long regionId = 233;
-    server.addGetRegionResp(
+    pdServer.addGetRegionResp(
         GrpcUtils.makeGetRegionResponse(
-            server.getClusterId(),
+            pdServer.getClusterId(),
             GrpcUtils.makeRegion(
                 regionId,
                 GrpcUtils.encodeKey(startKey.toByteArray()),
@@ -102,9 +82,9 @@ public class RegionManagerTest {
     int confVer = 1026;
     int ver = 1027;
     long regionId = 233;
-    server.addGetRegionResp(
+    pdServer.addGetRegionResp(
         GrpcUtils.makeGetRegionResponse(
-            server.getClusterId(),
+            pdServer.getClusterId(),
             GrpcUtils.makeRegion(
                 regionId,
                 GrpcUtils.encodeKey(startKey.toByteArray()),
@@ -112,9 +92,9 @@ public class RegionManagerTest {
                 GrpcUtils.makeRegionEpoch(confVer, ver),
                 GrpcUtils.makePeer(storeId, 10),
                 GrpcUtils.makePeer(storeId + 1, 20))));
-    server.addGetStoreResp(
+    pdServer.addGetStoreResp(
         GrpcUtils.makeGetStoreResponse(
-            server.getClusterId(),
+            pdServer.getClusterId(),
             GrpcUtils.makeStore(
                 storeId,
                 testAddress,
@@ -127,47 +107,12 @@ public class RegionManagerTest {
   }
 
   @Test
-  public void getRegionById() throws Exception {
-    ByteString startKey = ByteString.copyFrom(new byte[] {1});
-    ByteString endKey = ByteString.copyFrom(new byte[] {10});
-
-    int confVer = 1026;
-    int ver = 1027;
-    long regionId = 233;
-    server.addGetRegionByIDResp(
-        GrpcUtils.makeGetRegionResponse(
-            server.getClusterId(),
-            GrpcUtils.makeRegion(
-                regionId,
-                GrpcUtils.encodeKey(startKey.toByteArray()),
-                GrpcUtils.encodeKey(endKey.toByteArray()),
-                GrpcUtils.makeRegionEpoch(confVer, ver),
-                GrpcUtils.makePeer(1, 10),
-                GrpcUtils.makePeer(2, 20))));
-    TiRegion region = mgr.getRegionById(regionId);
-    assertEquals(region.getId(), regionId);
-
-    TiRegion regionToSearch = mgr.getRegionById(regionId);
-    assertEquals(region, regionToSearch);
-
-    mgr.invalidateRegion(regionId);
-
-    // This will in turn invoke rpc and results in an error
-    // since we set just one rpc response
-    try {
-      mgr.getRegionById(regionId);
-      fail();
-    } catch (Exception ignored) {
-    }
-  }
-
-  @Test
   public void getStoreById() throws Exception {
     long storeId = 234;
     String testAddress = "testAddress";
-    server.addGetStoreResp(
+    pdServer.addGetStoreResp(
         GrpcUtils.makeGetStoreResponse(
-            server.getClusterId(),
+            pdServer.getClusterId(),
             GrpcUtils.makeStore(
                 storeId,
                 testAddress,
@@ -177,9 +122,9 @@ public class RegionManagerTest {
     Store store = mgr.getStoreById(storeId);
     assertEquals(store.getId(), storeId);
 
-    server.addGetStoreResp(
+    pdServer.addGetStoreResp(
         GrpcUtils.makeGetStoreResponse(
-            server.getClusterId(),
+            pdServer.getClusterId(),
             GrpcUtils.makeStore(
                 storeId + 1,
                 testAddress,

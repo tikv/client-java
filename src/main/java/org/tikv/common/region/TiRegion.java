@@ -21,12 +21,15 @@ import com.google.protobuf.ByteString;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.key.Key;
 import org.tikv.common.util.FastByteComparisons;
+import org.tikv.common.util.KeyRangeUtils;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 import org.tikv.kvproto.Metapb;
@@ -35,10 +38,9 @@ import org.tikv.kvproto.Metapb.Region;
 
 public class TiRegion implements Serializable {
   private final Region meta;
-  private final Peer peer;
   private final IsolationLevel isolationLevel;
   private final Kvrpcpb.CommandPri commandPri;
-  private Kvrpcpb.Context cachedContext;
+  private Peer peer;
 
   public TiRegion(
       Region meta,
@@ -52,24 +54,13 @@ public class TiRegion implements Serializable {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());
       }
+      // region's first peer is leader.
       this.peer = meta.getPeers(0);
     } else {
       this.peer = peer;
     }
     this.isolationLevel = isolationLevel;
     this.commandPri = commandPri;
-  }
-
-  private TiRegion(
-      Region meta, Peer peer, IsolationLevel isolationLevel, Kvrpcpb.CommandPri commandPri) {
-    this.meta = meta;
-    this.peer = peer;
-    this.isolationLevel = isolationLevel;
-    this.commandPri = commandPri;
-  }
-
-  private TiRegion withNewLeader(Peer p) {
-    return new TiRegion(this.meta, p, this.isolationLevel, this.commandPri);
   }
 
   private Region decodeRegion(Region region, boolean isRawRegion) {
@@ -108,35 +99,29 @@ public class TiRegion implements Serializable {
     return meta.getStartKey();
   }
 
+  public boolean contains(Key key) {
+    return KeyRangeUtils.makeRange(this.getStartKey(), this.getEndKey()).contains(key);
+  }
+
   public ByteString getEndKey() {
     return meta.getEndKey();
   }
 
-  public Kvrpcpb.Context getContext() {
-    if (cachedContext == null) {
-      Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
-      builder.setIsolationLevel(this.isolationLevel);
-      builder.setPriority(this.commandPri);
-      builder
-          .setRegionId(this.meta.getId())
-          .setPeer(this.peer)
-          .setRegionEpoch(this.meta.getRegionEpoch());
-      cachedContext = builder.build();
-      return cachedContext;
-    }
-    return cachedContext;
+  public Key getRowEndKey() {
+    return Key.toRawKey(getEndKey());
   }
 
-  public class RegionVerID {
-    public final long id;
-    public final long confVer;
-    public final long ver;
+  public Kvrpcpb.Context getContext() {
+    return getContext(java.util.Collections.emptySet());
+  }
 
-    public RegionVerID(long id, long confVer, long ver) {
-      this.id = id;
-      this.confVer = confVer;
-      this.ver = ver;
-    }
+  public Kvrpcpb.Context getContext(Set<Long> resolvedLocks) {
+    Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
+    builder.setIsolationLevel(this.isolationLevel);
+    builder.setPriority(this.commandPri);
+    builder.setRegionId(meta.getId()).setPeer(this.peer).setRegionEpoch(this.meta.getRegionEpoch());
+    builder.addAllResolvedLocks(resolvedLocks);
+    return builder.build();
   }
 
   // getVerID returns the Region's RegionVerID.
@@ -150,36 +135,43 @@ public class TiRegion implements Serializable {
    * storeID.
    *
    * @param leaderStoreID is leader peer id.
-   * @return a copy of current region with new leader store id
+   * @return false if no peers matches the store id.
    */
-  public TiRegion withNewLeader(long leaderStoreID) {
+  boolean switchPeer(long leaderStoreID) {
     List<Peer> peers = meta.getPeersList();
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
-        return withNewLeader(p);
+        this.peer = p;
+        return true;
       }
     }
-    return this;
+    return false;
+  }
+
+  public boolean isMoreThan(ByteString key) {
+    return FastByteComparisons.compareTo(
+            meta.getStartKey().toByteArray(),
+            0,
+            meta.getStartKey().size(),
+            key.toByteArray(),
+            0,
+            key.size())
+        > 0;
+  }
+
+  public boolean isLessThan(ByteString key) {
+    return FastByteComparisons.compareTo(
+            meta.getEndKey().toByteArray(),
+            0,
+            meta.getEndKey().size(),
+            key.toByteArray(),
+            0,
+            key.size())
+        <= 0;
   }
 
   public boolean contains(ByteString key) {
-    return (FastByteComparisons.compareTo(
-                meta.getStartKey().toByteArray(),
-                0,
-                meta.getStartKey().size(),
-                key.toByteArray(),
-                0,
-                key.size())
-            <= 0)
-        && (meta.getEndKey().isEmpty()
-            || FastByteComparisons.compareTo(
-                    meta.getEndKey().toByteArray(),
-                    0,
-                    meta.getEndKey().size(),
-                    key.toByteArray(),
-                    0,
-                    key.size())
-                > 0);
+    return !isMoreThan(key) && !isLessThan(key);
   }
 
   public boolean isValid() {
@@ -194,6 +186,24 @@ public class TiRegion implements Serializable {
     return meta;
   }
 
+  @Override
+  public boolean equals(final Object another) {
+    if (!(another instanceof TiRegion)) {
+      return false;
+    }
+    TiRegion anotherRegion = ((TiRegion) another);
+    return anotherRegion.meta.equals(this.meta)
+        && anotherRegion.peer.equals(this.peer)
+        && anotherRegion.commandPri.equals(this.commandPri)
+        && anotherRegion.isolationLevel.equals(this.isolationLevel);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(meta, peer, isolationLevel, commandPri);
+  }
+
+  @Override
   public String toString() {
     return String.format(
         "{Region[%d] ConfVer[%d] Version[%d] Store[%d] KeyRange[%s]:[%s]}",
@@ -201,7 +211,40 @@ public class TiRegion implements Serializable {
         getRegionEpoch().getConfVer(),
         getRegionEpoch().getVersion(),
         getLeader().getStoreId(),
-        KeyUtils.formatBytes(getStartKey()),
-        KeyUtils.formatBytes(getEndKey()));
+        KeyUtils.formatBytesUTF8(getStartKey()),
+        KeyUtils.formatBytesUTF8(getEndKey()));
+  }
+
+  public class RegionVerID {
+    final long id;
+    final long confVer;
+    final long ver;
+
+    RegionVerID(long id, long confVer, long ver) {
+      this.id = id;
+      this.confVer = confVer;
+      this.ver = ver;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof RegionVerID)) {
+        return false;
+      }
+
+      RegionVerID that = (RegionVerID) other;
+      return id == that.id && confVer == that.confVer && ver == that.ver;
+    }
+
+    @Override
+    public int hashCode() {
+      int hash = Long.hashCode(id);
+      hash = hash * 31 + Long.hashCode(confVer);
+      hash = hash * 31 + Long.hashCode(ver);
+      return hash;
+    }
   }
 }
