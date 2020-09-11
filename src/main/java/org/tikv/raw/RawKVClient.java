@@ -130,7 +130,6 @@ public class RawKVClient implements AutoCloseable {
    */
   public ByteString get(ByteString key) {
     BackOffer backOffer = defaultBackOff();
-
     for (int i = 0; i < MAX_RETRY_LIMIT; i++) {
       RegionStoreClient client = clientBuilder.build(key);
       try {
