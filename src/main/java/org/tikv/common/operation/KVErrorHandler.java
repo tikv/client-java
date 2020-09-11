@@ -92,7 +92,6 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
                 "NotLeader Error with region id %d and store id %d, new store id %d",
                 ctxRegion.getId(), ctxRegion.getLeader().getStoreId(), newStoreId));
 
-        BackOffFunction.BackOffFuncType backOffFuncType;
         // if there's current no leader, we do not trigger update pd cache logic
         // since issuing store = NO_LEADER_STORE_ID requests to pd will definitely fail.
         if (newStoreId != NO_LEADER_STORE_ID) {
@@ -106,14 +105,15 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
             // to a new store address.
             retry = false;
           }
-          backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
+          // https://github.com/tikv/tikv/issues/7941
+          // If update leader returns a valid leader store id, don't do back off
+
         } else {
           logger.info(
               String.format(
                   "Received zero store id, from region %d try next time", ctxRegion.getId()));
-          backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
+          backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.toString()));
         }
-        backOffer.doBackOff(backOffFuncType, new GrpcException(error.toString()));
         return retry;
       } else if (error.hasStoreNotMatch()) {
         // this error is reported from raftstore:
