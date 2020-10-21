@@ -20,9 +20,18 @@ import static com.google.common.base.Preconditions.checkArgument;
 import gnu.trove.list.array.TIntArrayList;
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.util.ArrayList;
 import java.util.Arrays;
-import org.joda.time.*;
+import java.util.List;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.IllegalInstantException;
+import org.joda.time.LocalDate;
+import org.joda.time.LocalDateTime;
+import org.tikv.common.ExtendedDateTime;
+import org.tikv.common.exception.ConvertOverflowException;
 import org.tikv.common.exception.InvalidCodecFormatException;
+import org.tikv.common.exception.TypeException;
 
 public class Codec {
 
@@ -38,20 +47,21 @@ public class Codec {
   public static final int UVARINT_FLAG = 9;
   public static final int JSON_FLAG = 10;
   public static final int MAX_FLAG = 250;
+  public static final long SIGN_MASK = ~Long.MAX_VALUE;
 
   public static boolean isNullFlag(int flag) {
     return flag == NULL_FLAG;
   }
 
   public static class IntegerCodec {
-    private static final long SIGN_MASK = ~Long.MAX_VALUE;
 
     private static long flipSignBit(long v) {
       return v ^ SIGN_MASK;
     }
 
     /**
-     * Encoding a long value to byte buffer with type flag at the beginning
+     * Encoding a long value to byte buffer with type flag at the beginning If we are encoding a
+     * key, the comparable is must true; otherwise the comparable is false.
      *
      * @param cdo For outputting data in bytes array
      * @param lVal The data to encode
@@ -84,6 +94,17 @@ public class Codec {
         cdo.writeByte(UVARINT_FLAG);
         writeUVarLong(cdo, lVal);
       }
+    }
+
+    /**
+     * Encode Data as duration, the same as go's binary.PutUvarint
+     *
+     * @param cdo For outputting data in bytes array
+     * @param value The data to encode
+     */
+    public static void writeDuration(CodecDataOutput cdo, long value) {
+      cdo.writeByte(DURATION_FLAG);
+      writeLong(cdo, value);
     }
 
     /**
@@ -128,7 +149,8 @@ public class Codec {
      * @param value The data to encode
      */
     static void writeUVarLong(CodecDataOutput cdo, long value) {
-      while ((value - 0x80) >= 0) {
+      // value is assumed to be an unsigned value.
+      while (Long.compareUnsigned(value, 0x80) >= 0) {
         cdo.writeByte((byte) value | 0x80);
         value >>>= 7;
       }
@@ -143,10 +165,6 @@ public class Codec {
      */
     public static long readLong(CodecDataInput cdi) {
       return flipSignBit(cdi.readLong());
-    }
-
-    public static long readPartialLong(CodecDataInput cdi) {
-      return flipSignBit(cdi.readPartialLong());
     }
 
     /**
@@ -185,7 +203,7 @@ public class Codec {
       int s = 0;
       for (int i = 0; !cdi.eof(); i++) {
         long b = cdi.readUnsignedByte();
-        if ((b - 0x80) < 0) {
+        if (Long.compareUnsigned(b, 0x80) < 0) {
           if (i > 9 || i == 9 && b > 1) {
             throw new InvalidCodecFormatException("readUVarLong overflow");
           }
@@ -321,9 +339,6 @@ public class Codec {
   }
 
   public static class RealCodec {
-
-    private static final long signMask = 0x8000000000000000L;
-
     /**
      * Decode as float
      *
@@ -343,7 +358,7 @@ public class Codec {
     private static long encodeDoubleToCmpLong(double val) {
       long u = Double.doubleToRawLongBits(val);
       if (val >= 0) {
-        u |= signMask;
+        u |= SIGN_MASK;
       } else {
         u = ~u;
       }
@@ -395,7 +410,7 @@ public class Codec {
       int binSize = dec.fromBin(precision, frac, data.toArray());
       cdi.mark(curPos + binSize);
       cdi.reset();
-      return dec.toDecimal();
+      return dec.toBigDecimal();
     }
 
     /**
@@ -404,7 +419,20 @@ public class Codec {
      * @param cdo cdo is destination data.
      * @param dec is decimal value that will be written into cdo.
      */
-    static void writeDecimal(CodecDataOutput cdo, MyDecimal dec) {
+    public static void writeDecimal(
+        CodecDataOutput cdo, MyDecimal dec, int precision, int fraction) {
+      int[] data = dec.toBin(precision, fraction);
+      cdo.writeByte(precision);
+      cdo.writeByte(fraction);
+      for (int aData : data) {
+        cdo.writeByte(aData & 0xFF);
+      }
+    }
+
+    //  TODO remove this once we refactor unit test CodecTest
+    public static void writeDecimal(CodecDataOutput cdo, BigDecimal val) {
+      MyDecimal dec = new MyDecimal();
+      dec.fromString(val.toPlainString());
       int[] data = dec.toBin(dec.precision(), dec.frac());
       cdo.writeByte(dec.precision());
       cdo.writeByte(dec.frac());
@@ -413,34 +441,23 @@ public class Codec {
       }
     }
 
-    public static void writeDecimalFully(CodecDataOutput cdo, BigDecimal val) {
+    public static void writeDecimalFully(
+        CodecDataOutput cdo, MyDecimal val, int precision, int fraction) {
       cdo.writeByte(DECIMAL_FLAG);
-      writeDecimal(cdo, val);
-    }
-
-    /**
-     * Encoding a double value to byte buffer
-     *
-     * @param cdo For outputting data in bytes array
-     * @param val The data to encode
-     */
-    public static void writeDecimal(CodecDataOutput cdo, BigDecimal val) {
-      MyDecimal dec = new MyDecimal();
-      dec.fromString(val.toPlainString());
-      writeDecimal(cdo, dec);
+      writeDecimal(cdo, val, precision, fraction);
     }
   }
 
   public static class DateTimeCodec {
-
     /**
      * Encode a DateTime to a packed long converting to specific timezone
      *
-     * @param dateTime dateTime that need to be encoded.
+     * @param extendedDateTime dateTime with nanos that need to be encoded.
      * @param tz timezone used for converting to localDateTime
      * @return a packed long.
      */
-    static long toPackedLong(DateTime dateTime, DateTimeZone tz) {
+    public static long toPackedLong(ExtendedDateTime extendedDateTime, DateTimeZone tz) {
+      DateTime dateTime = extendedDateTime.getDateTime();
       LocalDateTime localDateTime = dateTime.withZone(tz).toLocalDateTime();
       return toPackedLong(
           localDateTime.getYear(),
@@ -449,7 +466,7 @@ public class Codec {
           localDateTime.getHourOfDay(),
           localDateTime.getMinuteOfHour(),
           localDateTime.getSecondOfMinute(),
-          localDateTime.getMillisOfSecond() * 1000);
+          extendedDateTime.getMicrosOfSeconds());
     }
 
     /**
@@ -474,7 +491,7 @@ public class Codec {
      * @param tz timezone to interpret datetime parts
      * @return decoded DateTime using provided timezone
      */
-    static DateTime fromPackedLong(long packed, DateTimeZone tz) {
+    public static ExtendedDateTime fromPackedLong(long packed, DateTimeZone tz) {
       // TODO: As for JDBC behavior, it can be configured to "round" or "toNull"
       // for now we didn't pass in session so we do a toNull behavior
       if (packed == 0) {
@@ -493,14 +510,29 @@ public class Codec {
       int hour = hms >> 12;
       int microsec = (int) (packed % (1 << 24));
 
+      return createExtendedDateTime(tz, year, month, day, hour, minute, second, microsec);
+    }
+
+    public static ExtendedDateTime createExtendedDateTime(
+        DateTimeZone tz,
+        int year,
+        int month,
+        int day,
+        int hour,
+        int minute,
+        int second,
+        int microsec) {
       try {
-        return new DateTime(year, month, day, hour, minute, second, microsec / 1000, tz);
+        DateTime dateTime =
+            new DateTime(year, month, day, hour, minute, second, microsec / 1000, tz);
+        return new ExtendedDateTime(dateTime, microsec % 1000);
       } catch (IllegalInstantException e) {
         LocalDateTime localDateTime =
             new LocalDateTime(year, month, day, hour, minute, second, microsec / 1000);
         DateTime dt = localDateTime.toLocalDate().toDateTimeAtStartOfDay(tz);
         long millis = dt.getMillis() + localDateTime.toLocalTime().getMillisOfDay();
-        return new DateTime(millis, tz);
+        DateTime dateTime = new DateTime(millis, tz);
+        return new ExtendedDateTime(dateTime, microsec % 1000);
       }
     }
 
@@ -509,11 +541,12 @@ public class Codec {
      * should be done beforehand
      *
      * @param cdo encoding output
-     * @param dateTime value to encode
+     * @param extendeddateTime value to encode
      * @param tz timezone used to converting local time
      */
-    public static void writeDateTimeFully(CodecDataOutput cdo, DateTime dateTime, DateTimeZone tz) {
-      long val = DateTimeCodec.toPackedLong(dateTime, tz);
+    public static void writeDateTimeFully(
+        CodecDataOutput cdo, ExtendedDateTime extendeddateTime, DateTimeZone tz) {
+      long val = DateTimeCodec.toPackedLong(extendeddateTime, tz);
       IntegerCodec.writeULongFully(cdo, val, true);
     }
 
@@ -522,11 +555,12 @@ public class Codec {
      * should be done beforehand The encoded value has no data type flag
      *
      * @param cdo encoding output
-     * @param dateTime value to encode
+     * @param extendedDateTime value to encode
      * @param tz timezone used to converting local time
      */
-    public static void writeDateTimeProto(CodecDataOutput cdo, DateTime dateTime, DateTimeZone tz) {
-      long val = DateTimeCodec.toPackedLong(dateTime, tz);
+    public static void writeDateTimeProto(
+        CodecDataOutput cdo, ExtendedDateTime extendedDateTime, DateTimeZone tz) {
+      long val = DateTimeCodec.toPackedLong(extendedDateTime, tz);
       IntegerCodec.writeULong(cdo, val);
     }
 
@@ -537,9 +571,9 @@ public class Codec {
      * @see DateTimeCodec#fromPackedLong(long, DateTimeZone)
      * @param cdi codec buffer input
      * @param tz timezone to interpret datetime parts
-     * @return decoded DateTime using provided timezone
+     * @return decoded ExtendedDateTime using provided timezone
      */
-    public static DateTime readFromUVarInt(CodecDataInput cdi, DateTimeZone tz) {
+    public static ExtendedDateTime readFromUVarInt(CodecDataInput cdi, DateTimeZone tz) {
       return DateTimeCodec.fromPackedLong(IntegerCodec.readUVarLong(cdi), tz);
     }
 
@@ -549,9 +583,9 @@ public class Codec {
      * @see DateTimeCodec#fromPackedLong(long, DateTimeZone)
      * @param cdi codec buffer input
      * @param tz timezone to interpret datetime parts
-     * @return decoded DateTime using provided timezone
+     * @return decoded ExtendedDateTime using provided timezone
      */
-    public static DateTime readFromUInt(CodecDataInput cdi, DateTimeZone tz) {
+    public static ExtendedDateTime readFromUInt(CodecDataInput cdi, DateTimeZone tz) {
       return DateTimeCodec.fromPackedLong(IntegerCodec.readULong(cdi), tz);
     }
   }
@@ -575,8 +609,7 @@ public class Codec {
     }
 
     static long toPackedLong(LocalDate date) {
-      return Codec.DateCodec.toPackedLong(
-          date.getYear(), date.getMonthOfYear(), date.getDayOfMonth());
+      return DateCodec.toPackedLong(date.getYear(), date.getMonthOfYear(), date.getDayOfMonth());
     }
 
     /**
@@ -651,6 +684,85 @@ public class Codec {
      */
     public static LocalDate readFromUInt(CodecDataInput cdi) {
       return DateCodec.fromPackedLong(IntegerCodec.readULong(cdi));
+    }
+  }
+
+  public static class EnumCodec {
+
+    public static Integer parseEnumName(String name, List<String> elems)
+        throws ConvertOverflowException {
+      int i = 0;
+      while (i < elems.size()) {
+        if (elems.get(i).equals(name)) {
+          return i + 1;
+        }
+        i = i + 1;
+      }
+
+      // name doesn't exist, maybe an integer?
+      int result;
+      try {
+        result = Integer.parseInt(name);
+      } catch (Exception e) {
+        throw ConvertOverflowException.newEnumException(name);
+      }
+      return parseEnumValue(result, elems);
+    }
+
+    public static Integer parseEnumValue(Integer number, List<String> elems)
+        throws ConvertOverflowException {
+      if (number == 0) {
+        throw ConvertOverflowException.newLowerBoundException(number, 0);
+      }
+
+      if (number > elems.size()) {
+        throw ConvertOverflowException.newUpperBoundException(number, elems.size());
+      }
+
+      return number;
+    }
+
+    public static String readEnumFromIndex(int idx, List<String> elems) {
+      if (idx < 0 || idx >= elems.size()) throw new TypeException("Index is out of range");
+      return elems.get(idx);
+    }
+  }
+
+  public static class SetCodec {
+    private static final long[] SET_INDEX_VALUE = initSetIndexVal();
+    private static final long[] SET_INDEX_INVERT_VALUE = initSetIndexInvertVal();
+
+    private static long[] initSetIndexInvertVal() {
+      long[] tmpArr = new long[64];
+      for (int i = 0; i < 64; i++) {
+        // complement of original value.
+        tmpArr[i] = ~SET_INDEX_VALUE[i];
+      }
+      return tmpArr;
+    }
+
+    private static long[] initSetIndexVal() {
+      long[] tmpArr = new long[64];
+      for (int i = 0; i < 64; i++) {
+        tmpArr[i] = 1L << i;
+      }
+      return tmpArr;
+    }
+
+    public static String readSetFromLong(long number, List<String> elems) {
+      List<String> items = new ArrayList<>();
+      int length = elems.size();
+      for (int i = 0; i < length; i++) {
+        long checker = number & SET_INDEX_VALUE[i];
+        if (checker != 0) {
+          items.add(elems.get(i));
+          number &= SET_INDEX_INVERT_VALUE[i];
+        }
+      }
+      if (number != 0) {
+        throw new TypeException(String.format("invalid number %d for Set %s", number, elems));
+      }
+      return String.join(",", items);
     }
   }
 }

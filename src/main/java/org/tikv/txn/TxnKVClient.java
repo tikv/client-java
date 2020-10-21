@@ -38,6 +38,7 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
+import org.tikv.txn.type.ClientRPCResult;
 
 /** KV client of transaction APIs for GET/PUT/DELETE/SCAN */
 public class TxnKVClient implements AutoCloseable {

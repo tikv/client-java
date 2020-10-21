@@ -27,15 +27,18 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
+import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Peer;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
@@ -47,10 +50,23 @@ public class RegionManager {
   // https://github.com/pingcap/tispark/issues/1170
   private final RegionCache cache;
 
+  private final Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
+
   // To avoid double retrieval, we used the async version of grpc
   // When rpc not returned, instead of call again, it wait for previous one done
+  public RegionManager(
+      ReadOnlyPDClient pdClient, Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
+    this.cache = new RegionCache(pdClient);
+    this.cacheInvalidateCallback = cacheInvalidateCallback;
+  }
+
   public RegionManager(ReadOnlyPDClient pdClient) {
     this.cache = new RegionCache(pdClient);
+    this.cacheInvalidateCallback = null;
+  }
+
+  public Function<CacheInvalidateEvent, Void> getCacheInvalidateCallback() {
+    return cacheInvalidateCallback;
   }
 
   public TiRegion getRegionByKey(ByteString key) {
@@ -72,11 +88,20 @@ public class RegionManager {
     return cache.getRegionById(ConcreteBackOffer.newGetBackOff(), regionId);
   }
 
-  public Pair<TiRegion, Store> getRegionStorePairByKey(ByteString key) {
-    return getRegionStorePairByKey(key, ConcreteBackOffer.newGetBackOff());
+  public Pair<TiRegion, Store> getRegionStorePairByKey(ByteString key, BackOffer backOffer) {
+    return getRegionStorePairByKey(key, TiStoreType.TiKV, backOffer);
   }
 
-  public Pair<TiRegion, Store> getRegionStorePairByKey(ByteString key, BackOffer backOffer) {
+  public Pair<TiRegion, Store> getRegionStorePairByKey(ByteString key) {
+    return getRegionStorePairByKey(key, TiStoreType.TiKV);
+  }
+
+  public Pair<TiRegion, Store> getRegionStorePairByKey(ByteString key, TiStoreType storeType) {
+    return getRegionStorePairByKey(key, storeType, ConcreteBackOffer.newGetBackOff());
+  }
+
+  public Pair<TiRegion, Store> getRegionStorePairByKey(
+      ByteString key, TiStoreType storeType, BackOffer backOffer) {
     TiRegion region = cache.getRegionByKey(key, backOffer);
     if (region == null) {
       throw new TiClientInternalException("Region not exist for key:" + formatBytesUTF8(key));
@@ -85,12 +110,31 @@ public class RegionManager {
       throw new TiClientInternalException("Region invalid: " + region.toString());
     }
 
-    Peer leader = region.getLeader();
-    Store store = cache.getStoreById(leader.getStoreId(), backOffer);
+    Store store = null;
+    if (storeType == TiStoreType.TiKV) {
+      Peer leader = region.getLeader();
+      store = cache.getStoreById(leader.getStoreId(), backOffer);
+    } else {
+      outerLoop:
+      for (Peer peer : region.getLearnerList()) {
+        Store s = getStoreById(peer.getStoreId(), backOffer);
+        for (Metapb.StoreLabel label : s.getLabelsList()) {
+          if (label.getKey().equals(storeType.getLabelKey())
+              && label.getValue().equals(storeType.getLabelValue())) {
+            store = s;
+            break outerLoop;
+          }
+        }
+      }
+      if (store == null) {
+        // clear the region cache so we may get the learner peer next time
+        cache.invalidateRegion(region.getId());
+      }
+    }
 
     if (store == null) {
       throw new TiClientInternalException(
-          "Cannot find valid store on TiKV for region " + region.toString());
+          "Cannot find valid store on " + storeType + " for region " + region.toString());
     }
 
     return Pair.create(region, store);

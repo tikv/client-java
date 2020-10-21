@@ -15,8 +15,14 @@
 
 package org.tikv.common;
 
+import java.util.List;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.region.TiStoreType;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.kvproto.Metapb;
 
 public class StoreVersion {
 
@@ -49,6 +55,39 @@ public class StoreVersion {
 
   public static int compareTo(String v0, String v1) {
     return new StoreVersion(v0).toIntVersion() - new StoreVersion(v1).toIntVersion();
+  }
+
+  public static boolean minTiKVVersion(String version, PDClient pdClient) {
+    StoreVersion storeVersion = new StoreVersion(version);
+
+    BackOffer bo = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
+    List<Metapb.Store> storeList =
+        pdClient
+            .getAllStores(bo)
+            .stream()
+            .filter(
+                store ->
+                    !isTiFlash(store)
+                        && (store.getState() == Metapb.StoreState.Up
+                            || store.getState() == Metapb.StoreState.Offline))
+            .collect(Collectors.toList());
+
+    for (Metapb.Store store : storeList) {
+      if (storeVersion.greatThan(new StoreVersion(store.getVersion()))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean isTiFlash(Metapb.Store store) {
+    for (Metapb.StoreLabel label : store.getLabelsList()) {
+      if (label.getKey().equals(TiStoreType.TiFlash.getLabelKey())
+          && label.getValue().equals(TiStoreType.TiFlash.getLabelValue())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private int toIntVersion() {

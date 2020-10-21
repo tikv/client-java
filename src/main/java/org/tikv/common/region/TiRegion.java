@@ -19,6 +19,7 @@ package org.tikv.common.region;
 
 import com.google.protobuf.ByteString;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -73,15 +74,15 @@ public class TiRegion implements Serializable {
     if (region.getStartKey().isEmpty() || isRawRegion) {
       builder.setStartKey(region.getStartKey());
     } else {
-      byte[] decodecStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
-      builder.setStartKey(ByteString.copyFrom(decodecStartKey));
+      byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
+      builder.setStartKey(ByteString.copyFrom(decodedStartKey));
     }
 
     if (region.getEndKey().isEmpty() || isRawRegion) {
       builder.setEndKey(region.getEndKey());
     } else {
-      byte[] decodecEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
-      builder.setEndKey(ByteString.copyFrom(decodecEndKey));
+      byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
+      builder.setEndKey(ByteString.copyFrom(decodedEndKey));
     }
 
     return builder.build();
@@ -89,6 +90,16 @@ public class TiRegion implements Serializable {
 
   public Peer getLeader() {
     return peer;
+  }
+
+  public List<Peer> getLearnerList() {
+    List<Peer> peers = new ArrayList<>();
+    for (Peer peer : getMeta().getPeersList()) {
+      if (peer.getIsLearner()) {
+        peers.add(peer);
+      }
+    }
+    return peers;
   }
 
   public long getId() {

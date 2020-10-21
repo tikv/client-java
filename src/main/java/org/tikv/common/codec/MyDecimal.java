@@ -16,12 +16,14 @@
 package org.tikv.common.codec;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.Serializable;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Arrays;
 
 // TODO: We shouldn't allow empty MyDecimal
 // TODO: It seems MyDecimal to BigDecimal is very slow
-public class MyDecimal {
+public class MyDecimal implements Serializable {
   // how many digits that a word has
   private static final int digitsPerWord = 9;
   // MyDecimal can holds at most 9 words.
@@ -40,9 +42,42 @@ public class MyDecimal {
   private static final int ten9 = 1000000000;
   private static final int digMask = ten8;
   private static final int wordBase = ten9;
+  private static final BigInteger wordBaseBigInt = BigInteger.valueOf(ten9);
   private static final int wordMax = wordBase - 1;
+  private static final int[] div9 =
+      new int[] {
+        0, 0, 0, 0, 0, 0, 0, 0, 0,
+        1, 1, 1, 1, 1, 1, 1, 1, 1,
+        2, 2, 2, 2, 2, 2, 2, 2, 2,
+        3, 3, 3, 3, 3, 3, 3, 3, 3,
+        4, 4, 4, 4, 4, 4, 4, 4, 4,
+        5, 5, 5, 5, 5, 5, 5, 5, 5,
+        6, 6, 6, 6, 6, 6, 6, 6, 6,
+        7, 7, 7, 7, 7, 7, 7, 7, 7,
+        8, 8, 8, 8, 8, 8, 8, 8, 8,
+        9, 9, 9, 9, 9, 9, 9, 9, 9,
+        10, 10, 10, 10, 10, 10, 10, 10, 10,
+        11, 11, 11, 11, 11, 11, 11, 11, 11,
+        12, 12, 12, 12, 12, 12, 12, 12, 12,
+        13, 13, 13, 13, 13, 13, 13, 13, 13,
+        14, 14,
+      };
   private static final int[] powers10 =
       new int[] {ten0, ten1, ten2, ten3, ten4, ten5, ten6, ten7, ten8, ten9};
+
+  private static final BigInteger[] powers10BigInt =
+      new BigInteger[] {
+        BigInteger.valueOf(ten0),
+        BigInteger.valueOf(ten1),
+        BigInteger.valueOf(ten2),
+        BigInteger.valueOf(ten3),
+        BigInteger.valueOf(ten4),
+        BigInteger.valueOf(ten5),
+        BigInteger.valueOf(ten6),
+        BigInteger.valueOf(ten7),
+        BigInteger.valueOf(ten8),
+        BigInteger.valueOf(ten9)
+      };
 
   // A MyDecimal holds 9 words.
   private static final int maxWordBufLen = 9;
@@ -52,9 +87,49 @@ public class MyDecimal {
   // The following are fields of MyDecimal
   private int digitsInt;
   private int digitsFrac;
-  private int resultFrac;
   private boolean negative;
   private int[] wordBuf = new int[maxWordBufLen];
+
+  public MyDecimal() {}
+
+  public MyDecimal(int digitsInt, int digitsFrac, boolean negative, int[] wordBuf) {
+    this.digitsInt = digitsInt;
+    this.digitsFrac = digitsFrac;
+    this.negative = negative;
+    this.wordBuf = wordBuf;
+  }
+
+  /**
+   * Reads a word from a array at given size.
+   *
+   * @param b b is source data of unsigned byte as int[]
+   * @param size is word size which can be used in switch statement.
+   * @param start start indicates the where start to read.
+   */
+  @VisibleForTesting
+  public static int readWord(int[] b, int size, int start) {
+    int x = 0;
+    switch (size) {
+      case 1:
+        x = (byte) b[start];
+        break;
+      case 2:
+        x = (((byte) b[start]) << 8) + (b[start + 1] & 0xFF);
+        break;
+      case 3:
+        int sign = b[start] & 128;
+        if (sign > 0) {
+          x = 0xFF << 24 | (b[start] << 16) | (b[start + 1] << 8) | (b[start + 2]);
+        } else {
+          x = b[start] << 16 | (b[start + 1] << 8) | b[start + 2];
+        }
+        break;
+      case 4:
+        x = b[start + 3] + (b[start + 2] << 8) + (b[start + 1] << 16) + (b[start] << 24);
+        break;
+    }
+    return x;
+  }
 
   /*
    * Returns total precision of this decimal. Basically, it is sum of digitsInt and digitsFrac. But there
@@ -104,16 +179,16 @@ public class MyDecimal {
       throw new IllegalArgumentException("Bad Float Number to parse");
     }
 
-    int digitsInt = precision - frac;
-    int wordsInt = digitsInt / digitsPerWord;
-    int leadingDigits = digitsInt - wordsInt * digitsPerWord;
-    int wordsFrac = frac / digitsPerWord;
-    int trailingDigits = frac - wordsFrac * digitsPerWord;
-    int wordsIntTo = wordsInt;
-    if (leadingDigits > 0) {
+    int _digitsInt = precision - frac;
+    int _wordsInt = _digitsInt / digitsPerWord;
+    int _leadingDigits = _digitsInt - _wordsInt * digitsPerWord;
+    int _wordsFrac = frac / digitsPerWord;
+    int trailingDigits = frac - _wordsFrac * digitsPerWord;
+    int wordsIntTo = _wordsInt;
+    if (_leadingDigits > 0) {
       wordsIntTo++;
     }
-    int wordsFracTo = wordsFrac;
+    int wordsFracTo = _wordsFrac;
     if (trailingDigits > 0) {
       wordsFracTo++;
     }
@@ -139,41 +214,41 @@ public class MyDecimal {
         wordsFracTo = 0;
         overflow = true;
       } else {
-        wordsIntTo = wordsInt;
-        wordsFracTo = wordBufLen - wordsInt;
+        wordsIntTo = _wordsInt;
+        wordsFracTo = wordBufLen - _wordsInt;
         truncated = true;
       }
     }
 
     if (overflow || truncated) {
       if (wordsIntTo < oldWordsIntTo) {
-        binIdx += dig2bytes[leadingDigits] + (wordsInt - wordsIntTo) * wordSize;
+        binIdx += dig2bytes[_leadingDigits] + (_wordsInt - wordsIntTo) * wordSize;
       } else {
         trailingDigits = 0;
-        wordsFrac = wordsFracTo;
+        _wordsFrac = wordsFracTo;
       }
     }
 
     this.negative = mask != 0;
-    this.digitsInt = (byte) (wordsInt * digitsPerWord + leadingDigits);
-    this.digitsFrac = (byte) (wordsFrac * digitsPerWord + trailingDigits);
+    this.digitsInt = (byte) (_wordsInt * digitsPerWord + _leadingDigits);
+    this.digitsFrac = (byte) (_wordsFrac * digitsPerWord + trailingDigits);
 
     int wordIdx = 0;
-    if (leadingDigits > 0) {
-      int i = dig2bytes[leadingDigits];
+    if (_leadingDigits > 0) {
+      int i = dig2bytes[_leadingDigits];
       int x = readWord(bin, i, binIdx);
       binIdx += i;
       this.wordBuf[wordIdx] = (x ^ mask) > 0 ? x ^ mask : (x ^ mask) & 0xFF;
-      if (this.wordBuf[wordIdx] >= powers10[leadingDigits + 1]) {
+      if (this.wordBuf[wordIdx] >= powers10[_leadingDigits + 1]) {
         throw new IllegalArgumentException("BadNumber");
       }
       if (this.wordBuf[wordIdx] != 0) {
         wordIdx++;
       } else {
-        this.digitsInt -= leadingDigits;
+        this.digitsInt -= _leadingDigits;
       }
     }
-    for (int stop = binIdx + wordsInt * wordSize; binIdx < stop; binIdx += wordSize) {
+    for (int stop = binIdx + _wordsInt * wordSize; binIdx < stop; binIdx += wordSize) {
       this.wordBuf[wordIdx] = (readWord(bin, 4, binIdx) ^ mask);
       if (this.wordBuf[wordIdx] > wordMax) {
         throw new IllegalArgumentException("BadNumber");
@@ -185,7 +260,7 @@ public class MyDecimal {
       }
     }
 
-    for (int stop = binIdx + wordsFrac * wordSize; binIdx < stop; binIdx += wordSize) {
+    for (int stop = binIdx + _wordsFrac * wordSize; binIdx < stop; binIdx += wordSize) {
       int x = readWord(bin, 4, binIdx);
       this.wordBuf[wordIdx] = (x ^ mask) > 0 ? x ^ mask : (x ^ mask) & 0xFF;
       if (this.wordBuf[wordIdx] > wordMax) {
@@ -203,20 +278,9 @@ public class MyDecimal {
       if (this.wordBuf[wordIdx] > wordMax) {
         throw new IllegalArgumentException("BadNumber");
       }
-      wordIdx++;
     }
 
-    this.resultFrac = frac;
     return binSize;
-  }
-
-  /** Returns a double value from MyDecimal instance. */
-  public BigDecimal toDecimal() {
-    return new BigDecimal(toString());
-  }
-
-  public double toDouble() {
-    return Float.parseFloat(toString());
   }
 
   /** Truncates any prefix zeros such as 00.001. After this, digitsInt is truncated from 2 to 0. */
@@ -241,7 +305,7 @@ public class MyDecimal {
   }
 
   /**
-   * Counts the number of digits of prefix zeors. For 00.001, it reutrns two.
+   * Counts the number of digits of prefix zeroes. For 00.001, it returns two.
    *
    * @param i i is index for getting powers10.
    * @param word word is a integer.
@@ -255,46 +319,12 @@ public class MyDecimal {
     return leading;
   }
 
-  private int min(int a, int b) {
-    if (a > b) return b;
-    else return a;
-  }
-
   /** Returns size of word for a give value with number of digits */
   private int digitsToWords(int digits) {
-    return (digits + digitsPerWord - 1) / digitsPerWord;
-  }
-
-  /**
-   * Reads a word from a array at given size.
-   *
-   * @param b b is source data of unsigned byte as int[]
-   * @param size is word size which can be used in switch statement.
-   * @param start start indicates the where start to read.
-   */
-  @VisibleForTesting
-  public static int readWord(int[] b, int size, int start) {
-    int x = 0;
-    switch (size) {
-      case 1:
-        x = (byte) b[start];
-        break;
-      case 2:
-        x = (((byte) b[start]) << 8) + (b[start + 1] & 0xFF);
-        break;
-      case 3:
-        int sign = b[start] & 128;
-        if (sign > 0) {
-          x = 0xFF << 24 | (b[start] << 16) | (b[start + 1] << 8) | (b[start + 2]);
-        } else {
-          x = b[start] << 16 | (b[start + 1] << 8) | b[start + 2];
-        }
-        break;
-      case 4:
-        x = b[start + 3] + (b[start + 2] << 8) + (b[start + 1] << 16) + (b[start] << 24);
-        break;
+    if ((digits + digitsPerWord - 1) >= 0 && ((digits + digitsPerWord - 1) < 128)) {
+      return div9[digits + digitsPerWord - 1];
     }
-    return x;
+    return (digits + digitsPerWord - 1) / digitsPerWord;
   }
 
   /**
@@ -339,8 +369,8 @@ public class MyDecimal {
     for (; strIdx < str.length && Character.isDigit(str[strIdx]); ) {
       strIdx++;
     }
-    // we initialize strIdx in case of sign notation, here we need substract startIdx from strIdx
-    // casue strIdx is used for counting the number of digits.
+    // we initialize strIdx in case of sign notation, here we need subtract startIdx from strIdx
+    // cause strIdx is used for counting the number of digits.
     int digitsInt = strIdx - startIdx;
     int digitsFrac;
     int endIdx;
@@ -353,7 +383,6 @@ public class MyDecimal {
       digitsFrac = endIdx - strIdx - 1;
     } else {
       digitsFrac = 0;
-      endIdx = strIdx;
     }
 
     if (digitsInt + digitsFrac == 0) {
@@ -438,47 +467,18 @@ public class MyDecimal {
     if (allZero) {
       this.negative = false;
     }
-
-    this.resultFrac = this.digitsFrac;
-  }
-
-  // parser a string to a int.
-  private int strToLong(String str) {
-    str = str.trim();
-    if (str.isEmpty()) {
-      return 0;
-    }
-    boolean negative = false;
-    int i = 0;
-    if (str.charAt(i) == '-') {
-      negative = true;
-      i++;
-    } else if (str.charAt(i) == '+') {
-      i++;
-    }
-
-    int r = 0;
-    for (; i < str.length(); i++) {
-      if (!Character.isDigit(str.charAt(i))) {
-        break;
-      }
-      r = r * 10 + (str.charAt(i) - '0');
-    }
-
-    if (negative) {
-      r = -r;
-    }
-    return r;
   }
 
   // Returns a decimal string.
+  @Override
   public String toString() {
     char[] str;
-    int digitsFrac = this.digitsFrac;
+
+    int _digitsFrac = this.digitsFrac;
     int[] res = removeLeadingZeros();
     int wordStartIdx = res[0];
     int digitsInt = res[1];
-    if (digitsInt + digitsFrac == 0) {
+    if (digitsInt + _digitsFrac == 0) {
       digitsInt = 1;
       wordStartIdx = 0;
     }
@@ -487,50 +487,38 @@ public class MyDecimal {
     if (digitsIntLen == 0) {
       digitsIntLen = 1;
     }
-    int digitsFracLen = digitsFrac;
+    int digitsFracLen = _digitsFrac;
     int length = digitsIntLen + digitsFracLen;
     if (this.negative) {
       length++;
     }
-    if (digitsFrac > 0) {
+    if (_digitsFrac > 0) {
       length++;
     }
     str = new char[length];
+
     int strIdx = 0;
     if (this.negative) {
       str[strIdx] = '-';
       strIdx++;
     }
-    int fill = 0;
-    if (digitsFrac > 0) {
+
+    if (_digitsFrac > 0) {
       int fracIdx = strIdx + digitsIntLen;
-      fill = digitsFracLen - digitsFrac;
       int wordIdx = wordStartIdx + digitsToWords(digitsInt);
       str[fracIdx] = '.';
       fracIdx++;
-      for (; digitsFrac > 0; digitsFrac -= digitsPerWord) {
+      for (; _digitsFrac > 0; _digitsFrac -= digitsPerWord) {
         int x = this.wordBuf[wordIdx];
         wordIdx++;
-        for (int i = min(digitsFrac, digitsPerWord); i > 0; i--) {
+        for (int i = Math.min(_digitsFrac, MyDecimal.digitsPerWord); i > 0; i--) {
           int y = x / digMask;
-          str[fracIdx] = (char) (y + '0');
+          str[fracIdx] = (char) ((char) y + '0');
           fracIdx++;
           x -= y * digMask;
           x *= 10;
         }
       }
-      for (; fill > 0; fill--) {
-        str[fracIdx] = '0';
-        fracIdx++;
-      }
-    }
-    fill = digitsIntLen - digitsInt;
-    if (digitsInt == 0) {
-      fill--; /* symbol 0 before digital point */
-    }
-    for (; fill > 0; fill--) {
-      str[strIdx] = '0';
-      strIdx++;
     }
     if (digitsInt > 0) {
       strIdx += digitsInt;
@@ -538,11 +526,11 @@ public class MyDecimal {
       for (; digitsInt > 0; digitsInt -= digitsPerWord) {
         wordIdx--;
         int x = this.wordBuf[wordIdx];
-        for (int i = min(digitsInt, digitsPerWord); i > 0; i--) {
-          int y = x / 10;
+        for (int i = Math.min(digitsInt, MyDecimal.digitsPerWord); i > 0; i--) {
+          int temp = x / 10;
           strIdx--;
-          str[strIdx] = (char) ('0' + (x - y * 10));
-          x = y;
+          str[strIdx] = (char) ('0' + (x - temp * 10));
+          x = temp;
         }
       }
     } else {
@@ -550,52 +538,6 @@ public class MyDecimal {
     }
 
     return new String(str);
-  }
-
-  private int stringSize() {
-    return digitsInt + digitsFrac + 3;
-  }
-
-  public long toLong() {
-    long x = 0;
-    int wordIdx = 0;
-    for (int i = this.digitsInt; i > 0; i -= digitsPerWord) {
-      /*
-        Attention: trick!
-        we're calculating -|from| instead of |from| here
-        because |LONGLONG_MIN| > LONGLONG_MAX
-        so we can convert -9223372036854775808 correctly
-      */
-      long y = x;
-      x = x * wordBase - (long) this.wordBuf[wordIdx];
-      wordIdx++;
-      if (y < Long.MIN_VALUE / wordBase || x > y) {
-        /*
-          the decimal is bigger than any possible integer
-          return border integer depending on the sign
-        */
-        if (this.negative) {
-          return Long.MIN_VALUE;
-        }
-        return Long.MAX_VALUE;
-      }
-    }
-
-    /* boundary case: 9223372036854775808 */
-    if (!this.negative && x == Long.MIN_VALUE) {
-      return Long.MAX_VALUE;
-    }
-
-    if (!this.negative) {
-      x = -x;
-    }
-    for (int i = this.digitsFrac; i > 0; i -= digitsPerWord) {
-      if (this.wordBuf[wordIdx] != 0) {
-        return x;
-      }
-      wordIdx++;
-    }
-    return x;
   }
 
   // decimalBinSize returns the size of array to hold a binary representation of a decimal.
@@ -629,10 +571,10 @@ public class MyDecimal {
    *
    * <p>This binary format is as follows: 1. First the number is converted to have a requested
    * precision and frac. 2. Every full digitsPerWord digits of digitsInt part are stored in 4 bytes
-   * as is 3. The first digitsInt % digitesPerWord digits are stored in the reduced number of bytes
+   * as is 3. The first digitsInt % digitsPerWord digits are stored in the reduced number of bytes
    * (enough bytes to store this number of digits - see dig2bytes) 4. same for frac - full word are
    * stored as is, the last frac % digitsPerWord digits - in the reduced number of bytes. 5. If the
-   * number is negative - every byte is inversed. 5. The very first bit of the resulting byte array
+   * number is negative - every byte is inverted. 5. The very first bit of the resulting byte array
    * is inverted (because memcmp compares unsigned bytes, see property 2 above)
    *
    * <p>Example:
@@ -686,11 +628,11 @@ public class MyDecimal {
       mask = -1;
     }
 
-    int digitsInt = precision - frac;
-    int wordsInt = digitsInt / digitsPerWord;
-    int leadingDigits = digitsInt - wordsInt * digitsPerWord;
-    int wordsFrac = frac / digitsPerWord;
-    int trailingDigits = frac - wordsFrac * digitsPerWord;
+    int digitsInt = precision - frac; // how many digits before dot
+    int wordsInt = digitsInt / digitsPerWord; // how many words to stores int part before dot.
+    int leadingDigits = digitsInt - wordsInt * digitsPerWord; // first digits
+    int wordsFrac = frac / digitsPerWord; // how many words to store int part after dot
+    int trailingDigits = frac - wordsFrac * digitsPerWord; // last digits
 
     // this should be one of 0, 1, 2, 3, 4
     int wordsFracFrom = this.digitsFrac / digitsPerWord;
@@ -825,5 +767,60 @@ public class MyDecimal {
     this.digitsFrac = 0;
     this.digitsInt = 0;
     this.negative = false;
+  }
+
+  private BigInteger toBigInteger() {
+    BigInteger x = BigInteger.ZERO;
+    int wordIdx = 0;
+    for (int i = this.digitsInt; i > 0; i -= digitsPerWord) {
+      x = x.multiply(wordBaseBigInt).add(BigInteger.valueOf(this.wordBuf[wordIdx]));
+      wordIdx++;
+    }
+
+    for (int i = this.digitsFrac; i > 0; i -= digitsPerWord) {
+      x = x.multiply(wordBaseBigInt).add(BigInteger.valueOf(this.wordBuf[wordIdx]));
+      wordIdx++;
+    }
+
+    if (digitsFrac % digitsPerWord != 0) {
+      x = x.divide(powers10BigInt[digitsPerWord - digitsFrac % digitsPerWord]);
+    }
+    if (negative) {
+      x = x.negate();
+    }
+    return x;
+  }
+
+  public long toLong() {
+    long x = 0;
+    int wordIdx = 0;
+    for (int i = this.digitsInt; i > 0; i -= digitsPerWord) {
+      x = x * wordBase + this.wordBuf[wordIdx];
+      wordIdx++;
+    }
+
+    for (int i = this.digitsFrac; i > 0; i -= digitsPerWord) {
+      x = x * wordBase + this.wordBuf[wordIdx];
+      wordIdx++;
+    }
+
+    if (digitsFrac % digitsPerWord != 0) {
+      x = x / powers10[digitsPerWord - digitsFrac % digitsPerWord];
+    }
+
+    if (negative) {
+      x = -x;
+    }
+    return x;
+  }
+
+  public BigDecimal toBigDecimal() {
+    // 19 is the length of digits of Long.MAX_VALUE
+    // If a decimal can be expressed as a long value, we should use toLong method which has
+    // better performance than toBigInteger.
+    if (digitsInt + digitsFrac < 19) {
+      return new BigDecimal(BigInteger.valueOf(toLong()), digitsFrac);
+    }
+    return new BigDecimal(toBigInteger(), digitsFrac);
   }
 }

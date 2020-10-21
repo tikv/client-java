@@ -17,22 +17,30 @@
 
 package org.tikv.common.region;
 
+import static org.tikv.common.region.RegionStoreClient.RequestTypes.REQ_TYPE_DAG;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.*;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.pingcap.tidb.tipb.DAGRequest;
+import com.pingcap.tidb.tipb.SelectResponse;
 import io.grpc.ManagedChannel;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.PDClient;
+import org.tikv.common.StoreVersion;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.Version;
 import org.tikv.common.exception.*;
 import org.tikv.common.operation.KVErrorHandler;
-import org.tikv.common.util.BackOffer;
-import org.tikv.common.util.ChannelFactory;
-import org.tikv.common.util.Pair;
+import org.tikv.common.streaming.StreamingResponse;
+import org.tikv.common.util.*;
+import org.tikv.kvproto.Coprocessor;
+import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Kvrpcpb.*;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
@@ -41,6 +49,7 @@ import org.tikv.kvproto.TikvGrpc.TikvStub;
 import org.tikv.txn.AbstractLockResolverClient;
 import org.tikv.txn.Lock;
 import org.tikv.txn.ResolveLockResult;
+import org.tikv.txn.exception.LockException;
 
 // TODO:
 //  1. RegionStoreClient will be inaccessible directly.
@@ -53,13 +62,25 @@ import org.tikv.txn.ResolveLockResult;
 public class RegionStoreClient extends AbstractRegionStoreClient {
   private static final Logger logger = LoggerFactory.getLogger(RegionStoreClient.class);
   @VisibleForTesting public final AbstractLockResolverClient lockResolverClient;
+  private final TiStoreType storeType;
   /** startTS -> List(locks) */
   private final Map<Long, Set<Long>> resolvedLocks = new HashMap<>();
+
+  private final PDClient pdClient;
+  private Boolean isV4 = null;
+
+  private synchronized Boolean getIsV4() {
+    if (isV4 == null) {
+      isV4 = StoreVersion.minTiKVVersion(Version.RESOLVE_LOCK_V4, pdClient);
+    }
+    return isV4;
+  }
 
   private RegionStoreClient(
       TiConfiguration conf,
       TiRegion region,
       Store store,
+      TiStoreType storeType,
       ChannelFactory channelFactory,
       TikvBlockingStub blockingStub,
       TikvStub asyncStub,
@@ -67,21 +88,50 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       PDClient pdClient,
       RegionStoreClient.RegionStoreClientBuilder clientBuilder) {
     super(conf, region, channelFactory, blockingStub, asyncStub, regionManager);
+    this.storeType = storeType;
 
-    this.lockResolverClient =
-        AbstractLockResolverClient.getInstance(
-            store,
-            conf,
-            region,
-            this.blockingStub,
-            this.asyncStub,
-            channelFactory,
-            regionManager,
-            pdClient,
-            clientBuilder);
+    if (this.storeType == TiStoreType.TiKV) {
+      this.lockResolverClient =
+          AbstractLockResolverClient.getInstance(
+              store,
+              conf,
+              region,
+              this.blockingStub,
+              this.asyncStub,
+              channelFactory,
+              regionManager,
+              pdClient,
+              clientBuilder);
+
+    } else {
+      Store tikvStore =
+          regionManager.getRegionStorePairByKey(region.getStartKey(), TiStoreType.TiKV).second;
+
+      String addressStr = tikvStore.getAddress();
+      if (logger.isDebugEnabled()) {
+        logger.debug(String.format("Create region store client on address %s", addressStr));
+      }
+      ManagedChannel channel = channelFactory.getChannel(addressStr);
+
+      TikvBlockingStub tikvBlockingStub = TikvGrpc.newBlockingStub(channel);
+      TikvStub tikvAsyncStub = TikvGrpc.newStub(channel);
+
+      this.lockResolverClient =
+          AbstractLockResolverClient.getInstance(
+              tikvStore,
+              conf,
+              region,
+              tikvBlockingStub,
+              tikvAsyncStub,
+              channelFactory,
+              regionManager,
+              pdClient,
+              clientBuilder);
+    }
+    this.pdClient = pdClient;
   }
 
-  public synchronized boolean addResolvedLocks(Long version, List<Long> locks) {
+  public synchronized boolean addResolvedLocks(Long version, Set<Long> locks) {
     Set<Long> oldList = resolvedLocks.get(version);
     if (oldList != null) {
       oldList.addAll(locks);
@@ -322,16 +372,27 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     while (true) {
       Supplier<PrewriteRequest> factory =
           () ->
-              PrewriteRequest.newBuilder()
-                  .setContext(region.getContext())
-                  .setStartVersion(startTs)
-                  .setPrimaryLock(primaryLock)
-                  .addAllMutations(mutations)
-                  .setLockTtl(ttl)
-                  .setSkipConstraintCheck(skipConstraintCheck)
-                  .setMinCommitTs(startTs)
-                  .setTxnSize(16)
-                  .build();
+              getIsV4()
+                  ? PrewriteRequest.newBuilder()
+                      .setContext(region.getContext())
+                      .setStartVersion(startTs)
+                      .setPrimaryLock(primaryLock)
+                      .addAllMutations(mutations)
+                      .setLockTtl(ttl)
+                      .setSkipConstraintCheck(skipConstraintCheck)
+                      .setMinCommitTs(startTs)
+                      .setTxnSize(16)
+                      .build()
+                  : PrewriteRequest.newBuilder()
+                      .setContext(region.getContext())
+                      .setStartVersion(startTs)
+                      .setPrimaryLock(primaryLock)
+                      .addAllMutations(mutations)
+                      .setLockTtl(ttl)
+                      .setSkipConstraintCheck(skipConstraintCheck)
+                      // v3 does not support setMinCommitTs(startTs)
+                      .setTxnSize(16)
+                      .build();
       KVErrorHandler<PrewriteResponse> handler =
           new KVErrorHandler<>(
               regionManager,
@@ -502,6 +563,235 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasError()) {
       throw new KeyException(resp.getError());
     }
+  }
+
+  /**
+   * Execute and retrieve the response from TiKV server.
+   *
+   * @param req Select request to process
+   * @param ranges Key range list
+   * @return Remaining tasks of this request, if task split happens, null otherwise
+   */
+  public List<RangeSplitter.RegionTask> coprocess(
+      BackOffer backOffer,
+      DAGRequest req,
+      List<Coprocessor.KeyRange> ranges,
+      Queue<SelectResponse> responseQueue,
+      long startTs) {
+    boolean forWrite = false;
+    if (req == null || ranges == null || req.getExecutorsCount() < 1) {
+      throw new IllegalArgumentException("Invalid coprocessor argument!");
+    }
+
+    Supplier<Coprocessor.Request> reqToSend =
+        () ->
+            Coprocessor.Request.newBuilder()
+                .setContext(region.getContext(getResolvedLocks(startTs)))
+                .setTp(REQ_TYPE_DAG.getValue())
+                .setStartTs(startTs)
+                .setData(req.toByteString())
+                .addAllRanges(ranges)
+                .build();
+
+    // we should handle the region error ourselves
+    KVErrorHandler<Coprocessor.Response> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            lockResolverClient,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null,
+            resp -> null,
+            resolveLockResult -> addResolvedLocks(startTs, resolveLockResult.getResolvedLocks()),
+            startTs,
+            forWrite);
+    Coprocessor.Response resp =
+        callWithRetry(backOffer, TikvGrpc.getCoprocessorMethod(), reqToSend, handler);
+    return handleCopResponse(backOffer, resp, ranges, responseQueue, startTs);
+  }
+
+  // handleCopResponse checks coprocessor Response for region split and lock,
+  // returns more tasks when that happens, or handles the response if no error.
+  // if we're handling streaming coprocessor response, lastRange is the range of last
+  // successful response, otherwise it's nil.
+  private List<RangeSplitter.RegionTask> handleCopResponse(
+      BackOffer backOffer,
+      Coprocessor.Response response,
+      List<Coprocessor.KeyRange> ranges,
+      Queue<SelectResponse> responseQueue,
+      long startTs) {
+    boolean forWrite = false;
+    if (response == null) {
+      // Send request failed, reasons may:
+      // 1. TiKV down
+      // 2. Network partition
+      backOffer.doBackOff(
+          BackOffFunction.BackOffFuncType.BoRegionMiss,
+          new GrpcException("TiKV down or Network partition"));
+      logger.warn("Re-splitting region task due to region error: TiKV down or Network partition");
+      // Split ranges
+      return RangeSplitter.newSplitter(this.regionManager).splitRangeByRegion(ranges, storeType);
+    }
+
+    if (response.hasRegionError()) {
+      Errorpb.Error regionError = response.getRegionError();
+      backOffer.doBackOff(
+          BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(regionError.toString()));
+      logger.warn("Re-splitting region task due to region error:" + regionError.getMessage());
+      // Split ranges
+      return RangeSplitter.newSplitter(this.regionManager).splitRangeByRegion(ranges, storeType);
+    }
+
+    if (response.hasLocked()) {
+      Lock lock = new Lock(response.getLocked());
+      logger.debug(String.format("coprocessor encounters locks: %s", lock));
+      ResolveLockResult resolveLockResult =
+          lockResolverClient.resolveLocks(
+              backOffer, startTs, Collections.singletonList(lock), forWrite);
+      addResolvedLocks(startTs, resolveLockResult.getResolvedLocks());
+      long msBeforeExpired = resolveLockResult.getMsBeforeTxnExpired();
+      if (msBeforeExpired > 0) {
+        backOffer.doBackOffWithMaxSleep(BoTxnLockFast, msBeforeExpired, new LockException(lock));
+      }
+      // Split ranges
+      return RangeSplitter.newSplitter(this.regionManager).splitRangeByRegion(ranges, storeType);
+    }
+
+    String otherError = response.getOtherError();
+    if (otherError != null && !otherError.isEmpty()) {
+      logger.warn(String.format("Other error occurred, message: %s", otherError));
+      throw new GrpcException(otherError);
+    }
+
+    responseQueue.offer(doCoprocessor(response));
+    return null;
+  }
+
+  private Iterator<SelectResponse> doCoprocessor(StreamingResponse response) {
+    Iterator<Coprocessor.Response> responseIterator = response.iterator();
+    // If we got nothing to handle, return null
+    if (!responseIterator.hasNext()) {
+      return null;
+    }
+
+    // Simply wrap it
+    return new Iterator<SelectResponse>() {
+      @Override
+      public boolean hasNext() {
+        return responseIterator.hasNext();
+      }
+
+      @Override
+      public SelectResponse next() {
+        return doCoprocessor(responseIterator.next());
+      }
+    };
+  }
+
+  private SelectResponse doCoprocessor(Coprocessor.Response resp) {
+    try {
+      SelectResponse selectResp = SelectResponse.parseFrom(resp.getData());
+      if (selectResp.hasError()) {
+        throw new SelectException(selectResp.getError(), selectResp.getError().getMsg());
+      }
+      return selectResp;
+    } catch (InvalidProtocolBufferException e) {
+      throw new TiClientInternalException("Error parsing protobuf for coprocessor response.", e);
+    }
+  }
+
+  // TODO: wait for future fix
+  // coprocessStreaming doesn't handle split error
+  // future work should handle it and do the resolve
+  // locks correspondingly
+  public Iterator<SelectResponse> coprocessStreaming(
+      DAGRequest req, List<Coprocessor.KeyRange> ranges, long startTs) {
+    boolean forWrite = false;
+    Supplier<Coprocessor.Request> reqToSend =
+        () ->
+            Coprocessor.Request.newBuilder()
+                .setContext(region.getContext(getResolvedLocks(startTs)))
+                // TODO: If no executors...?
+                .setTp(REQ_TYPE_DAG.getValue())
+                .setData(req.toByteString())
+                .addAllRanges(ranges)
+                .build();
+
+    KVErrorHandler<StreamingResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            lockResolverClient,
+            region,
+            StreamingResponse::getFirstRegionError, // TODO: handle all errors in streaming response
+            resp -> null,
+            resolveLockResult -> addResolvedLocks(startTs, resolveLockResult.getResolvedLocks()),
+            startTs,
+            forWrite);
+
+    StreamingResponse responseIterator =
+        this.callServerStreamingWithRetry(
+            ConcreteBackOffer.newCopNextMaxBackOff(),
+            TikvGrpc.getCoprocessorStreamMethod(),
+            reqToSend,
+            handler);
+    return doCoprocessor(responseIterator);
+  }
+
+  /**
+   * Send SplitRegion request to tikv split a region at splitKey. splitKey must between current
+   * region's start key and end key.
+   *
+   * @param splitKeys is the split points for a specific region.
+   * @return a split region info.
+   */
+  public List<TiRegion> splitRegion(Iterable<ByteString> splitKeys) {
+    Supplier<SplitRegionRequest> request =
+        () ->
+            SplitRegionRequest.newBuilder()
+                .setContext(region.getContext())
+                .addAllSplitKeys(splitKeys)
+                .build();
+
+    KVErrorHandler<SplitRegionResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            null,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null,
+            resp -> null,
+            resolveLockResult -> null,
+            0L,
+            false);
+
+    SplitRegionResponse resp =
+        callWithRetry(
+            ConcreteBackOffer.newGetBackOff(), TikvGrpc.getSplitRegionMethod(), request, handler);
+
+    if (resp == null) {
+      this.regionManager.onRequestFail(region);
+      throw new TiClientInternalException("SplitRegion Response failed without a cause");
+    }
+
+    if (resp.hasRegionError()) {
+      throw new TiClientInternalException(
+          String.format(
+              "failed to split region %d because %s",
+              region.getId(), resp.getRegionError().toString()));
+    }
+
+    return resp.getRegionsList()
+        .stream()
+        .map(
+            region ->
+                new TiRegion(
+                    region,
+                    null,
+                    conf.getIsolationLevel(),
+                    conf.getCommandPriority(),
+                    conf.getKvMode()))
+        .collect(Collectors.toList());
   }
 
   // APIs for Raw Scan/Put/Get/Delete
@@ -713,9 +1003,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       this.pdClient = pdClient;
     }
 
-    public RegionStoreClient build(TiRegion region, Store store) throws GrpcException {
+    public RegionStoreClient build(TiRegion region, Store store, TiStoreType storeType)
+        throws GrpcException {
       Objects.requireNonNull(region, "region is null");
       Objects.requireNonNull(store, "store is null");
+      Objects.requireNonNull(storeType, "storeType is null");
 
       String addressStr = store.getAddress();
       if (logger.isDebugEnabled()) {
@@ -730,6 +1022,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           conf,
           region,
           store,
+          storeType,
           channelFactory,
           blockingStub,
           asyncStub,
@@ -738,14 +1031,22 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           this);
     }
 
-    public RegionStoreClient build(ByteString key) {
-      Pair<TiRegion, Store> pair = regionManager.getRegionStorePairByKey(key);
-      return build(pair.first, pair.second);
+    public RegionStoreClient build(TiRegion region, Store store) throws GrpcException {
+      return build(region, store, TiStoreType.TiKV);
+    }
+
+    public RegionStoreClient build(ByteString key) throws GrpcException {
+      return build(key, TiStoreType.TiKV);
+    }
+
+    public RegionStoreClient build(ByteString key, TiStoreType storeType) throws GrpcException {
+      Pair<TiRegion, Store> pair = regionManager.getRegionStorePairByKey(key, storeType);
+      return build(pair.first, pair.second, storeType);
     }
 
     public RegionStoreClient build(TiRegion region) throws GrpcException {
       Store store = regionManager.getStoreById(region.getLeader().getStoreId());
-      return build(region, store);
+      return build(region, store, TiStoreType.TiKV);
     }
 
     public RegionManager getRegionManager() {

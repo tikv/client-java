@@ -22,40 +22,78 @@ import static org.tikv.common.pd.PDError.buildFromPdpbError;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
+import io.etcd.jetcd.ByteSequence;
+import io.etcd.jetcd.Client;
+import io.etcd.jetcd.KeyValue;
+import io.etcd.jetcd.kv.GetResponse;
+import io.etcd.jetcd.options.GetOption;
 import io.grpc.ManagedChannel;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
+import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.meta.TiTimestamp;
+import org.tikv.common.operation.NoopHandler;
 import org.tikv.common.operation.PDErrorHandler;
 import org.tikv.common.pd.PDUtils;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.util.BackOffFunction.BackOffFuncType;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.FutureObserver;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.PDGrpc.PDBlockingStub;
 import org.tikv.kvproto.PDGrpc.PDStub;
-import org.tikv.kvproto.Pdpb.*;
+import org.tikv.kvproto.Pdpb.Error;
+import org.tikv.kvproto.Pdpb.ErrorType;
+import org.tikv.kvproto.Pdpb.GetAllStoresRequest;
+import org.tikv.kvproto.Pdpb.GetMembersRequest;
+import org.tikv.kvproto.Pdpb.GetMembersResponse;
+import org.tikv.kvproto.Pdpb.GetOperatorRequest;
+import org.tikv.kvproto.Pdpb.GetOperatorResponse;
+import org.tikv.kvproto.Pdpb.GetRegionByIDRequest;
+import org.tikv.kvproto.Pdpb.GetRegionRequest;
+import org.tikv.kvproto.Pdpb.GetRegionResponse;
+import org.tikv.kvproto.Pdpb.GetStoreRequest;
+import org.tikv.kvproto.Pdpb.GetStoreResponse;
+import org.tikv.kvproto.Pdpb.OperatorStatus;
+import org.tikv.kvproto.Pdpb.RequestHeader;
+import org.tikv.kvproto.Pdpb.ResponseHeader;
+import org.tikv.kvproto.Pdpb.ScatterRegionRequest;
+import org.tikv.kvproto.Pdpb.ScatterRegionResponse;
+import org.tikv.kvproto.Pdpb.Timestamp;
+import org.tikv.kvproto.Pdpb.TsoRequest;
+import org.tikv.kvproto.Pdpb.TsoResponse;
 
-/** PDClient is thread-safe and suggested to be shared threads */
 public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     implements ReadOnlyPDClient {
+  private static final String TIFLASH_TABLE_SYNC_PROGRESS_PATH = "/tiflash/table/sync";
   private final Logger logger = LoggerFactory.getLogger(PDClient.class);
   private RequestHeader header;
   private TsoRequest tsoReq;
   private volatile LeaderWrapper leaderWrapper;
   private ScheduledExecutorService service;
+  private ScheduledExecutorService tiflashReplicaService;
   private List<URI> pdAddrs;
+  private Client etcdClient;
+  private ConcurrentMap<Long, Double> tiflashReplicaMap;
 
   private PDClient(TiConfiguration conf, ChannelFactory channelFactory) {
     super(conf, channelFactory);
@@ -110,18 +148,71 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
   }
 
+  /**
+   * wait scatter region until finish
+   *
+   * @param region
+   */
+  void waitScatterRegionFinish(TiRegion region, BackOffer backOffer) {
+    for (; ; ) {
+      GetOperatorResponse resp = getOperator(region.getId());
+      if (resp != null) {
+        if (isScatterRegionFinish(resp)) {
+          logger.info(String.format("wait scatter region on %d is finished", region.getId()));
+          return;
+        } else {
+          backOffer.doBackOff(
+              BackOffFuncType.BoRegionMiss, new GrpcException("waiting scatter region"));
+          logger.info(
+              String.format(
+                  "wait scatter region %d at key %s is %s",
+                  region.getId(),
+                  KeyUtils.formatBytes(resp.getDesc().toByteArray()),
+                  resp.getStatus().toString()));
+        }
+      }
+    }
+  }
+
+  private GetOperatorResponse getOperator(long regionId) {
+    Supplier<GetOperatorRequest> request =
+        () -> GetOperatorRequest.newBuilder().setHeader(header).setRegionId(regionId).build();
+    // get operator no need to handle error and no need back offer.
+    return callWithRetry(
+        ConcreteBackOffer.newCustomBackOff(0),
+        PDGrpc.getGetOperatorMethod(),
+        request,
+        new NoopHandler<>());
+  }
+
+  private boolean isScatterRegionFinish(GetOperatorResponse resp) {
+    // If the current operator of region is not `scatter-region`, we could assume
+    // that `scatter-operator` has finished or timeout.
+    boolean finished =
+        !resp.getDesc().equals(ByteString.copyFromUtf8("scatter-region"))
+            || resp.getStatus() != OperatorStatus.RUNNING;
+
+    if (resp.hasHeader()) {
+      ResponseHeader header = resp.getHeader();
+      if (header.hasError()) {
+        Error error = header.getError();
+        // heartbeat may not send to PD
+        if (error.getType() == ErrorType.REGION_NOT_FOUND) {
+          finished = true;
+        }
+      }
+    }
+    return finished;
+  }
+
   @Override
   public TiRegion getRegionByKey(BackOffer backOffer, ByteString key) {
-    Supplier<GetRegionRequest> request;
-    if (conf.getKvMode() == KVMode.RAW) {
-      request = () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
-    } else {
-      CodecDataOutput cdo = new CodecDataOutput();
-      BytesCodec.writeBytes(cdo, key.toByteArray());
-      ByteString encodedKey = cdo.toByteString();
-      request =
-          () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(encodedKey).build();
-    }
+    CodecDataOutput cdo = new CodecDataOutput();
+    BytesCodec.writeBytes(cdo, key.toByteArray());
+    ByteString encodedKey = cdo.toByteString();
+
+    Supplier<GetRegionRequest> request =
+        () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(encodedKey).build();
 
     PDErrorHandler<GetRegionResponse> handler =
         new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
@@ -232,9 +323,25 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   @Override
-  public void close() {
+  public List<Store> getAllStores(BackOffer backOffer) {
+    return callWithRetry(
+            backOffer,
+            PDGrpc.getGetAllStoresMethod(),
+            buildGetAllStoresReq(),
+            new PDErrorHandler<>(
+                r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
+                this))
+        .getStoresList();
+  }
+
+  @Override
+  public void close() throws InterruptedException {
+    etcdClient.close();
     if (service != null) {
       service.shutdownNow();
+    }
+    if (tiflashReplicaService != null) {
+      tiflashReplicaService.shutdownNow();
     }
     if (channelFactory != null) {
       channelFactory.close();
@@ -320,6 +427,59 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         "already tried all address on file, but not leader found yet.");
   }
 
+  public void updateTiFlashReplicaStatus() {
+    ByteSequence prefix =
+        ByteSequence.from(TIFLASH_TABLE_SYNC_PROGRESS_PATH, StandardCharsets.UTF_8);
+    for (int i = 0; i < 5; i++) {
+      CompletableFuture<GetResponse> resp;
+      try {
+        resp =
+            etcdClient.getKVClient().get(prefix, GetOption.newBuilder().withPrefix(prefix).build());
+      } catch (Exception e) {
+        logger.info("get tiflash table replica sync progress failed, continue checking.", e);
+        continue;
+      }
+      GetResponse getResp;
+      try {
+        getResp = resp.get();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        continue;
+      } catch (ExecutionException e) {
+        throw new GrpcException("failed to update tiflash replica", e);
+      }
+      ConcurrentMap<Long, Double> progressMap = new ConcurrentHashMap<>();
+      for (KeyValue kv : getResp.getKvs()) {
+        long tableId;
+        try {
+          tableId =
+              Long.parseLong(
+                  kv.getKey().toString().substring(TIFLASH_TABLE_SYNC_PROGRESS_PATH.length()));
+        } catch (Exception e) {
+          logger.info(
+              "invalid tiflash table replica sync progress key. key = " + kv.getKey().toString());
+          continue;
+        }
+        double progress;
+        try {
+          progress = Double.parseDouble(kv.getValue().toString());
+        } catch (Exception e) {
+          logger.info(
+              "invalid tiflash table replica sync progress value. value = "
+                  + kv.getValue().toString());
+          continue;
+        }
+        progressMap.put(tableId, progress);
+      }
+      tiflashReplicaMap = progressMap;
+      break;
+    }
+  }
+
+  public double getTiFlashReplicaProgress(long tableId) {
+    return tiflashReplicaMap.getOrDefault(tableId, 0.0);
+  }
+
   @Override
   protected PDBlockingStub getBlockingStub() {
     if (leaderWrapper == null) {
@@ -354,6 +514,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     header = RequestHeader.newBuilder().setClusterId(clusterId).build();
     tsoReq = TsoRequest.newBuilder().setHeader(header).setCount(1).build();
     this.pdAddrs = pdAddrs;
+    this.etcdClient = Client.builder().endpoints(pdAddrs).build();
+    this.tiflashReplicaMap = new ConcurrentHashMap<>();
     createLeaderWrapper(resp.getLeader().getClientUrls(0));
     service =
         Executors.newSingleThreadScheduledExecutor(
@@ -370,6 +532,11 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         1,
         1,
         TimeUnit.MINUTES);
+    tiflashReplicaService =
+        Executors.newSingleThreadScheduledExecutor(
+            new ThreadFactoryBuilder().setDaemon(true).build());
+    tiflashReplicaService.scheduleAtFixedRate(
+        this::updateTiFlashReplicaStatus, 10, 10, TimeUnit.SECONDS);
   }
 
   static class LeaderWrapper {

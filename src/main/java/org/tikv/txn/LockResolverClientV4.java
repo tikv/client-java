@@ -21,7 +21,6 @@ import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnNotFound;
 
 import com.google.protobuf.ByteString;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -110,7 +109,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
 
     Map<Long, Set<RegionVerID>> cleanTxns = new HashMap<>();
     boolean pushFail = false;
-    List<Long> pushed = new ArrayList<>(locks.size());
+    Set<Long> pushed = new HashSet<>(locks.size());
 
     for (Lock l : locks) {
       TxnStatus status = getTxnStatusFromLock(bo, l, callerStartTS);
@@ -119,7 +118,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
         Set<RegionVerID> cleanRegion =
             cleanTxns.computeIfAbsent(l.getTxnID(), k -> new HashSet<>());
 
-        if (l.getLockType() == Kvrpcpb.Op.PessimisticLock) {
+        if (l.getLockType() == org.tikv.kvproto.Kvrpcpb.Op.PessimisticLock) {
           resolvePessimisticLock(bo, l, cleanRegion);
         } else {
           resolveLock(bo, l, status, cleanRegion);
@@ -134,12 +133,13 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
           // If it's a optimistic conflict and current txn is earlier than the lock owner,
           // abort current transaction.
           // This could avoids the deadlock scene of two large transaction.
-          if (l.getLockType() != Kvrpcpb.Op.PessimisticLock && l.getTxnID() > callerStartTS) {
+          if (l.getLockType() != org.tikv.kvproto.Kvrpcpb.Op.PessimisticLock
+              && l.getTxnID() > callerStartTS) {
             throw new WriteConflictException(
                 callerStartTS, l.getTxnID(), status.getCommitTS(), l.getKey().toByteArray());
           }
         } else {
-          if (status.getAction() != Kvrpcpb.Action.MinCommitTSPushed) {
+          if (status.getAction() != org.tikv.kvproto.Kvrpcpb.Action.MinCommitTSPushed) {
             pushFail = true;
           } else {
             pushed.add(l.getTxnID());
@@ -149,7 +149,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
     }
 
     if (pushFail) {
-      pushed = new ArrayList<>();
+      pushed = new HashSet<>();
     }
 
     return new ResolveLockResult(msBeforeTxnExpired.value(), pushed);

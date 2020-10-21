@@ -22,9 +22,9 @@ import java.io.DataOutputStream;
 
 // A trivial implementation supposed to be replaced
 public class CodecDataOutput implements DataOutput {
-  private DataOutputStream s;
+  protected final DataOutputStream s;
   // TODO: Switch to ByteBuffer if possible, or a chain of ByteBuffer
-  private ByteArrayOutputStream byteArray;
+  protected final ByteArrayOutputStream byteArray;
 
   public CodecDataOutput() {
     byteArray = new ByteArrayOutputStream();
@@ -46,7 +46,7 @@ public class CodecDataOutput implements DataOutput {
   }
 
   @Override
-  public void write(byte b[]) {
+  public void write(byte[] b) {
     try {
       s.write(b);
     } catch (Exception e) {
@@ -168,6 +168,10 @@ public class CodecDataOutput implements DataOutput {
 
   public ByteString toByteString() {
     return ByteString.copyFrom(byteArray.toByteArray());
+  }
+
+  public int size() {
+    return this.byteArray.size();
   }
 
   public void reset() {
