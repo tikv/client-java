@@ -82,7 +82,7 @@ public class RawKVClientTest {
   }
 
   @After
-  public void tearDown() {
+  public void tearDown() throws Exception {
     if (session != null) {
       session.close();
     }

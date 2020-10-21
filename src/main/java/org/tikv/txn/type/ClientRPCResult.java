@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package org.tikv.txn;
+package org.tikv.txn.type;
 
 public class ClientRPCResult {
   private boolean success;

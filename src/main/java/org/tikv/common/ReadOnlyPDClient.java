@@ -16,6 +16,7 @@
 package org.tikv.common;
 
 import com.google.protobuf.ByteString;
+import java.util.List;
 import java.util.concurrent.Future;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.TiRegion;
@@ -60,4 +61,6 @@ public interface ReadOnlyPDClient {
   Store getStore(BackOffer backOffer, long storeId);
 
   Future<Store> getStoreAsync(BackOffer backOffer, long storeId);
+
+  List<Store> getAllStores(BackOffer backOffer);
 }

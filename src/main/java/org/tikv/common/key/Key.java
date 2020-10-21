@@ -18,16 +18,22 @@ package org.tikv.common.key;
 import static java.util.Objects.requireNonNull;
 import static org.tikv.common.codec.KeyUtils.formatBytes;
 
+import com.google.common.primitives.Bytes;
 import com.google.protobuf.ByteString;
 import java.util.Arrays;
+import javax.annotation.Nonnull;
+import org.tikv.common.codec.CodecDataOutput;
+import org.tikv.common.types.DataType;
 import org.tikv.common.util.FastByteComparisons;
 
 public class Key implements Comparable<Key> {
-
+  public static final Key EMPTY = createEmpty();
+  public static final Key NULL = createNull();
+  public static final Key MIN = createTypelessMin();
+  public static final Key MAX = createTypelessMax();
+  protected static final byte[] TBL_PREFIX = new byte[] {'t'};
   protected final byte[] value;
   protected final int infFlag;
-
-  public static final Key EMPTY = createEmpty();
 
   private Key(byte[] value, boolean negative) {
     this.value = requireNonNull(value, "value is null");
@@ -54,6 +60,17 @@ public class Key implements Comparable<Key> {
     return new Key(bytes);
   }
 
+  private static Key createNull() {
+    CodecDataOutput cdo = new CodecDataOutput();
+    DataType.encodeNull(cdo);
+    return new Key(cdo.toBytes()) {
+      @Override
+      public String toString() {
+        return "null";
+      }
+    };
+  }
+
   private static Key createEmpty() {
     return new Key(new byte[0]) {
       @Override
@@ -68,17 +85,37 @@ public class Key implements Comparable<Key> {
     };
   }
 
+  private static Key createTypelessMin() {
+    CodecDataOutput cdo = new CodecDataOutput();
+    DataType.encodeIndex(cdo);
+    return new Key(cdo.toBytes()) {
+      @Override
+      public String toString() {
+        return "MIN";
+      }
+    };
+  }
+
+  private static Key createTypelessMax() {
+    CodecDataOutput cdo = new CodecDataOutput();
+    DataType.encodeMaxValue(cdo);
+    return new Key(cdo.toBytes()) {
+      @Override
+      public String toString() {
+        return "MAX";
+      }
+    };
+  }
+
   /**
-   * The next key for bytes domain It first plus one at LSB and if LSB overflows, a zero byte is
-   * appended at the end Original bytes will be reused if possible
+   * The prefixNext key for bytes domain
+   *
+   * <p>It first plus one at LSB and if LSB overflows, a zero byte is appended at the end Original
+   * bytes will be reused if possible
    *
    * @return encoded results
    */
-  public Key next() {
-    return toRawKey(nextValue(value));
-  }
-
-  static byte[] nextValue(byte[] value) {
+  static byte[] prefixNext(byte[] value) {
     int i;
     byte[] newVal = Arrays.copyOf(value, value.length);
     for (i = newVal.length - 1; i >= 0; i--) {
@@ -94,9 +131,27 @@ public class Key implements Comparable<Key> {
     }
   }
 
+  /**
+   * Next key simply append a zero byte to previous key.
+   *
+   * @return next key with a zero byte appended
+   */
+  public Key next() {
+    return toRawKey(Arrays.copyOf(value, value.length + 1));
+  }
+
+  /**
+   * nextPrefix key will be key with next available rid. For example, if the current key is
+   * prefix_rid, after calling this method, the return value should be prefix_rid+1
+   *
+   * @return a new key current rid+1.
+   */
+  public Key nextPrefix() {
+    return toRawKey(prefixNext(value));
+  }
+
   @Override
-  public int compareTo(Key other) {
-    requireNonNull(other, "other is null");
+  public int compareTo(@Nonnull Key other) {
     if ((this.infFlag | other.infFlag) != 0) {
       return this.infFlag - other.infFlag;
     }
@@ -115,9 +170,16 @@ public class Key implements Comparable<Key> {
     }
   }
 
+  public Key append(Key other) {
+    if (other == null) {
+      return this;
+    }
+    return Key.toRawKey(Bytes.concat(getBytes(), other.getBytes()));
+  }
+
   @Override
   public int hashCode() {
-    return Arrays.hashCode(value) * infFlag;
+    return Arrays.hashCode(value);
   }
 
   public byte[] getBytes() {
