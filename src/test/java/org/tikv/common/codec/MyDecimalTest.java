@@ -26,24 +26,7 @@ import org.junit.Test;
 
 public class MyDecimalTest {
   @Test
-  public void toLongTest() {
-    List<MyDecimalTestStruct> tests = new ArrayList<>();
-    tests.add(new MyDecimalTestStruct("-9223372036854775807", "-9223372036854775807"));
-    tests.add(new MyDecimalTestStruct("-9223372036854775808", "-9223372036854775808"));
-    tests.add(new MyDecimalTestStruct("9223372036854775808", "9223372036854775807"));
-    tests.add(new MyDecimalTestStruct("-9223372036854775809", "-9223372036854775808"));
-    tests.add(new MyDecimalTestStruct("18446744073709551615", "9223372036854775807"));
-
-    for (MyDecimalTestStruct t : tests) {
-      MyDecimal dec = new MyDecimal();
-      dec.fromString(t.in);
-      String result = dec.toLong() + "";
-      assertEquals(t.out, result);
-    }
-  }
-
-  @Test
-  public void fromStringTest() throws Exception {
+  public void fromStringTest() {
     List<MyDecimalTestStruct> tests = new ArrayList<>();
     tests.add(
         new MyDecimalTestStruct(
@@ -73,7 +56,7 @@ public class MyDecimalTest {
   }
 
   @Test
-  public void readWordTest() throws Exception {
+  public void readWordTest() {
     assertEquals(MyDecimal.readWord(new int[] {250}, 1, 0), -6);
     assertEquals(MyDecimal.readWord(new int[] {50}, 1, 0), 50);
 
@@ -88,7 +71,7 @@ public class MyDecimalTest {
   }
 
   @Test
-  public void toBinFromBinTest() throws Exception {
+  public void toBinFromBinTest() {
     List<MyDecimalTestStruct> tests = new ArrayList<>();
     String decValStr = "11111111111111111111111111111111111.111111111111111111111111111111";
     tests.add(new MyDecimalTestStruct(decValStr, decValStr, 65, 30));
@@ -99,6 +82,7 @@ public class MyDecimalTest {
     tests.add(new MyDecimalTestStruct("0000000.001", "0.001", 3, 3));
     tests.add(new MyDecimalTestStruct("0.00012345000098765", "0.00012345000098765", 17, 17));
     tests.add(new MyDecimalTestStruct("-0.00012345000098765", "-0.00012345000098765", 17, 17));
+    tests.add(new MyDecimalTestStruct("0", "0", 1, 0));
     for (MyDecimalTestStruct a : tests) {
       MyDecimal dec = new MyDecimal();
       dec.fromString(a.in);
@@ -111,7 +95,7 @@ public class MyDecimalTest {
   }
 
   @Test
-  public void toBinTest() throws Exception {
+  public void toBinTest() {
     MyDecimal dec = new MyDecimal();
     dec.fromDecimal(-1234567890.1234);
     int[] data = dec.toBin(dec.precision(), dec.frac());
@@ -122,8 +106,8 @@ public class MyDecimalTest {
     assertArrayEquals(expected, data);
   }
 
-  // MyDecimalTestStruct is only used for simplifing testing.
-  private class MyDecimalTestStruct {
+  // MyDecimalTestStruct is only used for simplifying testing.
+  private static class MyDecimalTestStruct {
     String in;
     String out;
     int precision;
