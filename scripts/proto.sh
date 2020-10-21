@@ -15,8 +15,8 @@
 #
 
 CURRENT_DIR=`pwd`
-TISPARK_HOME="$(cd "`dirname "$0"`"/../..; pwd)"
-cd $TISPARK_HOME/tikv-client
+TIKV_CLIENT_HOME="$(cd "`dirname "$0"`"/..; pwd)"
+cd $TIKV_CLIENT_HOME
 
 kvproto_hash=2cf9a243b8d589f345de1dbaa9eeffec6afbdc06
 
