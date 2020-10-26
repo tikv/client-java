@@ -1,4 +1,4 @@
-## Ti-Client in Java [Under Construction]
+## TiKV JAVA Client
 
 A Java client for [TiDB](https://github.com/pingcap/tidb)/[TiKV](https://github.com/tikv/tikv).
 It is supposed to:
@@ -8,25 +8,6 @@ It is supposed to:
 + Talk to Coprocessor for calculation pushdown
 
 ## How to build
-
-### Gradle
-
-Alternatively, you can build `tikv-client-java` with gradle.
-
-The following command will build the project.
-
-```
-gradle init
-gradle clean build -x test
-```
-
-To make a jar with dependencies
-
-```
-gradle clean shadowJar -x test
-```
-
-The jar can be found in `./build/libs/`
 
 ### Maven
 
@@ -75,7 +56,7 @@ After building, add following lines into your `pom.xml` if you are using Maven
 <dependency>
 	<groupId>org.tikv</groupId>
 	<artifactId>tikv-client-java</artifactId>
-	<version>2.0-SNAPSHOT</version>
+	<version>3.0.0</version>
 </dependency>
 ```
 
