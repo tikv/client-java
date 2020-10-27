@@ -335,6 +335,11 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   @Override
+  public boolean getIsFollowerRead() {
+    return conf.isFollowerRead();
+  }
+
+  @Override
   public void close() throws InterruptedException {
     etcdClient.close();
     if (service != null) {
