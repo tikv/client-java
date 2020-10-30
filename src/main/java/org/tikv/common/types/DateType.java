@@ -19,6 +19,7 @@ package org.tikv.common.types;
 
 import java.sql.Date;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Days;
 import org.joda.time.LocalDate;
 import org.tikv.common.codec.Codec.DateCodec;
 import org.tikv.common.codec.CodecDataInput;
@@ -28,6 +29,7 @@ import org.tikv.common.exception.ConvertOverflowException;
 import org.tikv.common.meta.TiColumnInfo;
 
 public class DateType extends AbstractDateTimeType {
+  private static final LocalDate EPOCH = new LocalDate(0);
   public static final DateType DATE = new DateType(MySQLType.TypeDate);
   public static final MySQLType[] subTypes = new MySQLType[] {MySQLType.TypeDate};
 
@@ -90,6 +92,16 @@ public class DateType extends AbstractDateTimeType {
     return "DATE";
   }
 
+  public int getDays(LocalDate d) {
+    // count how many days from EPOCH
+    int days = Days.daysBetween(EPOCH, d).getDays();
+    // if the timezone has negative offset, minus one day.
+    if (getTimezone().getOffset(0) < 0) {
+      days -= 1;
+    }
+    return days;
+  }
+
   /** {@inheritDoc} */
   @Override
   protected Long decodeNotNull(int flag, CodecDataInput cdi) {
@@ -98,8 +110,8 @@ public class DateType extends AbstractDateTimeType {
     if (date == null) {
       return null;
     }
-    // return how many days from EPOCH
-    return Math.floorDiv(date.toDate().getTime(), AbstractDateTimeType.MILLS_PER_DAY);
+
+    return (long) getDays(date);
   }
 
   @Override
