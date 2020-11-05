@@ -7,7 +7,54 @@
     <artifactId>tikv-client-java</artifactId>
     <version>3.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>TiSpark Project TiKV Java Client</name>
+    <name>TiKV Java Client</name>
+    <description>A Java Client for TiKV</description>
+    <url>http://github.com/tikv/client-java</url>
+
+    <licenses>
+        <license>
+            <name>Apache 2.0 License</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <organization>
+        <name>PingCAP</name>
+    </organization>
+
+    <developers>
+        <developer>
+            <name>Xiaoyu Ma</name>
+            <email>maxiaoyu@pingcap.com</email>
+            <organization>PingCAP</organization>
+            <organizationUrl>https://www.pingcap.com</organizationUrl>
+        </developer>
+        <developer>
+            <name>Yifei Wu</name>
+            <email>birdstorm@pingcap.com</email>
+            <organization>PingCAP</organization>
+            <organizationUrl>https://www.pingcap.com</organizationUrl>
+        </developer>
+        <developer>
+            <name>Zhexuan Yang</name>
+            <email>yangzhexuan@pingcap.com</email>
+            <organization>PingCAP</organization>
+            <organizationUrl>https://www.pingcap.com</organizationUrl>
+        </developer>
+        <developer>
+            <name>Liangliang Gu</name>
+            <email>guliangliang@pingcap.com</email>
+            <organization>PingCAP</organization>
+            <organizationUrl>https://www.pingcap.com</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/tikv/client-java.git</connection>
+        <developerConnection>scm:git:ssh://github.com:tikv/client-java.git</developerConnection>
+        <url>https://github.com/tikv/client-java/tree/master</url>
+    </scm>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -23,6 +70,7 @@
         <joda-time.version>2.9.9</joda-time.version>
         <joda-convert.version>1.9.2</joda-convert.version>
         <proto.folder>${basedir}/proto</proto.folder>
+        <gpg.keyname>fake gpg key name</gpg.keyname>
         <gpg.skip>true</gpg.skip>
         <javadoc.skip>true</javadoc.skip>
     </properties>
@@ -284,6 +332,20 @@
                     </archive>
                 </configuration>
             </plugin>
+            <!-- Source Plug-in -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.0.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- Clean Plug-in -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -416,6 +478,36 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!--GPG Signed Components-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>1.5</version>
+                <configuration>
+                    <keyname>${gpg.keyname}</keyname>
+                    <skip>${gpg.skip}</skip>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Nexus staging maven plugin -->
+            <plugin>
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+                <version>1.6.7</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <serverId>ossrh</serverId>
+                    <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                    <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                </configuration>
             </plugin>
         </plugins>
     </build>
