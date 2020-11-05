@@ -69,7 +69,9 @@ public class RawKVClientTest {
   @Before
   public void setup() throws IOException {
     try {
-      session = TiSession.create(TiConfiguration.createRawDefault(DEFAULT_PD_ADDRESS));
+      TiConfiguration conf = TiConfiguration.createRawDefault(DEFAULT_PD_ADDRESS);
+      conf.setFollowerRead(true);
+      session = TiSession.create(conf);
       initialized = false;
       if (client == null) {
         client = session.createRawClient();

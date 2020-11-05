@@ -79,7 +79,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   private RegionStoreClient(
       TiConfiguration conf,
       TiRegion region,
-      Store store,
+      String storeVersion,
       TiStoreType storeType,
       ChannelFactory channelFactory,
       TikvBlockingStub blockingStub,
@@ -93,7 +93,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (this.storeType == TiStoreType.TiKV) {
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
-              store,
+              storeVersion,
               conf,
               region,
               this.blockingStub,
@@ -118,7 +118,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
-              tikvStore,
+              tikvStore.getVersion(),
               conf,
               region,
               tikvBlockingStub,
@@ -1021,7 +1021,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       return new RegionStoreClient(
           conf,
           region,
-          store,
+          store.getVersion(),
           storeType,
           channelFactory,
           blockingStub,
