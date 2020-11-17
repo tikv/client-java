@@ -69,7 +69,7 @@ public class TTLManager {
     this.primaryLock = ByteString.copyFrom(primaryKey);
     this.state = new AtomicInteger(STATE_UNINITIALIZED);
 
-    this.kvClient = TiSession.getInstance(conf).createTxnClient();
+    this.kvClient = TiSession.getInstance(conf).createTxnKVClient();
     this.regionManager = kvClient.getRegionManager();
 
     scheduler =
