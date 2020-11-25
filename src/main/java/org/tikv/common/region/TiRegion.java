@@ -41,27 +41,48 @@ public class TiRegion implements Serializable {
   private final Region meta;
   private final IsolationLevel isolationLevel;
   private final Kvrpcpb.CommandPri commandPri;
-  private Peer peer;
+  private Peer leader;
+  private int followerIdx = 0;
+  private final boolean isReplicaRead;
 
   public TiRegion(
       Region meta,
-      Peer peer,
+      Peer leader,
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
       KVMode kvMode) {
+    this(meta, leader, isolationLevel, commandPri, kvMode, false);
+  }
+
+  public TiRegion(
+      Region meta,
+      Peer leader,
+      IsolationLevel isolationLevel,
+      Kvrpcpb.CommandPri commandPri,
+      KVMode kvMode,
+      boolean isReplicaRead) {
     Objects.requireNonNull(meta, "meta is null");
     this.meta = decodeRegion(meta, kvMode == KVMode.RAW);
-    if (peer == null || peer.getId() == 0) {
+    if (leader == null || leader.getId() == 0) {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());
       }
       // region's first peer is leader.
-      this.peer = meta.getPeers(0);
+      this.leader = meta.getPeers(0);
     } else {
-      this.peer = peer;
+      this.leader = leader;
+    }
+    if (isReplicaRead && meta.getPeersCount() > 0) {
+      // try to get first follower
+      try {
+        getNextFollower();
+      } catch (Exception ignore) {
+        // ignore
+      }
     }
     this.isolationLevel = isolationLevel;
     this.commandPri = commandPri;
+    this.isReplicaRead = isReplicaRead;
   }
 
   private Region decodeRegion(Region region, boolean isRawRegion) {
@@ -89,7 +110,24 @@ public class TiRegion implements Serializable {
   }
 
   public Peer getLeader() {
-    return peer;
+    return leader;
+  }
+
+  public Peer getCurrentFollower() {
+    return meta.getPeers(followerIdx);
+  }
+
+  public Peer getNextFollower() {
+    int cnt = meta.getPeersCount();
+    for (int retry = cnt - 1; retry > 0; retry--) {
+      followerIdx = (followerIdx + 1) % cnt;
+      Peer cur = meta.getPeers(followerIdx);
+      if (cur.getIsLearner()) {
+        continue;
+      }
+      return cur;
+    }
+    return leader;
   }
 
   public List<Peer> getLearnerList() {
@@ -130,7 +168,18 @@ public class TiRegion implements Serializable {
     Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
     builder.setIsolationLevel(this.isolationLevel);
     builder.setPriority(this.commandPri);
-    builder.setRegionId(meta.getId()).setPeer(this.peer).setRegionEpoch(this.meta.getRegionEpoch());
+    if (isReplicaRead) {
+      builder
+          .setRegionId(meta.getId())
+          .setPeer(getCurrentFollower())
+          .setReplicaRead(true)
+          .setRegionEpoch(this.meta.getRegionEpoch());
+    } else {
+      builder
+          .setRegionId(meta.getId())
+          .setPeer(this.leader)
+          .setRegionEpoch(this.meta.getRegionEpoch());
+    }
     builder.addAllResolvedLocks(resolvedLocks);
     return builder.build();
   }
@@ -152,7 +201,7 @@ public class TiRegion implements Serializable {
     List<Peer> peers = meta.getPeersList();
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
-        this.peer = p;
+        this.leader = p;
         return true;
       }
     }
@@ -186,7 +235,7 @@ public class TiRegion implements Serializable {
   }
 
   public boolean isValid() {
-    return peer != null && meta != null;
+    return leader != null && meta != null;
   }
 
   public Metapb.RegionEpoch getRegionEpoch() {
@@ -204,14 +253,14 @@ public class TiRegion implements Serializable {
     }
     TiRegion anotherRegion = ((TiRegion) another);
     return anotherRegion.meta.equals(this.meta)
-        && anotherRegion.peer.equals(this.peer)
+        && anotherRegion.leader.equals(this.leader)
         && anotherRegion.commandPri.equals(this.commandPri)
         && anotherRegion.isolationLevel.equals(this.isolationLevel);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(meta, peer, isolationLevel, commandPri);
+    return Objects.hash(meta, leader, isolationLevel, commandPri);
   }
 
   @Override

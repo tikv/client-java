@@ -29,7 +29,6 @@ import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.kvproto.Kvrpcpb;
-import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
 
 public interface AbstractLockResolverClient {
@@ -67,7 +66,7 @@ public interface AbstractLockResolverClient {
   }
 
   static AbstractLockResolverClient getInstance(
-      Metapb.Store store,
+      String storeVersion,
       TiConfiguration conf,
       TiRegion region,
       TikvGrpc.TikvBlockingStub blockingStub,
@@ -76,10 +75,10 @@ public interface AbstractLockResolverClient {
       RegionManager regionManager,
       PDClient pdClient,
       RegionStoreClient.RegionStoreClientBuilder clientBuilder) {
-    if (StoreVersion.compareTo(store.getVersion(), Version.RESOLVE_LOCK_V3) < 0) {
+    if (StoreVersion.compareTo(storeVersion, Version.RESOLVE_LOCK_V3) < 0) {
       return new LockResolverClientV2(
           conf, region, blockingStub, asyncStub, channelFactory, regionManager);
-    } else if (StoreVersion.compareTo(store.getVersion(), Version.RESOLVE_LOCK_V4) < 0) {
+    } else if (StoreVersion.compareTo(storeVersion, Version.RESOLVE_LOCK_V4) < 0) {
       return new LockResolverClientV3(
           conf,
           region,

@@ -52,6 +52,7 @@ public class TiConfiguration implements Serializable {
   private static final int DEF_KV_CLIENT_CONCURRENCY = 10;
   private static final KVMode DEF_KV_MODE = KVMode.TXN;
   private static final int DEF_RAW_CLIENT_CONCURRENCY = 200;
+  private static final boolean DEF_IS_REPLICA_READ = false;
 
   private int timeout = DEF_TIMEOUT;
   private TimeUnit timeoutUnit = DEF_TIMEOUT_UNIT;
@@ -78,6 +79,7 @@ public class TiConfiguration implements Serializable {
   private int partitionPerSplit = DEF_PARTITION_PER_SPLIT;
 
   private int kvClientConcurrency = DEF_KV_CLIENT_CONCURRENCY;
+  private boolean isReplicaRead = DEF_IS_REPLICA_READ;
 
   public enum KVMode {
     TXN,
@@ -313,5 +315,13 @@ public class TiConfiguration implements Serializable {
 
   public void setKvClientConcurrency(int kvClientConcurrency) {
     this.kvClientConcurrency = kvClientConcurrency;
+  }
+
+  public boolean isReplicaRead() {
+    return isReplicaRead;
+  }
+
+  public void setReplicaRead(boolean isReplicaRead) {
+    this.isReplicaRead = isReplicaRead;
   }
 }
