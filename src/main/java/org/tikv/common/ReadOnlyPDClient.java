@@ -64,5 +64,5 @@ public interface ReadOnlyPDClient {
 
   List<Store> getAllStores(BackOffer backOffer);
 
-  boolean getIsFollowerRead();
+  boolean isReplicaRead();
 }

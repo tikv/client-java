@@ -49,7 +49,7 @@ public class RegionManager {
   // TODO: the region cache logic need rewrite.
   // https://github.com/pingcap/tispark/issues/1170
   private final RegionCache cache;
-  private final boolean isFollowerRead;
+  private final boolean isReplicaRead;
 
   private final Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
 
@@ -58,13 +58,13 @@ public class RegionManager {
   public RegionManager(
       ReadOnlyPDClient pdClient, Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
     this.cache = new RegionCache(pdClient);
-    this.isFollowerRead = pdClient.getIsFollowerRead();
+    this.isReplicaRead = pdClient.isReplicaRead();
     this.cacheInvalidateCallback = cacheInvalidateCallback;
   }
 
   public RegionManager(ReadOnlyPDClient pdClient) {
     this.cache = new RegionCache(pdClient);
-    this.isFollowerRead = pdClient.getIsFollowerRead();
+    this.isReplicaRead = pdClient.isReplicaRead();
     this.cacheInvalidateCallback = null;
   }
 
@@ -115,8 +115,8 @@ public class RegionManager {
 
     Store store = null;
     if (storeType == TiStoreType.TiKV) {
-      if (isFollowerRead) {
-        Peer peer = region.getNextFollower();
+      if (isReplicaRead) {
+        Peer peer = region.getCurrentFollower();
         store = cache.getStoreById(peer.getStoreId(), backOffer);
       } else {
         Peer leader = region.getLeader();

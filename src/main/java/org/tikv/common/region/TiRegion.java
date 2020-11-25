@@ -43,6 +43,7 @@ public class TiRegion implements Serializable {
   private final Kvrpcpb.CommandPri commandPri;
   private Peer leader;
   private int followerIdx = 0;
+  private final boolean isReplicaRead;
 
   public TiRegion(
       Region meta,
@@ -50,6 +51,16 @@ public class TiRegion implements Serializable {
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
       KVMode kvMode) {
+    this(meta, leader, isolationLevel, commandPri, kvMode, false);
+  }
+
+  public TiRegion(
+      Region meta,
+      Peer leader,
+      IsolationLevel isolationLevel,
+      Kvrpcpb.CommandPri commandPri,
+      KVMode kvMode,
+      boolean isReplicaRead) {
     Objects.requireNonNull(meta, "meta is null");
     this.meta = decodeRegion(meta, kvMode == KVMode.RAW);
     if (leader == null || leader.getId() == 0) {
@@ -61,8 +72,17 @@ public class TiRegion implements Serializable {
     } else {
       this.leader = leader;
     }
+    if (isReplicaRead && meta.getPeersCount() > 0) {
+      // try to get first follower
+      try {
+        getNextFollower();
+      } catch (Exception ignore) {
+        // ignore
+      }
+    }
     this.isolationLevel = isolationLevel;
     this.commandPri = commandPri;
+    this.isReplicaRead = isReplicaRead;
   }
 
   private Region decodeRegion(Region region, boolean isRawRegion) {
@@ -91,6 +111,10 @@ public class TiRegion implements Serializable {
 
   public Peer getLeader() {
     return leader;
+  }
+
+  public Peer getCurrentFollower() {
+    return meta.getPeers(followerIdx);
   }
 
   public Peer getNextFollower() {
@@ -144,10 +168,18 @@ public class TiRegion implements Serializable {
     Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
     builder.setIsolationLevel(this.isolationLevel);
     builder.setPriority(this.commandPri);
-    builder
-        .setRegionId(meta.getId())
-        .setPeer(this.leader)
-        .setRegionEpoch(this.meta.getRegionEpoch());
+    if (isReplicaRead) {
+      builder
+          .setRegionId(meta.getId())
+          .setPeer(getCurrentFollower())
+          .setReplicaRead(true)
+          .setRegionEpoch(this.meta.getRegionEpoch());
+    } else {
+      builder
+          .setRegionId(meta.getId())
+          .setPeer(this.leader)
+          .setRegionEpoch(this.meta.getRegionEpoch());
+    }
     builder.addAllResolvedLocks(resolvedLocks);
     return builder.build();
   }
