@@ -1032,20 +1032,20 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           this);
     }
 
-    public RegionStoreClient build(TiRegion region, Store store) throws GrpcException {
+    public synchronized RegionStoreClient build(TiRegion region, Store store) throws GrpcException {
       return build(region, store, TiStoreType.TiKV);
     }
 
-    public RegionStoreClient build(ByteString key) throws GrpcException {
+    public synchronized RegionStoreClient build(ByteString key) throws GrpcException {
       return build(key, TiStoreType.TiKV);
     }
 
-    public RegionStoreClient build(ByteString key, TiStoreType storeType) throws GrpcException {
+    public synchronized RegionStoreClient build(ByteString key, TiStoreType storeType) throws GrpcException {
       Pair<TiRegion, Store> pair = regionManager.getRegionStorePairByKey(key, storeType);
       return build(pair.first, pair.second, storeType);
     }
 
-    public RegionStoreClient build(TiRegion region) throws GrpcException {
+    public synchronized RegionStoreClient build(TiRegion region) throws GrpcException {
       Store store = regionManager.getStoreById(region.getLeader().getStoreId());
       return build(region, store, TiStoreType.TiKV);
     }
