@@ -19,9 +19,13 @@ import com.google.common.primitives.UnsignedLong;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 import org.joda.time.LocalDate;
 import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.MyDecimal;
+import org.tikv.common.exception.UnsupportedSyntaxException;
 import org.tikv.common.types.*;
 import org.tikv.common.util.JsonUtils;
 
@@ -123,15 +127,36 @@ public class TiChunkColumnVector extends TiColumnVector {
     int minute = coreTime.getMinute();
     int second = coreTime.getSecond();
     long microsecond = coreTime.getMicroSecond();
+    boolean zeroDate = false, zeroTime = false;
+    boolean zeroInDate = false;
+    if (year == 0 && month == 0 && day == 0) {
+      zeroDate = true;
+    }
+    if (hour == 0 && minute == 0 && microsecond == 0) {
+      zeroTime = true;
+    }
+    if (month == 0 || day == 0) {
+      zeroInDate = true;
+    }
     // This behavior can be modified using the zeroDateTimeBehavior configuration property.
     // The allowable values are:
     //    * exception (the default), which throws an SQLException with an SQLState of S1009.
     //    * convertToNull, which returns NULL instead of the date.
     //    * round, which rounds the date to the nearest closest value which is 0001-01-01.
-    if (year == 0 && month == 0 && day == 0 && hour == 0 && minute == 0 && microsecond == 0) {
+    if (zeroDate && zeroTime) {
       year = 1;
       month = 1;
       day = 1;
+    } else if (!zeroDate && zeroInDate) {
+      String dateString = String.format("%04d-%02d-%02d", year, month, day);
+      try {
+        Date d = new SimpleDateFormat("yyyy-MM-dd").parse(dateString);
+        year = d.getYear() + 1900;
+        month = d.getMonth() + 1;
+        day = d.getDate();
+      } catch (Exception e) {
+        throw new UnsupportedSyntaxException("illegal date value: " + dateString);
+      }
     }
     if (this.type instanceof DateType) {
       LocalDate date = new LocalDate(year, month, day);
