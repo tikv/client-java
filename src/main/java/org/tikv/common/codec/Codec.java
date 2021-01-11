@@ -723,6 +723,9 @@ public class Codec {
     }
 
     public static String readEnumFromIndex(int idx, List<String> elems) {
+      if (idx == 0) {
+        return "";
+      }
       if (idx < 0 || idx >= elems.size()) throw new TypeException("Index is out of range");
       return elems.get(idx);
     }
