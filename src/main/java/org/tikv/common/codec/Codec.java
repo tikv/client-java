@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import gnu.trove.list.array.TIntArrayList;
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -32,6 +33,7 @@ import org.tikv.common.ExtendedDateTime;
 import org.tikv.common.exception.ConvertOverflowException;
 import org.tikv.common.exception.InvalidCodecFormatException;
 import org.tikv.common.exception.TypeException;
+import org.tikv.common.exception.UnsupportedSyntaxException;
 
 public class Codec {
 
@@ -522,6 +524,37 @@ public class Codec {
         int minute,
         int second,
         int microsec) {
+      boolean zeroDate = false, zeroTime = false;
+      boolean zeroInDate = false;
+      if (year == 0 && month == 0 && day == 0) {
+        zeroDate = true;
+      }
+      if (hour == 0 && minute == 0 && microsec == 0) {
+        zeroTime = true;
+      }
+      if (month == 0 || day == 0) {
+        zeroInDate = true;
+      }
+      // This behavior can be modified using the zeroDateTimeBehavior configuration property.
+      // The allowable values are:
+      //    * exception (the default), which throws an SQLException with an SQLState of S1009.
+      //    * convertToNull, which returns NULL instead of the date.
+      //    * round, which rounds the date to the nearest closest value which is 0001-01-01.
+      if (zeroDate && zeroTime) {
+        year = 1;
+        month = 1;
+        day = 1;
+      } else if (!zeroDate && zeroInDate) {
+        String dateString = String.format("%04d-%02d-%02d", year, month, day);
+        try {
+          java.util.Date d = new SimpleDateFormat("yyyy-MM-dd").parse(dateString);
+          year = d.getYear() + 1900;
+          month = d.getMonth() + 1;
+          day = d.getDate();
+        } catch (Exception e) {
+          throw new UnsupportedSyntaxException("illegal date value: " + dateString);
+        }
+      }
       try {
         DateTime dateTime =
             new DateTime(year, month, day, hour, minute, second, microsec / 1000, tz);
@@ -633,6 +666,35 @@ public class Codec {
       long ym = ymd >> 5;
       int month = (int) (ym % 13);
       int year = (int) (ym / 13);
+
+      boolean zeroDate = false;
+      boolean zeroInDate = false;
+      if (year == 0 && month == 0 && day == 0) {
+        zeroDate = true;
+      }
+      if (month == 0 || day == 0) {
+        zeroInDate = true;
+      }
+      // This behavior can be modified using the zeroDateTimeBehavior configuration property.
+      // The allowable values are:
+      //    * exception (the default), which throws an SQLException with an SQLState of S1009.
+      //    * convertToNull, which returns NULL instead of the date.
+      //    * round, which rounds the date to the nearest closest value which is 0001-01-01.
+      if (zeroDate) {
+        year = 1;
+        month = 1;
+        day = 1;
+      } else if (zeroInDate) {
+        String dateString = String.format("%04d-%02d-%02d", year, month, day);
+        try {
+          java.util.Date d = new SimpleDateFormat("yyyy-MM-dd").parse(dateString);
+          year = d.getYear() + 1900;
+          month = d.getMonth() + 1;
+          day = d.getDate();
+        } catch (Exception e) {
+          throw new UnsupportedSyntaxException("illegal date value: " + dateString);
+        }
+      }
 
       return new LocalDate(year, month, day, null);
     }
