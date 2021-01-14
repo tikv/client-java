@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
+import org.tikv.common.key.Key;
 import org.tikv.common.operation.iterator.RawScanIterator;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
@@ -168,6 +169,27 @@ public class RawKVClient implements AutoCloseable {
     Iterator<Kvrpcpb.KvPair> iterator = rawScanIterator(conf, clientBuilder, startKey, limit);
     List<Kvrpcpb.KvPair> result = new ArrayList<>();
     iterator.forEachRemaining(result::add);
+    return result;
+  }
+
+  /**
+   * Scan all raw key-value pairs from TiKV in range [startKey, endKey)
+   *
+   * @param startKey raw start key, inclusive
+   * @param endKey raw end key, exclusive
+   * @return list of key-value pairs in range
+   */
+  public List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey) {
+    List<Kvrpcpb.KvPair> result = new ArrayList<>();
+    while (true) {
+      Iterator<Kvrpcpb.KvPair> iterator =
+          rawScanIterator(conf, clientBuilder, startKey, endKey, conf.getScanBatchSize());
+      if (!iterator.hasNext()) {
+        break;
+      }
+      iterator.forEachRemaining(result::add);
+      startKey = Key.toRawKey(result.get(result.size() - 1).getKey()).next().toByteString();
+    }
     return result;
   }
 
