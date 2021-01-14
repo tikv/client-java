@@ -21,7 +21,6 @@ import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-
 import org.joda.time.LocalDate;
 import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.MyDecimal;
