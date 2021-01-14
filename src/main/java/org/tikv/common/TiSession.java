@@ -59,6 +59,7 @@ public class TiSession implements AutoCloseable {
   private volatile Catalog catalog;
   private volatile ExecutorService indexScanThreadPool;
   private volatile ExecutorService tableScanThreadPool;
+  private volatile ExecutorService batchPutThreadPool;
   private volatile RegionManager regionManager;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private boolean isClosed = false;
@@ -91,7 +92,7 @@ public class TiSession implements AutoCloseable {
     RegionManager regionMgr = new RegionManager(client);
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(conf, channelFactory, regionMgr, client);
-    return new RawKVClient(conf, builder);
+    return new RawKVClient(this, builder);
   }
 
   public KVClient createKVClient() {
@@ -206,6 +207,22 @@ public class TiSession implements AutoCloseable {
                   new ThreadFactoryBuilder().setDaemon(true).build());
         }
         res = tableScanThreadPool;
+      }
+    }
+    return res;
+  }
+
+  public ExecutorService getThreadPoolForBatchPut() {
+    ExecutorService res = batchPutThreadPool;
+    if (res == null) {
+      synchronized (this) {
+        if (batchPutThreadPool == null) {
+          batchPutThreadPool =
+              Executors.newFixedThreadPool(
+                  conf.getBatchPutConcurrency(),
+                  new ThreadFactoryBuilder().setDaemon(true).build());
+        }
+        res = batchPutThreadPool;
       }
     }
     return res;
