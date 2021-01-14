@@ -1040,7 +1040,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       return build(key, TiStoreType.TiKV);
     }
 
-    public synchronized RegionStoreClient build(ByteString key, TiStoreType storeType) throws GrpcException {
+    public synchronized RegionStoreClient build(ByteString key, TiStoreType storeType)
+        throws GrpcException {
       Pair<TiRegion, Store> pair = regionManager.getRegionStorePairByKey(key, storeType);
       return build(pair.first, pair.second, storeType);
     }
