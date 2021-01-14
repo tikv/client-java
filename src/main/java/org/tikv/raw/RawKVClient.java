@@ -25,14 +25,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.operation.iterator.RawScanIterator;
@@ -61,13 +60,12 @@ public class RawKVClient implements AutoCloseable {
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
       new TiKVException("limit should be less than MAX_RAW_SCAN_LIMIT");
 
-  public RawKVClient(TiConfiguration conf, RegionStoreClientBuilder clientBuilder) {
-    Objects.requireNonNull(conf, "conf is null");
+  public RawKVClient(TiSession session, RegionStoreClientBuilder clientBuilder) {
+    Objects.requireNonNull(session, "session is null");
     Objects.requireNonNull(clientBuilder, "clientBuilder is null");
-    this.conf = conf;
+    this.conf = session.getConf();
     this.clientBuilder = clientBuilder;
-    ExecutorService executors = Executors.newFixedThreadPool(conf.getRawClientConcurrency());
-    this.completionService = new ExecutorCompletionService<>(executors);
+    this.completionService = new ExecutorCompletionService<>(session.getThreadPoolForBatchPut());
   }
 
   @Override
@@ -270,7 +268,6 @@ public class RawKVClient implements AutoCloseable {
     for (Batch batch : batches) {
       completionService.submit(
           () -> {
-            RegionStoreClient client = clientBuilder.build(batch.region);
             BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
             List<Kvrpcpb.KvPair> kvPairs = new ArrayList<>();
             for (int i = 0; i < batch.keys.size(); i++) {
@@ -280,7 +277,7 @@ public class RawKVClient implements AutoCloseable {
                       .setValue(batch.values.get(i))
                       .build());
             }
-            try {
+            try (RegionStoreClient client = clientBuilder.build(batch.region); ) {
               client.rawBatchPut(singleBatchBackOffer, kvPairs);
             } catch (final TiKVException e) {
               // TODO: any elegant way to re-split the ranges if fails?
