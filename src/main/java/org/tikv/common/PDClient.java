@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.codec.KeyUtils;
@@ -207,12 +208,15 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   @Override
   public TiRegion getRegionByKey(BackOffer backOffer, ByteString key) {
-    CodecDataOutput cdo = new CodecDataOutput();
-    BytesCodec.writeBytes(cdo, key.toByteArray());
-    ByteString encodedKey = cdo.toByteString();
+    if (conf.getKvMode() == KVMode.TXN) {
+      CodecDataOutput cdo = new CodecDataOutput();
+      BytesCodec.writeBytes(cdo, key.toByteArray());
+      key = cdo.toByteString();
+    }
+    ByteString queryKey = key;
 
     Supplier<GetRegionRequest> request =
-        () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(encodedKey).build();
+        () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(queryKey).build();
 
     PDErrorHandler<GetRegionResponse> handler =
         new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
