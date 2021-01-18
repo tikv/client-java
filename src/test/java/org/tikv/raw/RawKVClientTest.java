@@ -112,6 +112,7 @@ public class RawKVClientTest {
       result.add(kv2);
       checkScan(key, key3, result, limit);
       checkScan(key1, key3, result, limit);
+      checkScan(key, key1, new ArrayList<>(), limit);
       result2.add(kv1);
       checkScan(key, key2, result2, limit);
       checkDelete(key1);
