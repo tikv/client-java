@@ -73,7 +73,7 @@ public class Main {
 	public static void main() {
 		// You MUST create a raw configuration if you are using RawKVClient.
 		TiConfiguration conf = TiConfiguration.createRawDefault(YOUR_PD_ADDRESSES);
-		TiSession session = TiSession.create(conf);
+		TiSession session = TiSession.getInstance(conf);
 		RawKVClient = session.createRawKVClient();
 	}
 }

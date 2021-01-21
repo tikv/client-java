@@ -70,6 +70,7 @@ public class TiSession implements AutoCloseable {
     this.client = PDClient.createRaw(conf, channelFactory);
   }
 
+  @VisibleForTesting
   public static TiSession create(TiConfiguration conf) {
     return new TiSession(conf);
   }
