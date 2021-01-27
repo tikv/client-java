@@ -75,6 +75,7 @@ public class TiSession implements AutoCloseable {
     return new TiSession(conf);
   }
 
+  @Deprecated
   public static TiSession getInstance(TiConfiguration conf) {
     synchronized (sessionCachedMap) {
       String key = conf.getPdAddrsString();
