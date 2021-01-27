@@ -40,12 +40,10 @@ import org.tikv.kvproto.Kvrpcpb.KvPair;
 public class Snapshot {
   private final TiTimestamp timestamp;
   private final TiSession session;
-  private final TiConfiguration conf;
 
-  public Snapshot(@Nonnull TiTimestamp timestamp, TiConfiguration conf) {
+  public Snapshot(@Nonnull TiTimestamp timestamp, TiSession session) {
     this.timestamp = timestamp;
-    this.conf = conf;
-    this.session = TiSession.getInstance(conf);
+    this.session = session;
   }
 
   public TiSession getSession() {
@@ -175,6 +173,6 @@ public class Snapshot {
   }
 
   public TiConfiguration getConf() {
-    return conf;
+    return this.session.getConf();
   }
 }

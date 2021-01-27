@@ -20,7 +20,6 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.function.Function;
 import org.tikv.common.Snapshot;
-import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.CodecDataOutput;
@@ -41,15 +40,15 @@ import org.tikv.txn.TwoPhaseCommitter;
 public final class RowIDAllocator implements Serializable {
   private final long maxShardRowIDBits;
   private final long dbId;
-  private final TiConfiguration conf;
+  private final TiSession session;
   private final long step;
   private long end;
 
-  private RowIDAllocator(long maxShardRowIDBits, long dbId, long step, TiConfiguration conf) {
+  private RowIDAllocator(long maxShardRowIDBits, long dbId, long step, TiSession session) {
     this.maxShardRowIDBits = maxShardRowIDBits;
     this.dbId = dbId;
     this.step = step;
-    this.conf = conf;
+    this.session = session;
   }
 
   /**
@@ -72,18 +71,13 @@ public final class RowIDAllocator implements Serializable {
   }
 
   public static RowIDAllocator create(
-      long dbId, TiTableInfo table, TiConfiguration conf, boolean unsigned, long step) {
-    RowIDAllocator allocator = new RowIDAllocator(table.getMaxShardRowIDBits(), dbId, step, conf);
+      long dbId, TiTableInfo table, TiSession session, boolean unsigned, long step) {
+    RowIDAllocator allocator =
+        new RowIDAllocator(table.getMaxShardRowIDBits(), dbId, step, session);
     if (unsigned) {
-      allocator.initUnsigned(
-          TiSession.getInstance(conf).createSnapshot(),
-          table.getId(),
-          table.getMaxShardRowIDBits());
+      allocator.initUnsigned(session.createSnapshot(), table.getId(), table.getMaxShardRowIDBits());
     } else {
-      allocator.initSigned(
-          TiSession.getInstance(conf).createSnapshot(),
-          table.getId(),
-          table.getMaxShardRowIDBits());
+      allocator.initSigned(session.createSnapshot(), table.getId(), table.getMaxShardRowIDBits());
     }
 
     return allocator;
@@ -99,9 +93,8 @@ public final class RowIDAllocator implements Serializable {
 
   // set key value pair to tikv via two phase committer protocol.
   private void set(ByteString key, byte[] value) {
-    TiSession session = TiSession.getInstance(conf);
     TwoPhaseCommitter twoPhaseCommitter =
-        new TwoPhaseCommitter(conf, session.getTimestamp().getVersion());
+        new TwoPhaseCommitter(session, session.getTimestamp().getVersion());
 
     twoPhaseCommitter.prewritePrimaryKey(
         ConcreteBackOffer.newCustomBackOff(BackOffer.PREWRITE_MAX_BACKOFF),

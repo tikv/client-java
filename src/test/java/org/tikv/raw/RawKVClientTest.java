@@ -78,7 +78,8 @@ public class RawKVClientTest {
       data = new TreeMap<>(bsc);
       initialized = true;
     } catch (Exception e) {
-      logger.warn("Cannot initialize raw client, please check whether TiKV is running. Test skipped.", e);
+      logger.warn(
+          "Cannot initialize raw client, please check whether TiKV is running. Test skipped.", e);
     }
   }
 
