@@ -887,6 +887,38 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
+  public List<KvPair> rawBatchGet(BackOffer backoffer, List<ByteString> keys) {
+    if (keys.isEmpty()) {
+      return new ArrayList<>();
+    }
+    Supplier<RawBatchGetRequest> factory =
+        () ->
+            RawBatchGetRequest.newBuilder()
+                .setContext(region.getContext())
+                .addAllKeys(keys)
+                .build();
+    KVErrorHandler<RawBatchGetResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+    RawBatchGetResponse resp =
+        callWithRetry(backoffer, TikvGrpc.getRawBatchGetMethod(), factory, handler);
+    return handleRawBatchGet(resp);
+  }
+
+  private List<KvPair> handleRawBatchGet(RawBatchGetResponse resp) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(region);
+      throw new TiClientInternalException("RawBatchPutResponse failed without a cause");
+    }
+    if (resp.hasRegionError()) {
+      throw new RegionException(resp.getRegionError());
+    }
+    return resp.getPairsList();
+  }
+
   public void rawBatchPut(BackOffer backOffer, List<KvPair> kvPairs) {
     if (kvPairs.isEmpty()) {
       return;

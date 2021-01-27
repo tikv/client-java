@@ -23,13 +23,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.KVClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.GrpcException;
@@ -43,17 +41,20 @@ import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
+import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClient implements AutoCloseable {
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
-  private final ExecutorCompletionService<Object> completionService;
+  private final ExecutorService batchGetThreadPool;
+  private final ExecutorService batchPutThreadPool;
   private static final Logger logger = LoggerFactory.getLogger(RawKVClient.class);
 
   private static final int MAX_RETRY_LIMIT = 3;
   // https://www.github.com/pingcap/tidb/blob/master/store/tikv/rawkv.go
   private static final int MAX_RAW_SCAN_LIMIT = 10240;
   private static final int RAW_BATCH_PUT_SIZE = 16 * 1024;
+  private static final int RAW_BATCH_GET_SIZE = 16 * 1024;
   private static final int RAW_BATCH_PAIR_COUNT = 512;
 
   private static final TiKVException ERR_RETRY_LIMIT_EXCEEDED =
@@ -66,7 +67,8 @@ public class RawKVClient implements AutoCloseable {
     Objects.requireNonNull(clientBuilder, "clientBuilder is null");
     this.conf = session.getConf();
     this.clientBuilder = clientBuilder;
-    this.completionService = new ExecutorCompletionService<>(session.getThreadPoolForBatchPut());
+    this.batchGetThreadPool = session.getThreadPoolForBatchGet();
+    this.batchPutThreadPool = session.getThreadPoolForBatchPut();
   }
 
   @Override
@@ -138,6 +140,27 @@ public class RawKVClient implements AutoCloseable {
       }
     }
     throw ERR_RETRY_LIMIT_EXCEEDED;
+  }
+
+  /**
+   * Get a list of raw key-value pair from TiKV if key exists
+   *
+   * @param keys list of raw key
+   * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
+   */
+  public List<KvPair> batchGet(List<ByteString> keys) {
+    BackOffer backOffer = defaultBackOff();
+    return batchGet(backOffer, keys);
+  }
+
+  private List<KvPair> batchGet(BackOffer backOffer, List<ByteString> keys) {
+    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(keys);
+    List<Batch> batches = new ArrayList<>();
+
+    for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
+      appendBatches(batches, entry.getKey(), entry.getValue(), RAW_BATCH_GET_SIZE);
+    }
+    return sendBatchGet(backOffer, batches);
   }
 
   /**
@@ -253,6 +276,24 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
+  private void appendBatches(
+      List<Batch> batches,
+      TiRegion region,
+      List<ByteString> keys,
+      int limit) {
+    List<ByteString> tmpKeys = new ArrayList<>();
+    for (int i = 0; i < keys.size(); i++) {
+      if (i >= limit) {
+        batches.add(new Batch(region, tmpKeys, new ArrayList<>()));
+        tmpKeys.clear();
+      }
+      tmpKeys.add(keys.get(i));
+    }
+    if (!tmpKeys.isEmpty()) {
+      batches.add(new Batch(region, tmpKeys, new ArrayList<>()));
+    }
+  }
+
   /**
    * Group by list of keys according to its region
    *
@@ -271,6 +312,11 @@ public class RawKVClient implements AutoCloseable {
     return groups;
   }
 
+  private Map<TiRegion, List<ByteString>> groupKeysByRegion(List<ByteString> keys) {
+    return keys.stream()
+        .collect(Collectors.groupingBy(clientBuilder.getRegionManager()::getRegionByKey));
+  }
+
   private static Map<ByteString, ByteString> mapKeysToValues(
       List<ByteString> keys, List<ByteString> values) {
     Map<ByteString, ByteString> map = new HashMap<>();
@@ -286,7 +332,48 @@ public class RawKVClient implements AutoCloseable {
    * @param backOffer current backOffer
    * @param batches list of batch to send
    */
+  private List<KvPair> sendBatchGet(BackOffer backOffer, List<Batch> batches) {
+    ExecutorCompletionService<List<KvPair>> completionService = new ExecutorCompletionService<>(batchGetThreadPool);
+    for (Batch batch : batches) {
+      completionService.submit(
+          () -> {
+            BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
+            try (RegionStoreClient client = clientBuilder.build(batch.region); ) {
+              return client.rawBatchGet(singleBatchBackOffer, batch.keys);
+            } catch (final TiKVException e) {
+              // TODO: any elegant way to re-split the ranges if fails?
+              singleBatchBackOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+              logger.warn("ReSplitting ranges for BatchGetRequest");
+              // recursive calls
+              batchGet(singleBatchBackOffer, batch.keys);
+            }
+            return null;
+          });
+    }
+    try {
+      List<KvPair> results = new ArrayList<>();
+      for (int i = 0; i < batches.size(); i++) {
+        results.addAll(completionService.take().get(BackOffer.RAWKV_MAX_BACKOFF, TimeUnit.SECONDS));
+      }
+      return results;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new TiKVException("Current thread interrupted.", e);
+    } catch (TimeoutException e) {
+      throw new TiKVException("TimeOut Exceeded for current operation. ", e);
+    } catch (ExecutionException e) {
+      throw new TiKVException("Execution exception met.", e);
+    }
+  }
+
+  /**
+   * Send batchPut request concurrently
+   *
+   * @param backOffer current backOffer
+   * @param batches list of batch to send
+   */
   private void sendBatchPut(BackOffer backOffer, List<Batch> batches) {
+    ExecutorCompletionService<Object> completionService = new ExecutorCompletionService<>(batchPutThreadPool);
     for (Batch batch : batches) {
       completionService.submit(
           () -> {
