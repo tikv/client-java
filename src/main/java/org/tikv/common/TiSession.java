@@ -75,6 +75,7 @@ public class TiSession implements AutoCloseable {
     return new TiSession(conf);
   }
 
+  @Deprecated
   public static TiSession getInstance(TiConfiguration conf) {
     synchronized (sessionCachedMap) {
       String key = conf.getPdAddrsString();
@@ -132,11 +133,11 @@ public class TiSession implements AutoCloseable {
   }
 
   public Snapshot createSnapshot() {
-    return new Snapshot(getTimestamp(), this.conf);
+    return new Snapshot(getTimestamp(), this);
   }
 
   public Snapshot createSnapshot(TiTimestamp ts) {
-    return new Snapshot(ts, conf);
+    return new Snapshot(ts, this);
   }
 
   public PDClient getPDClient() {

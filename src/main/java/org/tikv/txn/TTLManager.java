@@ -23,7 +23,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
@@ -64,12 +63,12 @@ public class TTLManager {
   private final ScheduledExecutorService scheduler;
   private final AtomicInteger state;
 
-  public TTLManager(TiConfiguration conf, long startTS, byte[] primaryKey) {
+  public TTLManager(TiSession session, long startTS, byte[] primaryKey) {
     this.startTS = startTS;
     this.primaryLock = ByteString.copyFrom(primaryKey);
     this.state = new AtomicInteger(STATE_UNINITIALIZED);
 
-    this.kvClient = TiSession.getInstance(conf).createTxnClient();
+    this.kvClient = session.createTxnClient();
     this.regionManager = kvClient.getRegionManager();
 
     scheduler =
