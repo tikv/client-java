@@ -39,6 +39,7 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.Batch;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
@@ -225,7 +226,7 @@ public class KVClient implements AutoCloseable {
       for (end = start; end < len && size < batchGetMaxSizeInByte; end++) {
         size += keys.get(end).size();
       }
-      Batch batch = new Batch(region, keys.subList(start, end));
+      Batch batch = new Batch(region, keys.subList(start, end), new ArrayList<>());
       batches.add(batch);
     }
   }
@@ -257,16 +258,5 @@ public class KVClient implements AutoCloseable {
       long version,
       int limit) {
     return new ConcreteScanIterator(conf, builder, startKey, version, limit);
-  }
-
-  /** A Batch containing the region and a list of keys to send */
-  private static final class Batch {
-    private final TiRegion region;
-    private final List<ByteString> keys;
-
-    Batch(TiRegion region, List<ByteString> keys) {
-      this.region = region;
-      this.keys = keys;
-    }
   }
 }

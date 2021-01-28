@@ -64,7 +64,7 @@ public class ConcreteScanIterator extends ScanIterator {
       ByteString endKey,
       long version,
       int limit) {
-    super(conf, builder, startKey, endKey, limit);
+    super(conf, builder, startKey, endKey, limit, false);
     this.version = version;
   }
 

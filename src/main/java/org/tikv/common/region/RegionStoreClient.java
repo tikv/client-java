@@ -959,7 +959,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param keyOnly true if value of KvPair is not needed
    * @return KvPair list
    */
-  private List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
+  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
     Supplier<RawScanRequest> factory =
         () ->
             RawScanRequest.newBuilder()
@@ -979,12 +979,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return rawScanHelper(resp);
   }
 
-  public List<KvPair> rawScan(BackOffer backOffer, ByteString key) {
-    return rawScan(backOffer, key, getConf().getScanBatchSize());
-  }
-
-  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit) {
-    return rawScan(backOffer, key, limit, false);
+  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, boolean keyOnly) {
+    return rawScan(backOffer, key, getConf().getScanBatchSize(), keyOnly);
   }
 
   private List<KvPair> rawScanHelper(RawScanResponse resp) {
