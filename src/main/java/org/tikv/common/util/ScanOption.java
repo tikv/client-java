@@ -31,8 +31,8 @@ public class ScanOption {
     this.keyOnly = keyOnly;
   }
 
-  public ScanBatchBuilder newBuilder() {
-    return new ScanBatchBuilder();
+  public static ScanOptionBuilder newBuilder() {
+    return new ScanOptionBuilder();
   }
 
   public ByteString getStartKey() {
@@ -51,13 +51,13 @@ public class ScanOption {
     return keyOnly;
   }
 
-  public static class ScanBatchBuilder {
+  public static class ScanOptionBuilder {
     private ByteString startKey;
     private ByteString endKey;
     private int limit;
     private boolean keyOnly;
 
-    private ScanBatchBuilder() {
+    private ScanOptionBuilder() {
       this.startKey = ByteString.EMPTY;
       this.endKey = ByteString.EMPTY;
       this.limit = 0;
@@ -68,22 +68,22 @@ public class ScanOption {
       return new ScanOption(startKey, endKey, limit, keyOnly);
     }
 
-    public ScanBatchBuilder setStartKey(ByteString startKey) {
+    public ScanOptionBuilder setStartKey(ByteString startKey) {
       this.startKey = startKey;
       return this;
     }
 
-    public ScanBatchBuilder setEndKey(ByteString endKey) {
+    public ScanOptionBuilder setEndKey(ByteString endKey) {
       this.endKey = endKey;
       return this;
     }
 
-    public ScanBatchBuilder setLimit(int limit) {
+    public ScanOptionBuilder setLimit(int limit) {
       this.limit = limit;
       return this;
     }
 
-    public ScanBatchBuilder setKeyOnly(boolean keyOnly) {
+    public ScanOptionBuilder setKeyOnly(boolean keyOnly) {
       this.keyOnly = keyOnly;
       return this;
     }

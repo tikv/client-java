@@ -44,6 +44,7 @@ public class RawKVClient implements AutoCloseable {
   private final TiConfiguration conf;
   private final ExecutorService batchGetThreadPool;
   private final ExecutorService batchPutThreadPool;
+  private final ExecutorService batchScanThreadPool;
   private static final Logger logger = LoggerFactory.getLogger(RawKVClient.class);
 
   private static final int MAX_RETRY_LIMIT = 3;
@@ -66,6 +67,7 @@ public class RawKVClient implements AutoCloseable {
     this.clientBuilder = clientBuilder;
     this.batchGetThreadPool = session.getThreadPoolForBatchGet();
     this.batchPutThreadPool = session.getThreadPoolForBatchPut();
+    this.batchScanThreadPool = session.getThreadPoolForBatchScan();
   }
 
   @Override
@@ -161,12 +163,36 @@ public class RawKVClient implements AutoCloseable {
   }
 
   public List<List<KvPair>> batchScan(List<ScanOption> ranges) {
-    BackOffer backOffer = defaultBackOff();
-    return batchScan(backOffer, ranges);
-  }
-
-  private List<List<KvPair>> batchScan(BackOffer backOffer, List<ScanOption> ranges) {
-    return new ArrayList<>();
+    if (ranges.isEmpty()) {
+      return new ArrayList<>();
+    }
+    ExecutorCompletionService<Pair<Integer, List<KvPair>>> completionService =
+        new ExecutorCompletionService<>(batchScanThreadPool);
+    int num = 0;
+    for (ScanOption scanOption : ranges) {
+      int i = num;
+      completionService.submit(() -> Pair.create(i, scan(scanOption)));
+      ++num;
+    }
+    List<List<KvPair>> scanResults = new ArrayList<>();
+    for (int i = 0; i < num; i++) {
+      scanResults.add(new ArrayList<>());
+    }
+    for (int i = 0; i < num; i++) {
+      try {
+        Pair<Integer, List<KvPair>> scanResult =
+            completionService.take().get(BackOffer.RAWKV_MAX_BACKOFF, TimeUnit.SECONDS);
+        scanResults.set(scanResult.first, scanResult.second);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new TiKVException("Current thread interrupted.", e);
+      } catch (TimeoutException e) {
+        throw new TiKVException("TimeOut Exceeded for current operation. ", e);
+      } catch (ExecutionException e) {
+        throw new TiKVException("Execution exception met.", e);
+      }
+    }
+    return scanResults;
   }
 
   /**
@@ -229,7 +255,7 @@ public class RawKVClient implements AutoCloseable {
     return result;
   }
 
-  public List<KvPair> scan(ScanOption scanOption) {
+  private List<KvPair> scan(ScanOption scanOption) {
     ByteString startKey = scanOption.getStartKey();
     ByteString endKey = scanOption.getEndKey();
     int limit = scanOption.getLimit();
@@ -340,6 +366,9 @@ public class RawKVClient implements AutoCloseable {
    * @param batches list of batch to send
    */
   private List<KvPair> sendBatchGet(BackOffer backOffer, List<Batch> batches) {
+    if (batches.isEmpty()) {
+      return new ArrayList<>();
+    }
     ExecutorCompletionService<List<KvPair>> completionService =
         new ExecutorCompletionService<>(batchGetThreadPool);
     for (Batch batch : batches) {
