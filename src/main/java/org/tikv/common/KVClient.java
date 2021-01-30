@@ -19,7 +19,6 @@ package org.tikv.common;
 
 import static org.tikv.common.util.ClientUtils.getKvPairs;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -28,7 +27,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,23 +49,15 @@ public class KVClient implements AutoCloseable {
   private final TiConfiguration conf;
   private final ExecutorService batchGetThreadPool;
 
-  public KVClient(TiConfiguration conf, RegionStoreClientBuilder clientBuilder) {
-    Objects.requireNonNull(conf, "conf is null");
+  public KVClient(TiSession session, RegionStoreClientBuilder clientBuilder) {
     Objects.requireNonNull(clientBuilder, "clientBuilder is null");
-    this.conf = conf;
+    this.conf = session.getConf();
     this.clientBuilder = clientBuilder;
-    batchGetThreadPool =
-        Executors.newFixedThreadPool(
-            conf.getKvClientConcurrency(),
-            new ThreadFactoryBuilder().setNameFormat("kvclient-pool-%d").setDaemon(true).build());
+    this.batchGetThreadPool = session.getThreadPoolForBatchGet();
   }
 
   @Override
-  public void close() {
-    if (batchGetThreadPool != null) {
-      batchGetThreadPool.shutdownNow();
-    }
-  }
+  public void close() {}
 
   /**
    * Get a key-value pair from TiKV if key exists

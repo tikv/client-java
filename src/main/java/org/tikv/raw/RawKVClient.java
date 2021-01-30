@@ -304,38 +304,6 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Group by list of keys according to its region
-   *
-   * @param keys keys
-   * @return a mapping of keys and their region
-   */
-  private Map<TiRegion, List<ByteString>> groupKeysByRegion(Set<ByteString> keys) {
-    Map<TiRegion, List<ByteString>> groups = new HashMap<>();
-    TiRegion lastRegion = null;
-    for (ByteString key : keys) {
-      if (lastRegion == null || !lastRegion.contains(key)) {
-        lastRegion = clientBuilder.getRegionManager().getRegionByKey(key);
-      }
-      groups.computeIfAbsent(lastRegion, k -> new ArrayList<>()).add(key);
-    }
-    return groups;
-  }
-
-  private Map<TiRegion, List<ByteString>> groupKeysByRegion(List<ByteString> keys) {
-    return keys.stream()
-        .collect(Collectors.groupingBy(clientBuilder.getRegionManager()::getRegionByKey));
-  }
-
-  private static Map<ByteString, ByteString> mapKeysToValues(
-      List<ByteString> keys, List<ByteString> values) {
-    Map<ByteString, ByteString> map = new HashMap<>();
-    for (int i = 0; i < keys.size(); i++) {
-      map.put(keys.get(i), values.get(i));
-    }
-    return map;
-  }
-
   private void doSendBatchPut(BackOffer backOffer, Map<ByteString, ByteString> kvPairs) {
     ExecutorCompletionService<Object> completionService =
         new ExecutorCompletionService<>(batchPutThreadPool);
@@ -468,6 +436,38 @@ public class RawKVClient implements AutoCloseable {
       results.addAll(batchResult);
     }
     return results;
+  }
+
+  /**
+   * Group by list of keys according to its region
+   *
+   * @param keys keys
+   * @return a mapping of keys and their region
+   */
+  private Map<TiRegion, List<ByteString>> groupKeysByRegion(Set<ByteString> keys) {
+    Map<TiRegion, List<ByteString>> groups = new HashMap<>();
+    TiRegion lastRegion = null;
+    for (ByteString key : keys) {
+      if (lastRegion == null || !lastRegion.contains(key)) {
+        lastRegion = clientBuilder.getRegionManager().getRegionByKey(key);
+      }
+      groups.computeIfAbsent(lastRegion, k -> new ArrayList<>()).add(key);
+    }
+    return groups;
+  }
+
+  private Map<TiRegion, List<ByteString>> groupKeysByRegion(List<ByteString> keys) {
+    return keys.stream()
+        .collect(Collectors.groupingBy(clientBuilder.getRegionManager()::getRegionByKey));
+  }
+
+  private static Map<ByteString, ByteString> mapKeysToValues(
+      List<ByteString> keys, List<ByteString> values) {
+    Map<ByteString, ByteString> map = new HashMap<>();
+    for (int i = 0; i < keys.size(); i++) {
+      map.put(keys.get(i), values.get(i));
+    }
+    return map;
   }
 
   private Iterator<KvPair> rawScanIterator(
