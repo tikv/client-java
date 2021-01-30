@@ -16,7 +16,9 @@
 package org.tikv.common.util;
 
 import com.google.protobuf.ByteString;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.tikv.common.region.TiRegion;
 
 /** A Batch containing the region, a list of keys and/or values to send */
@@ -24,10 +26,28 @@ public class Batch {
   public final TiRegion region;
   public final List<ByteString> keys;
   public final List<ByteString> values;
+  public final Map<ByteString, ByteString> map;
+
+  public Batch(TiRegion region, List<ByteString> keys) {
+    this.region = region;
+    this.keys = keys;
+    this.values = null;
+    this.map = null;
+  }
 
   public Batch(TiRegion region, List<ByteString> keys, List<ByteString> values) {
     this.region = region;
     this.keys = keys;
     this.values = values;
+    this.map = toMap(keys, values);
+  }
+
+  private Map<ByteString, ByteString> toMap(List<ByteString> keys, List<ByteString> values) {
+    assert keys.size() == values.size();
+    Map<ByteString, ByteString> kvMap = new HashMap<>();
+    for (int i = 0; i < keys.size(); i++) {
+      kvMap.put(keys.get(i), values.get(i));
+    }
+    return kvMap;
   }
 }

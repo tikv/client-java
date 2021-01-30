@@ -17,6 +17,8 @@
 
 package org.tikv.common;
 
+import static org.tikv.common.util.ClientUtils.getKvPairs;
+
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
@@ -24,7 +26,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,14 +49,14 @@ public class KVClient implements AutoCloseable {
   private static final int BATCH_GET_SIZE = 16 * 1024;
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
-  private final ExecutorService executorService;
+  private final ExecutorService batchGetThreadPool;
 
   public KVClient(TiConfiguration conf, RegionStoreClientBuilder clientBuilder) {
     Objects.requireNonNull(conf, "conf is null");
     Objects.requireNonNull(clientBuilder, "clientBuilder is null");
     this.conf = conf;
     this.clientBuilder = clientBuilder;
-    executorService =
+    batchGetThreadPool =
         Executors.newFixedThreadPool(
             conf.getKvClientConcurrency(),
             new ThreadFactoryBuilder().setNameFormat("kvclient-pool-%d").setDaemon(true).build());
@@ -63,8 +64,8 @@ public class KVClient implements AutoCloseable {
 
   @Override
   public void close() {
-    if (executorService != null) {
-      executorService.shutdownNow();
+    if (batchGetThreadPool != null) {
+      batchGetThreadPool.shutdownNow();
     }
   }
 
@@ -135,7 +136,7 @@ public class KVClient implements AutoCloseable {
 
   private List<KvPair> doSendBatchGet(BackOffer backOffer, List<ByteString> keys, long version) {
     ExecutorCompletionService<List<KvPair>> completionService =
-        new ExecutorCompletionService<>(executorService);
+        new ExecutorCompletionService<>(batchGetThreadPool);
 
     Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(keys);
     List<Batch> batches = new ArrayList<>();
@@ -150,18 +151,7 @@ public class KVClient implements AutoCloseable {
           () -> doSendBatchGetInBatchesWithRetry(singleBatchBackOffer, batch, version));
     }
 
-    try {
-      List<KvPair> result = new ArrayList<>();
-      for (int i = 0; i < batches.size(); i++) {
-        result.addAll(completionService.take().get());
-      }
-      return result;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new TiKVException("Current thread interrupted.", e);
-    } catch (ExecutionException e) {
-      throw new TiKVException("Execution exception met.", e);
-    }
+    return getKvPairs(completionService, batches);
   }
 
   private List<KvPair> doSendBatchGetInBatchesWithRetry(
@@ -226,7 +216,7 @@ public class KVClient implements AutoCloseable {
       for (end = start; end < len && size < batchGetMaxSizeInByte; end++) {
         size += keys.get(end).size();
       }
-      Batch batch = new Batch(region, keys.subList(start, end), new ArrayList<>());
+      Batch batch = new Batch(region, keys.subList(start, end));
       batches.add(batch);
     }
   }

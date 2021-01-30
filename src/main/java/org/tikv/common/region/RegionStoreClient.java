@@ -940,6 +940,15 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     handleRawBatchPut(resp);
   }
 
+  public void rawBatchPut(BackOffer backOffer, Batch batch) {
+    List<KvPair> pairs = new ArrayList<>();
+    for (int i = 0; i < batch.keys.size(); i++) {
+      pairs.add(
+          KvPair.newBuilder().setKey(batch.keys.get(i)).setValue(batch.values.get(i)).build());
+    }
+    rawBatchPut(backOffer, pairs);
+  }
+
   private void handleRawBatchPut(RawBatchPutResponse resp) {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
