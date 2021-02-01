@@ -40,7 +40,9 @@ public class TiConfiguration implements Serializable {
   private static final int MAX_REQUEST_KEY_RANGE_SIZE = 20000;
   private static final int DEF_INDEX_SCAN_CONCURRENCY = 5;
   private static final int DEF_TABLE_SCAN_CONCURRENCY = 512;
+  private static final int DEF_BATCH_GET_CONCURRENCY = 20;
   private static final int DEF_BATCH_PUT_CONCURRENCY = 20;
+  private static final int DEF_BATCH_SCAN_CONCURRENCY = 5;
   private static final CommandPri DEF_COMMAND_PRIORITY = CommandPri.Low;
   private static final IsolationLevel DEF_ISOLATION_LEVEL = IsolationLevel.SI;
   private static final boolean DEF_SHOW_ROWID = false;
@@ -65,7 +67,9 @@ public class TiConfiguration implements Serializable {
   private int downgradeThreshold = DEF_REGION_SCAN_DOWNGRADE_THRESHOLD;
   private int indexScanConcurrency = DEF_INDEX_SCAN_CONCURRENCY;
   private int tableScanConcurrency = DEF_TABLE_SCAN_CONCURRENCY;
+  private int batchGetConcurrency = DEF_BATCH_GET_CONCURRENCY;
   private int batchPutConcurrency = DEF_BATCH_PUT_CONCURRENCY;
+  private int batchScanConcurrency = DEF_BATCH_SCAN_CONCURRENCY;
   private CommandPri commandPriority = DEF_COMMAND_PRIORITY;
   private IsolationLevel isolationLevel = DEF_ISOLATION_LEVEL;
   private int maxRequestKeyRangeSize = MAX_REQUEST_KEY_RANGE_SIZE;
@@ -204,12 +208,28 @@ public class TiConfiguration implements Serializable {
     this.tableScanConcurrency = tableScanConcurrency;
   }
 
+  public int getBatchGetConcurrency() {
+    return batchGetConcurrency;
+  }
+
+  public void setBatchGetConcurrency(int batchGetConcurrency) {
+    this.batchGetConcurrency = batchGetConcurrency;
+  }
+
   public int getBatchPutConcurrency() {
     return batchPutConcurrency;
   }
 
   public void setBatchPutConcurrency(int batchPutConcurrency) {
     this.batchPutConcurrency = batchPutConcurrency;
+  }
+
+  public int getBatchScanConcurrency() {
+    return batchScanConcurrency;
+  }
+
+  public void setBatchScanConcurrency(int batchScanConcurrency) {
+    this.batchScanConcurrency = batchScanConcurrency;
   }
 
   public CommandPri getCommandPriority() {

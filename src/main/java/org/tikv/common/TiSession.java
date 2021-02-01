@@ -59,7 +59,9 @@ public class TiSession implements AutoCloseable {
   private volatile Catalog catalog;
   private volatile ExecutorService indexScanThreadPool;
   private volatile ExecutorService tableScanThreadPool;
+  private volatile ExecutorService batchGetThreadPool;
   private volatile ExecutorService batchPutThreadPool;
+  private volatile ExecutorService batchScanThreadPool;
   private volatile RegionManager regionManager;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private boolean isClosed = false;
@@ -225,6 +227,38 @@ public class TiSession implements AutoCloseable {
                   new ThreadFactoryBuilder().setDaemon(true).build());
         }
         res = batchPutThreadPool;
+      }
+    }
+    return res;
+  }
+
+  public ExecutorService getThreadPoolForBatchGet() {
+    ExecutorService res = batchGetThreadPool;
+    if (res == null) {
+      synchronized (this) {
+        if (batchGetThreadPool == null) {
+          batchGetThreadPool =
+              Executors.newFixedThreadPool(
+                  conf.getBatchGetConcurrency(),
+                  new ThreadFactoryBuilder().setDaemon(true).build());
+        }
+        res = batchGetThreadPool;
+      }
+    }
+    return res;
+  }
+
+  public ExecutorService getThreadPoolForBatchScan() {
+    ExecutorService res = batchScanThreadPool;
+    if (res == null) {
+      synchronized (this) {
+        if (batchScanThreadPool == null) {
+          batchScanThreadPool =
+              Executors.newFixedThreadPool(
+                  conf.getBatchScanConcurrency(),
+                  new ThreadFactoryBuilder().setDaemon(true).build());
+        }
+        res = batchScanThreadPool;
       }
     }
     return res;

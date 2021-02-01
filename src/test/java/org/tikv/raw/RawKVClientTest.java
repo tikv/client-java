@@ -17,6 +17,7 @@ import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.FastByteComparisons;
+import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest {
@@ -26,7 +27,8 @@ public class RawKVClientTest {
   private static final int TEST_CASES = 10000;
   private static final int WORKER_CNT = 100;
   private static final ByteString RAW_START_KEY = ByteString.copyFromUtf8(RAW_PREFIX);
-  private static final ByteString RAW_END_KEY = Key.toRawKey(RAW_START_KEY).next().toByteString();
+  private static final ByteString RAW_END_KEY =
+      Key.toRawKey(RAW_START_KEY).nextPrefix().toByteString();
   private RawKVClient client;
   private static final List<ByteString> orderedKeys;
   private static final List<ByteString> randomKeys;
@@ -130,15 +132,15 @@ public class RawKVClientTest {
   @Test
   public void validate() {
     if (!initialized) return;
-    baseTest(100, 100, 100, 100, false, false);
-    baseTest(100, 100, 100, 100, false, true);
+    baseTest(100, 100, 100, 100, false, false, false, false);
+    baseTest(100, 100, 100, 100, false, true, true, true);
   }
 
   /** Example of benchmarking base test */
   public void benchmark() {
     if (!initialized) return;
-    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, false);
-    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, true);
+    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, false, false, false);
+    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, true, true, true);
   }
 
   private void baseTest(
@@ -147,7 +149,9 @@ public class RawKVClientTest {
       int scanCases,
       int deleteCases,
       boolean benchmark,
-      boolean batchPut) {
+      boolean batchPut,
+      boolean batchGet,
+      boolean batchScan) {
     if (putCases > KEY_POOL_SIZE) {
       logger.info("Number of distinct orderedKeys required exceeded pool size " + KEY_POOL_SIZE);
       return;
@@ -165,8 +169,16 @@ public class RawKVClientTest {
       } else {
         rawPutTest(putCases, benchmark);
       }
-      rawGetTest(getCases, benchmark);
-      rawScanTest(scanCases, benchmark);
+      if (batchGet) {
+        rawBatchGetTest(getCases, benchmark);
+      } else {
+        rawGetTest(getCases, benchmark);
+      }
+      if (batchScan) {
+        rawBatchScanTest(scanCases, benchmark);
+      } else {
+        rawScanTest(scanCases, benchmark);
+      }
       rawDeleteTest(deleteCases, benchmark);
 
       prepare();
@@ -338,8 +350,44 @@ public class RawKVClientTest {
     }
   }
 
+  private void rawBatchGetTest(int getCases, boolean benchmark) {
+    logger.info("batchGet testing");
+    if (benchmark) {
+      long start = System.currentTimeMillis();
+      int base = getCases / WORKER_CNT;
+      for (int cnt = 0; cnt < WORKER_CNT; cnt++) {
+        int i = cnt;
+        completionService.submit(
+            () -> {
+              List<ByteString> keys = new ArrayList<>();
+              for (int j = 0; j < base; j++) {
+                int num = i * base + j;
+                ByteString key = orderedKeys.get(num);
+                keys.add(key);
+              }
+              client.batchGet(keys);
+              return null;
+            });
+      }
+      awaitTimeOut(200);
+      long end = System.currentTimeMillis();
+      logger.info(getCases + " batchGet: " + (end - start) / 1000.0 + "s");
+    } else {
+      int i = 0;
+      List<ByteString> keys = new ArrayList<>();
+      for (Map.Entry<ByteString, ByteString> pair : data.entrySet()) {
+        keys.add(pair.getKey());
+        i++;
+        if (i >= getCases) {
+          break;
+        }
+      }
+      checkBatchGet(keys);
+    }
+  }
+
   private void rawScanTest(int scanCases, boolean benchmark) {
-    logger.info("rawScan testing");
+    logger.info("scan testing");
     if (benchmark) {
       long start = System.currentTimeMillis();
       int base = scanCases / WORKER_CNT;
@@ -377,6 +425,57 @@ public class RawKVClientTest {
     }
   }
 
+  private void rawBatchScanTest(int scanCases, boolean benchmark) {
+    logger.info("batchScan testing");
+    if (benchmark) {
+      long start = System.currentTimeMillis();
+      int base = scanCases / WORKER_CNT;
+      for (int cnt = 0; cnt < WORKER_CNT; cnt++) {
+        int i = cnt;
+        completionService.submit(
+            () -> {
+              List<ScanOption> scanOptions = new ArrayList<>();
+              for (int j = 0; j < base; j++) {
+                int num = i * base + j;
+                ByteString startKey = randomKeys.get(num), endKey = randomKeys.get(num + 1);
+                if (bsc.compare(startKey, endKey) > 0) {
+                  ByteString tmp = startKey;
+                  startKey = endKey;
+                  endKey = tmp;
+                }
+                ScanOption scanOption =
+                    ScanOption.newBuilder()
+                        .setStartKey(startKey)
+                        .setEndKey(endKey)
+                        .setLimit(limit)
+                        .build();
+                scanOptions.add(scanOption);
+              }
+              client.batchScan(scanOptions);
+              return null;
+            });
+      }
+      awaitTimeOut(200);
+      long end = System.currentTimeMillis();
+      logger.info(scanCases + " batchScan: " + (end - start) / 1000.0 + "s");
+    } else {
+      List<ScanOption> scanOptions = new ArrayList<>();
+      for (int i = 0; i < scanCases; i++) {
+        ByteString startKey = randomKeys.get(r.nextInt(KEY_POOL_SIZE)),
+            endKey = randomKeys.get(r.nextInt(KEY_POOL_SIZE));
+        if (bsc.compare(startKey, endKey) > 0) {
+          ByteString tmp = startKey;
+          startKey = endKey;
+          endKey = tmp;
+        }
+        ScanOption scanOption =
+            ScanOption.newBuilder().setStartKey(startKey).setEndKey(endKey).setLimit(limit).build();
+        scanOptions.add(scanOption);
+      }
+      checkBatchScan(scanOptions);
+    }
+  }
+
   private void rawDeleteTest(int deleteCases, boolean benchmark) {
     logger.info("delete testing");
     if (benchmark) {
@@ -406,6 +505,14 @@ public class RawKVClientTest {
           break;
         }
       }
+    }
+  }
+
+  private void checkBatchGet(List<ByteString> keys) {
+    List<Kvrpcpb.KvPair> result = client.batchGet(keys);
+    for (Kvrpcpb.KvPair kvPair : result) {
+      assert data.containsKey(kvPair.getKey());
+      assert kvPair.getValue().equals(data.get(kvPair.getKey()));
     }
   }
 
@@ -443,6 +550,26 @@ public class RawKVClientTest {
                         .build())
             .collect(Collectors.toList()),
         limit);
+  }
+
+  private void checkBatchScan(List<ScanOption> scanOptions) {
+    List<List<Kvrpcpb.KvPair>> result = client.batchScan(scanOptions);
+    int i = 0;
+    for (ScanOption scanOption : scanOptions) {
+      List<Kvrpcpb.KvPair> partialResult =
+          data.subMap(scanOption.getStartKey(), scanOption.getEndKey())
+              .entrySet()
+              .stream()
+              .map(
+                  kvPair ->
+                      Kvrpcpb.KvPair.newBuilder()
+                          .setKey(kvPair.getKey())
+                          .setValue(kvPair.getValue())
+                          .build())
+              .collect(Collectors.toList());
+      assert result.get(i).equals(partialResult);
+      i++;
+    }
   }
 
   private void checkDelete(ByteString key) {

@@ -887,6 +887,38 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
+  public List<KvPair> rawBatchGet(BackOffer backoffer, List<ByteString> keys) {
+    if (keys.isEmpty()) {
+      return new ArrayList<>();
+    }
+    Supplier<RawBatchGetRequest> factory =
+        () ->
+            RawBatchGetRequest.newBuilder()
+                .setContext(region.getContext())
+                .addAllKeys(keys)
+                .build();
+    KVErrorHandler<RawBatchGetResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+    RawBatchGetResponse resp =
+        callWithRetry(backoffer, TikvGrpc.getRawBatchGetMethod(), factory, handler);
+    return handleRawBatchGet(resp);
+  }
+
+  private List<KvPair> handleRawBatchGet(RawBatchGetResponse resp) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(region);
+      throw new TiClientInternalException("RawBatchPutResponse failed without a cause");
+    }
+    if (resp.hasRegionError()) {
+      throw new RegionException(resp.getRegionError());
+    }
+    return resp.getPairsList();
+  }
+
   public void rawBatchPut(BackOffer backOffer, List<KvPair> kvPairs) {
     if (kvPairs.isEmpty()) {
       return;
@@ -908,6 +940,15 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     handleRawBatchPut(resp);
   }
 
+  public void rawBatchPut(BackOffer backOffer, Batch batch) {
+    List<KvPair> pairs = new ArrayList<>();
+    for (int i = 0; i < batch.keys.size(); i++) {
+      pairs.add(
+          KvPair.newBuilder().setKey(batch.keys.get(i)).setValue(batch.values.get(i)).build());
+    }
+    rawBatchPut(backOffer, pairs);
+  }
+
   private void handleRawBatchPut(RawBatchPutResponse resp) {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
@@ -927,7 +968,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param keyOnly true if value of KvPair is not needed
    * @return KvPair list
    */
-  private List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
+  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
     Supplier<RawScanRequest> factory =
         () ->
             RawScanRequest.newBuilder()
@@ -947,12 +988,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return rawScanHelper(resp);
   }
 
-  public List<KvPair> rawScan(BackOffer backOffer, ByteString key) {
-    return rawScan(backOffer, key, getConf().getScanBatchSize());
-  }
-
-  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit) {
-    return rawScan(backOffer, key, limit, false);
+  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, boolean keyOnly) {
+    return rawScan(backOffer, key, getConf().getScanBatchSize(), keyOnly);
   }
 
   private List<KvPair> rawScanHelper(RawScanResponse resp) {

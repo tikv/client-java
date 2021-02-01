@@ -35,6 +35,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
   protected ByteString startKey;
   protected int index = -1;
   protected int limit;
+  protected boolean keyOnly;
   protected boolean endOfScan = false;
 
   protected Key endKey;
@@ -46,7 +47,8 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
       RegionStoreClientBuilder builder,
       ByteString startKey,
       ByteString endKey,
-      int limit) {
+      int limit,
+      boolean keyOnly) {
     this.startKey = requireNonNull(startKey, "start key is null");
     if (startKey.isEmpty()) {
       throw new IllegalArgumentException("start key cannot be empty");
@@ -54,6 +56,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
     this.endKey = Key.toRawKey(requireNonNull(endKey, "end key is null"));
     this.hasEndKey = !endKey.equals(ByteString.EMPTY);
     this.limit = limit;
+    this.keyOnly = keyOnly;
     this.conf = conf;
     this.builder = builder;
   }

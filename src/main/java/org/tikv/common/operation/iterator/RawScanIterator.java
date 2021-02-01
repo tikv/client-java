@@ -35,8 +35,9 @@ public class RawScanIterator extends ScanIterator {
       RegionStoreClientBuilder builder,
       ByteString startKey,
       ByteString endKey,
-      int limit) {
-    super(conf, builder, startKey, endKey, limit);
+      int limit,
+      boolean keyOnly) {
+    super(conf, builder, startKey, endKey, limit, keyOnly);
   }
 
   TiRegion loadCurrentRegionToCache() throws GrpcException {
@@ -48,7 +49,7 @@ public class RawScanIterator extends ScanIterator {
           currentCache = null;
         } else {
           try {
-            currentCache = client.rawScan(backOffer, startKey, limit);
+            currentCache = client.rawScan(backOffer, startKey, limit, keyOnly);
           } catch (final TiKVException e) {
             backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
             continue;

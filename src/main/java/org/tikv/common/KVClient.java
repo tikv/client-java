@@ -17,17 +17,16 @@
 
 package org.tikv.common;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import static org.tikv.common.util.ClientUtils.getKvPairs;
+
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +38,7 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.Batch;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
@@ -47,25 +47,17 @@ public class KVClient implements AutoCloseable {
   private static final int BATCH_GET_SIZE = 16 * 1024;
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
-  private final ExecutorService executorService;
+  private final ExecutorService batchGetThreadPool;
 
-  public KVClient(TiConfiguration conf, RegionStoreClientBuilder clientBuilder) {
-    Objects.requireNonNull(conf, "conf is null");
+  public KVClient(TiSession session, RegionStoreClientBuilder clientBuilder) {
     Objects.requireNonNull(clientBuilder, "clientBuilder is null");
-    this.conf = conf;
+    this.conf = session.getConf();
     this.clientBuilder = clientBuilder;
-    executorService =
-        Executors.newFixedThreadPool(
-            conf.getKvClientConcurrency(),
-            new ThreadFactoryBuilder().setNameFormat("kvclient-pool-%d").setDaemon(true).build());
+    this.batchGetThreadPool = session.getThreadPoolForBatchGet();
   }
 
   @Override
-  public void close() {
-    if (executorService != null) {
-      executorService.shutdownNow();
-    }
-  }
+  public void close() {}
 
   /**
    * Get a key-value pair from TiKV if key exists
@@ -134,7 +126,7 @@ public class KVClient implements AutoCloseable {
 
   private List<KvPair> doSendBatchGet(BackOffer backOffer, List<ByteString> keys, long version) {
     ExecutorCompletionService<List<KvPair>> completionService =
-        new ExecutorCompletionService<>(executorService);
+        new ExecutorCompletionService<>(batchGetThreadPool);
 
     Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(keys);
     List<Batch> batches = new ArrayList<>();
@@ -149,18 +141,7 @@ public class KVClient implements AutoCloseable {
           () -> doSendBatchGetInBatchesWithRetry(singleBatchBackOffer, batch, version));
     }
 
-    try {
-      List<KvPair> result = new ArrayList<>();
-      for (int i = 0; i < batches.size(); i++) {
-        result.addAll(completionService.take().get());
-      }
-      return result;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new TiKVException("Current thread interrupted.", e);
-    } catch (ExecutionException e) {
-      throw new TiKVException("Execution exception met.", e);
-    }
+    return getKvPairs(completionService, batches);
   }
 
   private List<KvPair> doSendBatchGetInBatchesWithRetry(
@@ -257,16 +238,5 @@ public class KVClient implements AutoCloseable {
       long version,
       int limit) {
     return new ConcreteScanIterator(conf, builder, startKey, version, limit);
-  }
-
-  /** A Batch containing the region and a list of keys to send */
-  private static final class Batch {
-    private final TiRegion region;
-    private final List<ByteString> keys;
-
-    Batch(TiRegion region, List<ByteString> keys) {
-      this.region = region;
-      this.keys = keys;
-    }
   }
 }

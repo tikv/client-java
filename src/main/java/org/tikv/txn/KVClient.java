@@ -15,10 +15,11 @@
 
 package org.tikv.txn;
 
+import static org.tikv.common.util.ClientUtils.getKvPairs;
+
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,6 +35,7 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.Batch;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
@@ -147,18 +149,7 @@ public class KVClient implements AutoCloseable {
           () -> doSendBatchGetInBatchesWithRetry(singleBatchBackOffer, batch, version));
     }
 
-    try {
-      List<Kvrpcpb.KvPair> result = new ArrayList<>();
-      for (int i = 0; i < batches.size(); i++) {
-        result.addAll(completionService.take().get());
-      }
-      return result;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new TiKVException("Current thread interrupted.", e);
-    } catch (ExecutionException e) {
-      throw new TiKVException("Execution exception met.", e);
-    }
+    return getKvPairs(completionService, batches);
   }
 
   private List<Kvrpcpb.KvPair> doSendBatchGetInBatchesWithRetry(
@@ -256,16 +247,5 @@ public class KVClient implements AutoCloseable {
       long version,
       int limit) {
     return new ConcreteScanIterator(conf, builder, startKey, version, limit);
-  }
-
-  /** A Batch containing the region and a list of keys to send */
-  private static final class Batch {
-    private final TiRegion region;
-    private final List<ByteString> keys;
-
-    Batch(TiRegion region, List<ByteString> keys) {
-      this.region = region;
-      this.keys = keys;
-    }
   }
 }
