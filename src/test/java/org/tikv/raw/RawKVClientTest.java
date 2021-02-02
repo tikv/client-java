@@ -132,15 +132,15 @@ public class RawKVClientTest {
   @Test
   public void validate() {
     if (!initialized) return;
-    baseTest(100, 100, 100, 100, false, false, false, false);
-    baseTest(100, 100, 100, 100, false, true, true, true);
+    baseTest(100, 100, 100, 100, false, false, false, false, false);
+    baseTest(100, 100, 100, 100, false, true, true, true, true);
   }
 
   /** Example of benchmarking base test */
   public void benchmark() {
     if (!initialized) return;
-    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, false, false, false);
-    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, true, true, true);
+    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, false, false, false, false);
+    baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, true, true, true, true);
   }
 
   private void baseTest(
@@ -151,7 +151,8 @@ public class RawKVClientTest {
       boolean benchmark,
       boolean batchPut,
       boolean batchGet,
-      boolean batchScan) {
+      boolean batchScan,
+      boolean deleteRange) {
     if (putCases > KEY_POOL_SIZE) {
       logger.info("Number of distinct orderedKeys required exceeded pool size " + KEY_POOL_SIZE);
       return;
@@ -179,7 +180,11 @@ public class RawKVClientTest {
       } else {
         rawScanTest(scanCases, benchmark);
       }
-      rawDeleteTest(deleteCases, benchmark);
+      if (deleteRange) {
+        rawDeleteRangeTest(benchmark);
+      } else {
+        rawDeleteTest(deleteCases, benchmark);
+      }
 
       prepare();
     } catch (final TiKVException e) {
@@ -508,6 +513,31 @@ public class RawKVClientTest {
     }
   }
 
+  private void rawDeleteRangeTest(boolean benchmark) {
+    logger.info("deleteRange testing");
+    if (benchmark) {
+      long start = System.currentTimeMillis();
+      ByteString startKey = randomKeys.get(0), endKey = randomKeys.get(1);
+      if (bsc.compare(startKey, endKey) > 0) {
+        ByteString tmp = startKey;
+        startKey = endKey;
+        endKey = tmp;
+      }
+      client.deleteRange(startKey, endKey);
+      long end = System.currentTimeMillis();
+      logger.info("deleteRange: " + (end - start) / 1000.0 + "s");
+    } else {
+      ByteString startKey = randomKeys.get(r.nextInt(KEY_POOL_SIZE)),
+          endKey = randomKeys.get(r.nextInt(KEY_POOL_SIZE));
+      if (bsc.compare(startKey, endKey) > 0) {
+        ByteString tmp = startKey;
+        startKey = endKey;
+        endKey = tmp;
+      }
+      checkDeleteRange(startKey, endKey);
+    }
+  }
+
   private void checkBatchGet(List<ByteString> keys) {
     List<Kvrpcpb.KvPair> result = client.batchGet(keys);
     for (Kvrpcpb.KvPair kvPair : result) {
@@ -575,6 +605,12 @@ public class RawKVClientTest {
   private void checkDelete(ByteString key) {
     client.delete(key);
     checkEmpty(key);
+  }
+
+  private void checkDeleteRange(ByteString startKey, ByteString endKey) {
+    client.deleteRange(startKey, endKey);
+    List<Kvrpcpb.KvPair> result = client.scan(startKey, endKey, limit);
+    assert result.isEmpty();
   }
 
   private void checkEmpty(ByteString key) {

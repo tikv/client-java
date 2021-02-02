@@ -1003,6 +1003,35 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return resp.getKvsList();
   }
 
+  public void rawDeleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
+    Supplier<RawDeleteRangeRequest> factory =
+        () ->
+            RawDeleteRangeRequest.newBuilder()
+                .setContext(region.getContext())
+                .setStartKey(startKey)
+                .setEndKey(endKey)
+                .build();
+
+    KVErrorHandler<RawDeleteRangeResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+    RawDeleteRangeResponse resp = callWithRetry(backOffer, TikvGrpc.getRawDeleteRangeMethod(), factory, handler);
+    rawDeleteRangeHelper(resp);
+  }
+
+  private void rawDeleteRangeHelper(RawDeleteRangeResponse resp) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(region);
+      throw new TiClientInternalException("RawDeleteRangeResponse failed without a cause");
+    }
+    if (resp.hasRegionError()) {
+      throw new RegionException(resp.getRegionError());
+    }
+  }
+
   public enum RequestTypes {
     REQ_TYPE_SELECT(101),
     REQ_TYPE_INDEX(102),
