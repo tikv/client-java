@@ -184,6 +184,15 @@ public class RawKVClient implements AutoCloseable {
     return scan(startKey, endKey, limit, false);
   }
 
+  /**
+   * Scan raw key-value pairs from TiKV in range [startKey, endKey)
+   *
+   * @param startKey raw start key, inclusive
+   * @param endKey raw end key, exclusive
+   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
+   * @param keyOnly whether to scan in key-only mode
+   * @return list of key-value pairs in range
+   */
   public List<KvPair> scan(ByteString startKey, ByteString endKey, int limit, boolean keyOnly) {
     Iterator<KvPair> iterator =
         rawScanIterator(conf, clientBuilder, startKey, endKey, limit, keyOnly);
@@ -203,6 +212,14 @@ public class RawKVClient implements AutoCloseable {
     return scan(startKey, limit, false);
   }
 
+  /**
+   * Scan raw key-value pairs from TiKV in range [startKey, ♾)
+   *
+   * @param startKey raw start key, inclusive
+   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
+   * @param keyOnly whether to scan in key-only mode
+   * @return list of key-value pairs in range
+   */
   public List<KvPair> scan(ByteString startKey, int limit, boolean keyOnly) {
     return scan(startKey, ByteString.EMPTY, limit, keyOnly);
   }
@@ -218,6 +235,14 @@ public class RawKVClient implements AutoCloseable {
     return scan(startKey, endKey, false);
   }
 
+  /**
+   * Scan all raw key-value pairs from TiKV in range [startKey, endKey)
+   *
+   * @param startKey raw start key, inclusive
+   * @param endKey raw end key, exclusive
+   * @param keyOnly whether to scan in key-only mode
+   * @return list of key-value pairs in range
+   */
   public List<KvPair> scan(ByteString startKey, ByteString endKey, boolean keyOnly) {
     List<KvPair> result = new ArrayList<>();
     while (true) {
@@ -238,6 +263,26 @@ public class RawKVClient implements AutoCloseable {
     int limit = scanOption.getLimit();
     boolean keyOnly = scanOption.isKeyOnly();
     return scan(startKey, endKey, limit, keyOnly);
+  }
+
+  /**
+   * Scan keys with prefix
+   *
+   * @param prefixKey prefix key
+   * @param limit limit of keys retrieved
+   * @param keyOnly whether to scan in keyOnly mode
+   * @return kvPairs with the specified prefix
+   */
+  public List<KvPair> scanPrefix(ByteString prefixKey, int limit, boolean keyOnly) {
+    return scan(prefixKey, Key.toRawKey(prefixKey).nextPrefix().toByteString(), limit, keyOnly);
+  }
+
+  public List<KvPair> scanPrefix(ByteString prefixKey) {
+    return scan(prefixKey, Key.toRawKey(prefixKey).nextPrefix().toByteString());
+  }
+
+  public List<KvPair> scanPrefix(ByteString prefixKey, boolean keyOnly) {
+    return scan(prefixKey, Key.toRawKey(prefixKey).nextPrefix().toByteString(), keyOnly);
   }
 
   /**
