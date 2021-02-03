@@ -260,8 +260,9 @@ public class RawKVClient implements AutoCloseable {
 
   /**
    * Delete all raw key-value pairs in range [startKey, endKey) from TiKV
-   * <p>Cautious, this API cannot be used concurrently, if multiple clients call
-   * write APIs along with deleteRange API, the result will be undefined.</p>
+   *
+   * <p>Cautious, this API cannot be used concurrently, if multiple clients call write APIs along
+   * with deleteRange API, the result will be undefined.
    *
    * @param startKey raw start key to be deleted
    * @param endKey raw start key to be deleted
@@ -473,9 +474,9 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  private Object doSendDeleteRangeWithRetry(BackOffer backOffer, TiRegion region, ByteString startKey, ByteString endKey) {
-    TiRegion currentRegion =
-        clientBuilder.getRegionManager().getRegionByKey(region.getStartKey());
+  private Object doSendDeleteRangeWithRetry(
+      BackOffer backOffer, TiRegion region, ByteString startKey, ByteString endKey) {
+    TiRegion currentRegion = clientBuilder.getRegionManager().getRegionByKey(region.getStartKey());
 
     if (region.equals(currentRegion)) {
       RegionStoreClient client = clientBuilder.build(region);
@@ -495,7 +496,8 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  private Object doSendDeleteRangeWithRefetchRegion(BackOffer backOffer, ByteString startKey, ByteString endKey) {
+  private Object doSendDeleteRangeWithRefetchRegion(
+      BackOffer backOffer, ByteString startKey, ByteString endKey) {
     List<TiRegion> regions = fetchRegionsFromRange(startKey, endKey);
     for (int i = 0; i < regions.size(); i++) {
       TiRegion region = regions.get(i);

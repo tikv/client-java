@@ -846,7 +846,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throw new TiClientInternalException("RawDeleteResponse failed without a cause");
     }
     String error = resp.getError();
-    if (error != null && !error.isEmpty()) {
+    if (!error.isEmpty()) {
       throw new KeyException(resp.getError());
     }
     if (resp.hasRegionError()) {
@@ -879,7 +879,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throw new TiClientInternalException("RawPutResponse failed without a cause");
     }
     String error = resp.getError();
-    if (error != null && !error.isEmpty()) {
+    if (!error.isEmpty()) {
       throw new KeyException(resp.getError());
     }
     if (resp.hasRegionError()) {
@@ -1018,7 +1018,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             this,
             region,
             resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-    RawDeleteRangeResponse resp = callWithRetry(backOffer, TikvGrpc.getRawDeleteRangeMethod(), factory, handler);
+    RawDeleteRangeResponse resp =
+        callWithRetry(backOffer, TikvGrpc.getRawDeleteRangeMethod(), factory, handler);
     rawDeleteRangeHelper(resp);
   }
 
@@ -1026,6 +1027,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("RawDeleteRangeResponse failed without a cause");
+    }
+    String error = resp.getError();
+    if (!error.isEmpty()) {
+      throw new KeyException(resp.getError());
     }
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
