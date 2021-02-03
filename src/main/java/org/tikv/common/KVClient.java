@@ -141,7 +141,7 @@ public class KVClient implements AutoCloseable {
           () -> doSendBatchGetInBatchesWithRetry(singleBatchBackOffer, batch, version));
     }
 
-    return getKvPairs(completionService, batches);
+    return getKvPairs(completionService, batches, BackOffer.BATCH_GET_MAX_BACKOFF);
   }
 
   private List<KvPair> doSendBatchGetInBatchesWithRetry(

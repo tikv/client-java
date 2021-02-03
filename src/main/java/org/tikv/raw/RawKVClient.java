@@ -15,7 +15,7 @@
 
 package org.tikv.raw;
 
-import static org.tikv.common.util.ClientUtils.getKvPairs;
+import static org.tikv.common.util.ClientUtils.*;
 
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
@@ -338,18 +338,7 @@ public class RawKVClient implements AutoCloseable {
       BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
       completionService.submit(() -> doSendBatchPutInBatchesWithRetry(singleBatchBackOffer, batch));
     }
-    try {
-      for (int i = 0; i < batches.size(); i++) {
-        completionService.take().get(BackOffer.RAWKV_MAX_BACKOFF, TimeUnit.SECONDS);
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new TiKVException("Current thread interrupted.", e);
-    } catch (TimeoutException e) {
-      throw new TiKVException("TimeOut Exceeded for current operation. ", e);
-    } catch (ExecutionException e) {
-      throw new TiKVException("Execution exception met.", e);
-    }
+    getTasks(completionService, batches, BackOffer.RAWKV_MAX_BACKOFF);
   }
 
   private Object doSendBatchPutInBatchesWithRetry(BackOffer backOffer, Batch batch) {
@@ -410,7 +399,7 @@ public class RawKVClient implements AutoCloseable {
       completionService.submit(() -> doSendBatchGetInBatchesWithRetry(singleBatchBackOffer, batch));
     }
 
-    return getKvPairs(completionService, batches);
+    return getKvPairs(completionService, batches, BackOffer.RAWKV_MAX_BACKOFF);
   }
 
   private List<KvPair> doSendBatchGetInBatchesWithRetry(BackOffer backOffer, Batch batch) {
@@ -471,6 +460,16 @@ public class RawKVClient implements AutoCloseable {
       ByteString end = calcKeyByCondition(i == regions.size() - 1, endKey, region.getEndKey());
       completionService.submit(
           () -> doSendDeleteRangeWithRetry(singleBatchBackOffer, region, start, end));
+    }
+    for (int i = 0; i < regions.size(); i++) {
+      try {
+        completionService.take().get();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new TiKVException("Current thread interrupted.", e);
+      } catch (ExecutionException e) {
+        throw new TiKVException("Execution exception met.", e);
+      }
     }
   }
 

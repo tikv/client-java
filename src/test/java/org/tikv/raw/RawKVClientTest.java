@@ -126,7 +126,7 @@ public class RawKVClientTest {
   }
 
   private List<Kvrpcpb.KvPair> rawKeys() {
-    return client.scan(RAW_START_KEY, RAW_END_KEY, limit);
+    return client.scan(RAW_START_KEY, RAW_END_KEY);
   }
 
   @Test
@@ -609,7 +609,9 @@ public class RawKVClientTest {
 
   private void checkDeleteRange(ByteString startKey, ByteString endKey) {
     client.deleteRange(startKey, endKey);
-    List<Kvrpcpb.KvPair> result = client.scan(startKey, endKey, limit);
+    logger.info("delete range complete");
+    List<Kvrpcpb.KvPair> result = client.scan(startKey, endKey);
+    logger.info("checking scan complete. number of remaining keys in range: " + result.size());
     assert result.isEmpty();
   }
 

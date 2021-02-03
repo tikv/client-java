@@ -19,21 +19,43 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class ClientUtils {
   public static List<Kvrpcpb.KvPair> getKvPairs(
-      ExecutorCompletionService<List<Kvrpcpb.KvPair>> completionService, List<Batch> batches) {
+      ExecutorCompletionService<List<Kvrpcpb.KvPair>> completionService,
+      List<Batch> batches,
+      int backOff) {
     try {
       List<Kvrpcpb.KvPair> result = new ArrayList<>();
       for (int i = 0; i < batches.size(); i++) {
-        result.addAll(completionService.take().get());
+        result.addAll(completionService.take().get(backOff, TimeUnit.MILLISECONDS));
       }
       return result;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new TiKVException("Current thread interrupted.", e);
+    } catch (TimeoutException e) {
+      throw new TiKVException("TimeOut Exceeded for current operation. ", e);
+    } catch (ExecutionException e) {
+      throw new TiKVException("Execution exception met.", e);
+    }
+  }
+
+  public static void getTasks(
+      ExecutorCompletionService<Object> completionService, List<Batch> batches, int backOff) {
+    try {
+      for (int i = 0; i < batches.size(); i++) {
+        completionService.take().get(backOff, TimeUnit.MILLISECONDS);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new TiKVException("Current thread interrupted.", e);
+    } catch (TimeoutException e) {
+      throw new TiKVException("TimeOut Exceeded for current operation. ", e);
     } catch (ExecutionException e) {
       throw new TiKVException("Execution exception met.", e);
     }
