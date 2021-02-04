@@ -229,10 +229,14 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         throw new StatusRuntimeException(Status.UNKNOWN.withDescription(error.toString()));
       }
 
-      logger.warn(String.format("Unknown error %s for region [%s]", error.toString(), ctxRegion));
+      logger.warn(String.format("Unknown error %s for region [%s]", error, ctxRegion));
       // For other errors, we only drop cache here.
       // Upper level may split this task.
       invalidateRegionStoreCache(ctxRegion);
+      // retry if raft proposal is dropped, it indicates the store is in the middle of transition
+      if (error.getMessage().contains("Raft Proposal Dropped")) {
+        return true;
+      }
     }
 
     boolean retry = false;
