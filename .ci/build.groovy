@@ -20,6 +20,22 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
                     }
                 }
 
+                stage('Format') {
+                    dir("/home/jenkins/agent/git/client-java") {
+                        sh """
+                        mvn com.coveo:fmt-maven-plugin:format
+                        git diff --quiet
+                        formatted="\$?"
+                        if [[ "\${formatted}" -eq 1 ]]
+                        then
+                           echo "code format error, please run the following commands:"
+                           echo "   mvn com.coveo:fmt-maven-plugin:format"
+                           exit 1
+                        fi
+                        """
+                    }
+                }
+
                 stage('Build') {
                     dir("/home/jenkins/agent/git/client-java") {
                         timeout(30) {
