@@ -1003,6 +1003,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return resp.getKvsList();
   }
 
+  /**
+   * Delete raw keys in the range of [startKey, endKey)
+   *
+   * @param backOffer BackOffer
+   * @param startKey startKey
+   * @param endKey endKey
+   */
   public void rawDeleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
     Supplier<RawDeleteRangeRequest> factory =
         () ->
