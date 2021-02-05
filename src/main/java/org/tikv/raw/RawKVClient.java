@@ -261,8 +261,8 @@ public class RawKVClient implements AutoCloseable {
   /**
    * Delete all raw key-value pairs in range [startKey, endKey) from TiKV
    *
-   * <p>Cautious, this API cannot be used concurrently, if multiple clients call write APIs along
-   * with deleteRange API, the result will be undefined.
+   * <p>Cautious, this API cannot be used concurrently, if multiple clients write keys into this
+   * range along with deleteRange API, the result will be undefined.
    *
    * @param startKey raw start key to be deleted
    * @param endKey raw start key to be deleted
@@ -270,6 +270,19 @@ public class RawKVClient implements AutoCloseable {
   public synchronized void deleteRange(ByteString startKey, ByteString endKey) {
     BackOffer backOffer = defaultBackOff();
     doSendDeleteRange(backOffer, startKey, endKey);
+  }
+
+  /**
+   * Delete all raw key-value pairs with the prefix `key` from TiKV
+   *
+   * <p>Cautious, this API cannot be used concurrently, if multiple clients write keys into this
+   * range along with deleteRange API, the result will be undefined.
+   *
+   * @param key prefix of keys to be deleted
+   */
+  public synchronized void deletePrefix(ByteString key) {
+    ByteString endKey = Key.toRawKey(key).nextPrefix().toByteString();
+    deleteRange(key, endKey);
   }
 
   /**
