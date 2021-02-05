@@ -47,6 +47,7 @@ public class RawKVClient implements AutoCloseable {
   private final ExecutorService batchGetThreadPool;
   private final ExecutorService batchPutThreadPool;
   private final ExecutorService batchScanThreadPool;
+  private final ExecutorService deleteRangeThreadPool;
   private static final Logger logger = LoggerFactory.getLogger(RawKVClient.class);
 
   private static final int MAX_RETRY_LIMIT = 3;
@@ -70,6 +71,7 @@ public class RawKVClient implements AutoCloseable {
     this.batchGetThreadPool = session.getThreadPoolForBatchGet();
     this.batchPutThreadPool = session.getThreadPoolForBatchPut();
     this.batchScanThreadPool = session.getThreadPoolForBatchScan();
+    this.deleteRangeThreadPool = session.getThreadPoolForDeleteRange();
   }
 
   @Override
@@ -463,7 +465,7 @@ public class RawKVClient implements AutoCloseable {
 
   private void doSendDeleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
     ExecutorCompletionService<Object> completionService =
-        new ExecutorCompletionService<>(batchGetThreadPool);
+        new ExecutorCompletionService<>(deleteRangeThreadPool);
 
     List<TiRegion> regions = fetchRegionsFromRange(startKey, endKey);
     for (int i = 0; i < regions.size(); i++) {
