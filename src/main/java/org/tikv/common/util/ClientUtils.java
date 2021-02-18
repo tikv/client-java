@@ -15,6 +15,7 @@
 
 package org.tikv.common.util;
 
+import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -22,9 +23,64 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.tikv.common.exception.TiKVException;
+import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class ClientUtils {
+  /**
+   * Append batch to list and split them according to batch limit
+   *
+   * @param batches a grouped batch
+   * @param region region
+   * @param keys keys
+   * @param batchMaxSizeInBytes batch max limit
+   */
+  public static void appendBatches(
+      List<Batch> batches, TiRegion region, List<ByteString> keys, int batchMaxSizeInBytes) {
+    if (keys == null) {
+      return;
+    }
+    int len = keys.size();
+    for (int start = 0, end; start < len; start = end) {
+      int size = 0;
+      for (end = start; end < len && size < batchMaxSizeInBytes; end++) {
+        size += keys.get(end).size();
+      }
+      Batch batch = new Batch(region, keys.subList(start, end));
+      batches.add(batch);
+    }
+  }
+
+  /**
+   * Append batch to list and split them according to batch limit
+   *
+   * @param batches a grouped batch
+   * @param region region
+   * @param keys keys
+   * @param values values
+   * @param batchMaxSizeInBytes batch max limit
+   */
+  public static void appendBatches(
+      List<Batch> batches,
+      TiRegion region,
+      List<ByteString> keys,
+      List<ByteString> values,
+      int batchMaxSizeInBytes) {
+    if (keys == null) {
+      return;
+    }
+    int len = keys.size();
+    for (int start = 0, end; start < len; start = end) {
+      int size = 0;
+      for (end = start; end < len && size < batchMaxSizeInBytes; end++) {
+        size += keys.get(end).size();
+        size += values.get(end).size();
+      }
+      Batch batch = new Batch(region, keys.subList(start, end), values.subList(start, end));
+      batches.add(batch);
+    }
+  }
+
   public static List<Kvrpcpb.KvPair> getKvPairs(
       ExecutorCompletionService<List<Kvrpcpb.KvPair>> completionService,
       List<Batch> batches,

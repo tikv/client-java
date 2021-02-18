@@ -53,8 +53,8 @@ public class RawKVClient implements AutoCloseable {
   private static final int MAX_RETRY_LIMIT = 3;
   // https://www.github.com/pingcap/tidb/blob/master/store/tikv/rawkv.go
   private static final int MAX_RAW_SCAN_LIMIT = 10240;
-  private static final int RAW_BATCH_PUT_SIZE = 16 * 1024;
-  private static final int RAW_BATCH_GET_SIZE = 16 * 1024;
+  private static final int RAW_BATCH_PUT_SIZE = 1024 * 1024; // 1 MB
+  private static final int RAW_BATCH_GET_SIZE = 16 * 1024; // 16 K
   private static final int RAW_BATCH_SCAN_SIZE = 16;
   private static final int RAW_BATCH_PAIR_COUNT = 512;
 
@@ -285,52 +285,6 @@ public class RawKVClient implements AutoCloseable {
   public synchronized void deletePrefix(ByteString key) {
     ByteString endKey = Key.toRawKey(key).nextPrefix().toByteString();
     deleteRange(key, endKey);
-  }
-
-  /**
-   * Append batch to list and split them according to batch limit
-   *
-   * @param batches a grouped batch
-   * @param region region
-   * @param keys keys
-   * @param values values
-   * @param limit batch max limit
-   */
-  private void appendBatches(
-      List<Batch> batches,
-      TiRegion region,
-      List<ByteString> keys,
-      List<ByteString> values,
-      int limit) {
-    List<ByteString> tmpKeys = new ArrayList<>();
-    List<ByteString> tmpValues = new ArrayList<>();
-    for (int i = 0; i < keys.size(); i++) {
-      if (i >= limit) {
-        batches.add(new Batch(region, tmpKeys, tmpValues));
-        tmpKeys.clear();
-        tmpValues.clear();
-      }
-      tmpKeys.add(keys.get(i));
-      tmpValues.add(values.get(i));
-    }
-    if (!tmpKeys.isEmpty()) {
-      batches.add(new Batch(region, tmpKeys, tmpValues));
-    }
-  }
-
-  private void appendBatches(
-      List<Batch> batches, TiRegion region, List<ByteString> keys, int limit) {
-    List<ByteString> tmpKeys = new ArrayList<>();
-    for (int i = 0; i < keys.size(); i++) {
-      if (i >= limit) {
-        batches.add(new Batch(region, tmpKeys));
-        tmpKeys.clear();
-      }
-      tmpKeys.add(keys.get(i));
-    }
-    if (!tmpKeys.isEmpty()) {
-      batches.add(new Batch(region, tmpKeys));
-    }
   }
 
   private void doSendBatchPut(BackOffer backOffer, Map<ByteString, ByteString> kvPairs) {
