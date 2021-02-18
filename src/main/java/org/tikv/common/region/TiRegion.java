@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 import java.util.Set;
 import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
@@ -75,7 +76,7 @@ public class TiRegion implements Serializable {
     if (isReplicaRead && meta.getPeersCount() > 0) {
       // try to get first follower
       try {
-        getNextFollower();
+        chooseRandomFollower();
       } catch (Exception ignore) {
         // ignore
       }
@@ -117,17 +118,17 @@ public class TiRegion implements Serializable {
     return meta.getPeers(followerIdx);
   }
 
-  public Peer getNextFollower() {
+  private void chooseRandomFollower() {
     int cnt = meta.getPeersCount();
+    followerIdx = new Random().nextInt(cnt);
     for (int retry = cnt - 1; retry > 0; retry--) {
       followerIdx = (followerIdx + 1) % cnt;
       Peer cur = meta.getPeers(followerIdx);
       if (cur.getIsLearner()) {
         continue;
       }
-      return cur;
+      return;
     }
-    return leader;
   }
 
   public List<Peer> getLearnerList() {
