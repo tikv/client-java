@@ -846,7 +846,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throw new TiClientInternalException("RawDeleteResponse failed without a cause");
     }
     String error = resp.getError();
-    if (error != null && !error.isEmpty()) {
+    if (!error.isEmpty()) {
       throw new KeyException(resp.getError());
     }
     if (resp.hasRegionError()) {
@@ -879,7 +879,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throw new TiClientInternalException("RawPutResponse failed without a cause");
     }
     String error = resp.getError();
-    if (error != null && !error.isEmpty()) {
+    if (!error.isEmpty()) {
       throw new KeyException(resp.getError());
     }
     if (resp.hasRegionError()) {
@@ -1001,6 +1001,47 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throw new RegionException(resp.getRegionError());
     }
     return resp.getKvsList();
+  }
+
+  /**
+   * Delete raw keys in the range of [startKey, endKey)
+   *
+   * @param backOffer BackOffer
+   * @param startKey startKey
+   * @param endKey endKey
+   */
+  public void rawDeleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
+    Supplier<RawDeleteRangeRequest> factory =
+        () ->
+            RawDeleteRangeRequest.newBuilder()
+                .setContext(region.getContext())
+                .setStartKey(startKey)
+                .setEndKey(endKey)
+                .build();
+
+    KVErrorHandler<RawDeleteRangeResponse> handler =
+        new KVErrorHandler<>(
+            regionManager,
+            this,
+            region,
+            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+    RawDeleteRangeResponse resp =
+        callWithRetry(backOffer, TikvGrpc.getRawDeleteRangeMethod(), factory, handler);
+    rawDeleteRangeHelper(resp);
+  }
+
+  private void rawDeleteRangeHelper(RawDeleteRangeResponse resp) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(region);
+      throw new TiClientInternalException("RawDeleteRangeResponse failed without a cause");
+    }
+    String error = resp.getError();
+    if (!error.isEmpty()) {
+      throw new KeyException(resp.getError());
+    }
+    if (resp.hasRegionError()) {
+      throw new RegionException(resp.getRegionError());
+    }
   }
 
   public enum RequestTypes {

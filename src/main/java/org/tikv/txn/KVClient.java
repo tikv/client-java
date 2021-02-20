@@ -15,6 +15,7 @@
 
 package org.tikv.txn;
 
+import static org.tikv.common.util.ClientUtils.appendBatches;
 import static org.tikv.common.util.ClientUtils.getKvPairs;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -149,7 +150,7 @@ public class KVClient implements AutoCloseable {
           () -> doSendBatchGetInBatchesWithRetry(singleBatchBackOffer, batch, version));
     }
 
-    return getKvPairs(completionService, batches);
+    return getKvPairs(completionService, batches, BackOffer.BATCH_GET_MAX_BACKOFF);
   }
 
   private List<Kvrpcpb.KvPair> doSendBatchGetInBatchesWithRetry(
@@ -192,32 +193,6 @@ public class KVClient implements AutoCloseable {
       results.addAll(batchResult);
     }
     return results;
-  }
-
-  /**
-   * Append batch to list and split them according to batch limit
-   *
-   * @param batches a grouped batch
-   * @param region region
-   * @param keys keys
-   * @param batchGetMaxSizeInByte batch max limit
-   */
-  private void appendBatches(
-      List<Batch> batches, TiRegion region, List<ByteString> keys, int batchGetMaxSizeInByte) {
-    int start;
-    int end;
-    if (keys == null) {
-      return;
-    }
-    int len = keys.size();
-    for (start = 0; start < len; start = end) {
-      int size = 0;
-      for (end = start; end < len && size < batchGetMaxSizeInByte; end++) {
-        size += keys.get(end).size();
-      }
-      Batch batch = new Batch(region, keys.subList(start, end));
-      batches.add(batch);
-    }
   }
 
   /**
