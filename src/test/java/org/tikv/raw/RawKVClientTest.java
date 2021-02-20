@@ -667,7 +667,7 @@ public class RawKVClientTest {
     client.put(key, value, ttl);
     assert client.get(key).equals(value);
     try {
-      Thread.sleep(ttl);
+      Thread.sleep(ttl * 1000);
     } catch (InterruptedException e) {
       throw new TiKVException(e);
     }
