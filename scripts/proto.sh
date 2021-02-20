@@ -18,7 +18,7 @@ CURRENT_DIR=`pwd`
 TIKV_CLIENT_HOME="$(cd "`dirname "$0"`"/..; pwd)"
 cd $TIKV_CLIENT_HOME
 
-kvproto_hash=2cf9a243b8d589f345de1dbaa9eeffec6afbdc06
+kvproto_hash=b2375dcc80adc9c9423bd010592c045241f29d5a
 
 raft_rs_hash=b9891b673573fad77ebcf9bbe0969cf945841926
 

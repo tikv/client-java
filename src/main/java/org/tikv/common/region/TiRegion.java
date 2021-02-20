@@ -118,23 +118,26 @@ public class TiRegion implements Serializable {
     return meta.getPeers(followerIdx);
   }
 
+  private boolean isValidFollower(Peer peer) {
+    return Metapb.PeerRole.valueOf(peer.getRole().getValueDescriptor()) == Metapb.PeerRole.Voter;
+  }
+
   private void chooseRandomFollower() {
     int cnt = meta.getPeersCount();
     followerIdx = new Random().nextInt(cnt);
     for (int retry = cnt - 1; retry > 0; retry--) {
       followerIdx = (followerIdx + 1) % cnt;
       Peer cur = meta.getPeers(followerIdx);
-      if (cur.getIsLearner()) {
-        continue;
+      if (isValidFollower(cur)) {
+        return;
       }
-      return;
     }
   }
 
   public List<Peer> getLearnerList() {
     List<Peer> peers = new ArrayList<>();
     for (Peer peer : getMeta().getPeersList()) {
-      if (peer.getIsLearner()) {
+      if (isValidFollower(peer)) {
         peers.add(peer);
       }
     }
