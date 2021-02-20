@@ -188,9 +188,9 @@ public class RawKVClientTest {
 
       prepare();
 
-      // TODO check whether cluster supports ttl
-      long ttl = 1;
-      rawTTLTest(10, ttl, benchmark);
+      // TODO: check whether cluster supports ttl
+      //  long ttl = 10;
+      //  rawTTLTest(10, ttl, benchmark);
 
       prepare();
     } catch (final TiKVException e) {
@@ -581,7 +581,16 @@ public class RawKVClientTest {
       for (int i = 0; i < cases; i++) {
         ByteString key = randomKeys.get(i), value = values.get(r.nextInt(KEY_POOL_SIZE));
         data.put(key, value);
-        checkTTL(key, value, ttl);
+        checkPutTTL(key, value, ttl);
+      }
+      try {
+        Thread.sleep(ttl * 1000);
+      } catch (InterruptedException e) {
+        throw new TiKVException(e);
+      }
+      for (int i = 0; i < cases; i++) {
+        ByteString key = randomKeys.get(i);
+        checkGetTTLTimeOut(key);
       }
     }
   }
@@ -663,14 +672,12 @@ public class RawKVClientTest {
     assert result.isEmpty();
   }
 
-  private void checkTTL(ByteString key, ByteString value, long ttl) {
+  private void checkPutTTL(ByteString key, ByteString value, long ttl) {
     client.put(key, value, ttl);
     assert client.get(key).equals(value);
-    try {
-      Thread.sleep(ttl * 1000);
-    } catch (InterruptedException e) {
-      throw new TiKVException(e);
-    }
+  }
+
+  private void checkGetTTLTimeOut(ByteString key) {
     assert client.get(key).isEmpty();
   }
 
