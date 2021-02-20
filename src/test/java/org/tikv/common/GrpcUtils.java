@@ -20,7 +20,12 @@ import com.google.protobuf.ByteString;
 import java.util.Arrays;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
-import org.tikv.kvproto.Metapb.*;
+import org.tikv.kvproto.Metapb.Peer;
+import org.tikv.kvproto.Metapb.Region;
+import org.tikv.kvproto.Metapb.RegionEpoch;
+import org.tikv.kvproto.Metapb.Store;
+import org.tikv.kvproto.Metapb.StoreLabel;
+import org.tikv.kvproto.Metapb.StoreState;
 import org.tikv.kvproto.Pdpb.*;
 
 public class GrpcUtils {
