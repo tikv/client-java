@@ -577,6 +577,6 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newCustomBackOff(1000);
+    return ConcreteBackOffer.newRawKVBackOff();
   }
 }
