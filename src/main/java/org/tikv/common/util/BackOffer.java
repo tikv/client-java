@@ -31,7 +31,9 @@ public interface BackOffer {
   int GC_ONE_REGION_MAX_BACKOFF = 20 * seconds;
   int GC_RESOLVE_LOCK_MAX_BACKOFF = 100 * seconds;
   int GC_DELETE_RANGE_MAX_BACKOFF = 100 * seconds;
-  int RAWKV_MAX_BACKOFF = 40 * seconds;
+
+  int RAWKV_MAX_BACKOFF = 20 * seconds;
+
   int SPLIT_REGION_BACKOFF = 20 * seconds;
   int BATCH_COMMIT_BACKOFF = 10 * seconds;
   int PD_INFO_BACKOFF = 5 * seconds;
