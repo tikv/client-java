@@ -658,7 +658,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
 
     String otherError = response.getOtherError();
-    if (otherError != null && !otherError.isEmpty()) {
+    if (!otherError.isEmpty()) {
       logger.warn(String.format("Other error occurred, message: %s", otherError));
       throw new GrpcException(otherError);
     }
@@ -816,7 +816,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throw new TiClientInternalException("RawGetResponse failed without a cause");
     }
     String error = resp.getError();
-    if (error != null && !error.isEmpty()) {
+    if (!error.isEmpty()) {
       throw new KeyException(resp.getError());
     }
     if (resp.hasRegionError()) {
@@ -854,13 +854,14 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  public void rawPut(BackOffer backOffer, ByteString key, ByteString value) {
+  public void rawPut(BackOffer backOffer, ByteString key, ByteString value, long ttl) {
     Supplier<RawPutRequest> factory =
         () ->
             RawPutRequest.newBuilder()
                 .setContext(region.getContext())
                 .setKey(key)
                 .setValue(value)
+                .setTtl(ttl)
                 .build();
 
     KVErrorHandler<RawPutResponse> handler =
@@ -919,7 +920,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return resp.getPairsList();
   }
 
-  public void rawBatchPut(BackOffer backOffer, List<KvPair> kvPairs) {
+  public void rawBatchPut(BackOffer backOffer, List<KvPair> kvPairs, long ttl) {
     if (kvPairs.isEmpty()) {
       return;
     }
@@ -928,6 +929,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             RawBatchPutRequest.newBuilder()
                 .setContext(region.getContext())
                 .addAllPairs(kvPairs)
+                .setTtl(ttl)
                 .build();
     KVErrorHandler<RawBatchPutResponse> handler =
         new KVErrorHandler<>(
@@ -940,13 +942,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     handleRawBatchPut(resp);
   }
 
-  public void rawBatchPut(BackOffer backOffer, Batch batch) {
+  public void rawBatchPut(BackOffer backOffer, Batch batch, long ttl) {
     List<KvPair> pairs = new ArrayList<>();
     for (int i = 0; i < batch.keys.size(); i++) {
       pairs.add(
           KvPair.newBuilder().setKey(batch.keys.get(i)).setValue(batch.values.get(i)).build());
     }
-    rawBatchPut(backOffer, pairs);
+    rawBatchPut(backOffer, pairs, ttl);
   }
 
   private void handleRawBatchPut(RawBatchPutResponse resp) {

@@ -187,6 +187,12 @@ public class RawKVClientTest {
       }
 
       prepare();
+
+      // TODO: check whether cluster supports ttl
+      //  long ttl = 10;
+      //  rawTTLTest(10, ttl, benchmark);
+
+      prepare();
     } catch (final TiKVException e) {
       logger.warn("Test fails with Exception " + e);
     }
@@ -195,6 +201,7 @@ public class RawKVClientTest {
 
   private void prepare() {
     logger.info("Initializing test");
+    data.clear();
     List<Kvrpcpb.KvPair> remainingKeys = rawKeys();
     int sz = remainingKeys.size();
     logger.info("deleting " + sz);
@@ -538,6 +545,56 @@ public class RawKVClientTest {
     }
   }
 
+  private void rawTTLTest(int cases, long ttl, boolean benchmark) {
+    logger.info("ttl testing");
+    if (benchmark) {
+      for (int i = 0; i < cases; i++) {
+        ByteString key = orderedKeys.get(i), value = values.get(i);
+        data.put(key, value);
+      }
+
+      long start = System.currentTimeMillis();
+      int base = cases / WORKER_CNT;
+      for (int cnt = 0; cnt < WORKER_CNT; cnt++) {
+        int i = cnt;
+        completionService.submit(
+            () -> {
+              for (int j = 0; j < base; j++) {
+                int num = i * base + j;
+                ByteString key = orderedKeys.get(num), value = values.get(num);
+                client.put(key, value, ttl);
+              }
+              return null;
+            });
+      }
+      awaitTimeOut(100);
+      long end = System.currentTimeMillis();
+      logger.info(
+          cases
+              + " ttl put: "
+              + (end - start) / 1000.0
+              + "s workers="
+              + WORKER_CNT
+              + " put="
+              + rawKeys().size());
+    } else {
+      for (int i = 0; i < cases; i++) {
+        ByteString key = randomKeys.get(i), value = values.get(r.nextInt(KEY_POOL_SIZE));
+        data.put(key, value);
+        checkPutTTL(key, value, ttl);
+      }
+      try {
+        Thread.sleep(ttl * 1000);
+      } catch (InterruptedException e) {
+        throw new TiKVException(e);
+      }
+      for (int i = 0; i < cases; i++) {
+        ByteString key = randomKeys.get(i);
+        checkGetTTLTimeOut(key);
+      }
+    }
+  }
+
   private void checkBatchGet(List<ByteString> keys) {
     List<Kvrpcpb.KvPair> result = client.batchGet(keys);
     for (Kvrpcpb.KvPair kvPair : result) {
@@ -613,6 +670,15 @@ public class RawKVClientTest {
     List<Kvrpcpb.KvPair> result = client.scan(startKey, endKey);
     logger.info("checking scan complete. number of remaining keys in range: " + result.size());
     assert result.isEmpty();
+  }
+
+  private void checkPutTTL(ByteString key, ByteString value, long ttl) {
+    client.put(key, value, ttl);
+    assert client.get(key).equals(value);
+  }
+
+  private void checkGetTTLTimeOut(ByteString key) {
+    assert client.get(key).isEmpty();
   }
 
   private void checkEmpty(ByteString key) {
