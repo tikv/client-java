@@ -197,11 +197,18 @@ public class RegionManager {
     cache.invalidateRegion(regionId);
   }
 
+  public double cacheMiss() {
+    logger.debug("cache miss: " + cache.miss + " total: " + cache.total);
+    return cache.miss * 1.0 / cache.total;
+  }
+
   public static class RegionCache {
     private final Map<Long, TiRegion> regionCache;
     private final Map<Long, Store> storeCache;
     private final RangeMap<Key, Long> keyToRegionIdCache;
     private final ReadOnlyPDClient pdClient;
+    private int total = 0;
+    private int miss = 0;
 
     public RegionCache(ReadOnlyPDClient pdClient) {
       regionCache = new HashMap<>();
@@ -213,6 +220,7 @@ public class RegionManager {
 
     public synchronized TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
       Long regionId;
+      ++total;
       regionId = keyToRegionIdCache.get(Key.toRawKey(key));
       if (logger.isDebugEnabled()) {
         logger.debug(
@@ -220,7 +228,8 @@ public class RegionManager {
       }
 
       if (regionId == null) {
-        logger.debug("Key not find in keyToRegionIdCache:" + formatBytesUTF8(key));
+        logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
+        ++miss;
         TiRegion region = pdClient.getRegionByKey(backOffer, key);
         if (!putRegion(region)) {
           throw new TiClientInternalException("Invalid Region: " + region.toString());
@@ -244,6 +253,7 @@ public class RegionManager {
       return true;
     }
 
+    @Deprecated
     private synchronized TiRegion getRegionById(BackOffer backOffer, long regionId) {
       TiRegion region = regionCache.get(regionId);
       if (logger.isDebugEnabled()) {
