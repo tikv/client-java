@@ -93,18 +93,14 @@ public class TiSession implements AutoCloseable {
   }
 
   public RawKVClient createRawClient() {
-    // Create new Region Manager avoiding thread contentions
-    RegionManager regionMgr = new RegionManager(client);
     RegionStoreClientBuilder builder =
-        new RegionStoreClientBuilder(conf, channelFactory, regionMgr, client);
+        new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
     return new RawKVClient(this, builder);
   }
 
   public KVClient createKVClient() {
-    // Create new Region Manager avoiding thread contentions
-    RegionManager regionMgr = new RegionManager(client);
     RegionStoreClientBuilder builder =
-        new RegionStoreClientBuilder(conf, channelFactory, regionMgr, client);
+        new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
     return new KVClient(conf, builder);
   }
 
@@ -411,6 +407,11 @@ public class TiSession implements AutoCloseable {
     }
     if (indexScanThreadPool != null) {
       indexScanThreadPool.shutdownNow();
+    }
+    if (regionManager != null) {
+      if (logger.isDebugEnabled()) {
+        logger.debug("region cache miss rate: " + getRegionManager().cacheMiss());
+      }
     }
     if (client != null) {
       getPDClient().close();

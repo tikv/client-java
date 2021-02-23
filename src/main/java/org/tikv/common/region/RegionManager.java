@@ -197,11 +197,19 @@ public class RegionManager {
     cache.invalidateRegion(regionId);
   }
 
+  public double cacheMiss() {
+    logger.debug("cache miss: " + cache.miss + " total: " + cache.total);
+    return cache.miss * 1.0 / cache.total;
+  }
+
   public static class RegionCache {
     private final Map<Long, TiRegion> regionCache;
     private final Map<Long, Store> storeCache;
     private final RangeMap<Key, Long> keyToRegionIdCache;
     private final ReadOnlyPDClient pdClient;
+    private final byte[] lock = new byte[0];
+    private int total = 0;
+    private int miss = 0;
 
     public RegionCache(ReadOnlyPDClient pdClient) {
       regionCache = new HashMap<>();
@@ -211,23 +219,30 @@ public class RegionManager {
       this.pdClient = pdClient;
     }
 
-    public synchronized TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
+    public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
       Long regionId;
-      regionId = keyToRegionIdCache.get(Key.toRawKey(key));
+      ++total;
+      synchronized (lock) {
+        regionId = keyToRegionIdCache.get(Key.toRawKey(key));
+      }
       if (logger.isDebugEnabled()) {
         logger.debug(
             String.format("getRegionByKey key[%s] -> ID[%s]", formatBytesUTF8(key), regionId));
       }
 
       if (regionId == null) {
-        logger.debug("Key not find in keyToRegionIdCache:" + formatBytesUTF8(key));
+        logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
+        ++miss;
         TiRegion region = pdClient.getRegionByKey(backOffer, key);
         if (!putRegion(region)) {
           throw new TiClientInternalException("Invalid Region: " + region.toString());
         }
         return region;
       }
-      TiRegion region = regionCache.get(regionId);
+      TiRegion region;
+      synchronized (lock) {
+        region = regionCache.get(regionId);
+      }
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
       }
@@ -235,15 +250,18 @@ public class RegionManager {
       return region;
     }
 
-    private synchronized boolean putRegion(TiRegion region) {
+    private boolean putRegion(TiRegion region) {
       if (logger.isDebugEnabled()) {
         logger.debug("putRegion: " + region);
       }
-      regionCache.put(region.getId(), region);
-      keyToRegionIdCache.put(makeRange(region.getStartKey(), region.getEndKey()), region.getId());
+      synchronized (lock) {
+        regionCache.put(region.getId(), region);
+        keyToRegionIdCache.put(makeRange(region.getStartKey(), region.getEndKey()), region.getId());
+      }
       return true;
     }
 
+    @Deprecated
     private synchronized TiRegion getRegionById(BackOffer backOffer, long regionId) {
       TiRegion region = regionCache.get(regionId);
       if (logger.isDebugEnabled()) {
@@ -259,51 +277,62 @@ public class RegionManager {
     }
 
     /** Removes region associated with regionId from regionCache. */
-    public synchronized void invalidateRegion(long regionId) {
-      try {
-        if (logger.isDebugEnabled()) {
-          logger.debug(String.format("invalidateRegion ID[%s]", regionId));
-        }
-        TiRegion region = regionCache.get(regionId);
-        keyToRegionIdCache.remove(makeRange(region.getStartKey(), region.getEndKey()));
-      } catch (Exception ignore) {
-      } finally {
-        regionCache.remove(regionId);
-      }
-    }
-
-    public synchronized void invalidateAllRegionForStore(long storeId) {
-      List<TiRegion> regionToRemove = new ArrayList<>();
-      for (TiRegion r : regionCache.values()) {
-        if (r.getLeader().getStoreId() == storeId) {
+    public void invalidateRegion(long regionId) {
+      synchronized (lock) {
+        try {
           if (logger.isDebugEnabled()) {
-            logger.debug(String.format("invalidateAllRegionForStore Region[%s]", r));
+            logger.debug(String.format("invalidateRegion ID[%s]", regionId));
           }
-          regionToRemove.add(r);
+          TiRegion region = regionCache.get(regionId);
+          keyToRegionIdCache.remove(makeRange(region.getStartKey(), region.getEndKey()));
+        } catch (Exception ignore) {
+        } finally {
+          regionCache.remove(regionId);
         }
       }
+    }
 
-      // remove region
-      for (TiRegion r : regionToRemove) {
-        regionCache.remove(r.getId());
-        keyToRegionIdCache.remove(makeRange(r.getStartKey(), r.getEndKey()));
+    public void invalidateAllRegionForStore(long storeId) {
+      synchronized (lock) {
+        List<TiRegion> regionToRemove = new ArrayList<>();
+        for (TiRegion r : regionCache.values()) {
+          if (r.getLeader().getStoreId() == storeId) {
+            if (logger.isDebugEnabled()) {
+              logger.debug(String.format("invalidateAllRegionForStore Region[%s]", r));
+            }
+            regionToRemove.add(r);
+          }
+        }
+
+        // remove region
+        for (TiRegion r : regionToRemove) {
+          regionCache.remove(r.getId());
+          keyToRegionIdCache.remove(makeRange(r.getStartKey(), r.getEndKey()));
+        }
       }
     }
 
-    public synchronized void invalidateStore(long storeId) {
-      storeCache.remove(storeId);
+    public void invalidateStore(long storeId) {
+      synchronized (lock) {
+        storeCache.remove(storeId);
+      }
     }
 
-    public synchronized Store getStoreById(long id, BackOffer backOffer) {
+    public Store getStoreById(long id, BackOffer backOffer) {
       try {
-        Store store = storeCache.get(id);
+        Store store;
+        synchronized (lock) {
+          store = storeCache.get(id);
+        }
         if (store == null) {
           store = pdClient.getStore(backOffer, id);
         }
         if (store.getState().equals(StoreState.Tombstone)) {
           return null;
         }
-        storeCache.put(id, store);
+        synchronized (lock) {
+          storeCache.put(id, store);
+        }
         return store;
       } catch (Exception e) {
         throw new GrpcException(e);
