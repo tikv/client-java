@@ -320,17 +320,20 @@ public class RegionManager {
 
     public Store getStoreById(long id, BackOffer backOffer) {
       try {
+        Store store;
         synchronized (lock) {
-          Store store = storeCache.get(id);
-          if (store == null) {
-            store = pdClient.getStore(backOffer, id);
-          }
-          if (store.getState().equals(StoreState.Tombstone)) {
-            return null;
-          }
-          storeCache.put(id, store);
-          return store;
+          store = storeCache.get(id);
         }
+        if (store == null) {
+          store = pdClient.getStore(backOffer, id);
+        }
+        if (store.getState().equals(StoreState.Tombstone)) {
+          return null;
+        }
+        synchronized (lock) {
+          storeCache.put(id, store);
+        }
+        return store;
       } catch (Exception e) {
         throw new GrpcException(e);
       }
