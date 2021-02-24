@@ -397,19 +397,19 @@
                             <relocations>
                                 <relocation>
                                     <pattern>io.grpc</pattern>
-                                    <shadedPattern>shade.io.grpc</shadedPattern>
+                                    <shadedPattern>org.tikv.shade.io.grpc</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.google</pattern>
-                                    <shadedPattern>shade.com.google</shadedPattern>
+                                    <shadedPattern>org.tikv.shade.com.google</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>io.netty</pattern>
-                                    <shadedPattern>shade.io.netty</shadedPattern>
+                                    <shadedPattern>org.tikv.shade.io.netty</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>io.opencensus</pattern>
-                                    <shadedPattern>shade.io.opencensus</shadedPattern>
+                                    <shadedPattern>org.tikv.shade.io.opencensus</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
