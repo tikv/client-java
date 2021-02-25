@@ -17,8 +17,7 @@
 
 package org.tikv.common;
 
-import static org.tikv.common.util.ClientUtils.appendBatches;
-import static org.tikv.common.util.ClientUtils.getKvPairs;
+import static org.tikv.common.util.ClientUtils.*;
 
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
@@ -28,7 +27,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.exception.GrpcException;
@@ -45,6 +43,7 @@ import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class KVClient implements AutoCloseable {
   private static final Logger logger = LoggerFactory.getLogger(KVClient.class);
+  private static final int MAX_BATCH_LIMIT = 1024;
   private static final int BATCH_GET_SIZE = 16 * 1024;
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
@@ -129,11 +128,12 @@ public class KVClient implements AutoCloseable {
     ExecutorCompletionService<List<KvPair>> completionService =
         new ExecutorCompletionService<>(batchGetThreadPool);
 
-    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(keys);
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(clientBuilder.getRegionManager(), keys, backOffer);
     List<Batch> batches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
-      appendBatches(batches, entry.getKey(), entry.getValue(), BATCH_GET_SIZE);
+      appendBatches(batches, entry.getKey(), entry.getValue(), BATCH_GET_SIZE, MAX_BATCH_LIMIT);
     }
 
     for (Batch batch : batches) {
@@ -170,11 +170,13 @@ public class KVClient implements AutoCloseable {
 
   private List<KvPair> doSendBatchGetWithRefetchRegion(
       BackOffer backOffer, Batch batch, long version) {
-    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(batch.keys);
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(clientBuilder.getRegionManager(), batch.keys, backOffer);
     List<Batch> retryBatches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
-      appendBatches(retryBatches, entry.getKey(), entry.getValue(), BATCH_GET_SIZE);
+      appendBatches(
+          retryBatches, entry.getKey(), entry.getValue(), BATCH_GET_SIZE, MAX_BATCH_LIMIT);
     }
 
     ArrayList<KvPair> results = new ArrayList<>();
@@ -184,17 +186,6 @@ public class KVClient implements AutoCloseable {
       results.addAll(batchResult);
     }
     return results;
-  }
-
-  /**
-   * Group by list of keys according to its region
-   *
-   * @param keys keys
-   * @return a mapping of keys and their region
-   */
-  private Map<TiRegion, List<ByteString>> groupKeysByRegion(List<ByteString> keys) {
-    return keys.stream()
-        .collect(Collectors.groupingBy(clientBuilder.getRegionManager()::getRegionByKey));
   }
 
   private Iterator<KvPair> scanIterator(

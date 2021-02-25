@@ -172,6 +172,8 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
               String.format(
                   "Received zero store id, from region %d try next time", ctxRegion.getId()));
           backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
+
+          this.regionManager.invalidateRegion(ctxRegion.getId());
         }
 
         backOffer.doBackOff(backOffFuncType, new GrpcException(error.toString()));

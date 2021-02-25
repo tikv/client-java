@@ -28,6 +28,7 @@ import io.etcd.jetcd.KeyValue;
 import io.etcd.jetcd.kv.GetResponse;
 import io.etcd.jetcd.options.GetOption;
 import io.grpc.ManagedChannel;
+import io.prometheus.client.Histogram;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -95,6 +96,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private List<URI> pdAddrs;
   private Client etcdClient;
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
+
+  public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_pd_get_region_by_requests_latency")
+          .help("pd getRegionByKey request latency.")
+          .register();
 
   private PDClient(TiConfiguration conf, ChannelFactory channelFactory) {
     super(conf, channelFactory);
@@ -208,28 +215,33 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   @Override
   public TiRegion getRegionByKey(BackOffer backOffer, ByteString key) {
-    if (conf.getKvMode() == KVMode.TXN) {
-      CodecDataOutput cdo = new CodecDataOutput();
-      BytesCodec.writeBytes(cdo, key.toByteArray());
-      key = cdo.toByteString();
+    Histogram.Timer requestTimer = PD_GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
+    try {
+      if (conf.getKvMode() == KVMode.TXN) {
+        CodecDataOutput cdo = new CodecDataOutput();
+        BytesCodec.writeBytes(cdo, key.toByteArray());
+        key = cdo.toByteString();
+      }
+      ByteString queryKey = key;
+
+      Supplier<GetRegionRequest> request =
+          () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(queryKey).build();
+
+      PDErrorHandler<GetRegionResponse> handler =
+          new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
+
+      GetRegionResponse resp =
+          callWithRetry(backOffer, PDGrpc.getGetRegionMethod(), request, handler);
+      return new TiRegion(
+          resp.getRegion(),
+          resp.getLeader(),
+          conf.getIsolationLevel(),
+          conf.getCommandPriority(),
+          conf.getKvMode(),
+          conf.isReplicaRead());
+    } finally {
+      requestTimer.observeDuration();
     }
-    ByteString queryKey = key;
-
-    Supplier<GetRegionRequest> request =
-        () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(queryKey).build();
-
-    PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
-
-    GetRegionResponse resp =
-        callWithRetry(backOffer, PDGrpc.getGetRegionMethod(), request, handler);
-    return new TiRegion(
-        resp.getRegion(),
-        resp.getLeader(),
-        conf.getIsolationLevel(),
-        conf.getCommandPriority(),
-        conf.getKvMode(),
-        conf.isReplicaRead());
   }
 
   @Override
@@ -498,9 +510,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     if (leaderWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
-    return leaderWrapper
-        .getBlockingStub()
-        .withDeadlineAfter(getConf().getTimeout(), getConf().getTimeoutUnit());
+    return leaderWrapper.getBlockingStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -508,9 +518,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     if (leaderWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
-    return leaderWrapper
-        .getAsyncStub()
-        .withDeadlineAfter(getConf().getTimeout(), getConf().getTimeoutUnit());
+    return leaderWrapper.getAsyncStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
   }
 
   private void initCluster() {

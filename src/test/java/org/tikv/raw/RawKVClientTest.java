@@ -93,6 +93,118 @@ public class RawKVClientTest {
   }
 
   @Test
+  public void getKeyTTLTest() {
+    if (!initialized) return;
+    long ttl = 10;
+    ByteString key = ByteString.copyFromUtf8("key_ttl");
+    ByteString value = ByteString.copyFromUtf8("value");
+    client.put(key, value, ttl);
+    for (int i = 0; i < 9; i++) {
+      Long t = client.getKeyTTL(key);
+      logger.info("current ttl of key is " + t);
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException ignore) {
+      }
+    }
+    Long t = client.getKeyTTL(key);
+    if (t == null) {
+      logger.info("key outdated.");
+    } else {
+      logger.info("key not outdated: " + t);
+    }
+  }
+
+  private ByteString generateBatchPutKey(String envId, String type, String id) {
+    return ByteString.copyFromUtf8(
+        String.format("indexInfo_:_{%s}_:_{%s}_:_{%s}", envId, type, id));
+  }
+
+  private ByteString generateBatchPutValue() {
+    return ByteString.copyFromUtf8(RandomStringUtils.randomAlphanumeric(290));
+  }
+
+  private String generateEnvId() {
+    return String.format(
+        "%s%02d", RandomStringUtils.randomAlphabetic(2).toLowerCase(Locale.ROOT), r.nextInt(100));
+  }
+
+  private String generateType() {
+    return String.format(
+        "%s%02d", RandomStringUtils.randomAlphabetic(3).toUpperCase(Locale.ROOT), r.nextInt(10000));
+  }
+
+  @Test
+  public void batchPutTest() {
+    if (!initialized) return;
+    ExecutorService executors = Executors.newFixedThreadPool(200);
+    ExecutorCompletionService<Object> completionService =
+        new ExecutorCompletionService<>(executors);
+    long dataCnt = 1000L;
+    long keysPerBatch = 1000;
+
+    long workerCnt = dataCnt / keysPerBatch;
+
+    List<String> envIdPool = new ArrayList<>();
+    int envIdPoolSize = 10000;
+    for (int i = 0; i < envIdPoolSize; i++) {
+      envIdPool.add(generateEnvId());
+    }
+
+    List<String> typePool = new ArrayList<>();
+    int typePoolSize = 10000;
+    for (int i = 0; i < typePoolSize; i++) {
+      typePool.add(generateType());
+    }
+
+    List<ByteString> valuePool = new ArrayList<>();
+    int valuePoolSize = 10000;
+    for (int i = 0; i < valuePoolSize; i++) {
+      valuePool.add(generateBatchPutValue());
+    }
+
+    for (long i = 0; i < workerCnt; i++) {
+      completionService.submit(
+          () -> {
+            String envId = envIdPool.get(r.nextInt(envIdPoolSize));
+            String type = typePool.get(r.nextInt(typePoolSize));
+            String prefix =
+                String.format(
+                    "%d%09d%09d", r.nextInt(10), r.nextInt(1000000000), r.nextInt(1000000000));
+            Map<ByteString, ByteString> map = new HashMap<>();
+            RawKVClient rawKVClient = session.createRawClient();
+            for (int j = 0; j < keysPerBatch; j++) {
+              String id = String.format("%s%04d", prefix, j);
+              map.put(
+                  generateBatchPutKey(envId, type, id), valuePool.get(r.nextInt(valuePoolSize)));
+            }
+            rawKVClient.batchPut(map);
+            return null;
+          });
+    }
+    logger.info("start");
+    try {
+      for (int i = 0; i < workerCnt; i++) {
+        completionService.take().get(1, TimeUnit.SECONDS);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      logger.info("Current thread interrupted. Test fail.");
+    } catch (TimeoutException e) {
+      logger.info("TimeOut Exceeded for current test. " + 1 + "s");
+    } catch (ExecutionException e) {
+      logger.info("Execution exception met. Test fail.");
+    }
+    logger.info("done");
+  }
+
+  @Test
+  public void deleteRangeTest() {
+    if (!initialized) return;
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+  }
+
+  @Test
   public void simpleTest() {
     if (!initialized) return;
     ByteString key = rawKey("key");
@@ -185,8 +297,6 @@ public class RawKVClientTest {
       } else {
         rawDeleteTest(deleteCases, benchmark);
       }
-
-      prepare();
 
       // TODO: check whether cluster supports ttl
       //  long ttl = 10;
@@ -582,6 +692,7 @@ public class RawKVClientTest {
         ByteString key = randomKeys.get(i), value = values.get(r.nextInt(KEY_POOL_SIZE));
         data.put(key, value);
         checkPutTTL(key, value, ttl);
+        checkGetKeyTTL(key, ttl);
       }
       try {
         Thread.sleep(ttl * 1000);
@@ -591,6 +702,7 @@ public class RawKVClientTest {
       for (int i = 0; i < cases; i++) {
         ByteString key = randomKeys.get(i);
         checkGetTTLTimeOut(key);
+        checkGetKeyTTLTimeOut(key);
       }
     }
   }
@@ -677,8 +789,19 @@ public class RawKVClientTest {
     assert client.get(key).equals(value);
   }
 
+  private void checkGetKeyTTL(ByteString key, long ttl) {
+    Long t = client.getKeyTTL(key);
+    assert t != null;
+    assert t <= ttl && t > 0;
+  }
+
   private void checkGetTTLTimeOut(ByteString key) {
     assert client.get(key).isEmpty();
+  }
+
+  private void checkGetKeyTTLTimeOut(ByteString key) {
+    Long t = client.getKeyTTL(key);
+    assert t == null;
   }
 
   private void checkEmpty(ByteString key) {

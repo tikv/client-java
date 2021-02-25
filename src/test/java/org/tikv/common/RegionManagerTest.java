@@ -17,12 +17,16 @@ package org.tikv.common;
 
 import static org.junit.Assert.*;
 
+import com.google.common.collect.RangeMap;
+import com.google.common.collect.TreeRangeMap;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import org.junit.Before;
 import org.junit.Test;
+import org.tikv.common.key.Key;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.util.KeyRangeUtils;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
@@ -36,6 +40,16 @@ public class RegionManagerTest extends PDMockServerTest {
   public void setUp() throws IOException {
     super.setUp();
     mgr = session.getRegionManager();
+  }
+
+  @Test
+  public void testRegionBorder() {
+    RangeMap<Key, Long> map = TreeRangeMap.create();
+
+    map.put(KeyRangeUtils.makeRange(ByteString.EMPTY, ByteString.copyFromUtf8("abc")), 1L);
+    map.put(KeyRangeUtils.makeRange(ByteString.copyFromUtf8("abc"), ByteString.EMPTY), 2L);
+    assert map.get(Key.toRawKey(ByteString.EMPTY)) == null;
+    assert map.get(Key.toRawKey(ByteString.EMPTY, true)) == 1L;
   }
 
   @Test
