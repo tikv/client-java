@@ -508,9 +508,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     if (leaderWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
-    return leaderWrapper
-        .getAsyncStub()
-        .withDeadlineAfter(getTimeout(), getConf().getTimeoutUnit());
+    return leaderWrapper.getAsyncStub().withDeadlineAfter(getTimeout(), getConf().getTimeoutUnit());
   }
 
   private void initCluster() {
