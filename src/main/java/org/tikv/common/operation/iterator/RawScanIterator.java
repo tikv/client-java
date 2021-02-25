@@ -44,7 +44,6 @@ public class RawScanIterator extends ScanIterator {
     BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
     while (true) {
       try (RegionStoreClient client = builder.build(startKey)) {
-        client.setTimeout(conf.getScanTimeout());
         TiRegion region = client.getRegion();
         if (limit <= 0) {
           currentCache = null;
