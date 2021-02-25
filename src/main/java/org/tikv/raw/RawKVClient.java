@@ -18,7 +18,6 @@ package org.tikv.raw;
 import static org.tikv.common.util.ClientUtils.*;
 
 import com.google.protobuf.ByteString;
-
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;

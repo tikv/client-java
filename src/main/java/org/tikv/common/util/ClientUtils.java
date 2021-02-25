@@ -103,7 +103,10 @@ public class ClientUtils {
   }
 
   public static void getTasks(
-      ExecutorCompletionService<List<Batch>> completionService, Queue<List<Batch>> taskQueue, List<Batch> batches, int backOff) {
+      ExecutorCompletionService<List<Batch>> completionService,
+      Queue<List<Batch>> taskQueue,
+      List<Batch> batches,
+      int backOff) {
     try {
       for (int i = 0; i < batches.size(); i++) {
         List<Batch> task = completionService.take().get(backOff, TimeUnit.MILLISECONDS);
