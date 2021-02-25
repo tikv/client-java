@@ -50,7 +50,6 @@ public class RawKVClient implements AutoCloseable {
   private final ExecutorService deleteRangeThreadPool;
   private static final Logger logger = LoggerFactory.getLogger(RawKVClient.class);
 
-  private static final int MAX_RETRY_LIMIT = 3;
   // https://www.github.com/pingcap/tidb/blob/master/store/tikv/rawkv.go
   private static final int MAX_RAW_SCAN_LIMIT = 10240;
   private static final int RAW_BATCH_PUT_SIZE = 1024 * 1024; // 1 MB
@@ -58,8 +57,6 @@ public class RawKVClient implements AutoCloseable {
   private static final int RAW_BATCH_SCAN_SIZE = 16;
   private static final int RAW_BATCH_PAIR_COUNT = 512;
 
-  private static final TiKVException ERR_RETRY_LIMIT_EXCEEDED =
-      new GrpcException("retry is exhausted. retry exceeds " + MAX_RETRY_LIMIT + "attempts");
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
       new TiKVException("limit should be less than MAX_RAW_SCAN_LIMIT");
 
@@ -96,7 +93,7 @@ public class RawKVClient implements AutoCloseable {
    */
   public void put(ByteString key, ByteString value, long ttl) {
     BackOffer backOffer = defaultBackOff();
-    for (int i = 0; i < MAX_RETRY_LIMIT; i++) {
+    while (true) {
       RegionStoreClient client = clientBuilder.build(key);
       try {
         client.rawPut(backOffer, key, value, ttl);
@@ -105,7 +102,6 @@ public class RawKVClient implements AutoCloseable {
         backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       }
     }
-    throw ERR_RETRY_LIMIT_EXCEEDED;
   }
 
   /**
@@ -145,7 +141,7 @@ public class RawKVClient implements AutoCloseable {
    */
   public ByteString get(ByteString key) {
     BackOffer backOffer = defaultBackOff();
-    for (int i = 0; i < MAX_RETRY_LIMIT; i++) {
+    while (true) {
       RegionStoreClient client = clientBuilder.build(key);
       try {
         return client.rawGet(defaultBackOff(), key);
@@ -153,7 +149,6 @@ public class RawKVClient implements AutoCloseable {
         backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       }
     }
-    throw ERR_RETRY_LIMIT_EXCEEDED;
   }
 
   /**

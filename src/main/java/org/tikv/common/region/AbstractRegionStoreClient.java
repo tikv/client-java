@@ -56,12 +56,12 @@ public abstract class AbstractRegionStoreClient
 
   @Override
   protected TikvGrpc.TikvBlockingStub getBlockingStub() {
-    return blockingStub.withDeadlineAfter(getConf().getTimeout(), getConf().getTimeoutUnit());
+    return blockingStub.withDeadlineAfter(getTimeout(), getConf().getTimeoutUnit());
   }
 
   @Override
   protected TikvGrpc.TikvStub getAsyncStub() {
-    return asyncStub.withDeadlineAfter(getConf().getTimeout(), getConf().getTimeoutUnit());
+    return asyncStub.withDeadlineAfter(getTimeout(), getConf().getTimeoutUnit());
   }
 
   @Override

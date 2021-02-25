@@ -500,7 +500,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
     return leaderWrapper
         .getBlockingStub()
-        .withDeadlineAfter(getConf().getTimeout(), getConf().getTimeoutUnit());
+        .withDeadlineAfter(getTimeout(), getConf().getTimeoutUnit());
   }
 
   @Override
@@ -510,7 +510,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
     return leaderWrapper
         .getAsyncStub()
-        .withDeadlineAfter(getConf().getTimeout(), getConf().getTimeoutUnit());
+        .withDeadlineAfter(getTimeout(), getConf().getTimeoutUnit());
   }
 
   private void initCluster() {
