@@ -366,6 +366,7 @@ public class RawKVClient implements AutoCloseable {
 
     while (!taskQueue.isEmpty()) {
       List<Batch> task = taskQueue.poll();
+      logger.info(Thread.currentThread().getName() + " - task has " + task.size() + " batches");
       for (Batch batch : task) {
         BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
         completionService.submit(

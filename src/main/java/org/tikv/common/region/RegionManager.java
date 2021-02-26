@@ -219,12 +219,10 @@ public class RegionManager {
       this.pdClient = pdClient;
     }
 
-    public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
+    public synchronized TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
       Long regionId;
       ++total;
-      synchronized (lock) {
-        regionId = keyToRegionIdCache.get(Key.toRawKey(key));
-      }
+      regionId = keyToRegionIdCache.get(Key.toRawKey(key));
       if (logger.isDebugEnabled()) {
         logger.debug(
             String.format("getRegionByKey key[%s] -> ID[%s]", formatBytesUTF8(key), regionId));
@@ -240,9 +238,7 @@ public class RegionManager {
         return region;
       }
       TiRegion region;
-      synchronized (lock) {
-        region = regionCache.get(regionId);
-      }
+      region = regionCache.get(regionId);
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
       }
@@ -250,14 +246,12 @@ public class RegionManager {
       return region;
     }
 
-    private boolean putRegion(TiRegion region) {
+    private synchronized boolean putRegion(TiRegion region) {
       if (logger.isDebugEnabled()) {
         logger.debug("putRegion: " + region);
       }
-      synchronized (lock) {
-        regionCache.put(region.getId(), region);
-        keyToRegionIdCache.put(makeRange(region.getStartKey(), region.getEndKey()), region.getId());
-      }
+      regionCache.put(region.getId(), region);
+      keyToRegionIdCache.put(makeRange(region.getStartKey(), region.getEndKey()), region.getId());
       return true;
     }
 
@@ -277,62 +271,52 @@ public class RegionManager {
     }
 
     /** Removes region associated with regionId from regionCache. */
-    public void invalidateRegion(long regionId) {
-      synchronized (lock) {
-        try {
+    public synchronized void invalidateRegion(long regionId) {
+      try {
+        if (logger.isDebugEnabled()) {
+          logger.debug(String.format("invalidateRegion ID[%s]", regionId));
+        }
+        TiRegion region = regionCache.get(regionId);
+        keyToRegionIdCache.remove(makeRange(region.getStartKey(), region.getEndKey()));
+      } catch (Exception ignore) {
+      } finally {
+        regionCache.remove(regionId);
+      }
+    }
+
+    public synchronized void invalidateAllRegionForStore(long storeId) {
+      List<TiRegion> regionToRemove = new ArrayList<>();
+      for (TiRegion r : regionCache.values()) {
+        if (r.getLeader().getStoreId() == storeId) {
           if (logger.isDebugEnabled()) {
-            logger.debug(String.format("invalidateRegion ID[%s]", regionId));
+            logger.debug(String.format("invalidateAllRegionForStore Region[%s]", r));
           }
-          TiRegion region = regionCache.get(regionId);
-          keyToRegionIdCache.remove(makeRange(region.getStartKey(), region.getEndKey()));
-        } catch (Exception ignore) {
-        } finally {
-          regionCache.remove(regionId);
+          regionToRemove.add(r);
         }
+      }
+
+      // remove region
+      for (TiRegion r : regionToRemove) {
+        regionCache.remove(r.getId());
+        keyToRegionIdCache.remove(makeRange(r.getStartKey(), r.getEndKey()));
       }
     }
 
-    public void invalidateAllRegionForStore(long storeId) {
-      synchronized (lock) {
-        List<TiRegion> regionToRemove = new ArrayList<>();
-        for (TiRegion r : regionCache.values()) {
-          if (r.getLeader().getStoreId() == storeId) {
-            if (logger.isDebugEnabled()) {
-              logger.debug(String.format("invalidateAllRegionForStore Region[%s]", r));
-            }
-            regionToRemove.add(r);
-          }
-        }
-
-        // remove region
-        for (TiRegion r : regionToRemove) {
-          regionCache.remove(r.getId());
-          keyToRegionIdCache.remove(makeRange(r.getStartKey(), r.getEndKey()));
-        }
-      }
+    public synchronized void invalidateStore(long storeId) {
+      storeCache.remove(storeId);
     }
 
-    public void invalidateStore(long storeId) {
-      synchronized (lock) {
-        storeCache.remove(storeId);
-      }
-    }
-
-    public Store getStoreById(long id, BackOffer backOffer) {
+    public synchronized Store getStoreById(long id, BackOffer backOffer) {
       try {
         Store store;
-        synchronized (lock) {
-          store = storeCache.get(id);
-        }
+        store = storeCache.get(id);
         if (store == null) {
           store = pdClient.getStore(backOffer, id);
         }
         if (store.getState().equals(StoreState.Tombstone)) {
           return null;
         }
-        synchronized (lock) {
-          storeCache.put(id, store);
-        }
+        storeCache.put(id, store);
         return store;
       } catch (Exception e) {
         throw new GrpcException(e);

@@ -221,7 +221,10 @@ public class TiSession implements AutoCloseable {
           batchPutThreadPool =
               Executors.newFixedThreadPool(
                   conf.getBatchPutConcurrency(),
-                  new ThreadFactoryBuilder().setDaemon(true).build());
+                  new ThreadFactoryBuilder()
+                      .setNameFormat("batchPut-thread-%d")
+                      .setDaemon(true)
+                      .build());
         }
         res = batchPutThreadPool;
       }
