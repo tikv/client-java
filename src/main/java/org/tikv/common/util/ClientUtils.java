@@ -18,6 +18,7 @@ package org.tikv.common.util;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.TimeUnit;
@@ -102,10 +103,16 @@ public class ClientUtils {
   }
 
   public static void getTasks(
-      ExecutorCompletionService<Object> completionService, List<Batch> batches, int backOff) {
+      ExecutorCompletionService<List<Batch>> completionService,
+      Queue<List<Batch>> taskQueue,
+      List<Batch> batches,
+      int backOff) {
     try {
       for (int i = 0; i < batches.size(); i++) {
-        completionService.take().get(backOff, TimeUnit.MILLISECONDS);
+        List<Batch> task = completionService.take().get(backOff, TimeUnit.MILLISECONDS);
+        if (!task.isEmpty()) {
+          taskQueue.offer(task);
+        }
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
