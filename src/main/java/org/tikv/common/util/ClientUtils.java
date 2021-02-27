@@ -83,7 +83,12 @@ public class ClientUtils {
 
   public static Map<TiRegion, List<ByteString>> groupKeysByRegion(
       RegionManager regionManager, Set<ByteString> keys, BackOffer backoffer) {
-    return groupKeysByRegion(regionManager, new ArrayList<>(keys), backoffer);
+    return groupKeysByRegion(regionManager, new ArrayList<>(keys), backoffer, true);
+  }
+
+  public static Map<TiRegion, List<ByteString>> groupKeysByRegion(
+      RegionManager regionManager, List<ByteString> keys, BackOffer backoffer) {
+    return groupKeysByRegion(regionManager, new ArrayList<>(keys), backoffer, false);
   }
 
   /**
@@ -93,9 +98,11 @@ public class ClientUtils {
    * @return a mapping of keys and their region
    */
   public static Map<TiRegion, List<ByteString>> groupKeysByRegion(
-      RegionManager regionManager, List<ByteString> keys, BackOffer backoffer) {
+      RegionManager regionManager, List<ByteString> keys, BackOffer backoffer, boolean sorted) {
     Map<TiRegion, List<ByteString>> groups = new HashMap<>();
-    keys.sort((k1, k2) -> FastByteComparisons.compareTo(k1.toByteArray(), k2.toByteArray()));
+    if (!sorted) {
+      keys.sort((k1, k2) -> FastByteComparisons.compareTo(k1.toByteArray(), k2.toByteArray()));
+    }
     TiRegion lastRegion = null;
     for (ByteString key : keys) {
       if (lastRegion == null || !lastRegion.contains(key)) {
