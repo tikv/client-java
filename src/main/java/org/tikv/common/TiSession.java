@@ -15,6 +15,8 @@
 
 package org.tikv.common;
 
+import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
@@ -380,7 +382,8 @@ public class TiSession implements AutoCloseable {
   private List<TiRegion> splitRegion(List<ByteString> splitKeys, BackOffer backOffer) {
     List<TiRegion> regions = new ArrayList<>();
 
-    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(splitKeys);
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(regionManager, splitKeys, backOffer);
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
 
       Pair<TiRegion, Metapb.Store> pair =
@@ -416,11 +419,6 @@ public class TiSession implements AutoCloseable {
 
     logger.info("splitRegion: return region size={}", regions.size());
     return regions;
-  }
-
-  private Map<TiRegion, List<ByteString>> groupKeysByRegion(List<ByteString> keys) {
-    return keys.stream()
-        .collect(Collectors.groupingBy(clientBuilder.getRegionManager()::getRegionByKey));
   }
 
   @Override

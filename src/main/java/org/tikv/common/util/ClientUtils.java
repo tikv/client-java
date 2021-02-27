@@ -16,14 +16,13 @@
 package org.tikv.common.util;
 
 import com.google.protobuf.ByteString;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.tikv.common.exception.TiKVException;
+import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Kvrpcpb;
 
@@ -80,6 +79,31 @@ public class ClientUtils {
       Batch batch = new Batch(region, keys.subList(start, end), values.subList(start, end));
       batches.add(batch);
     }
+  }
+
+  public static Map<TiRegion, List<ByteString>> groupKeysByRegion(
+      RegionManager regionManager, Set<ByteString> keys, BackOffer backoffer) {
+    return groupKeysByRegion(regionManager, new ArrayList<>(keys), backoffer);
+  }
+
+  /**
+   * Group by list of keys according to its region
+   *
+   * @param keys keys
+   * @return a mapping of keys and their region
+   */
+  public static Map<TiRegion, List<ByteString>> groupKeysByRegion(
+      RegionManager regionManager, List<ByteString> keys, BackOffer backoffer) {
+    Map<TiRegion, List<ByteString>> groups = new HashMap<>();
+    keys.sort((k1, k2) -> FastByteComparisons.compareTo(k1.toByteArray(), k2.toByteArray()));
+    TiRegion lastRegion = null;
+    for (ByteString key : keys) {
+      if (lastRegion == null || !lastRegion.contains(key)) {
+        lastRegion = regionManager.getRegionByKey(key, backoffer);
+      }
+      groups.computeIfAbsent(lastRegion, k -> new ArrayList<>()).add(key);
+    }
+    return groups;
   }
 
   public static List<Kvrpcpb.KvPair> getKvPairs(

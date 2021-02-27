@@ -15,8 +15,7 @@
 
 package org.tikv.txn;
 
-import static org.tikv.common.util.ClientUtils.appendBatches;
-import static org.tikv.common.util.ClientUtils.getKvPairs;
+import static org.tikv.common.util.ClientUtils.*;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
@@ -24,7 +23,6 @@ import java.util.*;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
@@ -137,7 +135,8 @@ public class KVClient implements AutoCloseable {
     ExecutorCompletionService<List<Kvrpcpb.KvPair>> completionService =
         new ExecutorCompletionService<>(executorService);
 
-    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(keys);
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(clientBuilder.getRegionManager(), keys, backOffer);
     List<Batch> batches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
@@ -178,7 +177,8 @@ public class KVClient implements AutoCloseable {
 
   private List<Kvrpcpb.KvPair> doSendBatchGetWithRefetchRegion(
       BackOffer backOffer, Batch batch, long version) {
-    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(batch.keys);
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(clientBuilder.getRegionManager(), batch.keys, backOffer);
     List<Batch> retryBatches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
@@ -193,17 +193,6 @@ public class KVClient implements AutoCloseable {
       results.addAll(batchResult);
     }
     return results;
-  }
-
-  /**
-   * Group by list of keys according to its region
-   *
-   * @param keys keys
-   * @return a mapping of keys and their region
-   */
-  private Map<TiRegion, List<ByteString>> groupKeysByRegion(List<ByteString> keys) {
-    return keys.stream()
-        .collect(Collectors.groupingBy(clientBuilder.getRegionManager()::getRegionByKey));
   }
 
   private Iterator<Kvrpcpb.KvPair> scanIterator(
