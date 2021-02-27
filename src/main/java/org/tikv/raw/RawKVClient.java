@@ -356,7 +356,8 @@ public class RawKVClient implements AutoCloseable {
     ExecutorCompletionService<List<Batch>> completionService =
         new ExecutorCompletionService<>(batchPutThreadPool);
 
-    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(kvPairs.keySet());
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(clientBuilder.getRegionManager(), kvPairs.keySet(), backOffer);
     List<Batch> batches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
@@ -403,7 +404,8 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private List<Batch> doSendBatchPutWithRefetchRegion(BackOffer backOffer, Batch batch, long ttl) {
-    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(batch.keys);
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(clientBuilder.getRegionManager(), batch.keys, backOffer);
     List<Batch> retryBatches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
@@ -422,7 +424,8 @@ public class RawKVClient implements AutoCloseable {
     ExecutorCompletionService<List<KvPair>> completionService =
         new ExecutorCompletionService<>(batchGetThreadPool);
 
-    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(keys);
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(clientBuilder.getRegionManager(), keys, backOffer);
     List<Batch> batches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
@@ -460,7 +463,8 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private List<KvPair> doSendBatchGetWithRefetchRegion(BackOffer backOffer, Batch batch) {
-    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(batch.keys);
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(clientBuilder.getRegionManager(), batch.keys, backOffer);
     List<Batch> retryBatches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
@@ -540,29 +544,6 @@ public class RawKVClient implements AutoCloseable {
       doSendDeleteRangeWithRetry(backOffer, region, start, end);
     }
     return null;
-  }
-
-  /**
-   * Group by list of keys according to its region
-   *
-   * @param keys keys
-   * @return a mapping of keys and their region
-   */
-  private Map<TiRegion, List<ByteString>> groupKeysByRegion(Set<ByteString> keys) {
-    Map<TiRegion, List<ByteString>> groups = new HashMap<>();
-    TiRegion lastRegion = null;
-    for (ByteString key : keys) {
-      if (lastRegion == null || !lastRegion.contains(key)) {
-        lastRegion = clientBuilder.getRegionManager().getRegionByKey(key);
-      }
-      groups.computeIfAbsent(lastRegion, k -> new ArrayList<>()).add(key);
-    }
-    return groups;
-  }
-
-  private Map<TiRegion, List<ByteString>> groupKeysByRegion(List<ByteString> keys) {
-    return keys.stream()
-        .collect(Collectors.groupingBy(clientBuilder.getRegionManager()::getRegionByKey));
   }
 
   private static Map<ByteString, ByteString> mapKeysToValues(
