@@ -207,7 +207,6 @@ public class RegionManager {
     private final Map<Long, Store> storeCache;
     private final RangeMap<Key, Long> keyToRegionIdCache;
     private final ReadOnlyPDClient pdClient;
-    private final byte[] lock = new byte[0];
     private int total = 0;
     private int miss = 0;
 

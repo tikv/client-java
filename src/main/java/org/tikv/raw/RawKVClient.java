@@ -366,7 +366,6 @@ public class RawKVClient implements AutoCloseable {
 
     while (!taskQueue.isEmpty()) {
       List<Batch> task = taskQueue.poll();
-      logger.info(Thread.currentThread().getName() + " - task has " + task.size() + " batches");
       for (Batch batch : task) {
         BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
         completionService.submit(
@@ -383,18 +382,16 @@ public class RawKVClient implements AutoCloseable {
 
     if (oldRegion.equals(currentRegion)) {
       try (RegionStoreClient client = clientBuilder.build(batch.region); ) {
-        logger.info(Thread.currentThread().getName() + " - region unchanged");
         client.rawBatchPut(backOffer, batch, ttl);
         return new ArrayList<>();
       } catch (final TiKVException e) {
         // TODO: any elegant way to re-split the ranges if fails?
         backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-        logger.warn(Thread.currentThread().getName() + " - ReSplitting ranges for BatchPutRequest");
+        logger.warn("ReSplitting ranges for BatchPutRequest");
         // retry
         return doSendBatchPutWithRefetchRegion(backOffer, batch, ttl);
       }
     } else {
-      logger.info(Thread.currentThread().getName() + " - region changed");
       return doSendBatchPutWithRefetchRegion(backOffer, batch, ttl);
     }
   }
