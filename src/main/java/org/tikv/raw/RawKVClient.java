@@ -18,16 +18,14 @@ package org.tikv.raw;
 import static org.tikv.common.util.ClientUtils.*;
 
 import com.google.protobuf.ByteString;
+import io.prometheus.client.Histogram;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
-
-import io.prometheus.client.Histogram;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
-import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.operation.iterator.RawScanIterator;
@@ -53,10 +51,16 @@ public class RawKVClient implements AutoCloseable {
   private static final int RAW_BATCH_SCAN_SIZE = 16;
   private static final int RAW_BATCH_PAIR_COUNT = 512;
 
-  public static final Histogram RAW_GET_REQUEST_LATENCY = Histogram.build()
-      .name("client_java_raw_get_requests_latency").help("rawGet request latency.").register();
-  public static final Histogram RAW_PUT_REQUEST_LATENCY = Histogram.build()
-      .name("client_java_raw_put_requests_latency").help("rawPut request latency.").register();
+  public static final Histogram RAW_GET_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_raw_get_requests_latency")
+          .help("rawGet request latency.")
+          .register();
+  public static final Histogram RAW_PUT_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_raw_put_requests_latency")
+          .help("rawPut request latency.")
+          .register();
 
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
       new TiKVException("limit should be less than MAX_RAW_SCAN_LIMIT");
