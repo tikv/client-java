@@ -36,6 +36,7 @@ import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
+import org.tikv.common.policy.RetryPolicy;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
@@ -69,8 +70,8 @@ public class TiSession implements AutoCloseable {
   private volatile RegionManager regionManager;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private boolean isClosed = false;
-  private HTTPServer server;
-  private CollectorRegistry collectorRegistry;
+  private final HTTPServer server;
+  private final CollectorRegistry collectorRegistry;
 
   public TiSession(TiConfiguration conf) {
     this.conf = conf;
@@ -80,7 +81,12 @@ public class TiSession implements AutoCloseable {
       this.collectorRegistry = new CollectorRegistry();
       this.collectorRegistry.register(RawKVClient.RAW_GET_REQUEST_LATENCY);
       this.collectorRegistry.register(RawKVClient.RAW_PUT_REQUEST_LATENCY);
-      this.server = new HTTPServer(new InetSocketAddress(1234), this.collectorRegistry, true);
+      this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_GET_REQUEST_LATENCY);
+      this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_PUT_REQUEST_LATENCY);
+      this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
+      this.server =
+          new HTTPServer(
+              new InetSocketAddress(conf.getMetricsPort()), this.collectorRegistry, true);
       logger.info("http server is up " + this.server.getPort());
     } catch (Exception e) {
       logger.error("http server not up");

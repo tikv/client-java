@@ -54,12 +54,12 @@ public class RawKVClient implements AutoCloseable {
   public static final Histogram RAW_GET_REQUEST_LATENCY =
       Histogram.build()
           .name("client_java_raw_get_requests_latency")
-          .help("rawGet request latency.")
+          .help("client rawGet request latency.")
           .register();
   public static final Histogram RAW_PUT_REQUEST_LATENCY =
       Histogram.build()
           .name("client_java_raw_put_requests_latency")
-          .help("rawPut request latency.")
+          .help("client rawPut request latency.")
           .register();
 
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
