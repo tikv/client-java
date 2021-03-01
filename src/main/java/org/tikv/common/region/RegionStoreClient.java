@@ -80,6 +80,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           .name("client_java_grpc_raw_put_requests_latency")
           .help("grpc rawPut request latency.")
           .register();
+  public static final Histogram GRPC_RAW_BATCH_PUT_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_grpc_raw_batch_put_requests_latency")
+          .help("grpc rawBatchPut request latency.")
+          .register();
 
   private synchronized Boolean getIsV4() {
     if (isV4 == null) {
@@ -943,25 +948,30 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public void rawBatchPut(BackOffer backOffer, List<KvPair> kvPairs, long ttl) {
-    if (kvPairs.isEmpty()) {
-      return;
+    Histogram.Timer requestTimer = GRPC_RAW_BATCH_PUT_REQUEST_LATENCY.startTimer();
+    try {
+      if (kvPairs.isEmpty()) {
+        return;
+      }
+      Supplier<RawBatchPutRequest> factory =
+          () ->
+              RawBatchPutRequest.newBuilder()
+                  .setContext(region.getContext())
+                  .addAllPairs(kvPairs)
+                  .setTtl(ttl)
+                  .build();
+      KVErrorHandler<RawBatchPutResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawBatchPutResponse resp =
+          callWithRetry(backOffer, TikvGrpc.getRawBatchPutMethod(), factory, handler);
+      handleRawBatchPut(resp);
+    } finally {
+      requestTimer.observeDuration();
     }
-    Supplier<RawBatchPutRequest> factory =
-        () ->
-            RawBatchPutRequest.newBuilder()
-                .setContext(region.getContext())
-                .addAllPairs(kvPairs)
-                .setTtl(ttl)
-                .build();
-    KVErrorHandler<RawBatchPutResponse> handler =
-        new KVErrorHandler<>(
-            regionManager,
-            this,
-            region,
-            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-    RawBatchPutResponse resp =
-        callWithRetry(backOffer, TikvGrpc.getRawBatchPutMethod(), factory, handler);
-    handleRawBatchPut(resp);
   }
 
   public void rawBatchPut(BackOffer backOffer, Batch batch, long ttl) {

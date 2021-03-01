@@ -23,6 +23,7 @@ import static org.tikv.common.util.KeyRangeUtils.makeRange;
 import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
 import com.google.protobuf.ByteString;
+import io.prometheus.client.Histogram;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,6 +53,12 @@ public class RegionManager {
   private final boolean isReplicaRead;
 
   private final Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
+
+  public static final Histogram GET_REGION_BY_KEY_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_get_region_by_requests_latency")
+          .help("getRegionByKey request latency.")
+          .register();
 
   // To avoid double retrieval, we used the async version of grpc
   // When rpc not returned, instead of call again, it wait for previous one done
@@ -219,30 +226,35 @@ public class RegionManager {
     }
 
     public synchronized TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
-      Long regionId;
-      ++total;
-      regionId = keyToRegionIdCache.get(Key.toRawKey(key));
-      if (logger.isDebugEnabled()) {
-        logger.debug(
-            String.format("getRegionByKey key[%s] -> ID[%s]", formatBytesUTF8(key), regionId));
-      }
-
-      if (regionId == null) {
-        logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
-        ++miss;
-        TiRegion region = pdClient.getRegionByKey(backOffer, key);
-        if (!putRegion(region)) {
-          throw new TiClientInternalException("Invalid Region: " + region.toString());
+      Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
+      try {
+        Long regionId;
+        ++total;
+        regionId = keyToRegionIdCache.get(Key.toRawKey(key));
+        if (logger.isDebugEnabled()) {
+          logger.debug(
+              String.format("getRegionByKey key[%s] -> ID[%s]", formatBytesUTF8(key), regionId));
         }
-        return region;
-      }
-      TiRegion region;
-      region = regionCache.get(regionId);
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
-      }
 
-      return region;
+        if (regionId == null) {
+          logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
+          ++miss;
+          TiRegion region = pdClient.getRegionByKey(backOffer, key);
+          if (!putRegion(region)) {
+            throw new TiClientInternalException("Invalid Region: " + region.toString());
+          }
+          return region;
+        }
+        TiRegion region;
+        region = regionCache.get(regionId);
+        if (logger.isDebugEnabled()) {
+          logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
+        }
+
+        return region;
+      } finally {
+        requestTimer.observeDuration();
+      }
     }
 
     private synchronized boolean putRegion(TiRegion region) {

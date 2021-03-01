@@ -61,6 +61,11 @@ public class RawKVClient implements AutoCloseable {
           .name("client_java_raw_put_requests_latency")
           .help("client rawPut request latency.")
           .register();
+  public static final Histogram RAW_BATCH_PUT_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_raw_batch_put_requests_latency")
+          .help("client rawBatchPut request latency.")
+          .register();
 
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
       new TiKVException("limit should be less than MAX_RAW_SCAN_LIMIT");
@@ -130,7 +135,12 @@ public class RawKVClient implements AutoCloseable {
    * @param ttl the TTL of keys to be put (in seconds), 0 means the keys will never be outdated
    */
   public void batchPut(Map<ByteString, ByteString> kvPairs, long ttl) {
-    doSendBatchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs, ttl);
+    Histogram.Timer requestTimer = RAW_BATCH_PUT_REQUEST_LATENCY.startTimer();
+    try {
+      doSendBatchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs, ttl);
+    } finally {
+      requestTimer.observeDuration();
+    }
   }
 
   private void batchPut(BackOffer backOffer, List<ByteString> keys, List<ByteString> values) {
