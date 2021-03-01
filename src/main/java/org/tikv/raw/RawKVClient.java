@@ -21,10 +21,13 @@ import com.google.protobuf.ByteString;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
+
+import io.prometheus.client.Histogram;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.operation.iterator.RawScanIterator;
@@ -49,6 +52,11 @@ public class RawKVClient implements AutoCloseable {
   private static final int RAW_BATCH_GET_SIZE = 16 * 1024; // 16 K
   private static final int RAW_BATCH_SCAN_SIZE = 16;
   private static final int RAW_BATCH_PAIR_COUNT = 512;
+
+  public static final Histogram RAW_GET_REQUEST_LATENCY = Histogram.build()
+      .name("client_java_raw_get_requests_latency").help("rawGet request latency.").register();
+  public static final Histogram RAW_PUT_REQUEST_LATENCY = Histogram.build()
+      .name("client_java_raw_put_requests_latency").help("rawPut request latency.").register();
 
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
       new TiKVException("limit should be less than MAX_RAW_SCAN_LIMIT");
@@ -85,15 +93,20 @@ public class RawKVClient implements AutoCloseable {
    * @param ttl the ttl of the key (in seconds), 0 means the key will never be outdated
    */
   public void put(ByteString key, ByteString value, long ttl) {
-    BackOffer backOffer = defaultBackOff();
-    while (true) {
-      RegionStoreClient client = clientBuilder.build(key);
-      try {
-        client.rawPut(backOffer, key, value, ttl);
-        return;
-      } catch (final TiKVException e) {
-        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+    Histogram.Timer requestTimer = RAW_PUT_REQUEST_LATENCY.startTimer();
+    try {
+      BackOffer backOffer = defaultBackOff();
+      while (true) {
+        RegionStoreClient client = clientBuilder.build(key);
+        try {
+          client.rawPut(backOffer, key, value, ttl);
+          return;
+        } catch (final TiKVException e) {
+          backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+        }
       }
+    } finally {
+      requestTimer.observeDuration();
     }
   }
 
@@ -133,14 +146,19 @@ public class RawKVClient implements AutoCloseable {
    * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
    */
   public ByteString get(ByteString key) {
-    BackOffer backOffer = defaultBackOff();
-    while (true) {
-      RegionStoreClient client = clientBuilder.build(key);
-      try {
-        return client.rawGet(defaultBackOff(), key);
-      } catch (final TiKVException e) {
-        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+    Histogram.Timer requestTimer = RAW_GET_REQUEST_LATENCY.startTimer();
+    try {
+      BackOffer backOffer = defaultBackOff();
+      while (true) {
+        RegionStoreClient client = clientBuilder.build(key);
+        try {
+          return client.rawGet(defaultBackOff(), key);
+        } catch (final TiKVException e) {
+          backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+        }
       }
+    } finally {
+      requestTimer.observeDuration();
     }
   }
 

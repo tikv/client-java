@@ -18,6 +18,8 @@ package org.tikv.common;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
+
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +28,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import io.prometheus.client.CollectorRegistry;
+import io.prometheus.client.exporter.HTTPServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.catalog.Catalog;
@@ -66,11 +71,23 @@ public class TiSession implements AutoCloseable {
   private volatile RegionManager regionManager;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private boolean isClosed = false;
+  private HTTPServer server;
+  private CollectorRegistry collectorRegistry;
 
   public TiSession(TiConfiguration conf) {
     this.conf = conf;
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
     this.client = PDClient.createRaw(conf, channelFactory);
+    try {
+      this.collectorRegistry = new CollectorRegistry();
+      this.collectorRegistry.register(RawKVClient.RAW_GET_REQUEST_LATENCY);
+      this.collectorRegistry.register(RawKVClient.RAW_PUT_REQUEST_LATENCY);
+      this.server = new HTTPServer(new InetSocketAddress(1234), this.collectorRegistry, true);
+      logger.info("http server is up " + this.server.getPort());
+    } catch (Exception e) {
+      logger.error("http server not up");
+      throw new RuntimeException(e);
+    }
   }
 
   @VisibleForTesting
@@ -285,6 +302,10 @@ public class TiSession implements AutoCloseable {
     return channelFactory;
   }
 
+  public CollectorRegistry getCollectorRegistry() {
+    return collectorRegistry;
+  }
+
   /**
    * This is used for setting call back function to invalidate cache information
    *
@@ -398,6 +419,10 @@ public class TiSession implements AutoCloseable {
     if (isClosed) {
       logger.warn("this TiSession is already closed!");
       return;
+    }
+
+    if (server != null) {
+      server.stop();
     }
 
     isClosed = true;
