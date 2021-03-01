@@ -96,6 +96,7 @@ public class TiSession implements AutoCloseable {
       logger.error("http server not up");
       throw new RuntimeException(e);
     }
+    logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
 
   @VisibleForTesting
