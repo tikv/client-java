@@ -46,6 +46,7 @@ public class RawKVClient implements AutoCloseable {
 
   // https://www.github.com/pingcap/tidb/blob/master/store/tikv/rawkv.go
   private static final int MAX_RAW_SCAN_LIMIT = 10240;
+  private static final int MAX_RAW_BATCH_LIMIT = 1024;
   private static final int RAW_BATCH_PUT_SIZE = 1024 * 1024; // 1 MB
   private static final int RAW_BATCH_GET_SIZE = 16 * 1024; // 16 K
   private static final int RAW_BATCH_SCAN_SIZE = 16;
@@ -392,7 +393,8 @@ public class RawKVClient implements AutoCloseable {
           entry.getKey(),
           entry.getValue(),
           entry.getValue().stream().map(kvPairs::get).collect(Collectors.toList()),
-          RAW_BATCH_PUT_SIZE);
+          RAW_BATCH_PUT_SIZE,
+          MAX_RAW_BATCH_LIMIT);
     }
     Queue<List<Batch>> taskQueue = new LinkedList<>();
     taskQueue.offer(batches);
@@ -432,7 +434,8 @@ public class RawKVClient implements AutoCloseable {
           entry.getKey(),
           entry.getValue(),
           entry.getValue().stream().map(batch.map::get).collect(Collectors.toList()),
-          RAW_BATCH_PUT_SIZE);
+          RAW_BATCH_PUT_SIZE,
+          MAX_RAW_BATCH_LIMIT);
     }
 
     return retryBatches;
@@ -447,7 +450,8 @@ public class RawKVClient implements AutoCloseable {
     List<Batch> batches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
-      appendBatches(batches, entry.getKey(), entry.getValue(), RAW_BATCH_GET_SIZE);
+      appendBatches(
+          batches, entry.getKey(), entry.getValue(), RAW_BATCH_GET_SIZE, MAX_RAW_BATCH_LIMIT);
     }
 
     for (Batch batch : batches) {
@@ -478,7 +482,8 @@ public class RawKVClient implements AutoCloseable {
     List<Batch> retryBatches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
-      appendBatches(retryBatches, entry.getKey(), entry.getValue(), RAW_BATCH_GET_SIZE);
+      appendBatches(
+          retryBatches, entry.getKey(), entry.getValue(), RAW_BATCH_GET_SIZE, MAX_RAW_BATCH_LIMIT);
     }
 
     ArrayList<KvPair> results = new ArrayList<>();

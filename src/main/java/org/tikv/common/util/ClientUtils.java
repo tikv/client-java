@@ -36,14 +36,20 @@ public class ClientUtils {
    * @param batchMaxSizeInBytes batch max limit
    */
   public static void appendBatches(
-      List<Batch> batches, TiRegion region, List<ByteString> keys, int batchMaxSizeInBytes) {
+      List<Batch> batches,
+      TiRegion region,
+      List<ByteString> keys,
+      int batchMaxSizeInBytes,
+      int batchLimit) {
     if (keys == null) {
       return;
     }
     int len = keys.size();
     for (int start = 0, end; start < len; start = end) {
       int size = 0;
-      for (end = start; end < len && size < batchMaxSizeInBytes; end++) {
+      for (end = start;
+          end < len && size < batchMaxSizeInBytes && end - start < batchLimit;
+          end++) {
         size += keys.get(end).size();
       }
       Batch batch = new Batch(region, keys.subList(start, end));
@@ -65,14 +71,17 @@ public class ClientUtils {
       TiRegion region,
       List<ByteString> keys,
       List<ByteString> values,
-      int batchMaxSizeInBytes) {
+      int batchMaxSizeInBytes,
+      int batchLimit) {
     if (keys == null) {
       return;
     }
     int len = keys.size();
     for (int start = 0, end; start < len; start = end) {
       int size = 0;
-      for (end = start; end < len && size < batchMaxSizeInBytes; end++) {
+      for (end = start;
+          end < len && size < batchMaxSizeInBytes && end - start < batchLimit;
+          end++) {
         size += keys.get(end).size();
         size += values.get(end).size();
       }
