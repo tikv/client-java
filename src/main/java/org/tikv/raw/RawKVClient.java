@@ -459,23 +459,15 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private List<KvPair> doSendBatchGetInBatchesWithRetry(BackOffer backOffer, Batch batch) {
-    TiRegion oldRegion = batch.region;
-    TiRegion currentRegion =
-        clientBuilder.getRegionManager().getRegionByKey(oldRegion.getStartKey());
+    RegionStoreClient client = clientBuilder.build(batch.region);
+    try {
+      return client.rawBatchGet(backOffer, batch.keys);
+    } catch (final TiKVException e) {
+      backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+      clientBuilder.getRegionManager().invalidateRegion(batch.region.getId());
+      logger.warn("ReSplitting ranges for BatchGetRequest", e);
 
-    if (oldRegion.equals(currentRegion)) {
-      RegionStoreClient client = clientBuilder.build(batch.region);
-      try {
-        return client.rawBatchGet(backOffer, batch.keys);
-      } catch (final TiKVException e) {
-        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-        clientBuilder.getRegionManager().invalidateRegion(batch.region.getId());
-        logger.warn("ReSplitting ranges for BatchGetRequest", e);
-
-        // retry
-        return doSendBatchGetWithRefetchRegion(backOffer, batch);
-      }
-    } else {
+      // retry
       return doSendBatchGetWithRefetchRegion(backOffer, batch);
     }
   }
@@ -532,22 +524,16 @@ public class RawKVClient implements AutoCloseable {
 
   private Object doSendDeleteRangeWithRetry(
       BackOffer backOffer, TiRegion region, ByteString startKey, ByteString endKey) {
-    TiRegion currentRegion = clientBuilder.getRegionManager().getRegionByKey(region.getStartKey());
+    RegionStoreClient client = clientBuilder.build(region);
+    try {
+      client.rawDeleteRange(backOffer, startKey, endKey);
+      return null;
+    } catch (final TiKVException e) {
+      backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+      clientBuilder.getRegionManager().invalidateRegion(region.getId());
+      logger.warn("ReSplitting ranges for BatchDeleteRangeRequest", e);
 
-    if (region.equals(currentRegion)) {
-      RegionStoreClient client = clientBuilder.build(region);
-      try {
-        client.rawDeleteRange(backOffer, startKey, endKey);
-        return null;
-      } catch (final TiKVException e) {
-        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-        clientBuilder.getRegionManager().invalidateRegion(region.getId());
-        logger.warn("ReSplitting ranges for BatchDeleteRangeRequest", e);
-
-        // retry
-        return doSendDeleteRangeWithRefetchRegion(backOffer, startKey, endKey);
-      }
-    } else {
+      // retry
       return doSendDeleteRangeWithRefetchRegion(backOffer, startKey, endKey);
     }
   }
