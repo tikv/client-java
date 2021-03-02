@@ -524,8 +524,8 @@ public class RawKVClient implements AutoCloseable {
 
   private Object doSendDeleteRangeWithRetry(
       BackOffer backOffer, TiRegion region, ByteString startKey, ByteString endKey) {
-    RegionStoreClient client = clientBuilder.build(region);
-    try {
+    try (RegionStoreClient client = clientBuilder.build(region)) {
+      client.setTimeout(conf.getScanTimeout());
       client.rawDeleteRange(backOffer, startKey, endKey);
       return null;
     } catch (final TiKVException e) {

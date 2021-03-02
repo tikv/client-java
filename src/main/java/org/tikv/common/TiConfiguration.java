@@ -27,8 +27,9 @@ import org.tikv.kvproto.Kvrpcpb.CommandPri;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
 public class TiConfiguration implements Serializable {
-  private static final int DEF_TIMEOUT = 20;
-  private static final TimeUnit DEF_TIMEOUT_UNIT = TimeUnit.SECONDS;
+  private static final int DEF_TIMEOUT = 600;
+  private static final int DEF_SCAN_TIMEOUT = 20 * 1000;
+  private static final TimeUnit DEF_TIMEOUT_UNIT = TimeUnit.MILLISECONDS;
   private static final int DEF_SCAN_BATCH_SIZE = 10240;
   private static final boolean DEF_IGNORE_TRUNCATE = true;
   private static final boolean DEF_TRUNCATE_AS_WARNING = false;
@@ -60,6 +61,7 @@ public class TiConfiguration implements Serializable {
   private static final int DEF_METRICS_PORT = 3140;
 
   private int timeout = DEF_TIMEOUT;
+  private int scanTimeout = DEF_SCAN_TIMEOUT;
   private TimeUnit timeoutUnit = DEF_TIMEOUT_UNIT;
   private boolean ignoreTruncate = DEF_IGNORE_TRUNCATE;
   private boolean truncateAsWarning = DEF_TRUNCATE_AS_WARNING;
@@ -138,6 +140,15 @@ public class TiConfiguration implements Serializable {
 
   public TiConfiguration setTimeout(int timeout) {
     this.timeout = timeout;
+    return this;
+  }
+
+  public int getScanTimeout() {
+    return scanTimeout;
+  }
+
+  public TiConfiguration setScanTimeout(int scanTimeout) {
+    this.scanTimeout = scanTimeout;
     return this;
   }
 
