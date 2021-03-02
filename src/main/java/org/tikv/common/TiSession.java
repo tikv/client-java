@@ -268,7 +268,10 @@ public class TiSession implements AutoCloseable {
           batchGetThreadPool =
               Executors.newFixedThreadPool(
                   conf.getBatchGetConcurrency(),
-                  new ThreadFactoryBuilder().setDaemon(true).build());
+                  new ThreadFactoryBuilder()
+                      .setNameFormat("batchGet-thread-%d")
+                      .setDaemon(true)
+                      .build());
         }
         res = batchGetThreadPool;
       }
@@ -284,7 +287,10 @@ public class TiSession implements AutoCloseable {
           batchScanThreadPool =
               Executors.newFixedThreadPool(
                   conf.getBatchScanConcurrency(),
-                  new ThreadFactoryBuilder().setDaemon(true).build());
+                  new ThreadFactoryBuilder()
+                      .setNameFormat("batchScan-thread-%d")
+                      .setDaemon(true)
+                      .build());
         }
         res = batchScanThreadPool;
       }
@@ -300,7 +306,10 @@ public class TiSession implements AutoCloseable {
           deleteRangeThreadPool =
               Executors.newFixedThreadPool(
                   conf.getDeleteRangeConcurrency(),
-                  new ThreadFactoryBuilder().setDaemon(true).build());
+                  new ThreadFactoryBuilder()
+                      .setNameFormat("deleteRange-thread-%d")
+                      .setDaemon(true)
+                      .build());
         }
         res = deleteRangeThreadPool;
       }
@@ -442,6 +451,18 @@ public class TiSession implements AutoCloseable {
     }
     if (indexScanThreadPool != null) {
       indexScanThreadPool.shutdownNow();
+    }
+    if (batchGetThreadPool != null) {
+      batchGetThreadPool.shutdownNow();
+    }
+    if (batchPutThreadPool != null) {
+      batchPutThreadPool.shutdownNow();
+    }
+    if (batchScanThreadPool != null) {
+      batchScanThreadPool.shutdownNow();
+    }
+    if (deleteRangeThreadPool != null) {
+      deleteRangeThreadPool.shutdownNow();
     }
     if (regionManager != null) {
       if (logger.isDebugEnabled()) {
