@@ -230,7 +230,12 @@ public class RegionManager {
       try {
         Long regionId;
         ++total;
-        regionId = keyToRegionIdCache.get(Key.toRawKey(key));
+        if (key.isEmpty()) {
+          // if key is empty, it must be the start key.
+          regionId = keyToRegionIdCache.get(Key.toRawKey(key, true));
+        } else {
+          regionId = keyToRegionIdCache.get(Key.toRawKey(key));
+        }
         if (logger.isDebugEnabled()) {
           logger.debug(
               String.format("getRegionByKey key[%s] -> ID[%s]", formatBytesUTF8(key), regionId));
