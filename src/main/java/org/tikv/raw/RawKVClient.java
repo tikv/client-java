@@ -29,6 +29,8 @@ import org.tikv.common.TiSession;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.operation.iterator.RawScanIterator;
+import org.tikv.common.region.RegionStoreAsyncClient;
+import org.tikv.common.region.RegionStoreAsyncClient.RegionStoreAsyncClientBuilder;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
@@ -37,6 +39,7 @@ import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClient implements AutoCloseable {
   private final RegionStoreClientBuilder clientBuilder;
+  private final RegionStoreAsyncClientBuilder asyncBuilder;
   private final TiConfiguration conf;
   private final ExecutorService batchGetThreadPool;
   private final ExecutorService batchPutThreadPool;
@@ -71,7 +74,11 @@ public class RawKVClient implements AutoCloseable {
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
       new TiKVException("limit should be less than MAX_RAW_SCAN_LIMIT");
 
-  public RawKVClient(TiSession session, RegionStoreClientBuilder clientBuilder) {
+  public RawKVClient(
+      TiSession session,
+      RegionStoreClientBuilder clientBuilder,
+      RegionStoreAsyncClientBuilder asyncBuilder) {
+    this.asyncBuilder = asyncBuilder;
     Objects.requireNonNull(session, "session is null");
     Objects.requireNonNull(clientBuilder, "clientBuilder is null");
     this.conf = session.getConf();
@@ -165,9 +172,9 @@ public class RawKVClient implements AutoCloseable {
     try {
       BackOffer backOffer = defaultBackOff();
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key);
+        RegionStoreAsyncClient client = asyncBuilder.build(key);
         try {
-          return client.rawGet(defaultBackOff(), key);
+          return client.rawGet(key);
         } catch (final TiKVException e) {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
         }

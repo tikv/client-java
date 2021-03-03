@@ -40,6 +40,7 @@ import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.policy.RetryPolicy;
 import org.tikv.common.region.RegionManager;
+import org.tikv.common.region.RegionStoreAsyncClient.RegionStoreAsyncClientBuilder;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
@@ -123,7 +124,9 @@ public class TiSession implements AutoCloseable {
   public RawKVClient createRawClient() {
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
-    return new RawKVClient(this, builder);
+    RegionStoreAsyncClientBuilder asyncBuilder =
+        new RegionStoreAsyncClientBuilder(conf, channelFactory, this.getRegionManager(), client);
+    return new RawKVClient(this, builder, asyncBuilder);
   }
 
   public KVClient createKVClient() {
