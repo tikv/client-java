@@ -92,12 +92,7 @@ public class ClientUtils {
 
   public static Map<TiRegion, List<ByteString>> groupKeysByRegion(
       RegionManager regionManager, Set<ByteString> keys, BackOffer backoffer) {
-    return groupKeysByRegion(regionManager, new ArrayList<>(keys), backoffer, true);
-  }
-
-  public static Map<TiRegion, List<ByteString>> groupKeysByRegion(
-      RegionManager regionManager, List<ByteString> keys, BackOffer backoffer) {
-    return groupKeysByRegion(regionManager, new ArrayList<>(keys), backoffer, false);
+    return groupKeysByRegion(regionManager, new ArrayList<>(keys), backoffer);
   }
 
   /**
@@ -107,11 +102,9 @@ public class ClientUtils {
    * @return a mapping of keys and their region
    */
   public static Map<TiRegion, List<ByteString>> groupKeysByRegion(
-      RegionManager regionManager, List<ByteString> keys, BackOffer backoffer, boolean sorted) {
+      RegionManager regionManager, List<ByteString> keys, BackOffer backoffer) {
     Map<TiRegion, List<ByteString>> groups = new HashMap<>();
-    if (!sorted) {
-      keys.sort((k1, k2) -> FastByteComparisons.compareTo(k1.toByteArray(), k2.toByteArray()));
-    }
+    keys.sort((k1, k2) -> FastByteComparisons.compareTo(k1.toByteArray(), k2.toByteArray()));
     TiRegion lastRegion = null;
     for (ByteString key : keys) {
       if (lastRegion == null || !lastRegion.contains(key)) {
@@ -131,6 +124,9 @@ public class ClientUtils {
       for (int i = 0; i < batches.size(); i++) {
         result.addAll(completionService.take().get(backOff, TimeUnit.MILLISECONDS));
       }
+      result.sort(
+          (k1, k2) ->
+              FastByteComparisons.compareTo(k1.getKey().toByteArray(), k2.getKey().toByteArray()));
       return result;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -143,16 +139,10 @@ public class ClientUtils {
   }
 
   public static void getTasks(
-      ExecutorCompletionService<List<Batch>> completionService,
-      Queue<List<Batch>> taskQueue,
-      List<Batch> batches,
-      int backOff) {
+      ExecutorCompletionService<Object> completionService, List<Batch> batches, int backOff) {
     try {
       for (int i = 0; i < batches.size(); i++) {
-        List<Batch> task = completionService.take().get(backOff, TimeUnit.MILLISECONDS);
-        if (!task.isEmpty()) {
-          taskQueue.offer(task);
-        }
+        completionService.take().get(backOff, TimeUnit.MILLISECONDS);
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
