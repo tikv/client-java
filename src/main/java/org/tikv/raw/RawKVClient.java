@@ -52,20 +52,11 @@ public class RawKVClient implements AutoCloseable {
   private static final int RAW_BATCH_SCAN_SIZE = 16;
   private static final int RAW_BATCH_PAIR_COUNT = 512;
 
-  public static final Histogram RAW_GET_REQUEST_LATENCY =
+  public static final Histogram RAW_REQUEST_LATENCY =
       Histogram.build()
-          .name("client_java_raw_get_requests_latency")
-          .help("client rawGet request latency.")
-          .register();
-  public static final Histogram RAW_PUT_REQUEST_LATENCY =
-      Histogram.build()
-          .name("client_java_raw_put_requests_latency")
-          .help("client rawPut request latency.")
-          .register();
-  public static final Histogram RAW_BATCH_PUT_REQUEST_LATENCY =
-      Histogram.build()
-          .name("client_java_raw_batch_put_requests_latency")
-          .help("client rawBatchPut request latency.")
+          .name("client_java_raw_requests_latency")
+          .help("client raw request latency.")
+          .labelNames("type")
           .register();
 
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
@@ -103,7 +94,7 @@ public class RawKVClient implements AutoCloseable {
    * @param ttl the ttl of the key (in seconds), 0 means the key will never be outdated
    */
   public void put(ByteString key, ByteString value, long ttl) {
-    Histogram.Timer requestTimer = RAW_PUT_REQUEST_LATENCY.startTimer();
+    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels("client_raw_put").startTimer();
     try {
       BackOffer backOffer = defaultBackOff();
       while (true) {
@@ -136,7 +127,7 @@ public class RawKVClient implements AutoCloseable {
    * @param ttl the TTL of keys to be put (in seconds), 0 means the keys will never be outdated
    */
   public void batchPut(Map<ByteString, ByteString> kvPairs, long ttl) {
-    Histogram.Timer requestTimer = RAW_BATCH_PUT_REQUEST_LATENCY.startTimer();
+    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels("client_raw_batch_put").startTimer();
     try {
       doSendBatchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs, ttl);
     } finally {
@@ -161,7 +152,7 @@ public class RawKVClient implements AutoCloseable {
    * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
    */
   public ByteString get(ByteString key) {
-    Histogram.Timer requestTimer = RAW_GET_REQUEST_LATENCY.startTimer();
+    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels("client_raw_get").startTimer();
     try {
       BackOffer backOffer = defaultBackOff();
       while (true) {
@@ -184,41 +175,51 @@ public class RawKVClient implements AutoCloseable {
    * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
    */
   public List<KvPair> batchGet(List<ByteString> keys) {
-    BackOffer backOffer = defaultBackOff();
-    return doSendBatchGet(backOffer, keys);
+    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels("client_raw_batch_get").startTimer();
+    try {
+      BackOffer backOffer = defaultBackOff();
+      return doSendBatchGet(backOffer, keys);
+    } finally {
+      requestTimer.observeDuration();
+    }
   }
 
   public List<List<KvPair>> batchScan(List<ScanOption> ranges) {
-    if (ranges.isEmpty()) {
-      return new ArrayList<>();
-    }
-    ExecutorCompletionService<Pair<Integer, List<KvPair>>> completionService =
-        new ExecutorCompletionService<>(batchScanThreadPool);
-    int num = 0;
-    for (ScanOption scanOption : ranges) {
-      int i = num;
-      completionService.submit(() -> Pair.create(i, scan(scanOption)));
-      ++num;
-    }
-    List<List<KvPair>> scanResults = new ArrayList<>();
-    for (int i = 0; i < num; i++) {
-      scanResults.add(new ArrayList<>());
-    }
-    for (int i = 0; i < num; i++) {
-      try {
-        Pair<Integer, List<KvPair>> scanResult =
-            completionService.take().get(BackOffer.RAWKV_MAX_BACKOFF, TimeUnit.SECONDS);
-        scanResults.set(scanResult.first, scanResult.second);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new TiKVException("Current thread interrupted.", e);
-      } catch (TimeoutException e) {
-        throw new TiKVException("TimeOut Exceeded for current operation. ", e);
-      } catch (ExecutionException e) {
-        throw new TiKVException("Execution exception met.", e);
+    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels("client_raw_batch_scan").startTimer();
+    try {
+      if (ranges.isEmpty()) {
+        return new ArrayList<>();
       }
+      ExecutorCompletionService<Pair<Integer, List<KvPair>>> completionService =
+          new ExecutorCompletionService<>(batchScanThreadPool);
+      int num = 0;
+      for (ScanOption scanOption : ranges) {
+        int i = num;
+        completionService.submit(() -> Pair.create(i, scan(scanOption)));
+        ++num;
+      }
+      List<List<KvPair>> scanResults = new ArrayList<>();
+      for (int i = 0; i < num; i++) {
+        scanResults.add(new ArrayList<>());
+      }
+      for (int i = 0; i < num; i++) {
+        try {
+          Pair<Integer, List<KvPair>> scanResult =
+              completionService.take().get(BackOffer.RAWKV_MAX_BACKOFF, TimeUnit.SECONDS);
+          scanResults.set(scanResult.first, scanResult.second);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new TiKVException("Current thread interrupted.", e);
+        } catch (TimeoutException e) {
+          throw new TiKVException("TimeOut Exceeded for current operation. ", e);
+        } catch (ExecutionException e) {
+          throw new TiKVException("Execution exception met.", e);
+        }
+      }
+      return scanResults;
+    } finally {
+      requestTimer.observeDuration();
     }
-    return scanResults;
   }
 
   /**
@@ -243,11 +244,16 @@ public class RawKVClient implements AutoCloseable {
    * @return list of key-value pairs in range
    */
   public List<KvPair> scan(ByteString startKey, ByteString endKey, int limit, boolean keyOnly) {
-    Iterator<KvPair> iterator =
-        rawScanIterator(conf, clientBuilder, startKey, endKey, limit, keyOnly);
-    List<KvPair> result = new ArrayList<>();
-    iterator.forEachRemaining(result::add);
-    return result;
+    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels("client_raw_scan").startTimer();
+    try {
+      Iterator<KvPair> iterator =
+          rawScanIterator(conf, clientBuilder, startKey, endKey, limit, keyOnly);
+      List<KvPair> result = new ArrayList<>();
+      iterator.forEachRemaining(result::add);
+      return result;
+    } finally {
+      requestTimer.observeDuration();
+    }
   }
 
   /**
@@ -293,17 +299,24 @@ public class RawKVClient implements AutoCloseable {
    * @return list of key-value pairs in range
    */
   public List<KvPair> scan(ByteString startKey, ByteString endKey, boolean keyOnly) {
-    List<KvPair> result = new ArrayList<>();
-    while (true) {
-      Iterator<KvPair> iterator =
-          rawScanIterator(conf, clientBuilder, startKey, endKey, conf.getScanBatchSize(), keyOnly);
-      if (!iterator.hasNext()) {
-        break;
+    Histogram.Timer requestTimer =
+        RAW_REQUEST_LATENCY.labels("client_raw_scan_without_limit").startTimer();
+    try {
+      List<KvPair> result = new ArrayList<>();
+      while (true) {
+        Iterator<KvPair> iterator =
+            rawScanIterator(
+                conf, clientBuilder, startKey, endKey, conf.getScanBatchSize(), keyOnly);
+        if (!iterator.hasNext()) {
+          break;
+        }
+        iterator.forEachRemaining(result::add);
+        startKey = Key.toRawKey(result.get(result.size() - 1).getKey()).next().toByteString();
       }
-      iterator.forEachRemaining(result::add);
-      startKey = Key.toRawKey(result.get(result.size() - 1).getKey()).next().toByteString();
+      return result;
+    } finally {
+      requestTimer.observeDuration();
     }
-    return result;
   }
 
   private List<KvPair> scan(ScanOption scanOption) {
@@ -340,15 +353,20 @@ public class RawKVClient implements AutoCloseable {
    * @param key raw key to be deleted
    */
   public void delete(ByteString key) {
-    BackOffer backOffer = defaultBackOff();
-    while (true) {
-      RegionStoreClient client = clientBuilder.build(key);
-      try {
-        client.rawDelete(defaultBackOff(), key);
-        return;
-      } catch (final TiKVException e) {
-        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels("client_raw_delete").startTimer();
+    try {
+      BackOffer backOffer = defaultBackOff();
+      while (true) {
+        RegionStoreClient client = clientBuilder.build(key);
+        try {
+          client.rawDelete(defaultBackOff(), key);
+          return;
+        } catch (final TiKVException e) {
+          backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+        }
       }
+    } finally {
+      requestTimer.observeDuration();
     }
   }
 
@@ -362,8 +380,14 @@ public class RawKVClient implements AutoCloseable {
    * @param endKey raw start key to be deleted
    */
   public synchronized void deleteRange(ByteString startKey, ByteString endKey) {
-    BackOffer backOffer = defaultBackOff();
-    doSendDeleteRange(backOffer, startKey, endKey);
+    Histogram.Timer requestTimer =
+        RAW_REQUEST_LATENCY.labels("client_raw_delete_range").startTimer();
+    try {
+      BackOffer backOffer = defaultBackOff();
+      doSendDeleteRange(backOffer, startKey, endKey);
+    } finally {
+      requestTimer.observeDuration();
+    }
   }
 
   /**

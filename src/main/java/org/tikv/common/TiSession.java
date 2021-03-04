@@ -82,12 +82,8 @@ public class TiSession implements AutoCloseable {
     if (conf.isEnableMetrics()) {
       try {
         this.collectorRegistry = new CollectorRegistry();
-        this.collectorRegistry.register(RawKVClient.RAW_GET_REQUEST_LATENCY);
-        this.collectorRegistry.register(RawKVClient.RAW_PUT_REQUEST_LATENCY);
-        this.collectorRegistry.register(RawKVClient.RAW_BATCH_PUT_REQUEST_LATENCY);
-        this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_GET_REQUEST_LATENCY);
-        this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_PUT_REQUEST_LATENCY);
-        this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_BATCH_PUT_REQUEST_LATENCY);
+        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_LATENCY);
+        this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_REQUEST_LATENCY);
         this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
         this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
         this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
