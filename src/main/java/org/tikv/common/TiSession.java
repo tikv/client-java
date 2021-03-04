@@ -72,31 +72,33 @@ public class TiSession implements AutoCloseable {
   private volatile RegionManager regionManager;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private boolean isClosed = false;
-  private final HTTPServer server;
-  private final CollectorRegistry collectorRegistry;
+  private HTTPServer server;
+  private CollectorRegistry collectorRegistry;
 
   public TiSession(TiConfiguration conf) {
     this.conf = conf;
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
     this.client = PDClient.createRaw(conf, channelFactory);
-    try {
-      this.collectorRegistry = new CollectorRegistry();
-      this.collectorRegistry.register(RawKVClient.RAW_GET_REQUEST_LATENCY);
-      this.collectorRegistry.register(RawKVClient.RAW_PUT_REQUEST_LATENCY);
-      this.collectorRegistry.register(RawKVClient.RAW_BATCH_PUT_REQUEST_LATENCY);
-      this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_GET_REQUEST_LATENCY);
-      this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_PUT_REQUEST_LATENCY);
-      this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_BATCH_PUT_REQUEST_LATENCY);
-      this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
-      this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
-      this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
-      this.server =
-          new HTTPServer(
-              new InetSocketAddress(conf.getMetricsPort()), this.collectorRegistry, true);
-      logger.info("http server is up " + this.server.getPort());
-    } catch (Exception e) {
-      logger.error("http server not up");
-      throw new RuntimeException(e);
+    if (conf.isEnableMetrics()) {
+      try {
+        this.collectorRegistry = new CollectorRegistry();
+        this.collectorRegistry.register(RawKVClient.RAW_GET_REQUEST_LATENCY);
+        this.collectorRegistry.register(RawKVClient.RAW_PUT_REQUEST_LATENCY);
+        this.collectorRegistry.register(RawKVClient.RAW_BATCH_PUT_REQUEST_LATENCY);
+        this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_GET_REQUEST_LATENCY);
+        this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_PUT_REQUEST_LATENCY);
+        this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_BATCH_PUT_REQUEST_LATENCY);
+        this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
+        this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
+        this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
+        this.server =
+            new HTTPServer(
+                new InetSocketAddress(conf.getMetricsPort()), this.collectorRegistry, true);
+        logger.info("http server is up " + this.server.getPort());
+      } catch (Exception e) {
+        logger.error("http server not up");
+        throw new RuntimeException(e);
+      }
     }
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }

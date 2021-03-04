@@ -58,6 +58,7 @@ public class TiConfiguration implements Serializable {
   private static final KVMode DEF_KV_MODE = KVMode.TXN;
   private static final int DEF_RAW_CLIENT_CONCURRENCY = 200;
   private static final boolean DEF_IS_REPLICA_READ = false;
+  private static final boolean DEF_ENABLE_METRICS = false;
   private static final int DEF_METRICS_PORT = 3140;
 
   private int timeout = DEF_TIMEOUT;
@@ -92,6 +93,7 @@ public class TiConfiguration implements Serializable {
   private int kvClientConcurrency = DEF_KV_CLIENT_CONCURRENCY;
   private boolean isReplicaRead = DEF_IS_REPLICA_READ;
 
+  private boolean enableMetrics = DEF_ENABLE_METRICS;
   private int metricsPort = DEF_METRICS_PORT;
 
   public enum KVMode {
@@ -377,6 +379,14 @@ public class TiConfiguration implements Serializable {
 
   public void setReplicaRead(boolean isReplicaRead) {
     this.isReplicaRead = isReplicaRead;
+  }
+
+  public boolean isEnableMetrics() {
+    return enableMetrics;
+  }
+
+  public void setEnableMetrics(boolean enableMetrics) {
+    this.enableMetrics = enableMetrics;
   }
 
   public int getMetricsPort() {
