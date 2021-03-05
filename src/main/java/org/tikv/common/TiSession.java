@@ -83,6 +83,7 @@ public class TiSession implements AutoCloseable {
       try {
         this.collectorRegistry = new CollectorRegistry();
         this.collectorRegistry.register(RawKVClient.RAW_REQUEST_LATENCY);
+        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_FAILURE);
         this.collectorRegistry.register(RawKVClient.RAW_REQUEST_SUCCESS);
         this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_REQUEST_LATENCY);
         this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);

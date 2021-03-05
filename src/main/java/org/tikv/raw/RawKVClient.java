@@ -63,6 +63,13 @@ public class RawKVClient implements AutoCloseable {
   public static final Counter RAW_REQUEST_SUCCESS =
       Counter.build()
           .name("client_java_raw_requests_success")
+          .help("client raw request success.")
+          .labelNames("type")
+          .register();
+
+  public static final Counter RAW_REQUEST_FAILURE =
+      Counter.build()
+          .name("client_java_raw_requests_failure")
           .help("client raw request failure.")
           .labelNames("type")
           .register();
@@ -116,6 +123,9 @@ public class RawKVClient implements AutoCloseable {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
         }
       }
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
     } finally {
       requestTimer.observeDuration();
     }
@@ -142,6 +152,9 @@ public class RawKVClient implements AutoCloseable {
     try {
       doSendBatchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs, ttl);
       RAW_REQUEST_SUCCESS.labels(label).inc();
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
     } finally {
       requestTimer.observeDuration();
     }
@@ -178,6 +191,9 @@ public class RawKVClient implements AutoCloseable {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
         }
       }
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
     } finally {
       requestTimer.observeDuration();
     }
@@ -197,6 +213,9 @@ public class RawKVClient implements AutoCloseable {
       List<KvPair> result = doSendBatchGet(backOffer, keys);
       RAW_REQUEST_SUCCESS.labels(label).inc();
       return result;
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
     } finally {
       requestTimer.observeDuration();
     }
@@ -237,6 +256,9 @@ public class RawKVClient implements AutoCloseable {
       }
       RAW_REQUEST_SUCCESS.labels(label).inc();
       return scanResults;
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
     } finally {
       requestTimer.observeDuration();
     }
@@ -273,6 +295,9 @@ public class RawKVClient implements AutoCloseable {
       iterator.forEachRemaining(result::add);
       RAW_REQUEST_SUCCESS.labels(label).inc();
       return result;
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
     } finally {
       requestTimer.observeDuration();
     }
@@ -337,6 +362,9 @@ public class RawKVClient implements AutoCloseable {
       }
       RAW_REQUEST_SUCCESS.labels(label).inc();
       return result;
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
     } finally {
       requestTimer.observeDuration();
     }
@@ -390,6 +418,9 @@ public class RawKVClient implements AutoCloseable {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
         }
       }
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
     } finally {
       requestTimer.observeDuration();
     }
@@ -411,6 +442,9 @@ public class RawKVClient implements AutoCloseable {
       BackOffer backOffer = defaultBackOff();
       doSendDeleteRange(backOffer, startKey, endKey);
       RAW_REQUEST_SUCCESS.labels(label).inc();
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
     } finally {
       requestTimer.observeDuration();
     }
