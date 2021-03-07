@@ -148,11 +148,15 @@ public class TiConfiguration implements Serializable {
   }
 
   private static boolean getBoolean(String key) {
-    return Boolean.getBoolean(get(key));
+    return Boolean.parseBoolean(get(key));
   }
 
   private static boolean getBoolean(String key, boolean defaultValue) {
-    return getOption(key).map(Boolean::getBoolean).orElse(defaultValue);
+    try {
+      return getOption(key).map(Boolean::parseBoolean).orElse(defaultValue);
+    } catch (NumberFormatException e) {
+      return defaultValue;
+    }
   }
 
   private static Long getTimeAsMs(String key) {

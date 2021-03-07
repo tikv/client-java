@@ -142,14 +142,14 @@ public class ClientUtils {
     }
   }
 
-  public static void getTasks(
-      ExecutorCompletionService<List<Batch>> completionService,
-      Queue<List<Batch>> taskQueue,
-      List<Batch> batches,
+  public static <T> void getTasks(
+      ExecutorCompletionService<List<T>> completionService,
+      Queue<List<T>> taskQueue,
+      List<T> batches,
       int backOff) {
     try {
       for (int i = 0; i < batches.size(); i++) {
-        List<Batch> task = completionService.take().get(backOff, TimeUnit.MILLISECONDS);
+        List<T> task = completionService.take().get(backOff, TimeUnit.MILLISECONDS);
         if (!task.isEmpty()) {
           taskQueue.offer(task);
         }

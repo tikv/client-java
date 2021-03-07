@@ -533,11 +533,11 @@ public class RawKVClient implements AutoCloseable {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       logger.warn("ReSplitting ranges for BatchPutRequest");
       // retry
-      return doSendBatchPutWithRefetchRegion(backOffer, batch, ttl);
+      return doSendBatchPutWithRefetchRegion(backOffer, batch);
     }
   }
 
-  private List<Batch> doSendBatchPutWithRefetchRegion(BackOffer backOffer, Batch batch, long ttl) {
+  private List<Batch> doSendBatchPutWithRefetchRegion(BackOffer backOffer, Batch batch) {
     Map<TiRegion, List<ByteString>> groupKeys =
         groupKeysByRegion(clientBuilder.getRegionManager(), batch.keys, backOffer);
     List<Batch> retryBatches = new ArrayList<>();
@@ -617,56 +617,57 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private void doSendDeleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
-    ExecutorCompletionService<Object> completionService =
+    ExecutorCompletionService<List<DeleteRange>> completionService =
         new ExecutorCompletionService<>(deleteRangeThreadPool);
 
-    List<TiRegion> regions = fetchRegionsFromRange(startKey, endKey);
+    List<TiRegion> regions = fetchRegionsFromRange(backOffer, startKey, endKey);
+    List<DeleteRange> ranges = new ArrayList<>();
     for (int i = 0; i < regions.size(); i++) {
       TiRegion region = regions.get(i);
-      BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
       ByteString start = calcKeyByCondition(i == 0, startKey, region.getStartKey());
       ByteString end = calcKeyByCondition(i == regions.size() - 1, endKey, region.getEndKey());
-      completionService.submit(
-          () -> doSendDeleteRangeWithRetry(singleBatchBackOffer, region, start, end));
+      ranges.add(new DeleteRange(region, start, end));
     }
-    for (int i = 0; i < regions.size(); i++) {
-      try {
-        completionService.take().get();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new TiKVException("Current thread interrupted.", e);
-      } catch (ExecutionException e) {
-        throw new TiKVException("Execution exception met.", e);
+    Queue<List<DeleteRange>> taskQueue = new LinkedList<>();
+    taskQueue.offer(ranges);
+    while (!taskQueue.isEmpty()) {
+      List<DeleteRange> task = taskQueue.poll();
+      for (DeleteRange range : task) {
+        BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
+        completionService.submit(() -> doSendDeleteRangeWithRetry(singleBatchBackOffer, range));
       }
+      getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
     }
   }
 
-  private Object doSendDeleteRangeWithRetry(
-      BackOffer backOffer, TiRegion region, ByteString startKey, ByteString endKey) {
-    try (RegionStoreClient client = clientBuilder.build(region)) {
+  private List<DeleteRange> doSendDeleteRangeWithRetry(BackOffer backOffer, DeleteRange range) {
+    try (RegionStoreClient client = clientBuilder.build(range.getRegion())) {
       client.setTimeout(conf.getScanTimeout());
-      client.rawDeleteRange(backOffer, startKey, endKey);
-      return null;
+      client.rawDeleteRange(backOffer, range.getStartKey(), range.getEndKey());
+      return new ArrayList<>();
     } catch (final TiKVException e) {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-      clientBuilder.getRegionManager().invalidateRegion(region.getId());
+      clientBuilder.getRegionManager().invalidateRegion(range.getRegion().getId());
       logger.warn("ReSplitting ranges for BatchDeleteRangeRequest", e);
 
       // retry
-      return doSendDeleteRangeWithRefetchRegion(backOffer, startKey, endKey);
+      return doSendDeleteRangeWithRefetchRegion(backOffer, range);
     }
   }
 
-  private Object doSendDeleteRangeWithRefetchRegion(
-      BackOffer backOffer, ByteString startKey, ByteString endKey) {
-    List<TiRegion> regions = fetchRegionsFromRange(startKey, endKey);
+  private List<DeleteRange> doSendDeleteRangeWithRefetchRegion(
+      BackOffer backOffer, DeleteRange range) {
+    List<TiRegion> regions =
+        fetchRegionsFromRange(backOffer, range.getStartKey(), range.getEndKey());
+    List<DeleteRange> retryRanges = new ArrayList<>();
     for (int i = 0; i < regions.size(); i++) {
       TiRegion region = regions.get(i);
-      ByteString start = calcKeyByCondition(i == 0, startKey, region.getStartKey());
-      ByteString end = calcKeyByCondition(i == regions.size() - 1, endKey, region.getEndKey());
-      doSendDeleteRangeWithRetry(backOffer, region, start, end);
+      ByteString start = calcKeyByCondition(i == 0, range.getStartKey(), region.getStartKey());
+      ByteString end =
+          calcKeyByCondition(i == regions.size() - 1, range.getEndKey(), region.getEndKey());
+      retryRanges.add(new DeleteRange(region, start, end));
     }
-    return null;
+    return retryRanges;
   }
 
   private static Map<ByteString, ByteString> mapKeysToValues(
@@ -678,10 +679,11 @@ public class RawKVClient implements AutoCloseable {
     return map;
   }
 
-  private List<TiRegion> fetchRegionsFromRange(ByteString startKey, ByteString endKey) {
+  private List<TiRegion> fetchRegionsFromRange(
+      BackOffer backOffer, ByteString startKey, ByteString endKey) {
     List<TiRegion> regions = new ArrayList<>();
     while (FastByteComparisons.compareTo(startKey.toByteArray(), endKey.toByteArray()) < 0) {
-      TiRegion currentRegion = clientBuilder.getRegionManager().getRegionByKey(startKey);
+      TiRegion currentRegion = clientBuilder.getRegionManager().getRegionByKey(startKey, backOffer);
       regions.add(currentRegion);
       startKey = currentRegion.getEndKey();
     }
