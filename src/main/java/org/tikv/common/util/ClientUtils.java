@@ -163,4 +163,30 @@ public class ClientUtils {
       throw new TiKVException("Execution exception met.", e);
     }
   }
+
+  public static <T, U> List<U> getTasksWithOutput(
+      ExecutorCompletionService<Pair<List<T>, List<U>>> completionService,
+      Queue<List<T>> taskQueue,
+      List<T> batches,
+      int backOff) {
+    try {
+      List<U> result = new ArrayList<>();
+      for (int i = 0; i < batches.size(); i++) {
+        Pair<List<T>, List<U>> task = completionService.take().get(backOff, TimeUnit.MILLISECONDS);
+        if (!task.first.isEmpty()) {
+          taskQueue.offer(task.first);
+        } else {
+          result.addAll(task.second);
+        }
+      }
+      return result;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new TiKVException("Current thread interrupted.", e);
+    } catch (TimeoutException e) {
+      throw new TiKVException("TimeOut Exceeded for current operation. ", e);
+    } catch (ExecutionException e) {
+      throw new TiKVException("Execution exception met.", e);
+    }
+  }
 }
