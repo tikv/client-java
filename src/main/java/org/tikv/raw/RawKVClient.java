@@ -221,6 +221,38 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
+  /**
+   * Get the TTL of a raw key from TiKV if key exists
+   *
+   * @param key raw key
+   * @return a Long indicating the TTL of key
+   *    ttl is a non-null long value indicating TTL if key exists.
+   *    - ttl=0 if the key will never be outdated.
+   *    - ttl=null if the key does not exist
+   */
+  public Long getKeyTTL(ByteString key) {
+    String label = "client_raw_get_key_ttl";
+    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+    try {
+      BackOffer backOffer = defaultBackOff();
+      while (true) {
+        RegionStoreClient client = clientBuilder.build(key);
+        try {
+          Long result = client.rawGetKeyTTL(defaultBackOff(), key);
+          RAW_REQUEST_SUCCESS.labels(label).inc();
+          return result;
+        } catch (final TiKVException e) {
+          backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+        }
+      }
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
+    } finally {
+      requestTimer.observeDuration();
+    }
+  }
+
   public List<List<KvPair>> batchScan(List<ScanOption> ranges) {
     String label = "client_raw_batch_scan";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();

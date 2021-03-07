@@ -21,7 +21,7 @@ import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest {
-  private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
+  private static final String DEFAULT_PD_ADDRESS = "172.16.5.35:2379";
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -92,6 +92,29 @@ public class RawKVClientTest {
     }
   }
 
+  @Test
+  public void getKeyTTLTest() {
+    if (!initialized) return;
+    long ttl = 10;
+    ByteString key = ByteString.copyFromUtf8("key_ttl");
+    ByteString value = ByteString.copyFromUtf8("value");
+    client.put(key, value, ttl);
+    for (int i = 0; i < 9; i++) {
+      Long t = client.getKeyTTL(key);
+      logger.info("current ttl of key is " + t);
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException ignore) {
+      }
+    }
+    Long t = client.getKeyTTL(key);
+    if (t == null) {
+      logger.info("key outdated.");
+    } else {
+      logger.info("key not outdated: " + t);
+    }
+  }
+
   private ByteString generateBatchPutKey(String envId, String type, String id) {
     return ByteString.copyFromUtf8(
         String.format("indexInfo_:_{%s}_:_{%s}_:_{%s}", envId, type, id));
@@ -113,6 +136,7 @@ public class RawKVClientTest {
 
   @Test
   public void batchPutTest() {
+    if (!initialized) return;
     ExecutorService executors = Executors.newFixedThreadPool(200);
     ExecutorCompletionService<Object> completionService =
         new ExecutorCompletionService<>(executors);
@@ -266,8 +290,6 @@ public class RawKVClientTest {
       } else {
         rawDeleteTest(deleteCases, benchmark);
       }
-
-      prepare();
 
       // TODO: check whether cluster supports ttl
       //  long ttl = 10;
@@ -663,6 +685,7 @@ public class RawKVClientTest {
         ByteString key = randomKeys.get(i), value = values.get(r.nextInt(KEY_POOL_SIZE));
         data.put(key, value);
         checkPutTTL(key, value, ttl);
+        checkGetKeyTTL(key, ttl);
       }
       try {
         Thread.sleep(ttl * 1000);
@@ -672,6 +695,7 @@ public class RawKVClientTest {
       for (int i = 0; i < cases; i++) {
         ByteString key = randomKeys.get(i);
         checkGetTTLTimeOut(key);
+        checkGetKeyTTLTimeOut(key);
       }
     }
   }
@@ -758,8 +782,19 @@ public class RawKVClientTest {
     assert client.get(key).equals(value);
   }
 
+  private void checkGetKeyTTL(ByteString key, long ttl) {
+    Long t = client.getKeyTTL(key);
+    assert t != null;
+    assert t <= ttl && t > 0;
+  }
+
   private void checkGetTTLTimeOut(ByteString key) {
     assert client.get(key).isEmpty();
+  }
+
+  private void checkGetKeyTTLTimeOut(ByteString key) {
+    Long t = client.getKeyTTL(key);
+    assert t == null;
   }
 
   private void checkEmpty(ByteString key) {

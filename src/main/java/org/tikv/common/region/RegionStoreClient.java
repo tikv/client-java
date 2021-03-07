@@ -839,6 +839,43 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return resp.getValue();
   }
 
+  public Long rawGetKeyTTL(BackOffer backOffer, ByteString key) {
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get_key_ttl").startTimer();
+    try {
+      Supplier<RawGetKeyTTLRequest> factory =
+          () -> RawGetKeyTTLRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
+      KVErrorHandler<RawGetKeyTTLResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawGetKeyTTLResponse resp = callWithRetry(backOffer, TikvGrpc.getRawGetKeyTTLMethod(), factory, handler);
+      return rawGetKeyTTLHelper(resp);
+    } finally {
+      requestTimer.observeDuration();
+    }
+  }
+
+  private Long rawGetKeyTTLHelper(RawGetKeyTTLResponse resp) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(region);
+      throw new TiClientInternalException("RawGetResponse failed without a cause");
+    }
+    String error = resp.getError();
+    if (!error.isEmpty()) {
+      throw new KeyException(resp.getError());
+    }
+    if (resp.hasRegionError()) {
+      throw new RegionException(resp.getRegionError());
+    }
+    if (resp.getNotFound()) {
+      return null;
+    }
+    return resp.getTtl();
+  }
+
   public void rawDelete(BackOffer backOffer, ByteString key) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete").startTimer();
