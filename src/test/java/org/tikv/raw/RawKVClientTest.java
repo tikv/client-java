@@ -21,7 +21,7 @@ import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest {
-  private static final String DEFAULT_PD_ADDRESS = "172.16.5.35:2379";
+  private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;

@@ -844,14 +844,16 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get_key_ttl").startTimer();
     try {
       Supplier<RawGetKeyTTLRequest> factory =
-          () -> RawGetKeyTTLRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
+          () ->
+              RawGetKeyTTLRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
       KVErrorHandler<RawGetKeyTTLResponse> handler =
           new KVErrorHandler<>(
               regionManager,
               this,
               region,
               resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-      RawGetKeyTTLResponse resp = callWithRetry(backOffer, TikvGrpc.getRawGetKeyTTLMethod(), factory, handler);
+      RawGetKeyTTLResponse resp =
+          callWithRetry(backOffer, TikvGrpc.getRawGetKeyTTLMethod(), factory, handler);
       return rawGetKeyTTLHelper(resp);
     } finally {
       requestTimer.observeDuration();

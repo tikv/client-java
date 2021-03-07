@@ -38,7 +38,7 @@ public abstract class AbstractGRPCClient<
   protected final Logger logger = LoggerFactory.getLogger(this.getClass());
   protected final ChannelFactory channelFactory;
   protected TiConfiguration conf;
-  protected int timeout;
+  protected long timeout;
   protected BlockingStubT blockingStub;
   protected StubT asyncStub;
 
@@ -160,11 +160,11 @@ public abstract class AbstractGRPCClient<
     return response;
   }
 
-  public void setTimeout(int timeout) {
+  public void setTimeout(long timeout) {
     this.timeout = timeout;
   }
 
-  public int getTimeout() {
+  public long getTimeout() {
     return this.timeout;
   }
 

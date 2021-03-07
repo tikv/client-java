@@ -79,7 +79,7 @@ public class TiSession implements AutoCloseable {
     this.conf = conf;
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
     this.client = PDClient.createRaw(conf, channelFactory);
-    if (conf.isEnableMetrics()) {
+    if (conf.isMetricsEnable()) {
       try {
         this.collectorRegistry = new CollectorRegistry();
         this.collectorRegistry.register(RawKVClient.RAW_REQUEST_LATENCY);
