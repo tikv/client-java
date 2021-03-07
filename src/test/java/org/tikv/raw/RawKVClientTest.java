@@ -172,12 +172,13 @@ public class RawKVClientTest {
                 String.format(
                     "%d%09d%09d", r.nextInt(10), r.nextInt(1000000000), r.nextInt(1000000000));
             Map<ByteString, ByteString> map = new HashMap<>();
+            RawKVClient rawKVClient = session.createRawClient();
             for (int j = 0; j < keysPerBatch; j++) {
               String id = String.format("%s%04d", prefix, j);
               map.put(
                   generateBatchPutKey(envId, type, id), valuePool.get(r.nextInt(valuePoolSize)));
             }
-            client.batchPut(map);
+            rawKVClient.batchPut(map);
             return null;
           });
     }
@@ -195,6 +196,12 @@ public class RawKVClientTest {
       logger.info("Execution exception met. Test fail.");
     }
     logger.info("done");
+  }
+
+  @Test
+  public void deleteRangeTest() {
+    if (!initialized) return;
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
   }
 
   @Test

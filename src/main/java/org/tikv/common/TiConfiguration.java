@@ -21,12 +21,15 @@ import java.io.Serializable;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.pd.PDUtils;
 import org.tikv.kvproto.Kvrpcpb.CommandPri;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
 public class TiConfiguration implements Serializable {
 
+  private static final Logger logger = LoggerFactory.getLogger(TiConfiguration.class);
   private static final ConcurrentHashMap<String, String> settings = new ConcurrentHashMap<>();
 
   static {
@@ -68,7 +71,7 @@ public class TiConfiguration implements Serializable {
   }
 
   public static void listAll() {
-    settings.forEach((key, value) -> System.out.println(key + " " + value));
+    logger.info(new ArrayList<>(settings.entrySet()).toString());
   }
 
   private static void set(String key, String value) {

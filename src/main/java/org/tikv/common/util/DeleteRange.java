@@ -40,4 +40,9 @@ public class DeleteRange {
   public ByteString getEndKey() {
     return endKey;
   }
+
+  @Override
+  public String toString() {
+    return KeyRangeUtils.makeRange(getStartKey(), getEndKey()).toString();
+  }
 }
