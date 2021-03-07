@@ -434,6 +434,10 @@
                                     <pattern>io.opencensus</pattern>
                                     <shadedPattern>org.tikv.shade.io.opencensus</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>io.prometheus</pattern>
+                                    <shadedPattern>org.tikv.shade.io.prometheus</shadedPattern>
+                                </relocation>
                             </relocations>
                         </configuration>
                     </execution>
