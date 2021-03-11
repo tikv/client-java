@@ -21,6 +21,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import io.grpc.ManagedChannel;
+import java.util.concurrent.TimeUnit;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
@@ -56,12 +57,12 @@ public abstract class AbstractRegionStoreClient
 
   @Override
   protected TikvGrpc.TikvBlockingStub getBlockingStub() {
-    return blockingStub.withDeadlineAfter(getConf().getTimeout(), getConf().getTimeoutUnit());
+    return blockingStub.withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
   }
 
   @Override
   protected TikvGrpc.TikvStub getAsyncStub() {
-    return asyncStub.withDeadlineAfter(getConf().getTimeout(), getConf().getTimeoutUnit());
+    return asyncStub.withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
   }
 
   @Override

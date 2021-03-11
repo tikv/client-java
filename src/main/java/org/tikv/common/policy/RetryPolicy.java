@@ -17,6 +17,7 @@ package org.tikv.common.policy;
 
 import com.google.common.collect.ImmutableSet;
 import io.grpc.Status;
+import io.prometheus.client.Histogram;
 import java.util.concurrent.Callable;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.operation.ErrorHandler;
@@ -25,6 +26,11 @@ import org.tikv.common.util.ConcreteBackOffer;
 
 public abstract class RetryPolicy<RespT> {
   BackOffer backOffer = ConcreteBackOffer.newCopNextMaxBackOff();
+  public static final Histogram GRPC_SINGLE_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_grpc_single_requests_latency")
+          .help("grpc request latency.")
+          .register();
 
   // handles PD and TiKV's error.
   private ErrorHandler<RespT> handler;
@@ -51,7 +57,13 @@ public abstract class RetryPolicy<RespT> {
     while (true) {
       RespT result = null;
       try {
-        result = proc.call();
+        // add single request duration histogram
+        Histogram.Timer requestTimer = GRPC_SINGLE_REQUEST_LATENCY.startTimer();
+        try {
+          result = proc.call();
+        } finally {
+          requestTimer.observeDuration();
+        }
       } catch (Exception e) {
         rethrowNotRecoverableException(e);
         // Handle request call error
@@ -65,6 +77,7 @@ public abstract class RetryPolicy<RespT> {
       if (handler != null) {
         boolean retry = handler.handleResponseError(backOffer, result);
         if (retry) {
+          // add retry counter
           continue;
         }
       }

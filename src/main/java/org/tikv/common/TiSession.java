@@ -15,9 +15,14 @@
 
 package org.tikv.common;
 
+import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
+import io.prometheus.client.CollectorRegistry;
+import io.prometheus.client.exporter.HTTPServer;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +38,7 @@ import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
+import org.tikv.common.policy.RetryPolicy;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
@@ -66,11 +72,33 @@ public class TiSession implements AutoCloseable {
   private volatile RegionManager regionManager;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private boolean isClosed = false;
+  private HTTPServer server;
+  private CollectorRegistry collectorRegistry;
 
   public TiSession(TiConfiguration conf) {
     this.conf = conf;
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
     this.client = PDClient.createRaw(conf, channelFactory);
+    if (conf.isMetricsEnable()) {
+      try {
+        this.collectorRegistry = new CollectorRegistry();
+        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_LATENCY);
+        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_FAILURE);
+        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_SUCCESS);
+        this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_REQUEST_LATENCY);
+        this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
+        this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
+        this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
+        this.server =
+            new HTTPServer(
+                new InetSocketAddress(conf.getMetricsPort()), this.collectorRegistry, true);
+        logger.info("http server is up " + this.server.getPort());
+      } catch (Exception e) {
+        logger.error("http server not up");
+        throw new RuntimeException(e);
+      }
+    }
+    logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
 
   @VisibleForTesting
@@ -221,7 +249,10 @@ public class TiSession implements AutoCloseable {
           batchPutThreadPool =
               Executors.newFixedThreadPool(
                   conf.getBatchPutConcurrency(),
-                  new ThreadFactoryBuilder().setDaemon(true).build());
+                  new ThreadFactoryBuilder()
+                      .setNameFormat("batchPut-thread-%d")
+                      .setDaemon(true)
+                      .build());
         }
         res = batchPutThreadPool;
       }
@@ -237,7 +268,10 @@ public class TiSession implements AutoCloseable {
           batchGetThreadPool =
               Executors.newFixedThreadPool(
                   conf.getBatchGetConcurrency(),
-                  new ThreadFactoryBuilder().setDaemon(true).build());
+                  new ThreadFactoryBuilder()
+                      .setNameFormat("batchGet-thread-%d")
+                      .setDaemon(true)
+                      .build());
         }
         res = batchGetThreadPool;
       }
@@ -253,7 +287,10 @@ public class TiSession implements AutoCloseable {
           batchScanThreadPool =
               Executors.newFixedThreadPool(
                   conf.getBatchScanConcurrency(),
-                  new ThreadFactoryBuilder().setDaemon(true).build());
+                  new ThreadFactoryBuilder()
+                      .setNameFormat("batchScan-thread-%d")
+                      .setDaemon(true)
+                      .build());
         }
         res = batchScanThreadPool;
       }
@@ -269,7 +306,10 @@ public class TiSession implements AutoCloseable {
           deleteRangeThreadPool =
               Executors.newFixedThreadPool(
                   conf.getDeleteRangeConcurrency(),
-                  new ThreadFactoryBuilder().setDaemon(true).build());
+                  new ThreadFactoryBuilder()
+                      .setNameFormat("deleteRange-thread-%d")
+                      .setDaemon(true)
+                      .build());
         }
         res = deleteRangeThreadPool;
       }
@@ -280,6 +320,10 @@ public class TiSession implements AutoCloseable {
   @VisibleForTesting
   public ChannelFactory getChannelFactory() {
     return channelFactory;
+  }
+
+  public CollectorRegistry getCollectorRegistry() {
+    return collectorRegistry;
   }
 
   /**
@@ -347,7 +391,8 @@ public class TiSession implements AutoCloseable {
   private List<TiRegion> splitRegion(List<ByteString> splitKeys, BackOffer backOffer) {
     List<TiRegion> regions = new ArrayList<>();
 
-    Map<TiRegion, List<ByteString>> groupKeys = groupKeysByRegion(splitKeys);
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(regionManager, splitKeys, backOffer);
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
 
       Pair<TiRegion, Metapb.Store> pair =
@@ -385,16 +430,16 @@ public class TiSession implements AutoCloseable {
     return regions;
   }
 
-  private Map<TiRegion, List<ByteString>> groupKeysByRegion(List<ByteString> keys) {
-    return keys.stream()
-        .collect(Collectors.groupingBy(clientBuilder.getRegionManager()::getRegionByKey));
-  }
-
   @Override
   public synchronized void close() throws Exception {
     if (isClosed) {
       logger.warn("this TiSession is already closed!");
       return;
+    }
+
+    if (server != null) {
+      server.stop();
+      logger.info("Metrics server on " + server.getPort() + " is stopped");
     }
 
     isClosed = true;
@@ -408,10 +453,17 @@ public class TiSession implements AutoCloseable {
     if (indexScanThreadPool != null) {
       indexScanThreadPool.shutdownNow();
     }
-    if (regionManager != null) {
-      if (logger.isDebugEnabled()) {
-        logger.debug("region cache miss rate: " + getRegionManager().cacheMiss());
-      }
+    if (batchGetThreadPool != null) {
+      batchGetThreadPool.shutdownNow();
+    }
+    if (batchPutThreadPool != null) {
+      batchPutThreadPool.shutdownNow();
+    }
+    if (batchScanThreadPool != null) {
+      batchScanThreadPool.shutdownNow();
+    }
+    if (deleteRangeThreadPool != null) {
+      deleteRangeThreadPool.shutdownNow();
     }
     if (client != null) {
       getPDClient().close();

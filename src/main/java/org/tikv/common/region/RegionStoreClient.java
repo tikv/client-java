@@ -26,6 +26,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.pingcap.tidb.tipb.DAGRequest;
 import com.pingcap.tidb.tipb.SelectResponse;
 import io.grpc.ManagedChannel;
+import io.prometheus.client.Histogram;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -68,6 +69,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   private final PDClient pdClient;
   private Boolean isV4 = null;
+
+  public static final Histogram GRPC_RAW_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_grpc_raw_requests_latency")
+          .help("grpc raw request latency.")
+          .labelNames("type")
+          .register();
 
   private synchronized Boolean getIsV4() {
     if (isV4 == null) {
@@ -798,16 +806,22 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   // APIs for Raw Scan/Put/Get/Delete
 
   public ByteString rawGet(BackOffer backOffer, ByteString key) {
-    Supplier<RawGetRequest> factory =
-        () -> RawGetRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
-    KVErrorHandler<RawGetResponse> handler =
-        new KVErrorHandler<>(
-            regionManager,
-            this,
-            region,
-            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-    RawGetResponse resp = callWithRetry(backOffer, TikvGrpc.getRawGetMethod(), factory, handler);
-    return rawGetHelper(resp);
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get").startTimer();
+    try {
+      Supplier<RawGetRequest> factory =
+          () -> RawGetRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
+      KVErrorHandler<RawGetResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawGetResponse resp = callWithRetry(backOffer, TikvGrpc.getRawGetMethod(), factory, handler);
+      return rawGetHelper(resp);
+    } finally {
+      requestTimer.observeDuration();
+    }
   }
 
   private ByteString rawGetHelper(RawGetResponse resp) {
@@ -825,19 +839,64 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return resp.getValue();
   }
 
-  public void rawDelete(BackOffer backOffer, ByteString key) {
-    Supplier<RawDeleteRequest> factory =
-        () -> RawDeleteRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
+  public Long rawGetKeyTTL(BackOffer backOffer, ByteString key) {
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get_key_ttl").startTimer();
+    try {
+      Supplier<RawGetKeyTTLRequest> factory =
+          () ->
+              RawGetKeyTTLRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
+      KVErrorHandler<RawGetKeyTTLResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawGetKeyTTLResponse resp =
+          callWithRetry(backOffer, TikvGrpc.getRawGetKeyTTLMethod(), factory, handler);
+      return rawGetKeyTTLHelper(resp);
+    } finally {
+      requestTimer.observeDuration();
+    }
+  }
 
-    KVErrorHandler<RawDeleteResponse> handler =
-        new KVErrorHandler<>(
-            regionManager,
-            this,
-            region,
-            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-    RawDeleteResponse resp =
-        callWithRetry(backOffer, TikvGrpc.getRawDeleteMethod(), factory, handler);
-    rawDeleteHelper(resp, region);
+  private Long rawGetKeyTTLHelper(RawGetKeyTTLResponse resp) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(region);
+      throw new TiClientInternalException("RawGetResponse failed without a cause");
+    }
+    String error = resp.getError();
+    if (!error.isEmpty()) {
+      throw new KeyException(resp.getError());
+    }
+    if (resp.hasRegionError()) {
+      throw new RegionException(resp.getRegionError());
+    }
+    if (resp.getNotFound()) {
+      return null;
+    }
+    return resp.getTtl();
+  }
+
+  public void rawDelete(BackOffer backOffer, ByteString key) {
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete").startTimer();
+    try {
+      Supplier<RawDeleteRequest> factory =
+          () -> RawDeleteRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
+
+      KVErrorHandler<RawDeleteResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawDeleteResponse resp =
+          callWithRetry(backOffer, TikvGrpc.getRawDeleteMethod(), factory, handler);
+      rawDeleteHelper(resp, region);
+    } finally {
+      requestTimer.observeDuration();
+    }
   }
 
   private void rawDeleteHelper(RawDeleteResponse resp, TiRegion region) {
@@ -855,23 +914,29 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public void rawPut(BackOffer backOffer, ByteString key, ByteString value, long ttl) {
-    Supplier<RawPutRequest> factory =
-        () ->
-            RawPutRequest.newBuilder()
-                .setContext(region.getContext())
-                .setKey(key)
-                .setValue(value)
-                .setTtl(ttl)
-                .build();
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put").startTimer();
+    try {
+      Supplier<RawPutRequest> factory =
+          () ->
+              RawPutRequest.newBuilder()
+                  .setContext(region.getContext())
+                  .setKey(key)
+                  .setValue(value)
+                  .setTtl(ttl)
+                  .build();
 
-    KVErrorHandler<RawPutResponse> handler =
-        new KVErrorHandler<>(
-            regionManager,
-            this,
-            region,
-            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-    RawPutResponse resp = callWithRetry(backOffer, TikvGrpc.getRawPutMethod(), factory, handler);
-    rawPutHelper(resp);
+      KVErrorHandler<RawPutResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawPutResponse resp = callWithRetry(backOffer, TikvGrpc.getRawPutMethod(), factory, handler);
+      rawPutHelper(resp);
+    } finally {
+      requestTimer.observeDuration();
+    }
   }
 
   private void rawPutHelper(RawPutResponse resp) {
@@ -889,24 +954,30 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public List<KvPair> rawBatchGet(BackOffer backoffer, List<ByteString> keys) {
-    if (keys.isEmpty()) {
-      return new ArrayList<>();
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_get").startTimer();
+    try {
+      if (keys.isEmpty()) {
+        return new ArrayList<>();
+      }
+      Supplier<RawBatchGetRequest> factory =
+          () ->
+              RawBatchGetRequest.newBuilder()
+                  .setContext(region.getContext())
+                  .addAllKeys(keys)
+                  .build();
+      KVErrorHandler<RawBatchGetResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawBatchGetResponse resp =
+          callWithRetry(backoffer, TikvGrpc.getRawBatchGetMethod(), factory, handler);
+      return handleRawBatchGet(resp);
+    } finally {
+      requestTimer.observeDuration();
     }
-    Supplier<RawBatchGetRequest> factory =
-        () ->
-            RawBatchGetRequest.newBuilder()
-                .setContext(region.getContext())
-                .addAllKeys(keys)
-                .build();
-    KVErrorHandler<RawBatchGetResponse> handler =
-        new KVErrorHandler<>(
-            regionManager,
-            this,
-            region,
-            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-    RawBatchGetResponse resp =
-        callWithRetry(backoffer, TikvGrpc.getRawBatchGetMethod(), factory, handler);
-    return handleRawBatchGet(resp);
   }
 
   private List<KvPair> handleRawBatchGet(RawBatchGetResponse resp) {
@@ -921,25 +992,31 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public void rawBatchPut(BackOffer backOffer, List<KvPair> kvPairs, long ttl) {
-    if (kvPairs.isEmpty()) {
-      return;
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_put").startTimer();
+    try {
+      if (kvPairs.isEmpty()) {
+        return;
+      }
+      Supplier<RawBatchPutRequest> factory =
+          () ->
+              RawBatchPutRequest.newBuilder()
+                  .setContext(region.getContext())
+                  .addAllPairs(kvPairs)
+                  .setTtl(ttl)
+                  .build();
+      KVErrorHandler<RawBatchPutResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawBatchPutResponse resp =
+          callWithRetry(backOffer, TikvGrpc.getRawBatchPutMethod(), factory, handler);
+      handleRawBatchPut(resp);
+    } finally {
+      requestTimer.observeDuration();
     }
-    Supplier<RawBatchPutRequest> factory =
-        () ->
-            RawBatchPutRequest.newBuilder()
-                .setContext(region.getContext())
-                .addAllPairs(kvPairs)
-                .setTtl(ttl)
-                .build();
-    KVErrorHandler<RawBatchPutResponse> handler =
-        new KVErrorHandler<>(
-            regionManager,
-            this,
-            region,
-            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-    RawBatchPutResponse resp =
-        callWithRetry(backOffer, TikvGrpc.getRawBatchPutMethod(), factory, handler);
-    handleRawBatchPut(resp);
   }
 
   public void rawBatchPut(BackOffer backOffer, Batch batch, long ttl) {
@@ -971,23 +1048,30 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @return KvPair list
    */
   public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
-    Supplier<RawScanRequest> factory =
-        () ->
-            RawScanRequest.newBuilder()
-                .setContext(region.getContext())
-                .setStartKey(key)
-                .setKeyOnly(keyOnly)
-                .setLimit(limit)
-                .build();
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_scan").startTimer();
+    try {
+      Supplier<RawScanRequest> factory =
+          () ->
+              RawScanRequest.newBuilder()
+                  .setContext(region.getContext())
+                  .setStartKey(key)
+                  .setKeyOnly(keyOnly)
+                  .setLimit(limit)
+                  .build();
 
-    KVErrorHandler<RawScanResponse> handler =
-        new KVErrorHandler<>(
-            regionManager,
-            this,
-            region,
-            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-    RawScanResponse resp = callWithRetry(backOffer, TikvGrpc.getRawScanMethod(), factory, handler);
-    return rawScanHelper(resp);
+      KVErrorHandler<RawScanResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawScanResponse resp =
+          callWithRetry(backOffer, TikvGrpc.getRawScanMethod(), factory, handler);
+      return rawScanHelper(resp);
+    } finally {
+      requestTimer.observeDuration();
+    }
   }
 
   public List<KvPair> rawScan(BackOffer backOffer, ByteString key, boolean keyOnly) {
@@ -1013,23 +1097,29 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param endKey endKey
    */
   public void rawDeleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
-    Supplier<RawDeleteRangeRequest> factory =
-        () ->
-            RawDeleteRangeRequest.newBuilder()
-                .setContext(region.getContext())
-                .setStartKey(startKey)
-                .setEndKey(endKey)
-                .build();
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete_range").startTimer();
+    try {
+      Supplier<RawDeleteRangeRequest> factory =
+          () ->
+              RawDeleteRangeRequest.newBuilder()
+                  .setContext(region.getContext())
+                  .setStartKey(startKey)
+                  .setEndKey(endKey)
+                  .build();
 
-    KVErrorHandler<RawDeleteRangeResponse> handler =
-        new KVErrorHandler<>(
-            regionManager,
-            this,
-            region,
-            resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-    RawDeleteRangeResponse resp =
-        callWithRetry(backOffer, TikvGrpc.getRawDeleteRangeMethod(), factory, handler);
-    rawDeleteRangeHelper(resp);
+      KVErrorHandler<RawDeleteRangeResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawDeleteRangeResponse resp =
+          callWithRetry(backOffer, TikvGrpc.getRawDeleteRangeMethod(), factory, handler);
+      rawDeleteRangeHelper(resp);
+    } finally {
+      requestTimer.observeDuration();
+    }
   }
 
   private void rawDeleteRangeHelper(RawDeleteRangeResponse resp) {

@@ -38,11 +38,13 @@ public abstract class AbstractGRPCClient<
   protected final Logger logger = LoggerFactory.getLogger(this.getClass());
   protected final ChannelFactory channelFactory;
   protected TiConfiguration conf;
+  protected long timeout;
   protected BlockingStubT blockingStub;
   protected StubT asyncStub;
 
   protected AbstractGRPCClient(TiConfiguration conf, ChannelFactory channelFactory) {
     this.conf = conf;
+    this.timeout = conf.getTimeout();
     this.channelFactory = channelFactory;
   }
 
@@ -52,6 +54,7 @@ public abstract class AbstractGRPCClient<
       BlockingStubT blockingStub,
       StubT asyncStub) {
     this.conf = conf;
+    this.timeout = conf.getTimeout();
     this.channelFactory = channelFactory;
     this.blockingStub = blockingStub;
     this.asyncStub = asyncStub;
@@ -155,6 +158,14 @@ public abstract class AbstractGRPCClient<
                 method.getFullMethodName());
     logger.debug(String.format("leaving %s...", method.getFullMethodName()));
     return response;
+  }
+
+  public void setTimeout(long timeout) {
+    this.timeout = timeout;
+  }
+
+  public long getTimeout() {
+    return this.timeout;
   }
 
   protected abstract BlockingStubT getBlockingStub();

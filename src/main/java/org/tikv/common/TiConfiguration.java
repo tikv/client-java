@@ -15,79 +15,226 @@
 
 package org.tikv.common;
 
+import static org.tikv.common.ConfigUtils.*;
+
 import java.io.Serializable;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.pd.PDUtils;
 import org.tikv.kvproto.Kvrpcpb.CommandPri;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
 public class TiConfiguration implements Serializable {
-  private static final int DEF_TIMEOUT = 10;
-  private static final TimeUnit DEF_TIMEOUT_UNIT = TimeUnit.MINUTES;
-  private static final int DEF_SCAN_BATCH_SIZE = 100;
-  private static final boolean DEF_IGNORE_TRUNCATE = true;
-  private static final boolean DEF_TRUNCATE_AS_WARNING = false;
-  private static final int DEF_MAX_FRAME_SIZE = 268435456 * 2; // 256 * 2 MB
-  private static final int DEF_INDEX_SCAN_BATCH_SIZE = 20000;
-  private static final int DEF_REGION_SCAN_DOWNGRADE_THRESHOLD = 10000000;
-  // if keyRange size per request exceeds this limit, the request might be too large to be accepted
-  // by TiKV(maximum request size accepted by TiKV is around 1MB)
-  private static final int MAX_REQUEST_KEY_RANGE_SIZE = 20000;
-  private static final int DEF_INDEX_SCAN_CONCURRENCY = 5;
-  private static final int DEF_TABLE_SCAN_CONCURRENCY = 512;
-  private static final int DEF_BATCH_GET_CONCURRENCY = 20;
-  private static final int DEF_BATCH_PUT_CONCURRENCY = 20;
-  private static final int DEF_BATCH_SCAN_CONCURRENCY = 5;
-  private static final int DEF_DELETE_RANGE_CONCURRENCY = 20;
-  private static final CommandPri DEF_COMMAND_PRIORITY = CommandPri.Low;
-  private static final IsolationLevel DEF_ISOLATION_LEVEL = IsolationLevel.SI;
-  private static final boolean DEF_SHOW_ROWID = false;
-  private static final String DEF_DB_PREFIX = "";
-  private static final boolean DEF_WRITE_ENABLE = true;
-  private static final boolean DEF_WRITE_ALLOW_SPARK_SQL = false;
-  private static final boolean DEF_WRITE_WITHOUT_LOCK_TABLE = false;
-  private static final int DEF_TIKV_REGION_SPLIT_SIZE_IN_MB = 96;
-  private static final int DEF_PARTITION_PER_SPLIT = 1;
-  private static final int DEF_KV_CLIENT_CONCURRENCY = 10;
-  private static final KVMode DEF_KV_MODE = KVMode.TXN;
-  private static final int DEF_RAW_CLIENT_CONCURRENCY = 200;
-  private static final boolean DEF_IS_REPLICA_READ = false;
 
-  private int timeout = DEF_TIMEOUT;
-  private TimeUnit timeoutUnit = DEF_TIMEOUT_UNIT;
-  private boolean ignoreTruncate = DEF_IGNORE_TRUNCATE;
-  private boolean truncateAsWarning = DEF_TRUNCATE_AS_WARNING;
-  private int maxFrameSize = DEF_MAX_FRAME_SIZE;
-  private List<URI> pdAddrs = new ArrayList<>();
-  private int indexScanBatchSize = DEF_INDEX_SCAN_BATCH_SIZE;
-  private int downgradeThreshold = DEF_REGION_SCAN_DOWNGRADE_THRESHOLD;
-  private int indexScanConcurrency = DEF_INDEX_SCAN_CONCURRENCY;
-  private int tableScanConcurrency = DEF_TABLE_SCAN_CONCURRENCY;
-  private int batchGetConcurrency = DEF_BATCH_GET_CONCURRENCY;
-  private int batchPutConcurrency = DEF_BATCH_PUT_CONCURRENCY;
-  private int batchScanConcurrency = DEF_BATCH_SCAN_CONCURRENCY;
-  private int deleteRangeConcurrency = DEF_DELETE_RANGE_CONCURRENCY;
-  private CommandPri commandPriority = DEF_COMMAND_PRIORITY;
-  private IsolationLevel isolationLevel = DEF_ISOLATION_LEVEL;
-  private int maxRequestKeyRangeSize = MAX_REQUEST_KEY_RANGE_SIZE;
-  private boolean showRowId = DEF_SHOW_ROWID;
-  private String dbPrefix = DEF_DB_PREFIX;
-  private KVMode kvMode = DEF_KV_MODE;
-  private int rawClientConcurrency = DEF_RAW_CLIENT_CONCURRENCY;
+  private static final Logger logger = LoggerFactory.getLogger(TiConfiguration.class);
+  private static final ConcurrentHashMap<String, String> settings = new ConcurrentHashMap<>();
 
-  private boolean writeAllowSparkSQL = DEF_WRITE_ALLOW_SPARK_SQL;
-  private boolean writeEnable = DEF_WRITE_ENABLE;
-  private boolean writeWithoutLockTable = DEF_WRITE_WITHOUT_LOCK_TABLE;
-  private int tikvRegionSplitSizeInMB = DEF_TIKV_REGION_SPLIT_SIZE_IN_MB;
-  private int partitionPerSplit = DEF_PARTITION_PER_SPLIT;
+  static {
+    loadFromSystemProperties();
+    loadFromDefaultProperties();
+  }
 
-  private int kvClientConcurrency = DEF_KV_CLIENT_CONCURRENCY;
-  private boolean isReplicaRead = DEF_IS_REPLICA_READ;
+  private static void loadFromSystemProperties() {
+    for (Map.Entry<String, String> prop : Utils.getSystemProperties().entrySet()) {
+      if (prop.getKey().startsWith("tikv.")) {
+        set(prop.getKey(), prop.getValue());
+      }
+    }
+  }
+
+  private static void loadFromDefaultProperties() {
+    setIfMissing(TIKV_GRPC_TIMEOUT, DEF_TIMEOUT);
+    setIfMissing(TIKV_GRPC_SCAN_TIMEOUT, DEF_SCAN_TIMEOUT);
+    setIfMissing(TIKV_GRPC_SCAN_BATCH_SIZE, DEF_SCAN_BATCH_SIZE);
+    setIfMissing(TIKV_GRPC_MAX_FRAME_SIZE, DEF_MAX_FRAME_SIZE);
+    setIfMissing(TIKV_INDEX_SCAN_BATCH_SIZE, DEF_INDEX_SCAN_BATCH_SIZE);
+    setIfMissing(TIKV_INDEX_SCAN_CONCURRENCY, DEF_INDEX_SCAN_CONCURRENCY);
+    setIfMissing(TIKV_TABLE_SCAN_CONCURRENCY, DEF_TABLE_SCAN_CONCURRENCY);
+    setIfMissing(TIKV_BATCH_GET_CONCURRENCY, DEF_BATCH_GET_CONCURRENCY);
+    setIfMissing(TIKV_BATCH_PUT_CONCURRENCY, DEF_BATCH_PUT_CONCURRENCY);
+    setIfMissing(TIKV_BATCH_SCAN_CONCURRENCY, DEF_BATCH_SCAN_CONCURRENCY);
+    setIfMissing(TIKV_DELETE_RANGE_CONCURRENCY, DEF_DELETE_RANGE_CONCURRENCY);
+    setIfMissing(TIKV_REQUEST_COMMAND_PRIORITY, LOW_COMMAND_PRIORITY);
+    setIfMissing(TIKV_REQUEST_ISOLATION_LEVEL, SNAPSHOT_ISOLATION_LEVEL);
+    setIfMissing(TIKV_REQUEST_ISOLATION_LEVEL, SNAPSHOT_ISOLATION_LEVEL);
+    setIfMissing(TIKV_SHOW_ROWID, DEF_SHOW_ROWID);
+    setIfMissing(TIKV_DB_PREFIX, DEF_DB_PREFIX);
+    setIfMissing(TIKV_DB_PREFIX, DEF_DB_PREFIX);
+    setIfMissing(TIKV_KV_CLIENT_CONCURRENCY, DEF_KV_CLIENT_CONCURRENCY);
+    setIfMissing(TIKV_KV_MODE, TXN_KV_MODE);
+    setIfMissing(TIKV_IS_REPLICA_READ, DEF_IS_REPLICA_READ);
+    setIfMissing(TIKV_METRICS_ENABLE, DEF_METRICS_ENABLE);
+    setIfMissing(TIKV_METRICS_PORT, DEF_METRICS_PORT);
+  }
+
+  public static void listAll() {
+    logger.info(new ArrayList<>(settings.entrySet()).toString());
+  }
+
+  private static void set(String key, String value) {
+    if (key == null) {
+      throw new NullPointerException("null key");
+    }
+    if (value == null) {
+      throw new NullPointerException("null value for " + key);
+    }
+    settings.put(key, value);
+  }
+
+  private static void setIfMissing(String key, int value) {
+    setIfMissing(key, String.valueOf(value));
+  }
+
+  private static void setIfMissing(String key, boolean value) {
+    setIfMissing(key, String.valueOf(value));
+  }
+
+  private static void setIfMissing(String key, String value) {
+    if (key == null) {
+      throw new NullPointerException("null key");
+    }
+    if (value == null) {
+      throw new NullPointerException("null value for " + key);
+    }
+    settings.putIfAbsent(key, value);
+  }
+
+  private static Optional<String> getOption(String key) {
+    return Optional.ofNullable(settings.get(key));
+  }
+
+  private static String get(String key) {
+    Optional<String> option = getOption(key);
+    if (!option.isPresent()) {
+      throw new NoSuchElementException(key);
+    }
+    return option.get();
+  }
+
+  private static int getInt(String key) {
+    return Integer.parseInt(get(key));
+  }
+
+  private static int getInt(String key, int defaultValue) {
+    try {
+      return getOption(key).map(Integer::parseInt).orElse(defaultValue);
+    } catch (NumberFormatException e) {
+      return defaultValue;
+    }
+  }
+
+  private static long getLong(String key) {
+    return Long.parseLong(get(key));
+  }
+
+  private static long getLong(String key, long defaultValue) {
+    try {
+      return getOption(key).map(Long::parseLong).orElse(defaultValue);
+    } catch (NumberFormatException e) {
+      return defaultValue;
+    }
+  }
+
+  private static double getDouble(String key) {
+    return Double.parseDouble(get(key));
+  }
+
+  private static double getDouble(String key, double defaultValue) {
+    try {
+      return getOption(key).map(Double::parseDouble).orElse(defaultValue);
+    } catch (NumberFormatException e) {
+      return defaultValue;
+    }
+  }
+
+  private static boolean getBoolean(String key) {
+    return Boolean.parseBoolean(get(key));
+  }
+
+  private static boolean getBoolean(String key, boolean defaultValue) {
+    try {
+      return getOption(key).map(Boolean::parseBoolean).orElse(defaultValue);
+    } catch (NumberFormatException e) {
+      return defaultValue;
+    }
+  }
+
+  private static Long getTimeAsMs(String key) {
+    return Utils.timeStringAsMs(get(key));
+  }
+
+  private static Long getTimeAsSeconds(String key) {
+    return Utils.timeStringAsSec(get(key));
+  }
+
+  private static List<URI> getPdAddrs(String key) {
+    Optional<String> pdAddrs = getOption(key);
+    if (pdAddrs.isPresent()) {
+      return strToURI(pdAddrs.get());
+    } else {
+      return new ArrayList<>();
+    }
+  }
+
+  private static CommandPri getCommandPri(String key) {
+    String priority = get(key).toUpperCase(Locale.ROOT);
+    switch (priority) {
+      case NORMAL_COMMAND_PRIORITY:
+        return CommandPri.Normal;
+      case LOW_COMMAND_PRIORITY:
+        return CommandPri.Low;
+      case HIGH_COMMAND_PRIORITY:
+        return CommandPri.High;
+      default:
+        return CommandPri.UNRECOGNIZED;
+    }
+  }
+
+  private static IsolationLevel getIsolationLevel(String key) {
+    String isolationLevel = get(key).toUpperCase(Locale.ROOT);
+    switch (isolationLevel) {
+      case READ_COMMITTED_ISOLATION_LEVEL:
+        return IsolationLevel.RC;
+      case SNAPSHOT_ISOLATION_LEVEL:
+        return IsolationLevel.SI;
+      default:
+        return IsolationLevel.UNRECOGNIZED;
+    }
+  }
+
+  private static KVMode getKvMode(String key) {
+    if (get(key).toUpperCase(Locale.ROOT).equals(RAW_KV_MODE)) {
+      return KVMode.RAW;
+    } else {
+      return KVMode.TXN;
+    }
+  }
+
+  private long timeout = getTimeAsMs(TIKV_GRPC_TIMEOUT);
+  private long scanTimeout = getTimeAsMs(TIKV_GRPC_SCAN_TIMEOUT);
+  private int maxFrameSize = getInt(TIKV_GRPC_MAX_FRAME_SIZE);
+  private List<URI> pdAddrs = getPdAddrs(TIKV_PD_ADDRESSES);
+  private int indexScanBatchSize = getInt(TIKV_INDEX_SCAN_BATCH_SIZE);
+  private int indexScanConcurrency = getInt(TIKV_INDEX_SCAN_CONCURRENCY);
+  private int tableScanConcurrency = getInt(TIKV_TABLE_SCAN_CONCURRENCY);
+  private int batchGetConcurrency = getInt(TIKV_BATCH_GET_CONCURRENCY);
+  private int batchPutConcurrency = getInt(TIKV_BATCH_PUT_CONCURRENCY);
+  private int batchScanConcurrency = getInt(TIKV_BATCH_SCAN_CONCURRENCY);
+  private int deleteRangeConcurrency = getInt(TIKV_DELETE_RANGE_CONCURRENCY);
+  private CommandPri commandPriority = getCommandPri(TIKV_REQUEST_COMMAND_PRIORITY);
+  private IsolationLevel isolationLevel = getIsolationLevel(TIKV_REQUEST_ISOLATION_LEVEL);
+  private boolean showRowId = getBoolean(TIKV_SHOW_ROWID);
+  private String dbPrefix = get(TIKV_DB_PREFIX);
+  private KVMode kvMode = getKvMode(TIKV_KV_MODE);
+
+  private int kvClientConcurrency = getInt(TIKV_KV_CLIENT_CONCURRENCY);
+  private boolean isReplicaRead = getBoolean(TIKV_IS_REPLICA_READ);
+
+  private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
+  private int metricsPort = getInt(TIKV_METRICS_PORT);
 
   public enum KVMode {
     TXN,
@@ -129,21 +276,21 @@ public class TiConfiguration implements Serializable {
     return sb.toString();
   }
 
-  public int getTimeout() {
+  public long getTimeout() {
     return timeout;
   }
 
-  public TiConfiguration setTimeout(int timeout) {
+  public TiConfiguration setTimeout(long timeout) {
     this.timeout = timeout;
     return this;
   }
 
-  public TimeUnit getTimeoutUnit() {
-    return timeoutUnit;
+  public long getScanTimeout() {
+    return scanTimeout;
   }
 
-  public TiConfiguration setTimeoutUnit(TimeUnit timeoutUnit) {
-    this.timeoutUnit = timeoutUnit;
+  public TiConfiguration setScanTimeout(long scanTimeout) {
+    this.scanTimeout = scanTimeout;
     return this;
   }
 
@@ -159,24 +306,6 @@ public class TiConfiguration implements Serializable {
     return DEF_SCAN_BATCH_SIZE;
   }
 
-  boolean isIgnoreTruncate() {
-    return ignoreTruncate;
-  }
-
-  public TiConfiguration setIgnoreTruncate(boolean ignoreTruncate) {
-    this.ignoreTruncate = ignoreTruncate;
-    return this;
-  }
-
-  boolean isTruncateAsWarning() {
-    return truncateAsWarning;
-  }
-
-  public TiConfiguration setTruncateAsWarning(boolean truncateAsWarning) {
-    this.truncateAsWarning = truncateAsWarning;
-    return this;
-  }
-
   public int getMaxFrameSize() {
     return maxFrameSize;
   }
@@ -190,178 +319,143 @@ public class TiConfiguration implements Serializable {
     return indexScanBatchSize;
   }
 
-  public void setIndexScanBatchSize(int indexScanBatchSize) {
+  public TiConfiguration setIndexScanBatchSize(int indexScanBatchSize) {
     this.indexScanBatchSize = indexScanBatchSize;
+    return this;
   }
 
   public int getIndexScanConcurrency() {
     return indexScanConcurrency;
   }
 
-  public void setIndexScanConcurrency(int indexScanConcurrency) {
+  public TiConfiguration setIndexScanConcurrency(int indexScanConcurrency) {
     this.indexScanConcurrency = indexScanConcurrency;
+    return this;
   }
 
   public int getTableScanConcurrency() {
     return tableScanConcurrency;
   }
 
-  public void setTableScanConcurrency(int tableScanConcurrency) {
+  public TiConfiguration setTableScanConcurrency(int tableScanConcurrency) {
     this.tableScanConcurrency = tableScanConcurrency;
+    return this;
   }
 
   public int getBatchGetConcurrency() {
     return batchGetConcurrency;
   }
 
-  public void setBatchGetConcurrency(int batchGetConcurrency) {
+  public TiConfiguration setBatchGetConcurrency(int batchGetConcurrency) {
     this.batchGetConcurrency = batchGetConcurrency;
+    return this;
   }
 
   public int getBatchPutConcurrency() {
     return batchPutConcurrency;
   }
 
-  public void setBatchPutConcurrency(int batchPutConcurrency) {
+  public TiConfiguration setBatchPutConcurrency(int batchPutConcurrency) {
     this.batchPutConcurrency = batchPutConcurrency;
+    return this;
   }
 
   public int getBatchScanConcurrency() {
     return batchScanConcurrency;
   }
 
-  public void setBatchScanConcurrency(int batchScanConcurrency) {
+  public TiConfiguration setBatchScanConcurrency(int batchScanConcurrency) {
     this.batchScanConcurrency = batchScanConcurrency;
+    return this;
   }
 
   public int getDeleteRangeConcurrency() {
     return deleteRangeConcurrency;
   }
 
-  public void setDeleteRangeConcurrency(int deleteRangeConcurrency) {
+  public TiConfiguration setDeleteRangeConcurrency(int deleteRangeConcurrency) {
     this.deleteRangeConcurrency = deleteRangeConcurrency;
+    return this;
   }
 
   public CommandPri getCommandPriority() {
     return commandPriority;
   }
 
-  public void setCommandPriority(CommandPri commandPriority) {
+  public TiConfiguration setCommandPriority(CommandPri commandPriority) {
     this.commandPriority = commandPriority;
+    return this;
   }
 
   public IsolationLevel getIsolationLevel() {
     return isolationLevel;
   }
 
-  public void setIsolationLevel(IsolationLevel isolationLevel) {
+  public TiConfiguration setIsolationLevel(IsolationLevel isolationLevel) {
     this.isolationLevel = isolationLevel;
-  }
-
-  public int getMaxRequestKeyRangeSize() {
-    return maxRequestKeyRangeSize;
-  }
-
-  public void setMaxRequestKeyRangeSize(int maxRequestKeyRangeSize) {
-    if (maxRequestKeyRangeSize <= 0) {
-      throw new IllegalArgumentException("Key range size cannot be less than 1");
-    }
-    this.maxRequestKeyRangeSize = maxRequestKeyRangeSize;
-  }
-
-  public void setShowRowId(boolean flag) {
-    this.showRowId = flag;
+    return this;
   }
 
   public boolean ifShowRowId() {
     return showRowId;
   }
 
+  public TiConfiguration setShowRowId(boolean flag) {
+    this.showRowId = flag;
+    return this;
+  }
+
   public String getDBPrefix() {
     return dbPrefix;
   }
 
-  public void setDBPrefix(String dbPrefix) {
+  public TiConfiguration setDBPrefix(String dbPrefix) {
     this.dbPrefix = dbPrefix;
-  }
-
-  public boolean isWriteEnable() {
-    return writeEnable;
-  }
-
-  public void setWriteEnable(boolean writeEnable) {
-    this.writeEnable = writeEnable;
-  }
-
-  public boolean isWriteWithoutLockTable() {
-    return writeWithoutLockTable;
-  }
-
-  public void setWriteWithoutLockTable(boolean writeWithoutLockTable) {
-    this.writeWithoutLockTable = writeWithoutLockTable;
-  }
-
-  public boolean isWriteAllowSparkSQL() {
-    return writeAllowSparkSQL;
-  }
-
-  public void setWriteAllowSparkSQL(boolean writeAllowSparkSQL) {
-    this.writeAllowSparkSQL = writeAllowSparkSQL;
-  }
-
-  public int getTikvRegionSplitSizeInMB() {
-    return tikvRegionSplitSizeInMB;
-  }
-
-  public void setTikvRegionSplitSizeInMB(int tikvRegionSplitSizeInMB) {
-    this.tikvRegionSplitSizeInMB = tikvRegionSplitSizeInMB;
-  }
-
-  public int getDowngradeThreshold() {
-    return downgradeThreshold;
-  }
-
-  public void setDowngradeThreshold(int downgradeThreshold) {
-    this.downgradeThreshold = downgradeThreshold;
-  }
-
-  public int getPartitionPerSplit() {
-    return partitionPerSplit;
-  }
-
-  public void setPartitionPerSplit(int partitionPerSplit) {
-    this.partitionPerSplit = partitionPerSplit;
+    return this;
   }
 
   public KVMode getKvMode() {
     return kvMode;
   }
 
-  public void setKvMode(String kvMode) {
+  public TiConfiguration setKvMode(String kvMode) {
     this.kvMode = KVMode.valueOf(kvMode);
-  }
-
-  public int getRawClientConcurrency() {
-    return rawClientConcurrency;
-  }
-
-  public void setRawClientConcurrency(int rawClientConcurrency) {
-    this.rawClientConcurrency = rawClientConcurrency;
+    return this;
   }
 
   public int getKvClientConcurrency() {
     return kvClientConcurrency;
   }
 
-  public void setKvClientConcurrency(int kvClientConcurrency) {
+  public TiConfiguration setKvClientConcurrency(int kvClientConcurrency) {
     this.kvClientConcurrency = kvClientConcurrency;
+    return this;
   }
 
   public boolean isReplicaRead() {
     return isReplicaRead;
   }
 
-  public void setReplicaRead(boolean isReplicaRead) {
+  public TiConfiguration setReplicaRead(boolean isReplicaRead) {
     this.isReplicaRead = isReplicaRead;
+    return this;
+  }
+
+  public boolean isMetricsEnable() {
+    return metricsEnable;
+  }
+
+  public TiConfiguration setMetricsEnable(boolean metricsEnable) {
+    this.metricsEnable = metricsEnable;
+    return this;
+  }
+
+  public int getMetricsPort() {
+    return metricsPort;
+  }
+
+  public TiConfiguration setMetricsPort(int metricsPort) {
+    this.metricsPort = metricsPort;
+    return this;
   }
 }
