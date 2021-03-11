@@ -136,13 +136,8 @@ public class KVClient implements AutoCloseable {
     ExecutorCompletionService<List<Kvrpcpb.KvPair>> completionService =
         new ExecutorCompletionService<>(executorService);
 
-    Map<TiRegion, List<ByteString>> groupKeys =
-        groupKeysByRegion(clientBuilder.getRegionManager(), keys, backOffer);
-    List<Batch> batches = new ArrayList<>();
-
-    for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
-      appendBatches(batches, entry.getKey(), entry.getValue(), BATCH_GET_SIZE, MAX_BATCH_LIMIT);
-    }
+    List<Batch> batches =
+        getBatches(backOffer, keys, BATCH_GET_SIZE, MAX_BATCH_LIMIT, this.clientBuilder);
 
     for (Batch batch : batches) {
       BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
@@ -178,14 +173,8 @@ public class KVClient implements AutoCloseable {
 
   private List<Kvrpcpb.KvPair> doSendBatchGetWithRefetchRegion(
       BackOffer backOffer, Batch batch, long version) {
-    Map<TiRegion, List<ByteString>> groupKeys =
-        groupKeysByRegion(clientBuilder.getRegionManager(), batch.keys, backOffer);
-    List<Batch> retryBatches = new ArrayList<>();
-
-    for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
-      appendBatches(
-          retryBatches, entry.getKey(), entry.getValue(), BATCH_GET_SIZE, MAX_BATCH_LIMIT);
-    }
+    List<Batch> retryBatches =
+        getBatches(backOffer, batch.keys, BATCH_GET_SIZE, MAX_BATCH_LIMIT, this.clientBuilder);
 
     ArrayList<Kvrpcpb.KvPair> results = new ArrayList<>();
     for (Batch retryBatch : retryBatches) {

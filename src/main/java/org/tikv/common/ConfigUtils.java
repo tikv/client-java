@@ -30,6 +30,7 @@ public class ConfigUtils {
 
   public static final String TIKV_BATCH_GET_CONCURRENCY = "tikv.batch_get_concurrency";
   public static final String TIKV_BATCH_PUT_CONCURRENCY = "tikv.batch_put_concurrency";
+  public static final String TIKV_BATCH_DELETE_CONCURRENCY = "tikv.batch_delete_concurrency";
   public static final String TIKV_BATCH_SCAN_CONCURRENCY = "tikv.batch_scan_concurrency";
   public static final String TIKV_DELETE_RANGE_CONCURRENCY = "tikv.delete_range_concurrency";
 
@@ -46,6 +47,7 @@ public class ConfigUtils {
   public static final String TIKV_METRICS_ENABLE = "tikv.metrics.enable";
   public static final String TIKV_METRICS_PORT = "tikv.metrics.port";
 
+  public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "600ms";
   public static final String DEF_SCAN_TIMEOUT = "20s";
   public static final int DEF_SCAN_BATCH_SIZE = 10240;
@@ -59,6 +61,7 @@ public class ConfigUtils {
   public static final int DEF_TABLE_SCAN_CONCURRENCY = 512;
   public static final int DEF_BATCH_GET_CONCURRENCY = 20;
   public static final int DEF_BATCH_PUT_CONCURRENCY = 20;
+  public static final int DEF_BATCH_DELETE_CONCURRENCY = 20;
   public static final int DEF_BATCH_SCAN_CONCURRENCY = 5;
   public static final int DEF_DELETE_RANGE_CONCURRENCY = 20;
   public static final Kvrpcpb.CommandPri DEF_COMMAND_PRIORITY = Kvrpcpb.CommandPri.Low;

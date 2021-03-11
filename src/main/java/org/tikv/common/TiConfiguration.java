@@ -46,6 +46,7 @@ public class TiConfiguration implements Serializable {
   }
 
   private static void loadFromDefaultProperties() {
+    setIfMissing(TIKV_PD_ADDRESSES, DEF_PD_ADDRESSES);
     setIfMissing(TIKV_GRPC_TIMEOUT, DEF_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_TIMEOUT, DEF_SCAN_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_BATCH_SIZE, DEF_SCAN_BATCH_SIZE);
@@ -55,6 +56,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_TABLE_SCAN_CONCURRENCY, DEF_TABLE_SCAN_CONCURRENCY);
     setIfMissing(TIKV_BATCH_GET_CONCURRENCY, DEF_BATCH_GET_CONCURRENCY);
     setIfMissing(TIKV_BATCH_PUT_CONCURRENCY, DEF_BATCH_PUT_CONCURRENCY);
+    setIfMissing(TIKV_BATCH_DELETE_CONCURRENCY, DEF_BATCH_DELETE_CONCURRENCY);
     setIfMissing(TIKV_BATCH_SCAN_CONCURRENCY, DEF_BATCH_SCAN_CONCURRENCY);
     setIfMissing(TIKV_DELETE_RANGE_CONCURRENCY, DEF_DELETE_RANGE_CONCURRENCY);
     setIfMissing(TIKV_REQUEST_COMMAND_PRIORITY, LOW_COMMAND_PRIORITY);
@@ -222,6 +224,7 @@ public class TiConfiguration implements Serializable {
   private int tableScanConcurrency = getInt(TIKV_TABLE_SCAN_CONCURRENCY);
   private int batchGetConcurrency = getInt(TIKV_BATCH_GET_CONCURRENCY);
   private int batchPutConcurrency = getInt(TIKV_BATCH_PUT_CONCURRENCY);
+  private int batchDeleteConcurrency = getInt(TIKV_BATCH_DELETE_CONCURRENCY);
   private int batchScanConcurrency = getInt(TIKV_BATCH_SCAN_CONCURRENCY);
   private int deleteRangeConcurrency = getInt(TIKV_DELETE_RANGE_CONCURRENCY);
   private CommandPri commandPriority = getCommandPri(TIKV_REQUEST_COMMAND_PRIORITY);
@@ -241,10 +244,20 @@ public class TiConfiguration implements Serializable {
     RAW
   }
 
+  public static TiConfiguration createDefault() {
+    return new TiConfiguration();
+  }
+
   public static TiConfiguration createDefault(String pdAddrsStr) {
     Objects.requireNonNull(pdAddrsStr, "pdAddrsStr is null");
     TiConfiguration conf = new TiConfiguration();
     conf.pdAddrs = strToURI(pdAddrsStr);
+    return conf;
+  }
+
+  public static TiConfiguration createRawDefault() {
+    TiConfiguration conf = new TiConfiguration();
+    conf.kvMode = KVMode.RAW;
     return conf;
   }
 
@@ -357,6 +370,15 @@ public class TiConfiguration implements Serializable {
 
   public TiConfiguration setBatchPutConcurrency(int batchPutConcurrency) {
     this.batchPutConcurrency = batchPutConcurrency;
+    return this;
+  }
+
+  public int getBatchDeleteConcurrency() {
+    return batchDeleteConcurrency;
+  }
+
+  public TiConfiguration setBatchDeleteConcurrency(int batchDeleteConcurrency) {
+    this.batchDeleteConcurrency = batchDeleteConcurrency;
     return this;
   }
 

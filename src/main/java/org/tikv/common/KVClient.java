@@ -23,7 +23,6 @@ import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
@@ -128,13 +127,8 @@ public class KVClient implements AutoCloseable {
     ExecutorCompletionService<List<KvPair>> completionService =
         new ExecutorCompletionService<>(batchGetThreadPool);
 
-    Map<TiRegion, List<ByteString>> groupKeys =
-        groupKeysByRegion(clientBuilder.getRegionManager(), keys, backOffer);
-    List<Batch> batches = new ArrayList<>();
-
-    for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
-      appendBatches(batches, entry.getKey(), entry.getValue(), BATCH_GET_SIZE, MAX_BATCH_LIMIT);
-    }
+    List<Batch> batches =
+        getBatches(backOffer, keys, BATCH_GET_SIZE, MAX_BATCH_LIMIT, this.clientBuilder);
 
     for (Batch batch : batches) {
       BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
@@ -170,14 +164,8 @@ public class KVClient implements AutoCloseable {
 
   private List<KvPair> doSendBatchGetWithRefetchRegion(
       BackOffer backOffer, Batch batch, long version) {
-    Map<TiRegion, List<ByteString>> groupKeys =
-        groupKeysByRegion(clientBuilder.getRegionManager(), batch.keys, backOffer);
-    List<Batch> retryBatches = new ArrayList<>();
-
-    for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
-      appendBatches(
-          retryBatches, entry.getKey(), entry.getValue(), BATCH_GET_SIZE, MAX_BATCH_LIMIT);
-    }
+    List<Batch> retryBatches =
+        getBatches(backOffer, batch.keys, BATCH_GET_SIZE, MAX_BATCH_LIMIT, this.clientBuilder);
 
     ArrayList<KvPair> results = new ArrayList<>();
     for (Batch retryBatch : retryBatches) {

@@ -21,7 +21,6 @@ import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest {
-  private static final String DEFAULT_PD_ADDRESS = "127.0.0.1:2379";
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -71,7 +70,7 @@ public class RawKVClientTest {
   @Before
   public void setup() throws IOException {
     try {
-      TiConfiguration conf = TiConfiguration.createRawDefault(DEFAULT_PD_ADDRESS);
+      TiConfiguration conf = TiConfiguration.createRawDefault();
       session = TiSession.create(conf);
       initialized = false;
       if (client == null) {
@@ -90,6 +89,23 @@ public class RawKVClientTest {
     if (session != null) {
       session.close();
     }
+  }
+
+  @Test
+  public void atomicAPITest() {
+    if (!initialized) return;
+    long ttl = 10;
+    ByteString key = ByteString.copyFromUtf8("key_atomic");
+    ByteString value = ByteString.copyFromUtf8("value");
+    ByteString value2 = ByteString.copyFromUtf8("value2");
+    client.delete(key);
+    ByteString res1 = client.putIfAbsent(key, value, ttl);
+    assert res1.isEmpty();
+    ByteString res2 = client.putIfAbsent(key, value2, ttl);
+    assert res2.equals(value);
+    client.batchDelete(new ArrayList<>(Collections.singleton(key)));
+    ByteString res3 = client.get(key);
+    assert res3.isEmpty();
   }
 
   @Test

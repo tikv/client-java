@@ -30,6 +30,7 @@ public abstract class RetryPolicy<RespT> {
       Histogram.build()
           .name("client_java_grpc_single_requests_latency")
           .help("grpc request latency.")
+          .labelNames("type")
           .register();
 
   // handles PD and TiKV's error.
@@ -58,7 +59,7 @@ public abstract class RetryPolicy<RespT> {
       RespT result = null;
       try {
         // add single request duration histogram
-        Histogram.Timer requestTimer = GRPC_SINGLE_REQUEST_LATENCY.startTimer();
+        Histogram.Timer requestTimer = GRPC_SINGLE_REQUEST_LATENCY.labels(methodName).startTimer();
         try {
           result = proc.call();
         } finally {
