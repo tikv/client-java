@@ -204,18 +204,11 @@ public class RegionManager {
     cache.invalidateRegion(regionId);
   }
 
-  public double cacheMiss() {
-    logger.debug("cache miss: " + cache.miss + " total: " + cache.total);
-    return cache.miss * 1.0 / cache.total;
-  }
-
   public static class RegionCache {
     private final Map<Long, TiRegion> regionCache;
     private final Map<Long, Store> storeCache;
     private final RangeMap<Key, Long> keyToRegionIdCache;
     private final ReadOnlyPDClient pdClient;
-    private int total = 0;
-    private int miss = 0;
 
     public RegionCache(ReadOnlyPDClient pdClient) {
       regionCache = new HashMap<>();
@@ -229,7 +222,6 @@ public class RegionManager {
       Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
       try {
         Long regionId;
-        ++total;
         if (key.isEmpty()) {
           // if key is empty, it must be the start key.
           regionId = keyToRegionIdCache.get(Key.toRawKey(key, true));
@@ -243,7 +235,6 @@ public class RegionManager {
 
         if (regionId == null) {
           logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
-          ++miss;
           TiRegion region = pdClient.getRegionByKey(backOffer, key);
           if (!putRegion(region)) {
             throw new TiClientInternalException("Invalid Region: " + region.toString());

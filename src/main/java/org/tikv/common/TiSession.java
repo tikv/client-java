@@ -465,11 +465,6 @@ public class TiSession implements AutoCloseable {
     if (deleteRangeThreadPool != null) {
       deleteRangeThreadPool.shutdownNow();
     }
-    if (regionManager != null) {
-      if (logger.isDebugEnabled()) {
-        logger.debug("region cache miss rate: " + getRegionManager().cacheMiss());
-      }
-    }
     if (client != null) {
       getPDClient().close();
     }
