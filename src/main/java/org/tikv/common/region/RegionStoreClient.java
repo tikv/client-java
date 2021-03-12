@@ -974,7 +974,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               region,
               resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawCASResponse resp =
-          callWithRetry(backOffer, TikvGrpc.getRawCompareAndSetAtomicMethod(), factory, handler);
+          callWithRetry(backOffer, TikvGrpc.getRawCompareAndSetMethod(), factory, handler);
       return rawPutIfAbsentHelper(resp);
     } finally {
       requestTimer.observeDuration();
@@ -1047,7 +1047,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getContext())
                   .addAllPairs(kvPairs)
                   .setTtl(ttl)
-                  .setForAtomic(atomic)
+                  .setForCas(atomic)
                   .build();
       KVErrorHandler<RawBatchPutResponse> handler =
           new KVErrorHandler<>(
@@ -1098,7 +1098,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               RawBatchDeleteRequest.newBuilder()
                   .setContext(region.getContext())
                   .addAllKeys(keys)
-                  .setForAtomic(atomic)
+                  .setForCas(atomic)
                   .build();
       KVErrorHandler<RawBatchDeleteResponse> handler =
           new KVErrorHandler<>(
