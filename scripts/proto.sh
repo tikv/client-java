@@ -18,16 +18,16 @@ CURRENT_DIR=`pwd`
 TIKV_CLIENT_HOME="$(cd "`dirname "$0"`"/..; pwd)"
 cd $TIKV_CLIENT_HOME
 
-kvproto_hash=8f377793a4b364f6e2567ba232ae04ad622bc40d
+kvproto_hash=70a5912413a95aa47c069044dd531efa69ad7549
 
 raft_rs_hash=b9891b673573fad77ebcf9bbe0969cf945841926
 
 tipb_hash=c4d518eb1d60c21f05b028b36729e64610346dac
 
 if [ -d "kvproto" ]; then
-	cd kvproto; git fetch -p; git fetch origin pull/732/head:cas; git checkout ${kvproto_hash}; cd ..
+	cd kvproto; git fetch -p; git checkout ${kvproto_hash}; cd ..
 else
-	git clone https://github.com/pingcap/kvproto; cd kvproto; git fetch origin pull/732/head:cas; git checkout ${kvproto_hash}; cd ..
+	git clone https://github.com/pingcap/kvproto; cd kvproto; git checkout ${kvproto_hash}; cd ..
 fi
 
 if [ -d "raft-rs" ]; then
