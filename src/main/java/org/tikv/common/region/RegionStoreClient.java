@@ -964,6 +964,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getContext())
                   .setKey(key)
                   .setValue(value)
+                  .setPreviousNotExist(true)
                   .setTtl(ttl)
                   .build();
 
@@ -992,6 +993,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
+    }
+    if (!resp.getNotEqual()) {
+      return ByteString.EMPTY;
     }
     return resp.getValue();
   }
