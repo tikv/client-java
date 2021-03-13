@@ -103,8 +103,12 @@ public class RawKVClientTest {
     assert res1.isEmpty();
     ByteString res2 = client.putIfAbsent(key, value2, ttl);
     assert res2.equals(value);
-    client.batchDelete(new ArrayList<>(Collections.singleton(key)));
-    ByteString res3 = client.get(key);
+    try {
+      Thread.sleep(ttl * 1000);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    ByteString res3 = client.putIfAbsent(key, value, ttl);
     assert res3.isEmpty();
   }
 
@@ -120,7 +124,8 @@ public class RawKVClientTest {
       logger.info("current ttl of key is " + t);
       try {
         Thread.sleep(1000);
-      } catch (InterruptedException ignore) {
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
       }
     }
     Long t = client.getKeyTTL(key);
@@ -713,7 +718,7 @@ public class RawKVClientTest {
       try {
         Thread.sleep(ttl * 1000);
       } catch (InterruptedException e) {
-        throw new TiKVException(e);
+        Thread.currentThread().interrupt();
       }
       for (int i = 0; i < cases; i++) {
         ByteString key = randomKeys.get(i);
