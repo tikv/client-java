@@ -953,6 +953,53 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
+  public ByteString rawPutIfAbsent(
+      BackOffer backOffer, ByteString key, ByteString value, long ttl) {
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put_if_absent").startTimer();
+    try {
+      Supplier<RawCASRequest> factory =
+          () ->
+              RawCASRequest.newBuilder()
+                  .setContext(region.getContext())
+                  .setKey(key)
+                  .setValue(value)
+                  .setPreviousNotExist(true)
+                  .setTtl(ttl)
+                  .build();
+
+      KVErrorHandler<RawCASResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawCASResponse resp =
+          callWithRetry(backOffer, TikvGrpc.getRawCompareAndSetMethod(), factory, handler);
+      return rawPutIfAbsentHelper(resp);
+    } finally {
+      requestTimer.observeDuration();
+    }
+  }
+
+  private ByteString rawPutIfAbsentHelper(RawCASResponse resp) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(region);
+      throw new TiClientInternalException("RawPutResponse failed without a cause");
+    }
+    String error = resp.getError();
+    if (!error.isEmpty()) {
+      throw new KeyException(resp.getError());
+    }
+    if (resp.hasRegionError()) {
+      throw new RegionException(resp.getRegionError());
+    }
+    if (!resp.getNotEqual()) {
+      return ByteString.EMPTY;
+    }
+    return resp.getValue();
+  }
+
   public List<KvPair> rawBatchGet(BackOffer backoffer, List<ByteString> keys) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_get").startTimer();
@@ -991,7 +1038,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return resp.getPairsList();
   }
 
-  public void rawBatchPut(BackOffer backOffer, List<KvPair> kvPairs, long ttl) {
+  public void rawBatchPut(BackOffer backOffer, List<KvPair> kvPairs, long ttl, boolean atomic) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_put").startTimer();
     try {
@@ -1004,6 +1051,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getContext())
                   .addAllPairs(kvPairs)
                   .setTtl(ttl)
+                  .setForCas(atomic)
                   .build();
       KVErrorHandler<RawBatchPutResponse> handler =
           new KVErrorHandler<>(
@@ -1019,19 +1067,65 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  public void rawBatchPut(BackOffer backOffer, Batch batch, long ttl) {
+  public void rawBatchPut(BackOffer backOffer, Batch batch, long ttl, boolean atomic) {
     List<KvPair> pairs = new ArrayList<>();
     for (int i = 0; i < batch.keys.size(); i++) {
       pairs.add(
           KvPair.newBuilder().setKey(batch.keys.get(i)).setValue(batch.values.get(i)).build());
     }
-    rawBatchPut(backOffer, pairs, ttl);
+    rawBatchPut(backOffer, pairs, ttl, atomic);
   }
 
   private void handleRawBatchPut(RawBatchPutResponse resp) {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("RawBatchPutResponse failed without a cause");
+    }
+    String error = resp.getError();
+    if (!error.isEmpty()) {
+      throw new KeyException(resp.getError());
+    }
+    if (resp.hasRegionError()) {
+      throw new RegionException(resp.getRegionError());
+    }
+  }
+
+  public void rawBatchDelete(BackOffer backoffer, List<ByteString> keys, boolean atomic) {
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_delete").startTimer();
+    try {
+      if (keys.isEmpty()) {
+        return;
+      }
+      Supplier<RawBatchDeleteRequest> factory =
+          () ->
+              RawBatchDeleteRequest.newBuilder()
+                  .setContext(region.getContext())
+                  .addAllKeys(keys)
+                  .setForCas(atomic)
+                  .build();
+      KVErrorHandler<RawBatchDeleteResponse> handler =
+          new KVErrorHandler<>(
+              regionManager,
+              this,
+              region,
+              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawBatchDeleteResponse resp =
+          callWithRetry(backoffer, TikvGrpc.getRawBatchDeleteMethod(), factory, handler);
+      handleRawBatchDelete(resp);
+    } finally {
+      requestTimer.observeDuration();
+    }
+  }
+
+  private void handleRawBatchDelete(RawBatchDeleteResponse resp) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(region);
+      throw new TiClientInternalException("RawBatchDeleteResponse failed without a cause");
+    }
+    String error = resp.getError();
+    if (!error.isEmpty()) {
+      throw new KeyException(resp.getError());
     }
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());

@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.region.RegionManager;
+import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Kvrpcpb;
 
@@ -88,6 +89,23 @@ public class ClientUtils {
       Batch batch = new Batch(region, keys.subList(start, end), values.subList(start, end));
       batches.add(batch);
     }
+  }
+
+  public static List<Batch> getBatches(
+      BackOffer backOffer,
+      List<ByteString> keys,
+      int batchSize,
+      int batchLimit,
+      RegionStoreClient.RegionStoreClientBuilder clientBuilder) {
+    Map<TiRegion, List<ByteString>> groupKeys =
+        groupKeysByRegion(clientBuilder.getRegionManager(), keys, backOffer);
+    List<Batch> retryBatches = new ArrayList<>();
+
+    for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
+      appendBatches(retryBatches, entry.getKey(), entry.getValue(), batchSize, batchLimit);
+    }
+
+    return retryBatches;
   }
 
   public static Map<TiRegion, List<ByteString>> groupKeysByRegion(
