@@ -80,10 +80,9 @@ public abstract class AbstractRegionStoreClient
       logger.debug(region + ", new leader = " + newStore.getId());
     }
     TiRegion cachedRegion = regionManager.getRegionByKey(region.getStartKey());
-    // When switch leader fails or the region changed its key range,
+    // When switch leader fails or the region changed its region epoch,
     // it would be necessary to re-split task's key range for new region.
-    if (!region.getStartKey().equals(cachedRegion.getStartKey())
-        || !region.getEndKey().equals(cachedRegion.getEndKey())) {
+    if (!region.getRegionEpoch().equals(cachedRegion.getRegionEpoch())) {
       return false;
     }
     region = cachedRegion;

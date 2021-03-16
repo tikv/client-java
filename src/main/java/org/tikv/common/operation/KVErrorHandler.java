@@ -171,9 +171,12 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
           logger.info(
               String.format(
                   "Received zero store id, from region %d try next time", ctxRegion.getId()));
-          backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
 
           this.regionManager.invalidateRegion(ctxRegion.getId());
+          // if the region info is outdated, we should change the region context as well
+          retry = recv.onNotLeader(this.regionManager.getStoreById(newStoreId));
+
+          backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
         }
 
         backOffer.doBackOff(backOffFuncType, new GrpcException(error.toString()));
@@ -190,9 +193,12 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
                 "Store Not Match happened with region id %d, store id %d, actual store id %d",
                 ctxRegion.getId(), storeId, actualStoreId));
 
+        this.regionManager.invalidateRegion(ctxRegion.getId());
         this.regionManager.invalidateStore(storeId);
-        recv.onStoreNotMatch(this.regionManager.getStoreById(storeId));
-        return true;
+        // recv.onStoreNotMatch(this.regionManager.getStoreById(storeId));
+        // assume this is a low probability error, do not retry, just re-split the request by
+        // throwing it out.
+        return false;
       } else if (error.hasEpochNotMatch()) {
         // this error is reported from raftstore:
         // region has outdated version，please try later.
