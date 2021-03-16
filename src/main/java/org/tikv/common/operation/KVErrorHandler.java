@@ -184,10 +184,11 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         // store_id requested at the moment is inconsistent with that expected
         // Solution：re-fetch from PD
         long storeId = ctxRegion.getLeader().getStoreId();
+        long actualStoreId = error.getStoreNotMatch().getActualStoreId();
         logger.warn(
             String.format(
-                "Store Not Match happened with region id %d, store id %d",
-                ctxRegion.getId(), storeId));
+                "Store Not Match happened with region id %d, store id %d, actual store id %d",
+                ctxRegion.getId(), storeId, actualStoreId));
 
         this.regionManager.invalidateStore(storeId);
         recv.onStoreNotMatch(this.regionManager.getStoreById(storeId));

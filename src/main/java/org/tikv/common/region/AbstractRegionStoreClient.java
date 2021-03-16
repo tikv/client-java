@@ -100,8 +100,8 @@ public abstract class AbstractRegionStoreClient
     ManagedChannel channel = channelFactory.getChannel(addressStr);
     blockingStub = TikvGrpc.newBlockingStub(channel);
     asyncStub = TikvGrpc.newStub(channel);
-    if (logger.isDebugEnabled() && region.getLeader().getStoreId() != store.getId()) {
-      logger.debug(
+    if (region.getLeader().getStoreId() != store.getId()) {
+      logger.warn(
           "store_not_match may occur? "
               + region
               + ", original store = "
