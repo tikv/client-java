@@ -155,16 +155,16 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         // if there's current no leader, we do not trigger update pd cache logic
         // since issuing store = NO_LEADER_STORE_ID requests to pd will definitely fail.
         if (newStoreId != NO_LEADER_STORE_ID) {
-          if (!this.regionManager.updateLeader(ctxRegion.getId(), newStoreId)
-              || !recv.onNotLeader(this.regionManager.getStoreById(newStoreId))) {
-            // If update leader fails, we need to fetch new region info from pd,
-            // and re-split key range for new region. Setting retry to false will
-            // stop retry and enter handleCopResponse logic, which would use RegionMiss
-            // backOff strategy to wait, fetch new region and re-split key range.
-            // onNotLeader is only needed when updateLeader succeeds, thus switch
-            // to a new store address.
-            retry = false;
-          }
+          // If update leader fails, we need to fetch new region info from pd,
+          // and re-split key range for new region. Setting retry to false will
+          // stop retry and enter handleCopResponse logic, which would use RegionMiss
+          // backOff strategy to wait, fetch new region and re-split key range.
+          // onNotLeader is only needed when updateLeader succeeds, thus switch
+          // to a new store address.
+          TiRegion newRegion = this.regionManager.updateLeader(ctxRegion.getId(), newStoreId);
+          retry =
+              newRegion != null
+                  && recv.onNotLeader(this.regionManager.getStoreById(newStoreId), newRegion);
 
           backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
         } else {
@@ -173,10 +173,9 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
                   "Received zero store id, from region %d try next time", ctxRegion.getId()));
 
           this.regionManager.invalidateRegion(ctxRegion.getId());
-          // if the region info is outdated, we should change the region context as well
-          retry = recv.onNotLeader(this.regionManager.getStoreById(newStoreId));
 
           backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
+          retry = false;
         }
 
         backOffer.doBackOff(backOffFuncType, new GrpcException(error.toString()));
