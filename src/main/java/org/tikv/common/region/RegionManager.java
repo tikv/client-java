@@ -168,7 +168,7 @@ public class RegionManager {
   }
 
   public synchronized TiRegion updateLeader(long regionId, long storeId) {
-    TiRegion r = cache.regionCache.get(regionId);
+    TiRegion r = cache.getRegionFromCache(regionId);
     if (r != null) {
       TiRegion newRegion = r.switchPeer(storeId);
       if (newRegion != null) {
@@ -275,6 +275,10 @@ public class RegionManager {
         }
       }
       return region;
+    }
+
+    private synchronized TiRegion getRegionFromCache(long regionId) {
+      return regionCache.get(regionId);
     }
 
     /** Removes region associated with regionId from regionCache. */

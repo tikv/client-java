@@ -23,4 +23,6 @@ public interface RegionErrorReceiver {
   boolean onNotLeader(Store store, TiRegion region);
 
   void onStoreNotMatch(Store store);
+
+  TiRegion getRegion();
 }

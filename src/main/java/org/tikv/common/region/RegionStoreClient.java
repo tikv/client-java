@@ -179,7 +179,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             regionManager,
             this,
             lockResolverClient,
-            region,
             resp -> resp.hasRegionError() ? resp.getRegionError() : null,
             resp -> resp.hasError() ? resp.getError() : null,
             resolveLockResult -> addResolvedLocks(version, resolveLockResult.getResolvedLocks()),
@@ -224,7 +223,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             regionManager,
             this,
             lockResolverClient,
-            region,
             resp -> resp.hasRegionError() ? resp.getRegionError() : null,
             resp -> null,
             resolveLockResult -> addResolvedLocks(version, resolveLockResult.getResolvedLocks()),
@@ -291,7 +289,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               regionManager,
               this,
               lockResolverClient,
-              region,
               resp -> resp.hasRegionError() ? resp.getRegionError() : null,
               resp -> null,
               resolveLockResult -> addResolvedLocks(version, resolveLockResult.getResolvedLocks()),
@@ -406,7 +403,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               regionManager,
               this,
               lockResolverClient,
-              region,
               resp -> resp.hasRegionError() ? resp.getRegionError() : null,
               resp -> null,
               resolveLockResult -> null,
@@ -483,7 +479,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               regionManager,
               this,
               lockResolverClient,
-              region,
               resp -> resp.hasRegionError() ? resp.getRegionError() : null,
               resp -> resp.hasError() ? resp.getError() : null,
               resolveLockResult -> null,
@@ -539,7 +534,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             regionManager,
             this,
             lockResolverClient,
-            region,
             resp -> resp.hasRegionError() ? resp.getRegionError() : null,
             resp -> resp.hasError() ? resp.getError() : null,
             resolveLockResult -> null,
@@ -607,7 +601,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             regionManager,
             this,
             lockResolverClient,
-            region,
             resp -> resp.hasRegionError() ? resp.getRegionError() : null,
             resp -> null,
             resolveLockResult -> addResolvedLocks(startTs, resolveLockResult.getResolvedLocks()),
@@ -730,7 +723,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             regionManager,
             this,
             lockResolverClient,
-            region,
             StreamingResponse::getFirstRegionError, // TODO: handle all errors in streaming response
             resp -> null,
             resolveLockResult -> addResolvedLocks(startTs, resolveLockResult.getResolvedLocks()),
@@ -766,7 +758,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             regionManager,
             this,
             null,
-            region,
             resp -> resp.hasRegionError() ? resp.getRegionError() : null,
             resp -> null,
             resolveLockResult -> null,
@@ -813,10 +804,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () -> RawGetRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
       KVErrorHandler<RawGetResponse> handler =
           new KVErrorHandler<>(
-              regionManager,
-              this,
-              region,
-              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawGetResponse resp = callWithRetry(backOffer, TikvGrpc.getRawGetMethod(), factory, handler);
       return rawGetHelper(resp);
     } finally {
@@ -848,10 +836,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               RawGetKeyTTLRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
       KVErrorHandler<RawGetKeyTTLResponse> handler =
           new KVErrorHandler<>(
-              regionManager,
-              this,
-              region,
-              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawGetKeyTTLResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawGetKeyTTLMethod(), factory, handler);
       return rawGetKeyTTLHelper(resp);
@@ -887,10 +872,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
       KVErrorHandler<RawDeleteResponse> handler =
           new KVErrorHandler<>(
-              regionManager,
-              this,
-              region,
-              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawDeleteResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawDeleteMethod(), factory, handler);
       rawDeleteHelper(resp, region);
@@ -928,10 +910,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
       KVErrorHandler<RawPutResponse> handler =
           new KVErrorHandler<>(
-              regionManager,
-              this,
-              region,
-              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawPutResponse resp = callWithRetry(backOffer, TikvGrpc.getRawPutMethod(), factory, handler);
       rawPutHelper(resp);
     } finally {
@@ -970,10 +949,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
       KVErrorHandler<RawCASResponse> handler =
           new KVErrorHandler<>(
-              regionManager,
-              this,
-              region,
-              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawCASResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawCompareAndSetMethod(), factory, handler);
       return rawPutIfAbsentHelper(resp);
@@ -1015,10 +991,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .build();
       KVErrorHandler<RawBatchGetResponse> handler =
           new KVErrorHandler<>(
-              regionManager,
-              this,
-              region,
-              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawBatchGetResponse resp =
           callWithRetry(backoffer, TikvGrpc.getRawBatchGetMethod(), factory, handler);
       return handleRawBatchGet(resp);
@@ -1055,10 +1028,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .build();
       KVErrorHandler<RawBatchPutResponse> handler =
           new KVErrorHandler<>(
-              regionManager,
-              this,
-              region,
-              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawBatchPutResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawBatchPutMethod(), factory, handler);
       handleRawBatchPut(resp);
@@ -1106,10 +1076,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .build();
       KVErrorHandler<RawBatchDeleteResponse> handler =
           new KVErrorHandler<>(
-              regionManager,
-              this,
-              region,
-              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawBatchDeleteResponse resp =
           callWithRetry(backoffer, TikvGrpc.getRawBatchDeleteMethod(), factory, handler);
       handleRawBatchDelete(resp);
@@ -1156,10 +1123,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
       KVErrorHandler<RawScanResponse> handler =
           new KVErrorHandler<>(
-              regionManager,
-              this,
-              region,
-              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawScanResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawScanMethod(), factory, handler);
       return rawScanHelper(resp);
@@ -1204,10 +1168,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
       KVErrorHandler<RawDeleteRangeResponse> handler =
           new KVErrorHandler<>(
-              regionManager,
-              this,
-              region,
-              resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawDeleteRangeResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawDeleteRangeMethod(), factory, handler);
       rawDeleteRangeHelper(resp);

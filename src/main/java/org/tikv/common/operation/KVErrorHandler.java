@@ -51,7 +51,6 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   private final RegionManager regionManager;
   private final RegionErrorReceiver recv;
   private final AbstractLockResolverClient lockResolverClient;
-  private final TiRegion ctxRegion;
   private final long callerStartTS;
   private final boolean forWrite;
 
@@ -59,13 +58,11 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
       RegionManager regionManager,
       RegionErrorReceiver recv,
       AbstractLockResolverClient lockResolverClient,
-      TiRegion ctxRegion,
       Function<RespT, Errorpb.Error> getRegionError,
       Function<RespT, Kvrpcpb.KeyError> getKeyError,
       Function<ResolveLockResult, Object> resolveLockResultCallback,
       long callerStartTS,
       boolean forWrite) {
-    this.ctxRegion = ctxRegion;
     this.recv = recv;
     this.lockResolverClient = lockResolverClient;
     this.regionManager = regionManager;
@@ -79,9 +76,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   public KVErrorHandler(
       RegionManager regionManager,
       RegionErrorReceiver recv,
-      TiRegion ctxRegion,
       Function<RespT, Errorpb.Error> getRegionError) {
-    this.ctxRegion = ctxRegion;
     this.recv = recv;
     this.lockResolverClient = null;
     this.regionManager = regionManager;
@@ -129,7 +124,8 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   public boolean handleResponseError(BackOffer backOffer, RespT resp) {
     if (resp == null) {
       String msg =
-          String.format("Request Failed with unknown reason for region region [%s]", ctxRegion);
+          String.format(
+              "Request Failed with unknown reason for region region [%s]", recv.getRegion());
       logger.warn(msg);
       return handleRequestError(backOffer, new GrpcException(msg));
     }
@@ -149,7 +145,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         logger.warn(
             String.format(
                 "NotLeader Error with region id %d and store id %d, new store id %d",
-                ctxRegion.getId(), ctxRegion.getLeader().getStoreId(), newStoreId));
+                recv.getRegion().getId(), recv.getRegion().getLeader().getStoreId(), newStoreId));
 
         BackOffFunction.BackOffFuncType backOffFuncType;
         // if there's current no leader, we do not trigger update pd cache logic
@@ -161,7 +157,8 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
           // backOff strategy to wait, fetch new region and re-split key range.
           // onNotLeader is only needed when updateLeader succeeds, thus switch
           // to a new store address.
-          TiRegion newRegion = this.regionManager.updateLeader(ctxRegion.getId(), newStoreId);
+          TiRegion newRegion =
+              this.regionManager.updateLeader(recv.getRegion().getId(), newStoreId);
           retry =
               newRegion != null
                   && recv.onNotLeader(this.regionManager.getStoreById(newStoreId), newRegion);
@@ -170,9 +167,10 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         } else {
           logger.info(
               String.format(
-                  "Received zero store id, from region %d try next time", ctxRegion.getId()));
+                  "Received zero store id, from region %d try next time",
+                  recv.getRegion().getId()));
 
-          this.regionManager.invalidateRegion(ctxRegion.getId());
+          this.regionManager.invalidateRegion(recv.getRegion().getId());
 
           backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
           retry = false;
@@ -185,14 +183,14 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         // this error is reported from raftstore:
         // store_id requested at the moment is inconsistent with that expected
         // Solution：re-fetch from PD
-        long storeId = ctxRegion.getLeader().getStoreId();
+        long storeId = recv.getRegion().getLeader().getStoreId();
         long actualStoreId = error.getStoreNotMatch().getActualStoreId();
         logger.warn(
             String.format(
                 "Store Not Match happened with region id %d, store id %d, actual store id %d",
-                ctxRegion.getId(), storeId, actualStoreId));
+                recv.getRegion().getId(), storeId, actualStoreId));
 
-        this.regionManager.invalidateRegion(ctxRegion.getId());
+        this.regionManager.invalidateRegion(recv.getRegion().getId());
         this.regionManager.invalidateStore(storeId);
         // recv.onStoreNotMatch(this.regionManager.getStoreById(storeId));
         // assume this is a low probability error, do not retry, just re-split the request by
@@ -201,8 +199,8 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
       } else if (error.hasEpochNotMatch()) {
         // this error is reported from raftstore:
         // region has outdated version，please try later.
-        logger.warn(String.format("Stale Epoch encountered for region [%s]", ctxRegion));
-        this.regionManager.onRegionStale(ctxRegion.getId());
+        logger.warn(String.format("Stale Epoch encountered for region [%s]", recv.getRegion()));
+        this.regionManager.onRegionStale(recv.getRegion().getId());
         return false;
       } else if (error.hasServerIsBusy()) {
         // this error is reported from kv:
@@ -210,7 +208,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         logger.warn(
             String.format(
                 "Server is busy for region [%s], reason: %s",
-                ctxRegion, error.getServerIsBusy().getReason()));
+                recv.getRegion(), error.getServerIsBusy().getReason()));
         backOffer.doBackOff(
             BackOffFunction.BackOffFuncType.BoServerBusy,
             new StatusRuntimeException(
@@ -219,10 +217,10 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
       } else if (error.hasStaleCommand()) {
         // this error is reported from raftstore:
         // command outdated, please try later
-        logger.warn(String.format("Stale command for region [%s]", ctxRegion));
+        logger.warn(String.format("Stale command for region [%s]", recv.getRegion()));
         return true;
       } else if (error.hasRaftEntryTooLarge()) {
-        logger.warn(String.format("Raft too large for region [%s]", ctxRegion));
+        logger.warn(String.format("Raft too large for region [%s]", recv.getRegion()));
         throw new StatusRuntimeException(
             Status.fromCode(Status.Code.UNAVAILABLE).withDescription(error.toString()));
       } else if (error.hasKeyNotInRegion()) {
@@ -233,14 +231,14 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         logger.error(
             String.format(
                 "Key not in region [%s] for key [%s], this error should not happen here.",
-                ctxRegion, KeyUtils.formatBytesUTF8(invalidKey)));
+                recv.getRegion(), KeyUtils.formatBytesUTF8(invalidKey)));
         throw new StatusRuntimeException(Status.UNKNOWN.withDescription(error.toString()));
       }
 
-      logger.warn(String.format("Unknown error %s for region [%s]", error, ctxRegion));
+      logger.warn(String.format("Unknown error %s for region [%s]", error, recv.getRegion()));
       // For other errors, we only drop cache here.
       // Upper level may split this task.
-      invalidateRegionStoreCache(ctxRegion);
+      invalidateRegionStoreCache(recv.getRegion());
       // retry if raft proposal is dropped, it indicates the store is in the middle of transition
       if (error.getMessage().contains("Raft Proposal Dropped")) {
         return true;
@@ -265,7 +263,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
 
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
-    regionManager.onRequestFail(ctxRegion);
+    regionManager.onRequestFail(recv.getRegion());
 
     backOffer.doBackOff(
         BackOffFunction.BackOffFuncType.BoTiKVRPC,
