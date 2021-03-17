@@ -87,7 +87,7 @@ public abstract class AbstractRegionStoreClient
     }
     region = newRegion;
     String addressStr = regionManager.getStoreById(region.getLeader().getStoreId()).getAddress();
-    ManagedChannel channel = channelFactory.getChannel(addressStr);
+    ManagedChannel channel = channelFactory.getChannel(addressStr, regionManager.getPDClient());
     blockingStub = TikvGrpc.newBlockingStub(channel);
     asyncStub = TikvGrpc.newStub(channel);
     return true;
@@ -96,7 +96,7 @@ public abstract class AbstractRegionStoreClient
   @Override
   public void onStoreNotMatch(Metapb.Store store) {
     String addressStr = store.getAddress();
-    ManagedChannel channel = channelFactory.getChannel(addressStr);
+    ManagedChannel channel = channelFactory.getChannel(addressStr, regionManager.getPDClient());
     blockingStub = TikvGrpc.newBlockingStub(channel);
     asyncStub = TikvGrpc.newStub(channel);
     if (region.getLeader().getStoreId() != store.getId()) {

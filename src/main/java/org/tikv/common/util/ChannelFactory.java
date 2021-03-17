@@ -18,31 +18,33 @@ package org.tikv.common.util;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.net.URI;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import org.tikv.common.ReadOnlyPDClient;
+import org.tikv.common.pd.PDUtils;
 
 public class ChannelFactory implements AutoCloseable {
   private final int maxFrameSize;
-  private final Map<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
 
   public ChannelFactory(int maxFrameSize) {
     this.maxFrameSize = maxFrameSize;
   }
 
-  public ManagedChannel getChannel(String addressStr) {
+  public ManagedChannel getChannel(String addressStr, ReadOnlyPDClient client) {
     return connPool.computeIfAbsent(
         addressStr,
         key -> {
-          URI address;
+          URI mappedAddr;
           try {
-            address = URI.create("http://" + key);
+            URI address = PDUtils.addrToUri(key);
+            mappedAddr = client.getMappedURI(address);
           } catch (Exception e) {
             throw new IllegalArgumentException("failed to form address " + key);
           }
           // Channel should be lazy without actual connection until first call
           // So a coarse grain lock is ok here
-          return ManagedChannelBuilder.forAddress(address.getHost(), address.getPort())
+          return ManagedChannelBuilder.forAddress(mappedAddr.getHost(), mappedAddr.getPort())
               .maxInboundMessageSize(maxFrameSize)
               .usePlaintext(true)
               .idleTimeout(60, TimeUnit.SECONDS)

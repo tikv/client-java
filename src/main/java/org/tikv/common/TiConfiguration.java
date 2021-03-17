@@ -239,6 +239,8 @@ public class TiConfiguration implements Serializable {
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
 
+  private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
+
   public enum KVMode {
     TXN,
     RAW
@@ -479,5 +481,9 @@ public class TiConfiguration implements Serializable {
   public TiConfiguration setMetricsPort(int metricsPort) {
     this.metricsPort = metricsPort;
     return this;
+  }
+
+  public String getNetworkMappingName() {
+    return this.networkMappingName;
   }
 }

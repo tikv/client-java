@@ -20,7 +20,7 @@ import java.net.URI;
 import java.util.List;
 
 public class PDUtils {
-  public static URI addrToUrl(String addr) {
+  public static URI addrToUri(String addr) {
     if (addr.contains("://")) {
       return URI.create(addr);
     } else {
@@ -31,8 +31,12 @@ public class PDUtils {
   public static List<URI> addrsToUrls(String[] addrs) {
     ImmutableList.Builder<URI> urlsBuilder = new ImmutableList.Builder<>();
     for (String addr : addrs) {
-      urlsBuilder.add(addrToUrl(addr));
+      urlsBuilder.add(addrToUri(addr));
     }
     return urlsBuilder.build();
+  }
+
+  public static String uriToAddr(URI uri) {
+    return uri.getHost() + ":" + uri.getPort();
   }
 }
