@@ -160,7 +160,7 @@ public class KVClient implements AutoCloseable {
         return client.batchGet(backOffer, batch.keys, version);
       } catch (final TiKVException e) {
         backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-        clientBuilder.getRegionManager().invalidateRegion(batch.region.getId());
+        clientBuilder.getRegionManager().invalidateRegion(batch.region);
         logger.warn("ReSplitting ranges for BatchGetRequest", e);
 
         // retry

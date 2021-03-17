@@ -95,7 +95,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   }
 
   private void invalidateRegionStoreCache(TiRegion ctxRegion) {
-    regionManager.invalidateRegion(ctxRegion.getId());
+    regionManager.invalidateRegion(ctxRegion);
     regionManager.invalidateStore(ctxRegion.getLeader().getStoreId());
   }
 
@@ -139,7 +139,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         // 1. cache is outdated, region has changed its leader, can be solved by re-fetching from PD
         // 2. leader of current region is missing, need to wait and then fetch region info from PD
         long newStoreId = error.getNotLeader().getLeader().getStoreId();
-        boolean retry = true;
+        boolean retry;
 
         // update Leader here
         logger.warn(
@@ -157,8 +157,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
           // backOff strategy to wait, fetch new region and re-split key range.
           // onNotLeader is only needed when updateLeader succeeds, thus switch
           // to a new store address.
-          TiRegion newRegion =
-              this.regionManager.updateLeader(recv.getRegion().getId(), newStoreId);
+          TiRegion newRegion = this.regionManager.updateLeader(recv.getRegion(), newStoreId);
           retry =
               newRegion != null
                   && recv.onNotLeader(this.regionManager.getStoreById(newStoreId), newRegion);
@@ -170,7 +169,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
                   "Received zero store id, from region %d try next time",
                   recv.getRegion().getId()));
 
-          this.regionManager.invalidateRegion(recv.getRegion().getId());
+          this.regionManager.invalidateRegion(recv.getRegion());
 
           backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
           retry = false;
@@ -190,7 +189,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
                 "Store Not Match happened with region id %d, store id %d, actual store id %d",
                 recv.getRegion().getId(), storeId, actualStoreId));
 
-        this.regionManager.invalidateRegion(recv.getRegion().getId());
+        this.regionManager.invalidateRegion(recv.getRegion());
         this.regionManager.invalidateStore(storeId);
         // recv.onStoreNotMatch(this.regionManager.getStoreById(storeId));
         // assume this is a low probability error, do not retry, just re-split the request by
@@ -200,7 +199,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
         // this error is reported from raftstore:
         // region has outdated version，please try later.
         logger.warn(String.format("Stale Epoch encountered for region [%s]", recv.getRegion()));
-        this.regionManager.onRegionStale(recv.getRegion().getId());
+        this.regionManager.onRegionStale(recv.getRegion());
         return false;
       } else if (error.hasServerIsBusy()) {
         // this error is reported from kv:

@@ -437,7 +437,7 @@ public class TiSession implements AutoCloseable {
         } catch (final TiKVException e) {
           // retry
           logger.warn("ReSplitting ranges for splitRegion", e);
-          clientBuilder.getRegionManager().invalidateRegion(region.getId());
+          clientBuilder.getRegionManager().invalidateRegion(region);
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
           newRegions = splitRegion(splits, backOffer);
         }

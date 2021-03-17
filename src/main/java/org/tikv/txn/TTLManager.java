@@ -122,7 +122,7 @@ public class TTLManager {
                 String.format("sendTxnHeartBeat failed, regionId=%s", tiRegion.getId()),
                 result.getException()));
         this.regionManager.invalidateStore(store.getId());
-        this.regionManager.invalidateRegion(tiRegion.getId());
+        this.regionManager.invalidateRegion(tiRegion);
         // re-split keys and commit again.
         sendTxnHeartBeat(bo, ttl);
       } catch (GrpcException e) {

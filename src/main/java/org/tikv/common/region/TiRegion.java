@@ -214,7 +214,7 @@ public class TiRegion implements Serializable {
    * @param leaderStoreID is leader peer id.
    * @return null if no peers matches the store id.
    */
-  TiRegion switchPeer(long leaderStoreID) {
+  public TiRegion switchPeer(long leaderStoreID) {
     List<Peer> peers = meta.getPeersList();
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
