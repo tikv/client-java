@@ -42,7 +42,7 @@ public class TiRegion implements Serializable {
   private final Region meta;
   private final IsolationLevel isolationLevel;
   private final Kvrpcpb.CommandPri commandPri;
-  private Peer leader;
+  private final Peer leader;
   private int followerIdx = 0;
   private final boolean isReplicaRead;
 
@@ -53,6 +53,19 @@ public class TiRegion implements Serializable {
       Kvrpcpb.CommandPri commandPri,
       KVMode kvMode) {
     this(meta, leader, isolationLevel, commandPri, kvMode, false);
+  }
+
+  private TiRegion(
+      Region meta,
+      Peer leader,
+      IsolationLevel isolationLevel,
+      Kvrpcpb.CommandPri commandPri,
+      boolean isReplicaRead) {
+    this.meta = meta;
+    this.leader = leader;
+    this.isolationLevel = isolationLevel;
+    this.commandPri = commandPri;
+    this.isReplicaRead = isReplicaRead;
   }
 
   public TiRegion(
@@ -199,17 +212,16 @@ public class TiRegion implements Serializable {
    * storeID.
    *
    * @param leaderStoreID is leader peer id.
-   * @return false if no peers matches the store id.
+   * @return null if no peers matches the store id.
    */
-  boolean switchPeer(long leaderStoreID) {
+  public TiRegion switchPeer(long leaderStoreID) {
     List<Peer> peers = meta.getPeersList();
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
-        this.leader = p;
-        return true;
+        return new TiRegion(this.meta, p, this.isolationLevel, this.commandPri, this.isReplicaRead);
       }
     }
-    return false;
+    return null;
   }
 
   public boolean isMoreThan(ByteString key) {

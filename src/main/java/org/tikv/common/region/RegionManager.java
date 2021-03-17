@@ -143,7 +143,7 @@ public class RegionManager {
       }
       if (store == null) {
         // clear the region cache so we may get the learner peer next time
-        cache.invalidateRegion(region.getId());
+        cache.invalidateRegion(region);
       }
     }
 
@@ -163,23 +163,26 @@ public class RegionManager {
     return cache.getStoreById(id, backOffer);
   }
 
-  public void onRegionStale(long regionId) {
-    cache.invalidateRegion(regionId);
+  public void onRegionStale(TiRegion region) {
+    cache.invalidateRegion(region);
   }
 
-  public boolean updateLeader(long regionId, long storeId) {
-    TiRegion r = cache.regionCache.get(regionId);
+  public synchronized TiRegion updateLeader(TiRegion region, long storeId) {
+    TiRegion r = cache.getRegionFromCache(region.getId());
     if (r != null) {
-      if (!r.switchPeer(storeId)) {
-        // failed to switch leader, possibly region is outdated, we need to drop region cache from
-        // regionCache
-        logger.warn("Cannot find peer when updating leader (" + regionId + "," + storeId + ")");
-        // drop region cache using verId
-        cache.invalidateRegion(regionId);
-        return false;
+      if (r.getLeader().getStoreId() == storeId) {
+        return r;
       }
+      TiRegion newRegion = r.switchPeer(storeId);
+      if (newRegion != null) {
+        cache.putRegion(newRegion);
+        return newRegion;
+      }
+      // failed to switch leader, possibly region is outdated, we need to drop region cache from
+      // regionCache
+      logger.warn("Cannot find peer when updating leader (" + region.getId() + "," + storeId + ")");
     }
-    return true;
+    return null;
   }
 
   /**
@@ -188,11 +191,11 @@ public class RegionManager {
    * @param region region
    */
   public void onRequestFail(TiRegion region) {
-    onRequestFail(region.getId(), region.getLeader().getStoreId());
+    onRequestFail(region, region.getLeader().getStoreId());
   }
 
-  public void onRequestFail(long regionId, long storeId) {
-    cache.invalidateRegion(regionId);
+  private void onRequestFail(TiRegion region, long storeId) {
+    cache.invalidateRegion(region);
     cache.invalidateAllRegionForStore(storeId);
   }
 
@@ -200,8 +203,8 @@ public class RegionManager {
     cache.invalidateStore(storeId);
   }
 
-  public void invalidateRegion(long regionId) {
-    cache.invalidateRegion(regionId);
+  public void invalidateRegion(TiRegion region) {
+    cache.invalidateRegion(region);
   }
 
   public static class RegionCache {
@@ -277,17 +280,22 @@ public class RegionManager {
       return region;
     }
 
+    private synchronized TiRegion getRegionFromCache(long regionId) {
+      return regionCache.get(regionId);
+    }
+
     /** Removes region associated with regionId from regionCache. */
-    public synchronized void invalidateRegion(long regionId) {
+    public synchronized void invalidateRegion(TiRegion region) {
       try {
         if (logger.isDebugEnabled()) {
-          logger.debug(String.format("invalidateRegion ID[%s]", regionId));
+          logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
         }
-        TiRegion region = regionCache.get(regionId);
-        keyToRegionIdCache.remove(makeRange(region.getStartKey(), region.getEndKey()));
+        TiRegion oldRegion = regionCache.get(region.getId());
+        if (oldRegion != null && oldRegion == region) {
+          keyToRegionIdCache.remove(makeRange(region.getStartKey(), region.getEndKey()));
+          regionCache.remove(region.getId());
+        }
       } catch (Exception ignore) {
-      } finally {
-        regionCache.remove(regionId);
       }
     }
 
