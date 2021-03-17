@@ -530,6 +530,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private void initCluster() {
     GetMembersResponse resp = null;
     List<URI> pdAddrs = getConf().getPdAddrs();
+    this.pdAddrs = pdAddrs;
+    this.etcdClient = Client.builder().endpoints(pdAddrs).build();
+    this.hostMapping = new HostMapping(this.etcdClient, conf.getNetworkMappingName());
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
@@ -540,10 +543,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     long clusterId = resp.getHeader().getClusterId();
     header = RequestHeader.newBuilder().setClusterId(clusterId).build();
     tsoReq = TsoRequest.newBuilder().setHeader(header).setCount(1).build();
-    this.pdAddrs = pdAddrs;
-    this.etcdClient = Client.builder().endpoints(pdAddrs).build();
     this.tiflashReplicaMap = new ConcurrentHashMap<>();
-    this.hostMapping = new HostMapping(this.etcdClient, conf.getNetworkMappingName());
     createLeaderWrapper(resp.getLeader().getClientUrls(0));
     service =
         Executors.newSingleThreadScheduledExecutor(
