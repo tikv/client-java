@@ -444,7 +444,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         continue;
       }
       // if leader is switched, just return.
-      if (switchLeader(resp.getLeader().getClientUrlsList())) {
+      if (switchLeader(resp.getLeader().getPeerUrlsList())) {
         return;
       }
     }
@@ -537,7 +537,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     this.pdAddrs = pdAddrs;
     this.etcdClient = Client.builder().endpoints(pdAddrs).build();
     this.tiflashReplicaMap = new ConcurrentHashMap<>();
-    createLeaderWrapper(resp.getLeader().getClientUrls(0));
+    createLeaderWrapper(resp.getLeader().getPeerUrls(0));
     service =
         Executors.newSingleThreadScheduledExecutor(
             new ThreadFactoryBuilder().setDaemon(true).build());
