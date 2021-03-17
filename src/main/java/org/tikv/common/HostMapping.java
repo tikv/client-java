@@ -61,7 +61,7 @@ public class HostMapping {
         if (kvs.size() != 1) {
           break;
         }
-        return kvs.get(0).getValue().toString();
+        return kvs.get(0).getValue().toString(StandardCharsets.UTF_8);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       } catch (ExecutionException e) {

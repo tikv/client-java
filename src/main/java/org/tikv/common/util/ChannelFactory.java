@@ -20,15 +20,12 @@ import io.grpc.ManagedChannelBuilder;
 import java.net.URI;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.tikv.common.HostMapping;
 import org.tikv.common.pd.PDUtils;
 
 public class ChannelFactory implements AutoCloseable {
   private final int maxFrameSize;
   private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
-  private final Logger logger = LoggerFactory.getLogger(ChannelFactory.class);
 
   public ChannelFactory(int maxFrameSize) {
     this.maxFrameSize = maxFrameSize;
@@ -47,7 +44,6 @@ public class ChannelFactory implements AutoCloseable {
           }
           try {
             mappedAddr = hostMapping.getMappedURI(address);
-            logger.info("maps " + address.getHost() + " to " + mappedAddr.getHost());
           } catch (Exception e) {
             throw new IllegalArgumentException("failed to get mapped address " + address, e);
           }
