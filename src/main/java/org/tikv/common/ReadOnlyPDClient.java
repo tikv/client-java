@@ -16,7 +16,6 @@
 package org.tikv.common;
 
 import com.google.protobuf.ByteString;
-import java.net.URI;
 import java.util.List;
 import java.util.concurrent.Future;
 import org.tikv.common.meta.TiTimestamp;
@@ -53,7 +52,7 @@ public interface ReadOnlyPDClient {
 
   Future<TiRegion> getRegionByIDAsync(BackOffer backOffer, long id);
 
-  URI getMappedURI(URI uri);
+  HostMapping getHostMapping();
 
   /**
    * Get Store by StoreId

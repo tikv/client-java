@@ -20,38 +20,21 @@ import io.grpc.ManagedChannelBuilder;
 import java.net.URI;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import org.tikv.common.ReadOnlyPDClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.tikv.common.HostMapping;
 import org.tikv.common.pd.PDUtils;
 
 public class ChannelFactory implements AutoCloseable {
   private final int maxFrameSize;
   private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
+  private final Logger logger = LoggerFactory.getLogger(ChannelFactory.class);
 
   public ChannelFactory(int maxFrameSize) {
     this.maxFrameSize = maxFrameSize;
   }
 
-  public ManagedChannel getChannel(String addressStr) {
-    return connPool.computeIfAbsent(
-        addressStr,
-        key -> {
-          URI address;
-          try {
-            address = PDUtils.addrToUri(key);
-          } catch (Exception e) {
-            throw new IllegalArgumentException("failed to form address " + key, e);
-          }
-          // Channel should be lazy without actual connection until first call
-          // So a coarse grain lock is ok here
-          return ManagedChannelBuilder.forAddress(address.getHost(), address.getPort())
-              .maxInboundMessageSize(maxFrameSize)
-              .usePlaintext(true)
-              .idleTimeout(60, TimeUnit.SECONDS)
-              .build();
-        });
-  }
-
-  public ManagedChannel getChannel(String addressStr, ReadOnlyPDClient client) {
+  public ManagedChannel getChannel(String addressStr, HostMapping hostMapping) {
     return connPool.computeIfAbsent(
         addressStr,
         key -> {
@@ -63,7 +46,8 @@ public class ChannelFactory implements AutoCloseable {
             throw new IllegalArgumentException("failed to form address " + key, e);
           }
           try {
-            mappedAddr = client.getMappedURI(address);
+            mappedAddr = hostMapping.getMappedURI(address);
+            logger.info("maps " + address.getHost() + " to " + mappedAddr.getHost());
           } catch (Exception e) {
             throw new IllegalArgumentException("failed to get mapped address " + address, e);
           }

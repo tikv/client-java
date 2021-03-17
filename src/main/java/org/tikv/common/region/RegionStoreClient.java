@@ -119,7 +119,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("Create region store client on address %s", addressStr));
       }
-      ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient);
+      ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
+      logger.info("created channel " + channel.toString());
 
       TikvBlockingStub tikvBlockingStub = TikvGrpc.newBlockingStub(channel);
       TikvStub tikvAsyncStub = TikvGrpc.newStub(channel);
@@ -1239,7 +1240,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("Create region store client on address %s", addressStr));
       }
-      ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient);
+      ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
 
       TikvBlockingStub blockingStub = TikvGrpc.newBlockingStub(channel);
       TikvStub asyncStub = TikvGrpc.newStub(channel);
