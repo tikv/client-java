@@ -31,16 +31,41 @@ public class ChannelFactory implements AutoCloseable {
     this.maxFrameSize = maxFrameSize;
   }
 
+  public ManagedChannel getChannel(String addressStr) {
+    return connPool.computeIfAbsent(
+        addressStr,
+        key -> {
+          URI address;
+          try {
+            address = PDUtils.addrToUri(key);
+          } catch (Exception e) {
+            throw new IllegalArgumentException("failed to form address " + key, e);
+          }
+          // Channel should be lazy without actual connection until first call
+          // So a coarse grain lock is ok here
+          return ManagedChannelBuilder.forAddress(address.getHost(), address.getPort())
+              .maxInboundMessageSize(maxFrameSize)
+              .usePlaintext(true)
+              .idleTimeout(60, TimeUnit.SECONDS)
+              .build();
+        });
+  }
+
   public ManagedChannel getChannel(String addressStr, ReadOnlyPDClient client) {
     return connPool.computeIfAbsent(
         addressStr,
         key -> {
+          URI address;
           URI mappedAddr;
           try {
-            URI address = PDUtils.addrToUri(key);
+            address = PDUtils.addrToUri(key);
+          } catch (Exception e) {
+            throw new IllegalArgumentException("failed to form address " + key, e);
+          }
+          try {
             mappedAddr = client.getMappedURI(address);
           } catch (Exception e) {
-            throw new IllegalArgumentException("failed to form address " + key);
+            throw new IllegalArgumentException("failed to get mapped address " + address, e);
           }
           // Channel should be lazy without actual connection until first call
           // So a coarse grain lock is ok here
