@@ -212,11 +212,13 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
             BackOffFunction.BackOffFuncType.BoServerBusy,
             new StatusRuntimeException(
                 Status.fromCode(Status.Code.UNAVAILABLE).withDescription(error.toString())));
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.getMessage()));
         return true;
       } else if (error.hasStaleCommand()) {
         // this error is reported from raftstore:
         // command outdated, please try later
         logger.warn(String.format("Stale command for region [%s]", recv.getRegion()));
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.getMessage()));
         return true;
       } else if (error.hasRaftEntryTooLarge()) {
         logger.warn(String.format("Raft too large for region [%s]", recv.getRegion()));
@@ -239,7 +241,8 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
       // Upper level may split this task.
       invalidateRegionStoreCache(recv.getRegion());
       // retry if raft proposal is dropped, it indicates the store is in the middle of transition
-      if (error.getMessage().contains("Raft Proposal Dropped")) {
+      if (error.getMessage().contains("Raft ProposalDropped")) {
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.getMessage()));
         return true;
       }
     }
