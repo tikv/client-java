@@ -70,6 +70,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_IS_REPLICA_READ, DEF_IS_REPLICA_READ);
     setIfMissing(TIKV_METRICS_ENABLE, DEF_METRICS_ENABLE);
     setIfMissing(TIKV_METRICS_PORT, DEF_METRICS_PORT);
+    setIfMissing(TIKV_NETWORK_MAPPING_NAME, DEF_TIKV_NETWORK_MAPPING_NAME);
   }
 
   public static void listAll() {
