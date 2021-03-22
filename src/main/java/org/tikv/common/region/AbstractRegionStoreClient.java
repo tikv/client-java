@@ -82,7 +82,6 @@ public abstract class AbstractRegionStoreClient
     // When switch leader fails or the region changed its region epoch,
     // it would be necessary to re-split task's key range for new region.
     if (!region.getRegionEpoch().equals(newRegion.getRegionEpoch())) {
-      regionManager.invalidateRegion(newRegion);
       return false;
     }
     region = newRegion;
