@@ -141,17 +141,17 @@ public class KVClient implements AutoCloseable {
 
   private List<KvPair> doSendBatchGetInBatchesWithRetry(
       BackOffer backOffer, Batch batch, long version) {
-    TiRegion oldRegion = batch.region;
+    TiRegion oldRegion = batch.getRegion();
     TiRegion currentRegion =
         clientBuilder.getRegionManager().getRegionByKey(oldRegion.getStartKey());
 
     if (oldRegion.equals(currentRegion)) {
-      RegionStoreClient client = clientBuilder.build(batch.region);
+      RegionStoreClient client = clientBuilder.build(batch.getRegion());
       try {
-        return client.batchGet(backOffer, batch.keys, version);
+        return client.batchGet(backOffer, batch.getKeys(), version);
       } catch (final TiKVException e) {
         backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-        clientBuilder.getRegionManager().invalidateRegion(batch.region);
+        clientBuilder.getRegionManager().invalidateRegion(batch.getRegion());
         logger.warn("ReSplitting ranges for BatchGetRequest", e);
 
         // retry
@@ -165,7 +165,7 @@ public class KVClient implements AutoCloseable {
   private List<KvPair> doSendBatchGetWithRefetchRegion(
       BackOffer backOffer, Batch batch, long version) {
     List<Batch> retryBatches =
-        getBatches(backOffer, batch.keys, BATCH_GET_SIZE, MAX_BATCH_LIMIT, this.clientBuilder);
+        getBatches(backOffer, batch.getKeys(), BATCH_GET_SIZE, MAX_BATCH_LIMIT, this.clientBuilder);
 
     ArrayList<KvPair> results = new ArrayList<>();
     for (Batch retryBatch : retryBatches) {

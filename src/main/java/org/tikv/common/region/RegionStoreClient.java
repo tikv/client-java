@@ -1039,9 +1039,12 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public void rawBatchPut(BackOffer backOffer, Batch batch, long ttl, boolean atomic) {
     List<KvPair> pairs = new ArrayList<>();
-    for (int i = 0; i < batch.keys.size(); i++) {
+    for (int i = 0; i < batch.getKeys().size(); i++) {
       pairs.add(
-          KvPair.newBuilder().setKey(batch.keys.get(i)).setValue(batch.values.get(i)).build());
+          KvPair.newBuilder()
+              .setKey(batch.getKeys().get(i))
+              .setValue(batch.getValues().get(i))
+              .build());
     }
     rawBatchPut(backOffer, pairs, ttl, atomic);
   }

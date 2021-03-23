@@ -23,19 +23,23 @@ import org.tikv.common.region.TiRegion;
 
 /** A Batch containing the region, a list of keys and/or values to send */
 public class Batch {
-  public final TiRegion region;
-  public final List<ByteString> keys;
-  public final List<ByteString> values;
-  public final Map<ByteString, ByteString> map;
+  private final BackOffer backOffer;
+  private final TiRegion region;
+  private final List<ByteString> keys;
+  private final List<ByteString> values;
+  private final Map<ByteString, ByteString> map;
 
-  public Batch(TiRegion region, List<ByteString> keys) {
+  public Batch(BackOffer backOffer, TiRegion region, List<ByteString> keys) {
+    this.backOffer = backOffer;
     this.region = region;
     this.keys = keys;
     this.values = null;
     this.map = null;
   }
 
-  public Batch(TiRegion region, List<ByteString> keys, List<ByteString> values) {
+  public Batch(
+      BackOffer backOffer, TiRegion region, List<ByteString> keys, List<ByteString> values) {
+    this.backOffer = backOffer;
     this.region = region;
     this.keys = keys;
     this.values = values;
@@ -49,5 +53,25 @@ public class Batch {
       kvMap.put(keys.get(i), values.get(i));
     }
     return kvMap;
+  }
+
+  public BackOffer getBackOffer() {
+    return backOffer;
+  }
+
+  public TiRegion getRegion() {
+    return region;
+  }
+
+  public List<ByteString> getKeys() {
+    return keys;
+  }
+
+  public List<ByteString> getValues() {
+    return values;
+  }
+
+  public Map<ByteString, ByteString> getMap() {
+    return map;
   }
 }
