@@ -25,7 +25,7 @@ public class DeleteRange {
   private final ByteString endKey;
 
   public DeleteRange(BackOffer backOffer, TiRegion region, ByteString startKey, ByteString endKey) {
-    this.backOffer = backOffer;
+    this.backOffer = ConcreteBackOffer.create(backOffer);
     this.region = region;
     this.startKey = startKey;
     this.endKey = endKey;
