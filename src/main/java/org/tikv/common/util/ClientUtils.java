@@ -31,12 +31,14 @@ public class ClientUtils {
   /**
    * Append batch to list and split them according to batch limit
    *
+   * @param backOffer backOffer
    * @param batches a grouped batch
    * @param region region
    * @param keys keys
    * @param batchMaxSizeInBytes batch max limit
    */
   public static void appendBatches(
+      BackOffer backOffer,
       List<Batch> batches,
       TiRegion region,
       List<ByteString> keys,
@@ -53,7 +55,7 @@ public class ClientUtils {
           end++) {
         size += keys.get(end).size();
       }
-      Batch batch = new Batch(region, keys.subList(start, end));
+      Batch batch = new Batch(backOffer, region, keys.subList(start, end));
       batches.add(batch);
     }
   }
@@ -61,6 +63,7 @@ public class ClientUtils {
   /**
    * Append batch to list and split them according to batch limit
    *
+   * @param backOffer backOffer
    * @param batches a grouped batch
    * @param region region
    * @param keys keys
@@ -68,6 +71,7 @@ public class ClientUtils {
    * @param batchMaxSizeInBytes batch max limit
    */
   public static void appendBatches(
+      BackOffer backOffer,
       List<Batch> batches,
       TiRegion region,
       List<ByteString> keys,
@@ -86,7 +90,8 @@ public class ClientUtils {
         size += keys.get(end).size();
         size += values.get(end).size();
       }
-      Batch batch = new Batch(region, keys.subList(start, end), values.subList(start, end));
+      Batch batch =
+          new Batch(backOffer, region, keys.subList(start, end), values.subList(start, end));
       batches.add(batch);
     }
   }
@@ -102,7 +107,8 @@ public class ClientUtils {
     List<Batch> retryBatches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
-      appendBatches(retryBatches, entry.getKey(), entry.getValue(), batchSize, batchLimit);
+      appendBatches(
+          backOffer, retryBatches, entry.getKey(), entry.getValue(), batchSize, batchLimit);
     }
 
     return retryBatches;

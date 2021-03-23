@@ -598,6 +598,7 @@ public class RawKVClient implements AutoCloseable {
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
       appendBatches(
+          backOffer,
           batches,
           entry.getKey(),
           entry.getValue(),
@@ -611,9 +612,8 @@ public class RawKVClient implements AutoCloseable {
     while (!taskQueue.isEmpty()) {
       List<Batch> task = taskQueue.poll();
       for (Batch batch : task) {
-        BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
         completionService.submit(
-            () -> doSendBatchPutInBatchesWithRetry(singleBatchBackOffer, batch, ttl, atomic));
+            () -> doSendBatchPutInBatchesWithRetry(batch.getBackOffer(), batch, ttl, atomic));
       }
       getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
     }
@@ -621,7 +621,7 @@ public class RawKVClient implements AutoCloseable {
 
   private List<Batch> doSendBatchPutInBatchesWithRetry(
       BackOffer backOffer, Batch batch, long ttl, boolean atomic) {
-    try (RegionStoreClient client = clientBuilder.build(batch.region)) {
+    try (RegionStoreClient client = clientBuilder.build(batch.getRegion())) {
       client.rawBatchPut(backOffer, batch, ttl, atomic);
       return new ArrayList<>();
     } catch (final TiKVException e) {
@@ -635,15 +635,16 @@ public class RawKVClient implements AutoCloseable {
 
   private List<Batch> doSendBatchPutWithRefetchRegion(BackOffer backOffer, Batch batch) {
     Map<TiRegion, List<ByteString>> groupKeys =
-        groupKeysByRegion(clientBuilder.getRegionManager(), batch.keys, backOffer);
+        groupKeysByRegion(clientBuilder.getRegionManager(), batch.getKeys(), backOffer);
     List<Batch> retryBatches = new ArrayList<>();
 
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
       appendBatches(
+          backOffer,
           retryBatches,
           entry.getKey(),
           entry.getValue(),
-          entry.getValue().stream().map(batch.map::get).collect(Collectors.toList()),
+          entry.getValue().stream().map(batch.getMap()::get).collect(Collectors.toList()),
           RAW_BATCH_PUT_SIZE,
           MAX_RAW_BATCH_LIMIT);
     }
@@ -665,9 +666,8 @@ public class RawKVClient implements AutoCloseable {
     while (!taskQueue.isEmpty()) {
       List<Batch> task = taskQueue.poll();
       for (Batch batch : task) {
-        BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
         completionService.submit(
-            () -> doSendBatchGetInBatchesWithRetry(singleBatchBackOffer, batch));
+            () -> doSendBatchGetInBatchesWithRetry(batch.getBackOffer(), batch));
       }
       result.addAll(
           getTasksWithOutput(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF));
@@ -678,13 +678,13 @@ public class RawKVClient implements AutoCloseable {
 
   private Pair<List<Batch>, List<KvPair>> doSendBatchGetInBatchesWithRetry(
       BackOffer backOffer, Batch batch) {
-    RegionStoreClient client = clientBuilder.build(batch.region);
+    RegionStoreClient client = clientBuilder.build(batch.getRegion());
     try {
-      List<KvPair> partialResult = client.rawBatchGet(backOffer, batch.keys);
+      List<KvPair> partialResult = client.rawBatchGet(backOffer, batch.getKeys());
       return Pair.create(new ArrayList<>(), partialResult);
     } catch (final TiKVException e) {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-      clientBuilder.getRegionManager().invalidateRegion(batch.region);
+      clientBuilder.getRegionManager().invalidateRegion(batch.getRegion());
       logger.warn("ReSplitting ranges for BatchGetRequest", e);
 
       // retry
@@ -694,7 +694,7 @@ public class RawKVClient implements AutoCloseable {
 
   private List<Batch> doSendBatchGetWithRefetchRegion(BackOffer backOffer, Batch batch) {
     return getBatches(
-        backOffer, batch.keys, RAW_BATCH_GET_SIZE, MAX_RAW_BATCH_LIMIT, clientBuilder);
+        backOffer, batch.getKeys(), RAW_BATCH_GET_SIZE, MAX_RAW_BATCH_LIMIT, clientBuilder);
   }
 
   private void doSendBatchDelete(BackOffer backOffer, List<ByteString> keys, boolean atomic) {
@@ -710,9 +710,8 @@ public class RawKVClient implements AutoCloseable {
     while (!taskQueue.isEmpty()) {
       List<Batch> task = taskQueue.poll();
       for (Batch batch : task) {
-        BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
         completionService.submit(
-            () -> doSendBatchDeleteInBatchesWithRetry(singleBatchBackOffer, batch, atomic));
+            () -> doSendBatchDeleteInBatchesWithRetry(batch.getBackOffer(), batch, atomic));
       }
       getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
     }
@@ -720,13 +719,13 @@ public class RawKVClient implements AutoCloseable {
 
   private List<Batch> doSendBatchDeleteInBatchesWithRetry(
       BackOffer backOffer, Batch batch, boolean atomic) {
-    RegionStoreClient client = clientBuilder.build(batch.region);
+    RegionStoreClient client = clientBuilder.build(batch.getRegion());
     try {
-      client.rawBatchDelete(backOffer, batch.keys, atomic);
+      client.rawBatchDelete(backOffer, batch.getKeys(), atomic);
       return new ArrayList<>();
     } catch (final TiKVException e) {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-      clientBuilder.getRegionManager().invalidateRegion(batch.region);
+      clientBuilder.getRegionManager().invalidateRegion(batch.getRegion());
       logger.warn("ReSplitting ranges for BatchGetRequest", e);
 
       // retry
@@ -736,7 +735,7 @@ public class RawKVClient implements AutoCloseable {
 
   private List<Batch> doSendBatchDeleteWithRefetchRegion(BackOffer backOffer, Batch batch) {
     return getBatches(
-        backOffer, batch.keys, RAW_BATCH_DELETE_SIZE, MAX_RAW_BATCH_LIMIT, clientBuilder);
+        backOffer, batch.getKeys(), RAW_BATCH_DELETE_SIZE, MAX_RAW_BATCH_LIMIT, clientBuilder);
   }
 
   private ByteString calcKeyByCondition(boolean condition, ByteString key1, ByteString key2) {
@@ -756,15 +755,14 @@ public class RawKVClient implements AutoCloseable {
       TiRegion region = regions.get(i);
       ByteString start = calcKeyByCondition(i == 0, startKey, region.getStartKey());
       ByteString end = calcKeyByCondition(i == regions.size() - 1, endKey, region.getEndKey());
-      ranges.add(new DeleteRange(region, start, end));
+      ranges.add(new DeleteRange(backOffer, region, start, end));
     }
     Queue<List<DeleteRange>> taskQueue = new LinkedList<>();
     taskQueue.offer(ranges);
     while (!taskQueue.isEmpty()) {
       List<DeleteRange> task = taskQueue.poll();
       for (DeleteRange range : task) {
-        BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
-        completionService.submit(() -> doSendDeleteRangeWithRetry(singleBatchBackOffer, range));
+        completionService.submit(() -> doSendDeleteRangeWithRetry(range.getBackOffer(), range));
       }
       getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
     }
@@ -795,7 +793,7 @@ public class RawKVClient implements AutoCloseable {
       ByteString start = calcKeyByCondition(i == 0, range.getStartKey(), region.getStartKey());
       ByteString end =
           calcKeyByCondition(i == regions.size() - 1, range.getEndKey(), region.getEndKey());
-      retryRanges.add(new DeleteRange(region, start, end));
+      retryRanges.add(new DeleteRange(backOffer, region, start, end));
     }
     return retryRanges;
   }

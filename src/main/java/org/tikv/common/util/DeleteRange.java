@@ -19,14 +19,20 @@ import com.google.protobuf.ByteString;
 import org.tikv.common.region.TiRegion;
 
 public class DeleteRange {
+  private final BackOffer backOffer;
   private final TiRegion region;
   private final ByteString startKey;
   private final ByteString endKey;
 
-  public DeleteRange(TiRegion region, ByteString startKey, ByteString endKey) {
+  public DeleteRange(BackOffer backOffer, TiRegion region, ByteString startKey, ByteString endKey) {
+    this.backOffer = ConcreteBackOffer.create(backOffer);
     this.region = region;
     this.startKey = startKey;
     this.endKey = endKey;
+  }
+
+  public BackOffer getBackOffer() {
+    return backOffer;
   }
 
   public TiRegion getRegion() {
