@@ -18,6 +18,8 @@ package org.tikv.common;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.tikv.common.operation.PDErrorHandler.getRegionResponseErrorExtractor;
 import static org.tikv.common.pd.PDError.buildFromPdpbError;
+import static org.tikv.common.pd.PDUtils.addrToUri;
+import static org.tikv.common.pd.PDUtils.uriToAddr;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -52,7 +54,6 @@ import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.NoopHandler;
 import org.tikv.common.operation.PDErrorHandler;
-import org.tikv.common.pd.PDUtils;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction.BackOffFuncType;
 import org.tikv.common.util.BackOffer;
@@ -96,6 +97,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private List<URI> pdAddrs;
   private Client etcdClient;
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
+  private HostMapping hostMapping;
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
       Histogram.build()
@@ -116,6 +118,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   static PDClient createRaw(TiConfiguration conf, ChannelFactory channelFactory) {
     return new PDClient(conf, channelFactory);
+  }
+
+  public HostMapping getHostMapping() {
+    return hostMapping;
   }
 
   @Override
@@ -383,9 +389,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return leaderWrapper;
   }
 
-  private GetMembersResponse getMembers(URI url) {
+  private GetMembersResponse getMembers(URI uri) {
     try {
-      ManagedChannel probChan = channelFactory.getChannel(url.getHost() + ":" + url.getPort());
+      ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
       PDGrpc.PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
       GetMembersRequest request =
           GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
@@ -414,14 +420,14 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   private boolean createLeaderWrapper(String leaderUrlStr) {
     try {
-      URI newLeader = PDUtils.addrToUrl(leaderUrlStr);
-      leaderUrlStr = newLeader.getHost() + ":" + newLeader.getPort();
+      URI newLeader = addrToUri(leaderUrlStr);
+      leaderUrlStr = uriToAddr(newLeader);
       if (leaderWrapper != null && leaderUrlStr.equals(leaderWrapper.getLeaderInfo())) {
         return true;
       }
 
       // create new Leader
-      ManagedChannel clientChannel = channelFactory.getChannel(leaderUrlStr);
+      ManagedChannel clientChannel = channelFactory.getChannel(leaderUrlStr, hostMapping);
       leaderWrapper =
           new LeaderWrapper(
               leaderUrlStr,
@@ -524,6 +530,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private void initCluster() {
     GetMembersResponse resp = null;
     List<URI> pdAddrs = getConf().getPdAddrs();
+    this.pdAddrs = pdAddrs;
+    this.etcdClient = Client.builder().endpoints(pdAddrs).build();
+    this.hostMapping = new HostMapping(this.etcdClient, conf.getNetworkMappingName());
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
@@ -534,8 +543,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     long clusterId = resp.getHeader().getClusterId();
     header = RequestHeader.newBuilder().setClusterId(clusterId).build();
     tsoReq = TsoRequest.newBuilder().setHeader(header).setCount(1).build();
-    this.pdAddrs = pdAddrs;
-    this.etcdClient = Client.builder().endpoints(pdAddrs).build();
     this.tiflashReplicaMap = new ConcurrentHashMap<>();
     createLeaderWrapper(resp.getLeader().getClientUrls(0));
     service =

@@ -47,6 +47,8 @@ public class ConfigUtils {
   public static final String TIKV_METRICS_ENABLE = "tikv.metrics.enable";
   public static final String TIKV_METRICS_PORT = "tikv.metrics.port";
 
+  public static final String TIKV_NETWORK_MAPPING_NAME = "tikv.network.mapping";
+
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "600ms";
   public static final String DEF_SCAN_TIMEOUT = "20s";
@@ -73,6 +75,7 @@ public class ConfigUtils {
   public static final boolean DEF_IS_REPLICA_READ = false;
   public static final boolean DEF_METRICS_ENABLE = false;
   public static final int DEF_METRICS_PORT = 3140;
+  public static final String DEF_TIKV_NETWORK_MAPPING_NAME = "";
 
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";

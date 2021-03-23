@@ -52,6 +52,8 @@ public interface ReadOnlyPDClient {
 
   Future<TiRegion> getRegionByIDAsync(BackOffer backOffer, long id);
 
+  HostMapping getHostMapping();
+
   /**
    * Get Store by StoreId
    *

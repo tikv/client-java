@@ -70,6 +70,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_IS_REPLICA_READ, DEF_IS_REPLICA_READ);
     setIfMissing(TIKV_METRICS_ENABLE, DEF_METRICS_ENABLE);
     setIfMissing(TIKV_METRICS_PORT, DEF_METRICS_PORT);
+    setIfMissing(TIKV_NETWORK_MAPPING_NAME, DEF_TIKV_NETWORK_MAPPING_NAME);
   }
 
   public static void listAll() {
@@ -238,6 +239,8 @@ public class TiConfiguration implements Serializable {
 
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
+
+  private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
 
   public enum KVMode {
     TXN,
@@ -479,5 +482,9 @@ public class TiConfiguration implements Serializable {
   public TiConfiguration setMetricsPort(int metricsPort) {
     this.metricsPort = metricsPort;
     return this;
+  }
+
+  public String getNetworkMappingName() {
+    return this.networkMappingName;
   }
 }
