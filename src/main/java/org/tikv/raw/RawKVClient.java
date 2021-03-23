@@ -612,9 +612,8 @@ public class RawKVClient implements AutoCloseable {
     while (!taskQueue.isEmpty()) {
       List<Batch> task = taskQueue.poll();
       for (Batch batch : task) {
-        BackOffer singleBatchBackOffer = ConcreteBackOffer.create(batch.getBackOffer());
         completionService.submit(
-            () -> doSendBatchPutInBatchesWithRetry(singleBatchBackOffer, batch, ttl, atomic));
+            () -> doSendBatchPutInBatchesWithRetry(batch.getBackOffer(), batch, ttl, atomic));
       }
       getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
     }
@@ -667,9 +666,8 @@ public class RawKVClient implements AutoCloseable {
     while (!taskQueue.isEmpty()) {
       List<Batch> task = taskQueue.poll();
       for (Batch batch : task) {
-        BackOffer singleBatchBackOffer = ConcreteBackOffer.create(batch.getBackOffer());
         completionService.submit(
-            () -> doSendBatchGetInBatchesWithRetry(singleBatchBackOffer, batch));
+            () -> doSendBatchGetInBatchesWithRetry(batch.getBackOffer(), batch));
       }
       result.addAll(
           getTasksWithOutput(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF));
@@ -712,9 +710,8 @@ public class RawKVClient implements AutoCloseable {
     while (!taskQueue.isEmpty()) {
       List<Batch> task = taskQueue.poll();
       for (Batch batch : task) {
-        BackOffer singleBatchBackOffer = ConcreteBackOffer.create(batch.getBackOffer());
         completionService.submit(
-            () -> doSendBatchDeleteInBatchesWithRetry(singleBatchBackOffer, batch, atomic));
+            () -> doSendBatchDeleteInBatchesWithRetry(batch.getBackOffer(), batch, atomic));
       }
       getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
     }
@@ -765,8 +762,7 @@ public class RawKVClient implements AutoCloseable {
     while (!taskQueue.isEmpty()) {
       List<DeleteRange> task = taskQueue.poll();
       for (DeleteRange range : task) {
-        BackOffer singleBatchBackOffer = ConcreteBackOffer.create(range.getBackOffer());
-        completionService.submit(() -> doSendDeleteRangeWithRetry(singleBatchBackOffer, range));
+        completionService.submit(() -> doSendDeleteRangeWithRetry(range.getBackOffer(), range));
       }
       getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
     }

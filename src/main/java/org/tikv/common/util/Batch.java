@@ -30,7 +30,7 @@ public class Batch {
   private final Map<ByteString, ByteString> map;
 
   public Batch(BackOffer backOffer, TiRegion region, List<ByteString> keys) {
-    this.backOffer = backOffer;
+    this.backOffer = ConcreteBackOffer.create(backOffer);
     this.region = region;
     this.keys = keys;
     this.values = null;
@@ -39,7 +39,7 @@ public class Batch {
 
   public Batch(
       BackOffer backOffer, TiRegion region, List<ByteString> keys, List<ByteString> values) {
-    this.backOffer = backOffer;
+    this.backOffer = ConcreteBackOffer.create(backOffer);
     this.region = region;
     this.keys = keys;
     this.values = values;

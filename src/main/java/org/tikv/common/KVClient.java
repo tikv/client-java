@@ -131,9 +131,8 @@ public class KVClient implements AutoCloseable {
         getBatches(backOffer, keys, BATCH_GET_SIZE, MAX_BATCH_LIMIT, this.clientBuilder);
 
     for (Batch batch : batches) {
-      BackOffer singleBatchBackOffer = ConcreteBackOffer.create(backOffer);
       completionService.submit(
-          () -> doSendBatchGetInBatchesWithRetry(singleBatchBackOffer, batch, version));
+          () -> doSendBatchGetInBatchesWithRetry(batch.getBackOffer(), batch, version));
     }
 
     return getKvPairs(completionService, batches, BackOffer.BATCH_GET_MAX_BACKOFF);
@@ -170,7 +169,8 @@ public class KVClient implements AutoCloseable {
     ArrayList<KvPair> results = new ArrayList<>();
     for (Batch retryBatch : retryBatches) {
       // recursive calls
-      List<KvPair> batchResult = doSendBatchGetInBatchesWithRetry(backOffer, retryBatch, version);
+      List<KvPair> batchResult =
+          doSendBatchGetInBatchesWithRetry(retryBatch.getBackOffer(), retryBatch, version);
       results.addAll(batchResult);
     }
     return results;
