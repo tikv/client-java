@@ -92,6 +92,226 @@ public class RawKVClientTest {
   }
 
   @Test
+  public void putDumplicateKey() {
+    if (!initialized) return;
+    ByteString key = ByteString.copyFromUtf8("key_lt");
+    ByteString value = ByteString.copyFromUtf8("value1");
+    ByteString value2 = ByteString.copyFromUtf8("value2");
+    checkDelete(key);
+    checkPut(key, value);
+    checkPut(key, value2);
+    checkDelete(key);
+    logger.info("done");
+  }
+
+  //  please modify this case, the expect result is return error
+  @Test
+  public void putwithInvalidTTL() {
+    if (!initialized) return;
+    long ttl = -1;
+    ByteString key = ByteString.copyFromUtf8("key_lt");
+    ByteString value = ByteString.copyFromUtf8("value1");
+    try {
+      client.put(key, value, ttl);
+    } catch (Exception e) {
+      logger.info("put fail for error:" + e);
+    }
+    Long t = client.getKeyTTL(key);
+    logger.info("current ttl of key is " + t);
+    checkDelete(key);
+    logger.info("done");
+  }
+
+  @Test
+  public void putwithdefaultttl() {
+    if (!initialized) return;
+    long ttl = 0;
+    ByteString key = ByteString.copyFromUtf8("key_lt");
+    ByteString value = ByteString.copyFromUtf8("value1");
+    try {
+      client.put(key, value, ttl);
+    } catch (Exception e) {
+      logger.info("put fail for error:" + e);
+    }
+    Long t = client.getKeyTTL(key);
+    logger.info("current ttl of key is " + t);
+    checkDelete(key);
+    logger.info("done");
+  }
+
+  @Test
+  public void putKeywithSpec() {
+    if (!initialized) return;
+    ByteString key = ByteString.copyFromUtf8("_!@#$%^&*()?");
+    ByteString value = ByteString.copyFromUtf8("value1");
+    ByteString key2 = ByteString.copyFromUtf8("key2");
+    ByteString value2 = ByteString.copyFromUtf8("_!@#$%^&*()?");
+    checkPut(key, value);
+    checkPut(key2, value2);
+    checkDelete(key);
+    checkDelete(key2);
+    logger.info("done");
+  }
+
+  @Test
+  public void batchputwithduplicate() {
+    if (!initialized) return;
+    ByteString key1 = rawKey("key1");
+    ByteString key2 = rawKey("key2");
+    ByteString key3 = rawKey("key3");
+    ByteString key4 = rawKey("key4");
+
+    ByteString value1 = rawValue("value1");
+    ByteString value1_1 = rawValue("value1_1");
+    ByteString value2 = rawValue("value2");
+    ByteString value3 = rawValue("value3");
+
+    Kvrpcpb.KvPair kv1 = Kvrpcpb.KvPair.newBuilder().setKey(key1).setValue(value1_1).build();
+    Kvrpcpb.KvPair kv2 = Kvrpcpb.KvPair.newBuilder().setKey(key2).setValue(value2).build();
+    Kvrpcpb.KvPair kv3 = Kvrpcpb.KvPair.newBuilder().setKey(key3).setValue(value3).build();
+
+    Map<ByteString, ByteString> kvPairs = new HashMap<>();
+    kvPairs.put(key1, value1_1);
+    kvPairs.put(key2, value2);
+    kvPairs.put(key3, value3);
+
+    List<Kvrpcpb.KvPair> result = new ArrayList<>();
+    result.add(kv1);
+    result.add(kv2);
+    result.add(kv3);
+
+    try {
+      checkPut(key1, value1);
+      client.batchPut(kvPairs);
+    } catch (final TiKVException e) {
+      logger.warn("Test fails with Exception: " + e);
+    }
+    checkScan(key1, key4, result, limit);
+    checkDelete(key1);
+    checkDelete(key2);
+    checkDelete(key3);
+  }
+
+  @Test
+  public void scanRange() {
+    if (!initialized) return;
+    ByteString key = rawKey("key");
+    ByteString key1 = rawKey("key1");
+    ByteString key2 = rawKey("key2");
+    ByteString key3 = rawKey("key3");
+    ByteString value1 = rawValue("value1");
+    ByteString value2 = rawValue("value2");
+    ByteString value3 = rawValue("value3");
+    Kvrpcpb.KvPair kv1 = Kvrpcpb.KvPair.newBuilder().setKey(key1).setValue(value1).build();
+    Kvrpcpb.KvPair kv2 = Kvrpcpb.KvPair.newBuilder().setKey(key2).setValue(value2).build();
+    try {
+      checkPut(key1, value1);
+      checkPut(key2, value2);
+      checkPut(key3, value3);
+      List<Kvrpcpb.KvPair> result = new ArrayList<>();
+      result.add(kv1);
+      result.add(kv2);
+      checkScan(key1, key3, result, limit);
+    } catch (final TiKVException e) {
+      logger.warn("Test fails with Exception: " + e);
+    }
+    checkDelete(key1);
+    checkDelete(key2);
+    checkDelete(key3);
+  }
+
+  @Test
+  public void scanRangeEmpty() {
+    if (!initialized) return;
+    ByteString key = rawKey("");
+    ByteString key1 = rawKey("key1");
+    ByteString key2 = rawKey("key2");
+    ByteString key3 = rawKey("key3");
+    ByteString value1 = rawValue("value1");
+    ByteString value2 = rawValue("value2");
+    ByteString value3 = rawValue("value3");
+    Kvrpcpb.KvPair kv1 = Kvrpcpb.KvPair.newBuilder().setKey(key1).setValue(value1).build();
+    Kvrpcpb.KvPair kv2 = Kvrpcpb.KvPair.newBuilder().setKey(key2).setValue(value2).build();
+    try {
+      checkPut(key1, value1);
+      checkPut(key2, value2);
+      checkPut(key3, value3);
+      List<Kvrpcpb.KvPair> result = new ArrayList<>();
+      result.add(kv1);
+      result.add(kv2);
+      checkScan(key, key3, result, limit);
+    } catch (final TiKVException e) {
+      logger.warn("Test fails with Exception: " + e);
+    }
+    checkDelete(key1);
+    checkDelete(key2);
+    checkDelete(key3);
+  }
+
+  @Test
+  public void scanRangewithinvalid() {
+    if (!initialized) return;
+    ByteString key1 = rawKey("key1");
+    ByteString key2 = rawKey("key2");
+    ByteString key3 = rawKey("key3");
+    ByteString value1 = rawValue("value1");
+    ByteString value2 = rawValue("value2");
+    ByteString value3 = rawValue("value3");
+    try {
+      checkPut(key1, value1);
+      checkPut(key2, value2);
+      checkPut(key3, value3);
+      List<Kvrpcpb.KvPair> result = new ArrayList<>();
+      checkScan(key2, key1, result, limit);
+      checkScan(key1, key1, result, limit);
+    } catch (final TiKVException e) {
+      logger.warn("Test fails with Exception: " + e);
+    }
+    checkDelete(key1);
+    checkDelete(key2);
+    checkDelete(key3);
+  }
+
+  @Test
+  public void batchget() {
+    if (!initialized) return;
+    ByteString key = rawKey("key");
+    ByteString key1 = rawKey("key1");
+    ByteString key2 = rawKey("key2");
+    ByteString key3 = rawKey("key3");
+    ByteString key8 = rawKey("key8");
+
+    ByteString value1 = rawValue("value1");
+    ByteString value2 = rawValue("value2");
+    ByteString value3 = rawValue("value3");
+
+    List<ByteString> keys = new ArrayList<>();
+    keys.add(key3);
+    keys.add(key8);
+    keys.add(key1);
+    keys.add(key2);
+
+    Map<ByteString, ByteString> kvPairs = new HashMap<>();
+    kvPairs.put(key3, value3);
+    kvPairs.put(key1, value1);
+    kvPairs.put(key2, value2);
+
+    try {
+      client.batchPut(kvPairs);
+    } catch (final TiKVException e) {
+      logger.warn("Test fails with Exception: " + e);
+    }
+    List<Kvrpcpb.KvPair> result = client.batchGet(keys);
+    for (Kvrpcpb.KvPair kvPair : result) {
+      assert kvPairs.containsKey(kvPair.getKey());
+      assert kvPair.getValue().equals(kvPairs.get(kvPair.getKey()));
+    }
+    checkDelete(key1);
+    checkDelete(key2);
+    checkDelete(key3);
+  }
+
+  @Test
   public void atomicAPITest() {
     if (!initialized) return;
     long ttl = 10;
