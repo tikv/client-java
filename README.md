@@ -133,5 +133,50 @@ List<Kvrpcpb.KvPair> scan(ByteString startKey, int limit)
 void delete(ByteString key)
 ```
 
+## Java Client 配置参数
+
+本文介绍了与部署使用 Java Client 相关的配置参数。
+
+### 常用配置 JVM 参数
+
+以下包括常用配置的 JVM 相关参数。
+
+####tikv.pd.addresses
+- pd 集群的地址，逗号分隔
+- 默认值 127.0.0.1:2379
+
+####tikv.grpc.timeout_in_ms
+- grpc 请求的 timeout 时间
+- 默认值 600ms
+
+####tikv.grpc.scan_timeout_in_ms
+- scan/delete range grpc 请求的 timeout 时间
+- 默认值 20s
+
+### ThreadPool 配置 JVM 参数
+
+以下包括 ThreadPool 相关的参数及其默认配置，可通过 JVM 参数传入。
+
+####tikv.batch_get_concurrency
+- Client 端 batchGet 请求的线程池大小
+- 默认值 20
+
+####tikv.batch_put_concurrency
+- Client 端 batchPut 请求的线程池大小
+- 默认值 20
+
+####tikv.batch_delete_concurrency
+- Client 端 batchDelete 请求的线程池大小
+- 默认值 20
+
+####tikv.batch_scan_concurrency
+- Client 端 batchScan 请求的线程池大小
+- 默认值 5
+
+####tikv.delete_range_concurrency
+- Client 端 deleteRange 请求的线程池大小
+- 默认值 20
+
+
 ## License
 Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.
