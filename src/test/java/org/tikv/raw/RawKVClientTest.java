@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +19,7 @@ import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.FastByteComparisons;
 import org.tikv.common.util.ScanOption;
+import org.tikv.integration.IntegrationTest;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest {
@@ -70,7 +72,7 @@ public class RawKVClientTest {
   @Before
   public void setup() throws IOException {
     try {
-      TiConfiguration conf = TiConfiguration.createRawDefault();
+      TiConfiguration conf = TiConfiguration.createRawDefault(IntegrationTest.getPdAddr());
       session = TiSession.create(conf);
       initialized = false;
       if (client == null) {
@@ -91,7 +93,8 @@ public class RawKVClientTest {
     }
   }
 
-  @Test
+  // tikv-4.0 does not support atomic api
+  @Ignore
   public void atomicAPITest() {
     if (!initialized) return;
     long ttl = 10;
@@ -112,7 +115,8 @@ public class RawKVClientTest {
     assert res3.isEmpty();
   }
 
-  @Test
+  // tikv-4.0 doest not support ttl
+  @Ignore
   public void getKeyTTLTest() {
     if (!initialized) return;
     long ttl = 10;

@@ -61,13 +61,13 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
                         killall -9 pd-server || true
                         killall -9 java || true
                         sleep 10
-                        bin/pd-server --name=pd --data-dir=pd --config=../.ci/config/pd.toml &>pd.log &
+                        bin/pd-server --name=pd --data-dir=pd --config=../config/pd.toml &>pd.log &
                         sleep 10
-                        bin/tikv-server --pd=127.0.0.1:2379 -s tikv --addr=0.0.0.0:20160 --advertise-addr=127.0.0.1:20160 --config=../.ci/config/tikv.toml &>tikv.log &
+                        bin/tikv-server --pd=127.0.0.1:2379 -s tikv --addr=0.0.0.0:20160 --advertise-addr=127.0.0.1:20160 --config=../config/tikv.toml &>tikv.log &
                         sleep 10
                         ps aux | grep '-server' || true
                         curl -s 127.0.0.1:2379/pd/api/v1/status || true
-                        bin/tidb-server --store=tikv --path="127.0.0.1:2379" --config=../.ci/config/tidb.toml &>tidb.log &
+                        bin/tidb-server --store=tikv --path="127.0.0.1:2379" --config=../config/tidb.toml &>tidb.log &
                         sleep 60
                         """
                     }
@@ -99,11 +99,11 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
     stage('Summary') {
         def duration = ((System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000 / 60).setScale(2, BigDecimal.ROUND_HALF_UP)
         def msg = "[#${ghprbPullId}: ${ghprbPullTitle}]" + "\n" +
-        "${ghprbPullLink}" + "\n" +
-        "${ghprbPullDescription}" + "\n" +
-        "Integration Common Test Result: `${currentBuild.result}`" + "\n" +
-        "Elapsed Time: `${duration} mins` " + "\n" +
-        "${env.RUN_DISPLAY_URL}"
+                "${ghprbPullLink}" + "\n" +
+                "${ghprbPullDescription}" + "\n" +
+                "Integration Common Test Result: `${currentBuild.result}`" + "\n" +
+                "Elapsed Time: `${duration} mins` " + "\n" +
+                "${env.RUN_DISPLAY_URL}"
 
         print msg
     }

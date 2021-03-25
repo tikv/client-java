@@ -244,7 +244,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
           conf.getIsolationLevel(),
           conf.getCommandPriority(),
           conf.getKvMode(),
-          conf.isReplicaRead());
+          conf.getReplicaRead());
     } finally {
       requestTimer.observeDuration();
     }
@@ -261,7 +261,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                     conf.getIsolationLevel(),
                     conf.getCommandPriority(),
                     conf.getKvMode(),
-                    conf.isReplicaRead()));
+                    conf.getReplicaRead()));
     Supplier<GetRegionRequest> request =
         () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
 
@@ -288,7 +288,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         conf.getIsolationLevel(),
         conf.getCommandPriority(),
         conf.getKvMode(),
-        conf.isReplicaRead());
+        conf.getReplicaRead());
   }
 
   @Override
@@ -302,7 +302,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                     conf.getIsolationLevel(),
                     conf.getCommandPriority(),
                     conf.getKvMode(),
-                    conf.isReplicaRead()));
+                    conf.getReplicaRead()));
 
     Supplier<GetRegionByIDRequest> request =
         () -> GetRegionByIDRequest.newBuilder().setHeader(header).setRegionId(id).build();
@@ -361,8 +361,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   @Override
-  public boolean isReplicaRead() {
-    return conf.isReplicaRead();
+  public TiConfiguration.ReplicaRead getReplicaRead() {
+    return conf.getReplicaRead();
   }
 
   @Override
