@@ -161,7 +161,7 @@ public class RawKVClientTest {
     ExecutorService executors = Executors.newFixedThreadPool(200);
     ExecutorCompletionService<Object> completionService =
         new ExecutorCompletionService<>(executors);
-    long dataCnt = 1000L;
+    long dataCnt = Long.parseLong(System.getProperty("tikv.test.batch_put_cnt", "1000"));
     long keysPerBatch = 1000;
 
     long workerCnt = dataCnt / keysPerBatch;
@@ -184,24 +184,49 @@ public class RawKVClientTest {
       valuePool.add(generateBatchPutValue());
     }
 
-    for (long i = 0; i < workerCnt; i++) {
-      completionService.submit(
-          () -> {
-            String envId = envIdPool.get(r.nextInt(envIdPoolSize));
-            String type = typePool.get(r.nextInt(typePoolSize));
-            String prefix =
-                String.format(
-                    "%d%09d%09d", r.nextInt(10), r.nextInt(1000000000), r.nextInt(1000000000));
-            Map<ByteString, ByteString> map = new HashMap<>();
-            RawKVClient rawKVClient = session.createRawClient();
-            for (int j = 0; j < keysPerBatch; j++) {
-              String id = String.format("%s%04d", prefix, j);
-              map.put(
-                  generateBatchPutKey(envId, type, id), valuePool.get(r.nextInt(valuePoolSize)));
-            }
-            rawKVClient.batchPut(map);
-            return null;
-          });
+    boolean randomBatchPutTest =
+        System.getProperty("tikv.test.batch_put_strategy", "random").equalsIgnoreCase("random");
+
+    if (randomBatchPutTest) {
+      for (long i = 0; i < workerCnt; i++) {
+        completionService.submit(
+            () -> {
+              String envId = envIdPool.get(r.nextInt(envIdPoolSize));
+              String type = typePool.get(r.nextInt(typePoolSize));
+              String prefix =
+                  String.format(
+                      "%d%09d%09d", r.nextInt(10), r.nextInt(1000000000), r.nextInt(1000000000));
+              Map<ByteString, ByteString> map = new HashMap<>();
+              RawKVClient rawKVClient = session.createRawClient();
+              for (int j = 0; j < keysPerBatch; j++) {
+                String id = String.format("%s%04d", prefix, j);
+                map.put(
+                    generateBatchPutKey(envId, type, id), valuePool.get(r.nextInt(valuePoolSize)));
+              }
+              rawKVClient.batchPut(map);
+              return null;
+            });
+      }
+    } else {
+      for (long i = 0; i < workerCnt; i++) {
+        final long idx = i;
+        completionService.submit(
+            () -> {
+              String envId = envIdPool.get(0);
+              String type = typePool.get(0);
+              String prefix = String.format("%d%09d%06d", 0, 0, idx / keysPerBatch);
+              Map<ByteString, ByteString> map = new HashMap<>();
+              RawKVClient rawKVClient = session.createRawClient();
+              long offset = idx % keysPerBatch;
+              for (int j = 0; j < keysPerBatch; j++) {
+                String id = String.format("%s%03d%04d", prefix, offset, j);
+                map.put(
+                    generateBatchPutKey(envId, type, id), valuePool.get(r.nextInt(valuePoolSize)));
+              }
+              rawKVClient.batchPut(map);
+              return null;
+            });
+      }
     }
     logger.info("start");
     try {
