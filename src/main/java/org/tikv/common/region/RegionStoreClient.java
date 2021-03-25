@@ -951,7 +951,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           new KVErrorHandler<>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawCASResponse resp =
-          callWithRetry(backOffer, TikvGrpc.getRawCompareAndSetMethod(), factory, handler);
+          callWithRetry(backOffer, TikvGrpc.getRawCompareAndSwapMethod(), factory, handler);
       return rawPutIfAbsentHelper(resp);
     } finally {
       requestTimer.observeDuration();
@@ -970,10 +970,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
     }
-    if (!resp.getNotEqual()) {
+    if (resp.getSucceed()) {
       return ByteString.EMPTY;
     }
-    return resp.getValue();
+    return resp.getPreviousValue();
   }
 
   public List<KvPair> rawBatchGet(BackOffer backoffer, List<ByteString> keys) {
