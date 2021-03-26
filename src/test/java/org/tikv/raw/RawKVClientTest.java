@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,7 +92,8 @@ public class RawKVClientTest {
     }
   }
 
-  @Test
+  // tikv-4.0 does not support atomic api
+  @Ignore
   public void atomicAPITest() {
     if (!initialized) return;
     long ttl = 10;
@@ -112,7 +114,8 @@ public class RawKVClientTest {
     assert res3.isEmpty();
   }
 
-  @Test
+  // tikv-4.0 doest not support ttl
+  @Ignore
   public void getKeyTTLTest() {
     if (!initialized) return;
     long ttl = 10;
