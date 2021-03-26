@@ -1,4 +1,4 @@
-package org.tikv.integration;
+package org.tikv.txn;
 
 import static junit.framework.TestCase.assertTrue;
 import static junit.framework.TestCase.fail;
@@ -21,15 +21,14 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
-public class IntegrationTest {
+public class TXNTest {
   static final int DEFAULT_TTL = 10;
-  private static final String DEFAULT_PD_ADDR = "127.0.0.1:2379";
   private TiSession session;
   RegionStoreClient.RegionStoreClientBuilder builder;
 
   @Before
   public void setUp() {
-    TiConfiguration conf = TiConfiguration.createDefault(getPdAddr());
+    TiConfiguration conf = TiConfiguration.createDefault();
     try {
       session = TiSession.create(conf);
       this.builder = session.getRegionStoreClientBuilder();
@@ -43,20 +42,6 @@ public class IntegrationTest {
     if (session != null) {
       session.close();
     }
-  }
-
-  public static String getPdAddr() {
-    String tmp = System.getenv("pdAddr");
-    if (tmp != null && !tmp.equals("")) {
-      return tmp;
-    }
-
-    tmp = System.getProperty("pdAddr");
-    if (tmp != null && !tmp.equals("")) {
-      return tmp;
-    }
-
-    return DEFAULT_PD_ADDR;
   }
 
   void putKV(String key, String value) {

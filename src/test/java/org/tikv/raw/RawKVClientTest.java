@@ -19,7 +19,6 @@ import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.FastByteComparisons;
 import org.tikv.common.util.ScanOption;
-import org.tikv.integration.IntegrationTest;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest {
@@ -72,7 +71,7 @@ public class RawKVClientTest {
   @Before
   public void setup() throws IOException {
     try {
-      TiConfiguration conf = TiConfiguration.createRawDefault(IntegrationTest.getPdAddr());
+      TiConfiguration conf = TiConfiguration.createRawDefault();
       session = TiSession.create(conf);
       initialized = false;
       if (client == null) {

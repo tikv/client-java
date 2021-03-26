@@ -1,4 +1,4 @@
-package org.tikv.integration;
+package org.tikv.txn;
 
 import com.google.protobuf.ByteString;
 import org.junit.After;
@@ -9,7 +9,7 @@ import org.junit.Test;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 
-public class ReplicaReadTest extends IntegrationTest {
+public class ReplicaReadTest extends TXNTest {
   private TiSession session;
   private String key;
   private String value;
@@ -31,7 +31,7 @@ public class ReplicaReadTest extends IntegrationTest {
   }
 
   private void doTest(TiConfiguration.ReplicaRead replicaRead) {
-    TiConfiguration conf = TiConfiguration.createDefault(getPdAddr());
+    TiConfiguration conf = TiConfiguration.createDefault();
     conf.setReplicaRead(replicaRead);
     session = TiSession.create(conf);
 

@@ -144,10 +144,8 @@ public class TiRegion implements Serializable {
   public List<Peer> getLearnerList() {
     List<Peer> peers = new ArrayList<>();
     for (Peer peer : getMeta().getPeersList()) {
-      if (!peer.equals(this.leader)) {
-        if (peer.getRole().equals(Metapb.PeerRole.Learner)) {
-          peers.add(peer);
-        }
+      if (peer.getRole().equals(Metapb.PeerRole.Learner)) {
+        peers.add(peer);
       }
     }
     return peers;
