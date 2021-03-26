@@ -790,7 +790,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                     conf.getIsolationLevel(),
                     conf.getCommandPriority(),
                     conf.getKvMode(),
-                    conf.getReplicaRead()))
+                    conf.getReplicaSelector()))
         .collect(Collectors.toList());
   }
 

@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.pd.PDUtils;
+import org.tikv.common.replica.ReplicaSelector;
 import org.tikv.kvproto.Kvrpcpb.CommandPri;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
@@ -247,6 +248,8 @@ public class TiConfiguration implements Serializable {
 
   private int kvClientConcurrency = getInt(TIKV_KV_CLIENT_CONCURRENCY);
   private ReplicaRead replicaRead = getReplicaRead(TIKV_REPLICA_READ);
+  private ReplicaSelector internalReplicaSelector = getReplicaSelector(replicaRead);
+  private ReplicaSelector replicaSelector;
 
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
@@ -480,7 +483,32 @@ public class TiConfiguration implements Serializable {
 
   public TiConfiguration setReplicaRead(ReplicaRead replicaRead) {
     this.replicaRead = replicaRead;
+    this.internalReplicaSelector = getReplicaSelector(this.replicaRead);
     return this;
+  }
+
+  private ReplicaSelector getReplicaSelector(ReplicaRead replicaRead) {
+    if (TiConfiguration.ReplicaRead.LEADER.equals(replicaRead)) {
+      return ReplicaSelector.LEADER;
+    } else if (TiConfiguration.ReplicaRead.FOLLOWER.equals(replicaRead)) {
+      return ReplicaSelector.FOLLOWER;
+    } else if (TiConfiguration.ReplicaRead.LEADER_AND_FOLLOWER.equals(replicaRead)) {
+      return ReplicaSelector.LEADER_AND_FOLLOWER;
+    } else {
+      return null;
+    }
+  }
+
+  public ReplicaSelector getReplicaSelector() {
+    if (replicaSelector != null) {
+      return replicaSelector;
+    } else {
+      return internalReplicaSelector;
+    }
+  }
+
+  public void setReplicaSelector(ReplicaSelector replicaSelector) {
+    this.replicaSelector = replicaSelector;
   }
 
   public boolean isMetricsEnable() {
