@@ -151,7 +151,7 @@ public class LockResolverClientV3 extends AbstractRegionStoreClient
 
       Kvrpcpb.ResolveLockRequest.Builder builder =
           Kvrpcpb.ResolveLockRequest.newBuilder()
-              .setContext(region.getContext())
+              .setContext(region.getLeaderContext())
               .setStartVersion(lock.getTxnID());
 
       if (txnStatus.isCommitted()) {
@@ -230,7 +230,7 @@ public class LockResolverClientV3 extends AbstractRegionStoreClient
         () -> {
           TiRegion primaryKeyRegion = regionManager.getRegionByKey(primary);
           return CleanupRequest.newBuilder()
-              .setContext(primaryKeyRegion.getContext())
+              .setContext(primaryKeyRegion.getLeaderContext())
               .setKey(primary)
               .setStartVersion(txnID)
               .setCurrentTs(currentTS)

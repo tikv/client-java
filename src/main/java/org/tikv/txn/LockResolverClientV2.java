@@ -125,7 +125,7 @@ public class LockResolverClientV2 extends AbstractRegionStoreClient
       Supplier<CleanupRequest> factory =
           () ->
               CleanupRequest.newBuilder()
-                  .setContext(region.getContext())
+                  .setContext(region.getLeaderContext())
                   .setKey(primary)
                   .setStartVersion(txnID)
                   .build();
@@ -232,7 +232,7 @@ public class LockResolverClientV2 extends AbstractRegionStoreClient
         factory =
             () ->
                 ResolveLockRequest.newBuilder()
-                    .setContext(region.getContext())
+                    .setContext(region.getLeaderContext())
                     .setStartVersion(lock.getTxnID())
                     .setCommitVersion(txnStatus)
                     .build();
@@ -240,7 +240,7 @@ public class LockResolverClientV2 extends AbstractRegionStoreClient
         factory =
             () ->
                 ResolveLockRequest.newBuilder()
-                    .setContext(region.getContext())
+                    .setContext(region.getLeaderContext())
                     .setStartVersion(lock.getTxnID())
                     .build();
       }

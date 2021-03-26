@@ -169,7 +169,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
       Supplier<Kvrpcpb.PessimisticRollbackRequest> factory =
           () ->
               Kvrpcpb.PessimisticRollbackRequest.newBuilder()
-                  .setContext(region.getContext())
+                  .setContext(region.getLeaderContext())
                   .setStartVersion(lock.getTxnID())
                   .setForUpdateTs(forUpdateTS)
                   .addKeys(lock.getKey())
@@ -287,7 +287,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
         () -> {
           TiRegion primaryKeyRegion = regionManager.getRegionByKey(primary);
           return Kvrpcpb.CheckTxnStatusRequest.newBuilder()
-              .setContext(primaryKeyRegion.getContext())
+              .setContext(primaryKeyRegion.getLeaderContext())
               .setPrimaryKey(primary)
               .setLockTs(txnID)
               .setCallerStartTs(callerStartTS)
@@ -364,7 +364,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
 
       Kvrpcpb.ResolveLockRequest.Builder builder =
           Kvrpcpb.ResolveLockRequest.newBuilder()
-              .setContext(region.getContext())
+              .setContext(region.getLeaderContext())
               .setStartVersion(lock.getTxnID());
 
       if (txnStatus.isCommitted()) {
