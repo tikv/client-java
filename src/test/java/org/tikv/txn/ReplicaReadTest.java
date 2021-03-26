@@ -8,9 +8,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.tikv.common.ReplicaSelector;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.replica.ReplicaSelector;
 import org.tikv.kvproto.Metapb;
 
 public class ReplicaReadTest extends TXNTest {

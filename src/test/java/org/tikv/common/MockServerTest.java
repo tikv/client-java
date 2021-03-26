@@ -5,6 +5,7 @@ import java.io.IOException;
 import org.junit.Before;
 import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.replica.ReplicaSelector;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
 
@@ -34,7 +35,7 @@ public class MockServerTest extends PDMockServerTest {
             session.getConf().getIsolationLevel(),
             session.getConf().getCommandPriority(),
             KVMode.TXN,
-            new InternalReplicaSelector(TiConfiguration.ReplicaRead.LEADER));
+            ReplicaSelector.LEADER);
     pdServer.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
     server = new KVMockServer();
     port = server.start(region);

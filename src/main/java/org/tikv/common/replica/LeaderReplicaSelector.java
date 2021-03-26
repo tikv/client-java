@@ -13,36 +13,18 @@
  * limitations under the License.
  */
 
-package org.tikv.common;
+package org.tikv.common.replica;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import org.tikv.kvproto.Metapb;
 
-public class InternalReplicaSelector implements ReplicaSelector {
-  private final TiConfiguration.ReplicaRead replicaRead;
-
-  public InternalReplicaSelector(TiConfiguration.ReplicaRead replicaRead) {
-    this.replicaRead = replicaRead;
-  }
-
+public class LeaderReplicaSelector implements ReplicaSelector {
   @Override
   public List<Metapb.Peer> select(
       Metapb.Peer leader, List<Metapb.Peer> followers, List<Metapb.Peer> learners) {
     List<Metapb.Peer> list = new ArrayList<>();
-
-    if (TiConfiguration.ReplicaRead.LEADER.equals(replicaRead)) {
-      list.add(leader);
-    } else if (TiConfiguration.ReplicaRead.FOLLOWER.equals(replicaRead)) {
-      list.addAll(followers);
-      Collections.shuffle(list);
-    } else if (TiConfiguration.ReplicaRead.LEADER_AND_FOLLOWER.equals(replicaRead)) {
-      list.addAll(followers);
-      Collections.shuffle(list);
-      list.add(leader);
-    }
-
+    list.add(leader);
     return list;
   }
 }
