@@ -20,13 +20,12 @@ package org.tikv.common.region;
 import com.google.protobuf.ByteString;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.TiConfiguration;
+import org.tikv.common.ReplicaSelector;
 import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataInput;
@@ -49,7 +48,7 @@ public class TiRegion implements Serializable {
   private final IsolationLevel isolationLevel;
   private final Kvrpcpb.CommandPri commandPri;
   private final Peer leader;
-  private final TiConfiguration.ReplicaRead replicaRead;
+  private final ReplicaSelector replicaSelector;
   private final List<Peer> replicaList;
   private int replicaIdx;
 
@@ -58,23 +57,14 @@ public class TiRegion implements Serializable {
       Peer leader,
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
-      KVMode kvMode) {
-    this(meta, leader, isolationLevel, commandPri, kvMode, TiConfiguration.ReplicaRead.LEADER);
-  }
-
-  public TiRegion(
-      Region meta,
-      Peer leader,
-      IsolationLevel isolationLevel,
-      Kvrpcpb.CommandPri commandPri,
       KVMode kvMode,
-      TiConfiguration.ReplicaRead replicaRead) {
+      ReplicaSelector replicaSelector) {
     Objects.requireNonNull(meta, "meta is null");
     this.meta = decodeRegion(meta, kvMode == KVMode.RAW);
     this.kvMode = kvMode;
     this.isolationLevel = isolationLevel;
     this.commandPri = commandPri;
-    this.replicaRead = replicaRead;
+    this.replicaSelector = replicaSelector;
     if (leader == null || leader.getId() == 0) {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());
@@ -86,18 +76,7 @@ public class TiRegion implements Serializable {
     }
 
     // init replicaList
-    List<Peer> followerList = getFollowerList();
-    replicaList = new ArrayList<>();
-    if (TiConfiguration.ReplicaRead.LEADER.equals(replicaRead)) {
-      replicaList.add(this.leader);
-    } else if (TiConfiguration.ReplicaRead.FOLLOWER.equals(replicaRead)) {
-      replicaList.addAll(followerList);
-      Collections.shuffle(replicaList);
-    } else if (TiConfiguration.ReplicaRead.LEADER_AND_FOLLOWER.equals(replicaRead)) {
-      replicaList.addAll(followerList);
-      Collections.shuffle(replicaList);
-      replicaList.add(this.leader);
-    }
+    replicaList = replicaSelector.select(this.leader, getFollowerList(), getLearnerList());
     replicaIdx = 0;
   }
 
@@ -230,7 +209,7 @@ public class TiRegion implements Serializable {
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
         return new TiRegion(
-            this.meta, p, this.isolationLevel, this.commandPri, this.kvMode, this.replicaRead);
+            this.meta, p, this.isolationLevel, this.commandPri, this.kvMode, this.replicaSelector);
       }
     }
     return null;

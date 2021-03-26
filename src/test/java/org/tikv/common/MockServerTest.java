@@ -33,7 +33,8 @@ public class MockServerTest extends PDMockServerTest {
             r.getPeers(0),
             session.getConf().getIsolationLevel(),
             session.getConf().getCommandPriority(),
-            KVMode.TXN);
+            KVMode.TXN,
+            new InternalReplicaSelector(TiConfiguration.ReplicaRead.LEADER));
     pdServer.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
     server = new KVMockServer();
     port = server.start(region);

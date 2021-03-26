@@ -1,13 +1,17 @@
 package org.tikv.txn;
 
 import com.google.protobuf.ByteString;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.tikv.common.ReplicaSelector;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.kvproto.Metapb;
 
 public class ReplicaReadTest extends TXNTest {
   private TiSession session;
@@ -28,6 +32,29 @@ public class ReplicaReadTest extends TXNTest {
   @Test
   public void leadAndFollowerReadTest() {
     doTest(TiConfiguration.ReplicaRead.LEADER_AND_FOLLOWER);
+  }
+
+  @Test
+  public void replicaSelectorTest() {
+    TiConfiguration conf = TiConfiguration.createDefault();
+
+    conf.setReplicaSelector(
+        new ReplicaSelector() {
+          @Override
+          public List<Metapb.Peer> select(
+              Metapb.Peer leader, List<Metapb.Peer> followers, List<Metapb.Peer> learners) {
+            List<Metapb.Peer> list = new ArrayList<>();
+            list.addAll(followers);
+            list.addAll(learners);
+            list.add(leader);
+            return list;
+          }
+        });
+    session = TiSession.create(conf);
+
+    putKV(key, value);
+    ByteString v = session.createSnapshot().get(ByteString.copyFromUtf8(key));
+    Assert.assertEquals(value, v.toStringUtf8());
   }
 
   private void doTest(TiConfiguration.ReplicaRead replicaRead) {

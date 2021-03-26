@@ -247,6 +247,8 @@ public class TiConfiguration implements Serializable {
 
   private int kvClientConcurrency = getInt(TIKV_KV_CLIENT_CONCURRENCY);
   private ReplicaRead replicaRead = getReplicaRead(TIKV_REPLICA_READ);
+  private ReplicaSelector internalReplicaSelector = new InternalReplicaSelector(replicaRead);
+  private ReplicaSelector replicaSelector;
 
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
@@ -480,7 +482,20 @@ public class TiConfiguration implements Serializable {
 
   public TiConfiguration setReplicaRead(ReplicaRead replicaRead) {
     this.replicaRead = replicaRead;
+    this.internalReplicaSelector = new InternalReplicaSelector(this.replicaRead);
     return this;
+  }
+
+  public ReplicaSelector getReplicaSelector() {
+    if (replicaSelector != null) {
+      return replicaSelector;
+    } else {
+      return internalReplicaSelector;
+    }
+  }
+
+  public void setReplicaSelector(ReplicaSelector replicaSelector) {
+    this.replicaSelector = replicaSelector;
   }
 
   public boolean isMetricsEnable() {
