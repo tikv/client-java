@@ -121,7 +121,7 @@ public class ClientUtils {
 
   public static Map<TiRegion, List<ByteString>> groupKeysByRegion(
       RegionManager regionManager, List<ByteString> keys, BackOffer backoffer) {
-    return groupKeysByRegion(regionManager, new ArrayList<>(keys), backoffer, false);
+    return groupKeysByRegion(regionManager, keys, backoffer, false);
   }
 
   /**
