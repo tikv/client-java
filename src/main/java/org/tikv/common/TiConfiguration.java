@@ -15,6 +15,12 @@
 
 package org.tikv.common;
 
+import static org.tikv.common.ConfigUtils.*;
+
+import java.io.Serializable;
+import java.net.URI;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.pd.PDUtils;
@@ -22,75 +28,10 @@ import org.tikv.common.replica.ReplicaSelector;
 import org.tikv.kvproto.Kvrpcpb.CommandPri;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
-import java.io.Serializable;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.Optional;
-
-import static org.tikv.common.ConfigUtils.DEF_BATCH_DELETE_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.DEF_BATCH_GET_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.DEF_BATCH_PUT_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.DEF_BATCH_SCAN_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.DEF_DB_PREFIX;
-import static org.tikv.common.ConfigUtils.DEF_DELETE_RANGE_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.DEF_INDEX_SCAN_BATCH_SIZE;
-import static org.tikv.common.ConfigUtils.DEF_INDEX_SCAN_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.DEF_KV_CLIENT_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.DEF_MAX_FRAME_SIZE;
-import static org.tikv.common.ConfigUtils.DEF_METRICS_ENABLE;
-import static org.tikv.common.ConfigUtils.DEF_METRICS_PORT;
-import static org.tikv.common.ConfigUtils.DEF_PD_ADDRESSES;
-import static org.tikv.common.ConfigUtils.DEF_REPLICA_READ;
-import static org.tikv.common.ConfigUtils.DEF_SCAN_BATCH_SIZE;
-import static org.tikv.common.ConfigUtils.DEF_SCAN_TIMEOUT;
-import static org.tikv.common.ConfigUtils.DEF_SHOW_ROWID;
-import static org.tikv.common.ConfigUtils.DEF_TABLE_SCAN_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.DEF_TIKV_NETWORK_MAPPING_NAME;
-import static org.tikv.common.ConfigUtils.DEF_TIMEOUT;
-import static org.tikv.common.ConfigUtils.FOLLOWER;
-import static org.tikv.common.ConfigUtils.HIGH_COMMAND_PRIORITY;
-import static org.tikv.common.ConfigUtils.LEADER_AND_FOLLOWER;
-import static org.tikv.common.ConfigUtils.LOW_COMMAND_PRIORITY;
-import static org.tikv.common.ConfigUtils.NORMAL_COMMAND_PRIORITY;
-import static org.tikv.common.ConfigUtils.RAW_KV_MODE;
-import static org.tikv.common.ConfigUtils.READ_COMMITTED_ISOLATION_LEVEL;
-import static org.tikv.common.ConfigUtils.SNAPSHOT_ISOLATION_LEVEL;
-import static org.tikv.common.ConfigUtils.TIKV_BATCH_DELETE_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.TIKV_BATCH_GET_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.TIKV_BATCH_PUT_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.TIKV_BATCH_SCAN_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.TIKV_DB_PREFIX;
-import static org.tikv.common.ConfigUtils.TIKV_DELETE_RANGE_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.TIKV_GRPC_MAX_FRAME_SIZE;
-import static org.tikv.common.ConfigUtils.TIKV_GRPC_SCAN_BATCH_SIZE;
-import static org.tikv.common.ConfigUtils.TIKV_GRPC_SCAN_TIMEOUT;
-import static org.tikv.common.ConfigUtils.TIKV_GRPC_TIMEOUT;
-import static org.tikv.common.ConfigUtils.TIKV_INDEX_SCAN_BATCH_SIZE;
-import static org.tikv.common.ConfigUtils.TIKV_INDEX_SCAN_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.TIKV_KV_CLIENT_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.TIKV_KV_MODE;
-import static org.tikv.common.ConfigUtils.TIKV_METRICS_ENABLE;
-import static org.tikv.common.ConfigUtils.TIKV_METRICS_PORT;
-import static org.tikv.common.ConfigUtils.TIKV_NETWORK_MAPPING_NAME;
-import static org.tikv.common.ConfigUtils.TIKV_PD_ADDRESSES;
-import static org.tikv.common.ConfigUtils.TIKV_REPLICA_READ;
-import static org.tikv.common.ConfigUtils.TIKV_REQUEST_COMMAND_PRIORITY;
-import static org.tikv.common.ConfigUtils.TIKV_REQUEST_ISOLATION_LEVEL;
-import static org.tikv.common.ConfigUtils.TIKV_SHOW_ROWID;
-import static org.tikv.common.ConfigUtils.TIKV_TABLE_SCAN_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.TXN_KV_MODE;
-
 public class TiConfiguration implements Serializable {
 
   private static final Logger logger = LoggerFactory.getLogger(TiConfiguration.class);
-  private static final Map<String, String> settings = new HashMap<>();
+  private static final ConcurrentHashMap<String, String> settings = new ConcurrentHashMap<>();
 
   static {
     loadFromSystemProperties();
