@@ -531,7 +531,16 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     GetMembersResponse resp = null;
     List<URI> pdAddrs = getConf().getPdAddrs();
     this.pdAddrs = pdAddrs;
-    this.etcdClient = Client.builder().endpoints(pdAddrs).build();
+    this.etcdClient =
+        Client.builder()
+            .endpoints(pdAddrs)
+            .executorService(
+                Executors.newCachedThreadPool(
+                    new ThreadFactoryBuilder()
+                        .setNameFormat("etcd-conn-manager-pool-%d")
+                        .setDaemon(true)
+                        .build()))
+            .build();
     this.hostMapping = new HostMapping(this.etcdClient, conf.getNetworkMappingName());
     for (URI u : pdAddrs) {
       resp = getMembers(u);
@@ -547,7 +556,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     createLeaderWrapper(resp.getLeader().getClientUrls(0));
     service =
         Executors.newSingleThreadScheduledExecutor(
-            new ThreadFactoryBuilder().setDaemon(true).build());
+            new ThreadFactoryBuilder()
+                .setNameFormat("PDClient-update-leader-pool-%d")
+                .setDaemon(true)
+                .build());
     service.scheduleAtFixedRate(
         () -> {
           // Wrap this with a try catch block in case schedule update fails
@@ -562,7 +574,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         TimeUnit.MINUTES);
     tiflashReplicaService =
         Executors.newSingleThreadScheduledExecutor(
-            new ThreadFactoryBuilder().setDaemon(true).build());
+            new ThreadFactoryBuilder()
+                .setNameFormat("PDClient-tiflash-replica-pool-%d")
+                .setDaemon(true)
+                .build());
     tiflashReplicaService.scheduleAtFixedRate(
         this::updateTiFlashReplicaStatus, 10, 10, TimeUnit.SECONDS);
   }
