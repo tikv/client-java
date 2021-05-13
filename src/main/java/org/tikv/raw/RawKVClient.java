@@ -837,4 +837,159 @@ public class RawKVClient implements AutoCloseable {
   private BackOffer defaultBackOff() {
     return ConcreteBackOffer.newRawKVBackOff();
   }
+
+  /**
+   * Scan raw key-value pairs from TiKV in range [startKey, endKey)
+   *
+   * @param startKey raw start key, inclusive
+   * @param endKey raw end key, exclusive
+   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
+   * @return iterator of key-value pairs in range
+   */
+  public Iterator<KvPair> scan0(ByteString startKey, ByteString endKey, int limit) {
+    return scan0(startKey, endKey, limit, false);
+  }
+
+  /**
+   * Scan raw key-value pairs from TiKV in range [startKey, ♾)
+   *
+   * @param startKey raw start key, inclusive
+   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
+   * @return iterator of key-value pairs in range
+   */
+  public Iterator<KvPair> scan0(ByteString startKey, int limit) {
+    return scan0(startKey, limit, false);
+  }
+
+  /**
+   * Scan raw key-value pairs from TiKV in range [startKey, ♾)
+   *
+   * @param startKey raw start key, inclusive
+   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
+   * @param keyOnly whether to scan in key-only mode
+   * @return iterator of key-value pairs in range
+   */
+  public Iterator<KvPair> scan0(ByteString startKey, int limit, boolean keyOnly) {
+    return scan0(startKey, ByteString.EMPTY, limit, keyOnly);
+  }
+
+  /**
+   * Scan raw key-value pairs from TiKV in range [startKey, endKey)
+   *
+   * @param startKey raw start key, inclusive
+   * @param endKey raw end key, exclusive
+   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
+   * @param keyOnly whether to scan in key-only mode
+   * @return iterator of key-value pairs in range
+   */
+  public Iterator<KvPair> scan0(
+      ByteString startKey, ByteString endKey, int limit, boolean keyOnly) {
+    String label = "client_raw_scan";
+    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+    try {
+      Iterator<KvPair> iterator =
+          rawScanIterator(conf, clientBuilder, startKey, endKey, limit, keyOnly);
+      RAW_REQUEST_SUCCESS.labels(label).inc();
+      return iterator;
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
+    } finally {
+      requestTimer.observeDuration();
+    }
+  }
+
+  /**
+   * Scan all raw key-value pairs from TiKV in range [startKey, endKey)
+   *
+   * @param startKey raw start key, inclusive
+   * @param endKey raw end key, exclusive
+   * @return iterator of key-value pairs in range
+   */
+  public Iterator<KvPair> scan0(ByteString startKey, ByteString endKey) {
+    return scan0(startKey, endKey, false);
+  }
+
+  private Iterator<KvPair> scan0(ScanOption scanOption) {
+    ByteString startKey = scanOption.getStartKey();
+    ByteString endKey = scanOption.getEndKey();
+    int limit = scanOption.getLimit();
+    boolean keyOnly = scanOption.isKeyOnly();
+    return scan0(startKey, endKey, limit, keyOnly);
+  }
+
+  /**
+   * Scan keys with prefix
+   *
+   * @param prefixKey prefix key
+   * @param limit limit of keys retrieved
+   * @param keyOnly whether to scan in keyOnly mode
+   * @return kvPairs iterator with the specified prefix
+   */
+  public Iterator<KvPair> scanPrefix0(ByteString prefixKey, int limit, boolean keyOnly) {
+    return scan0(prefixKey, Key.toRawKey(prefixKey).nextPrefix().toByteString(), limit, keyOnly);
+  }
+
+  public Iterator<KvPair> scanPrefix0(ByteString prefixKey) {
+    return scan0(prefixKey, Key.toRawKey(prefixKey).nextPrefix().toByteString());
+  }
+
+  public Iterator<KvPair> scanPrefix0(ByteString prefixKey, boolean keyOnly) {
+    return scan0(prefixKey, Key.toRawKey(prefixKey).nextPrefix().toByteString(), keyOnly);
+  }
+
+  /**
+   * Scan all raw key-value pairs from TiKV in range [startKey, endKey)
+   *
+   * @param startKey raw start key, inclusive
+   * @param endKey raw end key, exclusive
+   * @param keyOnly whether to scan in key-only mode
+   * @return iterator of key-value pairs in range
+   */
+  public Iterator<KvPair> scan0(ByteString startKey, ByteString endKey, boolean keyOnly) {
+    return new TikvIterator(startKey, endKey, keyOnly);
+  }
+
+  public class TikvIterator implements Iterator<KvPair> {
+
+    private Iterator<KvPair> iterator;
+
+    private ByteString startKey;
+    private ByteString endKey;
+    private boolean keyOnly;
+
+    private KvPair last;
+
+    public TikvIterator(ByteString startKey, ByteString endKey, boolean keyOnly) {
+      this.startKey = startKey;
+      this.endKey = endKey;
+      this.keyOnly = keyOnly;
+
+      this.iterator =
+          rawScanIterator(
+              conf, clientBuilder, this.startKey, this.endKey, conf.getScanBatchSize(), keyOnly);
+    }
+
+    @Override
+    public boolean hasNext() {
+      if (this.iterator.hasNext()) {
+        return true;
+      }
+      if (this.last == null) {
+        return false;
+      }
+      ByteString startKey = Key.toRawKey(this.last.getKey()).next().toByteString();
+      this.iterator =
+          rawScanIterator(conf, clientBuilder, startKey, endKey, conf.getScanBatchSize(), keyOnly);
+      this.last = null;
+      return this.iterator.hasNext();
+    }
+
+    @Override
+    public KvPair next() {
+      KvPair next = this.iterator.next();
+      this.last = next;
+      return next;
+    }
+  }
 }
