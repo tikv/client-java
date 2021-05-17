@@ -129,9 +129,16 @@ public class RegionManager {
       if (isReplicaRead) {
         Peer peer = region.getCurrentFollower();
         store = cache.getStoreById(peer.getStoreId(), backOffer);
+        if (store == null) {
+          cache.invalidateRegion(region);
+        }
       } else {
         Peer leader = region.getLeader();
-        store = cache.getStoreById(leader.getStoreId(), backOffer);
+        long storeId = leader.getStoreId();
+        store = cache.getStoreById(storeId, backOffer);
+        if (store == null) {
+          cache.invalidateAllRegionForStore(storeId);
+        }
       }
     } else {
       outerLoop:
