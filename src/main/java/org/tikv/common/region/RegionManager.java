@@ -134,10 +134,9 @@ public class RegionManager {
         }
       } else {
         Peer leader = region.getLeader();
-        long storeId = leader.getStoreId();
-        store = cache.getStoreById(storeId, backOffer);
+        store = cache.getStoreById(leader.getStoreId(), backOffer);
         if (store == null) {
-          cache.invalidateAllRegionForStore(storeId);
+          cache.clearAll();
         }
       }
     } else {
@@ -323,8 +322,8 @@ public class RegionManager {
 
       // remove region
       for (TiRegion r : regionToRemove) {
-        regionCache.remove(r.getId());
         keyToRegionIdCache.remove(makeRange(r.getStartKey(), r.getEndKey()));
+        regionCache.remove(r.getId());
       }
     }
 
@@ -346,6 +345,11 @@ public class RegionManager {
       } catch (Exception e) {
         throw new GrpcException(e);
       }
+    }
+
+    public synchronized void clearAll() {
+      keyToRegionIdCache.clear();
+      regionCache.clear();
     }
   }
 }
