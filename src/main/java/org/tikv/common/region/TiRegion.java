@@ -23,11 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.TiConfiguration.KVMode;
-import org.tikv.common.codec.Codec.BytesCodec;
-import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
@@ -39,31 +37,35 @@ import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Peer;
 import org.tikv.kvproto.Metapb.Region;
+import org.tikv.kvproto.Metapb.Store;
 
 public class TiRegion implements Serializable {
   private static final Logger logger = LoggerFactory.getLogger(TiRegion.class);
 
   private final Region meta;
-  private final KVMode kvMode;
   private final IsolationLevel isolationLevel;
   private final Kvrpcpb.CommandPri commandPri;
   private final Peer leader;
   private final ReplicaSelector replicaSelector;
   private final List<Peer> replicaList;
   private int replicaIdx;
+  private final List<Peer> peers;
+  private final List<Store> stores;
 
   public TiRegion(
       Region meta,
       Peer leader,
+      List<Peer> peers,
+      List<Store> stores,
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
-      KVMode kvMode,
       ReplicaSelector replicaSelector) {
     Objects.requireNonNull(meta, "meta is null");
-    this.meta = decodeRegion(meta, kvMode == KVMode.RAW);
-    this.kvMode = kvMode;
+    this.meta = meta;
     this.isolationLevel = isolationLevel;
     this.commandPri = commandPri;
+    this.peers = peers;
+    this.stores = stores;
     this.replicaSelector = replicaSelector;
     if (leader == null || leader.getId() == 0) {
       if (meta.getPeersCount() == 0) {
@@ -76,48 +78,18 @@ public class TiRegion implements Serializable {
     }
 
     // init replicaList
-    replicaList = replicaSelector.select(this.leader, getFollowerList(), getLearnerList());
+    // replicaList = replicaSelector.select(this.leader, getFollowerList(), getLearnerList());
+    replicaList =
+        replicaSelector
+            .select(new org.tikv.common.replica.Region(meta, leader, peers, stores))
+            .stream()
+            .map(org.tikv.common.replica.Store::getPeer)
+            .collect(Collectors.toList());
     replicaIdx = 0;
-  }
-
-  private Region decodeRegion(Region region, boolean isRawRegion) {
-    Region.Builder builder =
-        Region.newBuilder()
-            .setId(region.getId())
-            .setRegionEpoch(region.getRegionEpoch())
-            .addAllPeers(region.getPeersList());
-
-    if (region.getStartKey().isEmpty() || isRawRegion) {
-      builder.setStartKey(region.getStartKey());
-    } else {
-      byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
-      builder.setStartKey(ByteString.copyFrom(decodedStartKey));
-    }
-
-    if (region.getEndKey().isEmpty() || isRawRegion) {
-      builder.setEndKey(region.getEndKey());
-    } else {
-      byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
-      builder.setEndKey(ByteString.copyFrom(decodedEndKey));
-    }
-
-    return builder.build();
   }
 
   public Peer getLeader() {
     return leader;
-  }
-
-  public List<Peer> getFollowerList() {
-    List<Peer> peers = new ArrayList<>();
-    for (Peer peer : getMeta().getPeersList()) {
-      if (!peer.equals(this.leader)) {
-        if (peer.getRole().equals(Metapb.PeerRole.Voter)) {
-          peers.add(peer);
-        }
-      }
-    }
-    return peers;
   }
 
   public List<Peer> getLearnerList() {
@@ -209,7 +181,13 @@ public class TiRegion implements Serializable {
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
         return new TiRegion(
-            this.meta, p, this.isolationLevel, this.commandPri, this.kvMode, this.replicaSelector);
+            this.meta,
+            p,
+            peers,
+            stores,
+            this.isolationLevel,
+            this.commandPri,
+            this.replicaSelector);
       }
     }
     return null;

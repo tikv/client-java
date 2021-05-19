@@ -24,9 +24,9 @@ import java.util.concurrent.*;
 import org.junit.Test;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.meta.TiTimestamp;
-import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
@@ -85,13 +85,16 @@ public class PDClientTest extends PDMockServerTest {
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
     try (PDClient client = session.getPDClient()) {
-      TiRegion r = client.getRegionByKey(defaultBackOff(), ByteString.EMPTY);
+      Pair<Metapb.Region, Metapb.Peer> rl =
+          client.getRegionByKey(defaultBackOff(), ByteString.EMPTY);
+      Metapb.Region r = rl.first;
+      Metapb.Peer l = rl.second;
       assertEquals(r.getStartKey(), ByteString.copyFrom(startKey));
       assertEquals(r.getEndKey(), ByteString.copyFrom(endKey));
       assertEquals(r.getRegionEpoch().getConfVer(), confVer);
       assertEquals(r.getRegionEpoch().getVersion(), ver);
-      assertEquals(r.getLeader().getId(), 1);
-      assertEquals(r.getLeader().getStoreId(), 10);
+      assertEquals(l.getId(), 1);
+      assertEquals(l.getStoreId(), 10);
     }
   }
 
@@ -112,13 +115,16 @@ public class PDClientTest extends PDMockServerTest {
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
     try (PDClient client = session.getPDClient()) {
-      TiRegion r = client.getRegionByKeyAsync(defaultBackOff(), ByteString.EMPTY).get();
+      Pair<Metapb.Region, Metapb.Peer> rl =
+          client.getRegionByKeyAsync(defaultBackOff(), ByteString.EMPTY).get();
+      Metapb.Region r = rl.first;
+      Metapb.Peer l = rl.second;
       assertEquals(r.getStartKey(), ByteString.copyFrom(startKey));
       assertEquals(r.getEndKey(), ByteString.copyFrom(endKey));
       assertEquals(r.getRegionEpoch().getConfVer(), confVer);
       assertEquals(r.getRegionEpoch().getVersion(), ver);
-      assertEquals(r.getLeader().getId(), 1);
-      assertEquals(r.getLeader().getStoreId(), 10);
+      assertEquals(l.getId(), 1);
+      assertEquals(l.getStoreId(), 10);
     }
   }
 
@@ -140,13 +146,15 @@ public class PDClientTest extends PDMockServerTest {
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
     try (PDClient client = session.getPDClient()) {
-      TiRegion r = client.getRegionByID(defaultBackOff(), 0);
+      Pair<Metapb.Region, Metapb.Peer> rl = client.getRegionByID(defaultBackOff(), 0);
+      Metapb.Region r = rl.first;
+      Metapb.Peer l = rl.second;
       assertEquals(r.getStartKey(), ByteString.copyFrom(startKey));
       assertEquals(r.getEndKey(), ByteString.copyFrom(endKey));
       assertEquals(r.getRegionEpoch().getConfVer(), confVer);
       assertEquals(r.getRegionEpoch().getVersion(), ver);
-      assertEquals(r.getLeader().getId(), 1);
-      assertEquals(r.getLeader().getStoreId(), 10);
+      assertEquals(l.getId(), 1);
+      assertEquals(l.getStoreId(), 10);
     }
   }
 
@@ -167,13 +175,15 @@ public class PDClientTest extends PDMockServerTest {
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
     try (PDClient client = session.getPDClient()) {
-      TiRegion r = client.getRegionByIDAsync(defaultBackOff(), 0).get();
+      Pair<Metapb.Region, Metapb.Peer> rl = client.getRegionByIDAsync(defaultBackOff(), 0).get();
+      Metapb.Region r = rl.first;
+      Metapb.Peer l = rl.second;
       assertEquals(r.getStartKey(), ByteString.copyFrom(startKey));
       assertEquals(r.getEndKey(), ByteString.copyFrom(endKey));
       assertEquals(r.getRegionEpoch().getConfVer(), confVer);
       assertEquals(r.getRegionEpoch().getVersion(), ver);
-      assertEquals(r.getLeader().getId(), 1);
-      assertEquals(r.getLeader().getStoreId(), 10);
+      assertEquals(l.getId(), 1);
+      assertEquals(l.getStoreId(), 10);
     }
   }
 

@@ -29,9 +29,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
+import org.tikv.common.TiConfiguration;
 import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
@@ -53,6 +55,8 @@ public class RegionManager {
 
   private final Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
 
+  private final TiConfiguration conf;
+
   public static final Histogram GET_REGION_BY_KEY_REQUEST_LATENCY =
       Histogram.build()
           .name("client_java_get_region_by_requests_latency")
@@ -62,14 +66,16 @@ public class RegionManager {
   // To avoid double retrieval, we used the async version of grpc
   // When rpc not returned, instead of call again, it wait for previous one done
   public RegionManager(
-      ReadOnlyPDClient pdClient, Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
-    this.cache = new RegionCache(pdClient);
+      TiConfiguration conf,
+      ReadOnlyPDClient pdClient,
+      Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
+    this.conf = conf;
+    this.cache = new RegionCache(conf, pdClient);
     this.cacheInvalidateCallback = cacheInvalidateCallback;
   }
 
-  public RegionManager(ReadOnlyPDClient pdClient) {
-    this.cache = new RegionCache(pdClient);
-    this.cacheInvalidateCallback = null;
+  public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
+    this(conf, pdClient, null);
   }
 
   public Function<CacheInvalidateEvent, Void> getCacheInvalidateCallback() {
@@ -208,12 +214,14 @@ public class RegionManager {
     private final Map<Long, Store> storeCache;
     private final RangeMap<Key, Long> keyToRegionIdCache;
     private final ReadOnlyPDClient pdClient;
+    private final TiConfiguration conf;
 
-    public RegionCache(ReadOnlyPDClient pdClient) {
+    public RegionCache(TiConfiguration conf, ReadOnlyPDClient pdClient) {
       regionCache = new HashMap<>();
       storeCache = new HashMap<>();
 
       keyToRegionIdCache = TreeRangeMap.create();
+      this.conf = conf;
       this.pdClient = pdClient;
     }
 
@@ -234,7 +242,9 @@ public class RegionManager {
 
         if (regionId == null) {
           logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
-          TiRegion region = pdClient.getRegionByKey(backOffer, key);
+          Pair<Metapb.Region, Metapb.Peer> regionAndLeader =
+              pdClient.getRegionByKey(backOffer, key);
+          TiRegion region = createRegion(regionAndLeader.first, regionAndLeader.second, backOffer);
           if (!putRegion(region)) {
             throw new TiClientInternalException("Invalid Region: " + region.toString());
           }
@@ -268,7 +278,9 @@ public class RegionManager {
         logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
       }
       if (region == null) {
-        region = pdClient.getRegionByID(backOffer, regionId);
+        Pair<Metapb.Region, Metapb.Peer> regionAndLeader =
+            pdClient.getRegionByID(backOffer, regionId);
+        region = createRegion(regionAndLeader.first, regionAndLeader.second, backOffer);
         if (!putRegion(region)) {
           throw new TiClientInternalException("Invalid Region: " + region.toString());
         }
@@ -331,6 +343,26 @@ public class RegionManager {
       } catch (Exception e) {
         throw new GrpcException(e);
       }
+    }
+
+    private List<Metapb.Store> getRegionStore(List<Metapb.Peer> peers, BackOffer backOffer) {
+      return peers
+          .stream()
+          .map(p -> getStoreById(p.getStoreId(), backOffer))
+          .collect(Collectors.toList());
+    }
+
+    private TiRegion createRegion(Metapb.Region region, Metapb.Peer leader, BackOffer backOffer) {
+      List<Metapb.Peer> peers = region.getPeersList();
+      List<Metapb.Store> stores = getRegionStore(peers, backOffer);
+      return new TiRegion(
+          region,
+          leader,
+          peers,
+          stores,
+          conf.getIsolationLevel(),
+          conf.getCommandPriority(),
+          conf.getReplicaSelector());
     }
   }
 }

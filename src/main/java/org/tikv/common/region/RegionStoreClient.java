@@ -29,7 +29,6 @@ import io.grpc.ManagedChannel;
 import io.prometheus.client.Histogram;
 import java.util.*;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.PDClient;
@@ -43,6 +42,7 @@ import org.tikv.common.util.*;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Kvrpcpb.*;
+import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
@@ -745,7 +745,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param splitKeys is the split points for a specific region.
    * @return a split region info.
    */
-  public List<TiRegion> splitRegion(Iterable<ByteString> splitKeys) {
+  public List<Metapb.Region> splitRegion(Iterable<ByteString> splitKeys) {
     Supplier<SplitRegionRequest> request =
         () ->
             SplitRegionRequest.newBuilder()
@@ -780,18 +780,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               region.getId(), resp.getRegionError().toString()));
     }
 
-    return resp.getRegionsList()
-        .stream()
-        .map(
-            region ->
-                new TiRegion(
-                    region,
-                    null,
-                    conf.getIsolationLevel(),
-                    conf.getCommandPriority(),
-                    conf.getKvMode(),
-                    conf.getReplicaSelector()))
-        .collect(Collectors.toList());
+    return resp.getRegionsList();
   }
 
   // APIs for Raw Scan/Put/Get/Delete

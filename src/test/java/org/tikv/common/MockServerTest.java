@@ -2,8 +2,8 @@ package org.tikv.common;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.util.List;
 import org.junit.Before;
-import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.replica.ReplicaSelector;
 import org.tikv.kvproto.Metapb;
@@ -28,13 +28,22 @@ public class MockServerTest extends PDMockServerTest {
             .addPeers(Metapb.Peer.newBuilder().setId(11).setStoreId(13))
             .build();
 
+    List<Metapb.Store> s =
+        List.of(
+            Metapb.Store.newBuilder()
+                .setAddress("localhost:1234")
+                .setVersion("5.0.0")
+                .setId(13)
+                .build());
+
     region =
         new TiRegion(
             r,
             r.getPeers(0),
+            r.getPeersList(),
+            s,
             session.getConf().getIsolationLevel(),
             session.getConf().getCommandPriority(),
-            KVMode.TXN,
             ReplicaSelector.LEADER);
     pdServer.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
     server = new KVMockServer();
