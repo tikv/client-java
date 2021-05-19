@@ -19,6 +19,7 @@ import org.tikv.kvproto.Cdcpb.ResolvedTs;
 import org.tikv.kvproto.ChangeDataGrpc;
 import org.tikv.kvproto.ChangeDataGrpc.ChangeDataStub;
 import org.tikv.kvproto.Coprocessor.KeyRange;
+import org.tikv.kvproto.Kvrpcpb;
 
 class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RegionCDCClient.class);
@@ -64,6 +65,7 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
             .setStartKey(keyRange.getStart())
             .setEndKey(keyRange.getEnd())
             .setRegionEpoch(region.getRegionEpoch())
+            .setExtraOp(Kvrpcpb.ExtraOp.ReadOldValue)
             .build();
     final StreamObserver<ChangeDataRequest> requestObserver = asyncStub.eventFeed(this);
     requestObserver.onNext(request);
@@ -122,9 +124,7 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
   public void onNext(final ChangeDataEvent event) {
     try {
       if (running.get()) {
-        event
-            .getEventsList()
-            .stream()
+        event.getEventsList().stream()
             .flatMap(ev -> ev.getEntries().getEntriesList().stream())
             .filter(row -> ALLOWED_LOGTYPE.contains(row.getType()))
             .map(row -> CDCEvent.rowEvent(region.getId(), row))
