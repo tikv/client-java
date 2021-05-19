@@ -40,6 +40,16 @@ public class TableCodec {
     return TableCodecV1.encodeRow(columnInfos, values, isPkHandle);
   }
 
+  public static Object[] decodeObjects(byte[] value, Long handle, TiTableInfo tableInfo) {
+    if (value.length == 0) {
+      throw new CodecException("Decode fails: value length is zero");
+    }
+    if ((value[0] & 0xff) == org.tikv.common.codec.RowV2.CODEC_VER) {
+      return TableCodecV2.decodeObjects(value, handle, tableInfo);
+    }
+    return TableCodecV1.decodeObjects(value, handle, tableInfo);
+  }
+
   public static Row decodeRow(byte[] value, Long handle, TiTableInfo tableInfo) {
     if (value.length == 0) {
       throw new CodecException("Decode fails: value length is zero");
