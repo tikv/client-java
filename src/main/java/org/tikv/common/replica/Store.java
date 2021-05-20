@@ -1,5 +1,7 @@
 package org.tikv.common.replica;
 
+import static com.google.common.base.MoreObjects.toStringHelper;
+
 import java.util.List;
 import org.tikv.kvproto.Metapb;
 
@@ -104,6 +106,6 @@ public class Store {
   }
 
   public String toString() {
-    return "{\npeer:{\n" + peer.toString() + "},\nstore:{\n" + store.toString() + "}\n}";
+    return toStringHelper(this).add("peer", peer).add("store", store).toString();
   }
 }

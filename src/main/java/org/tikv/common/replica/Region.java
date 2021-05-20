@@ -1,6 +1,7 @@
 package org.tikv.common.replica;
 
-import java.util.Arrays;
+import static com.google.common.base.MoreObjects.toStringHelper;
+
 import java.util.Iterator;
 import java.util.List;
 import org.tikv.kvproto.Metapb;
@@ -50,10 +51,6 @@ public class Region {
   }
 
   public String toString() {
-    return "{\nregion:{\n"
-        + region.toString()
-        + "},\nstores:[\n"
-        + Arrays.deepToString(stores)
-        + "]\n}";
+    return toStringHelper(this).add("region", region).add("stores", stores).toString();
   }
 }
