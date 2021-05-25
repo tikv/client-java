@@ -19,7 +19,6 @@ import org.tikv.kvproto.Cdcpb.ResolvedTs;
 import org.tikv.kvproto.ChangeDataGrpc;
 import org.tikv.kvproto.ChangeDataGrpc.ChangeDataStub;
 import org.tikv.kvproto.Coprocessor.KeyRange;
-import org.tikv.kvproto.Kvrpcpb;
 
 class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RegionCDCClient.class);
@@ -33,6 +32,8 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
   private final ManagedChannel channel;
   private final ChangeDataStub asyncStub;
   private final Consumer<CDCEvent> eventConsumer;
+  private final CDCConfig config;
+
   private final AtomicBoolean running = new AtomicBoolean(false);
 
   private boolean started = false;
@@ -41,12 +42,14 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
       final TiRegion region,
       final KeyRange keyRange,
       final ManagedChannel channel,
-      final Consumer<CDCEvent> eventConsumer) {
+      final Consumer<CDCEvent> eventConsumer,
+      final CDCConfig config) {
     this.region = region;
     this.keyRange = keyRange;
     this.channel = channel;
     this.asyncStub = ChangeDataGrpc.newStub(channel);
     this.eventConsumer = eventConsumer;
+    this.config = config;
 
     this.regionKeyRange =
         KeyRange.newBuilder().setStart(region.getStartKey()).setEnd(region.getEndKey()).build();
@@ -65,7 +68,7 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
             .setStartKey(keyRange.getStart())
             .setEndKey(keyRange.getEnd())
             .setRegionEpoch(region.getRegionEpoch())
-            .setExtraOp(Kvrpcpb.ExtraOp.ReadOldValue)
+            .setExtraOp(config.getExtraOp())
             .build();
     final StreamObserver<ChangeDataRequest> requestObserver = asyncStub.eventFeed(this);
     requestObserver.onNext(request);
@@ -124,7 +127,9 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
   public void onNext(final ChangeDataEvent event) {
     try {
       if (running.get()) {
-        event.getEventsList().stream()
+        event
+            .getEventsList()
+            .stream()
             .flatMap(ev -> ev.getEntries().getEntriesList().stream())
             .filter(row -> ALLOWED_LOGTYPE.contains(row.getType()))
             .map(row -> CDCEvent.rowEvent(region.getId(), row))

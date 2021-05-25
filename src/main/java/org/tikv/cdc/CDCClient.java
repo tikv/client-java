@@ -26,12 +26,12 @@ import org.tikv.kvproto.Kvrpcpb;
 
 public class CDCClient implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(CDCClient.class);
-  private static final int EVENT_BUFFER_SIZE = 10000;
 
   private final TiSession session;
   private final KeyRange keyRange;
+  private final CDCConfig config;
 
-  private final BlockingQueue<CDCEvent> eventsBuffer = new ArrayBlockingQueue<>(EVENT_BUFFER_SIZE);
+  private final BlockingQueue<CDCEvent> eventsBuffer;
   private final TreeMap<Long, RegionCDCClient> regionClients = new TreeMap<>();
   private final Map<Long, Long> regionToResolvedTs = new HashMap<>();
   private final TreeMultiset<Long> resolvedTsSet = TreeMultiset.create();
@@ -39,11 +39,17 @@ public class CDCClient implements AutoCloseable {
   private boolean started = false;
 
   public CDCClient(final TiSession session, final KeyRange keyRange) {
+    this(session, keyRange, new CDCConfig());
+  }
+
+  public CDCClient(final TiSession session, final KeyRange keyRange, final CDCConfig config) {
     Preconditions.checkState(
         session.getConf().getIsolationLevel().equals(Kvrpcpb.IsolationLevel.SI),
         "Unsupported Isolation Level"); // only support SI for now
     this.session = session;
     this.keyRange = keyRange;
+    this.config = config;
+    eventsBuffer = new ArrayBlockingQueue<>(config.getEventBufferSize());
   }
 
   public synchronized void start(final long startTs) {
@@ -148,7 +154,7 @@ public class CDCClient implements AutoCloseable {
             session.getChannelFactory().getChannel(address, session.getPDClient().getHostMapping());
         try {
           final RegionCDCClient client =
-              new RegionCDCClient(region, keyRange, channel, eventsBuffer::offer);
+              new RegionCDCClient(region, keyRange, channel, eventsBuffer::offer, config);
           regionClients.put(region.getId(), client);
           regionToResolvedTs.put(region.getId(), timestamp);
           resolvedTsSet.add(timestamp);
