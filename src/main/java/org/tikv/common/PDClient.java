@@ -528,6 +528,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       if (resp != null) {
         break;
       }
+      logger.info("Could not get leader member with pd: " + u);
     }
     checkNotNull(resp, "Failed to init client for PD cluster.");
     long clusterId = resp.getHeader().getClusterId();
