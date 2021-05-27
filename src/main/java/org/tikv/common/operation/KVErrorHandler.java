@@ -123,9 +123,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleResponseError(BackOffer backOffer, RespT resp) {
     if (resp == null) {
-      String msg =
-          String.format(
-              "Request Failed with unknown reason for region region [%s]", recv.getRegion());
+      String msg = String.format("Request Failed with unknown reason for [%s]", recv.getRegion());
       logger.warn(msg);
       return handleRequestError(backOffer, new GrpcException(msg));
     }
