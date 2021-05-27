@@ -56,7 +56,7 @@ public class Batch {
   }
 
   public BackOffer getBackOffer() {
-    return backOffer;
+    return ConcreteBackOffer.create(backOffer);
   }
 
   public TiRegion getRegion() {
