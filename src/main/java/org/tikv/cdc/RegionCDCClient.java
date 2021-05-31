@@ -1,6 +1,7 @@
 package org.tikv.cdc;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import java.util.Set;
@@ -24,7 +25,7 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
   private static final Logger LOGGER = LoggerFactory.getLogger(RegionCDCClient.class);
   private static final AtomicLong REQ_ID_COUNTER = new AtomicLong(0);
   private static final Set<LogType> ALLOWED_LOGTYPE =
-      Set.of(LogType.PREWRITE, LogType.COMMIT, LogType.COMMITTED, LogType.ROLLBACK);
+      ImmutableSet.of(LogType.PREWRITE, LogType.COMMIT, LogType.COMMITTED, LogType.ROLLBACK);
 
   private final TiRegion region;
   private final KeyRange keyRange;
