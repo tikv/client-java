@@ -9,6 +9,7 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
     if (m1) {
         TIDB_BRANCH = "${m1[0][1]}"
     }
+    m1 = null
     println "TIDB_BRANCH=${TIDB_BRANCH}"
 
     // parse pd branch
@@ -16,6 +17,7 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
     if (m2) {
         PD_BRANCH = "${m2[0][1]}"
     }
+    m2 = null
     println "PD_BRANCH=${PD_BRANCH}"
 
     // parse tikv branch
@@ -23,6 +25,7 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
     if (m3) {
         TIKV_BRANCH = "${m3[0][1]}"
     }
+    m3 = null
     println "TIKV_BRANCH=${TIKV_BRANCH}"
 
     catchError {
