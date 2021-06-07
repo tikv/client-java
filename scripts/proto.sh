@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
 #   Copyright 2017 PingCAP, Inc.
 #
@@ -14,32 +14,40 @@
 #   limitations under the License.
 #
 
-CURRENT_DIR=`pwd`
-TIKV_CLIENT_HOME="$(cd "`dirname "$0"`"/..; pwd)"
-cd $TIKV_CLIENT_HOME
-
 kvproto_hash=6ed99a08e262d8a32d6355dcba91cf99cb92074a
-
 raft_rs_hash=b9891b673573fad77ebcf9bbe0969cf945841926
-
 tipb_hash=c4d518eb1d60c21f05b028b36729e64610346dac
 
-if [ -d "kvproto" ]; then
-	cd kvproto; git fetch -p; git checkout ${kvproto_hash}; cd ..
-else
-	git clone https://github.com/pingcap/kvproto; cd kvproto; git checkout ${kvproto_hash}; cd ..
-fi
+kvproto_dir="kvproto"
+raft_rs_dir="raft-rs"
+tipb_dir="tipb"
 
-if [ -d "raft-rs" ]; then
-	cd raft-rs; git fetch -p; git checkout ${raft_rs_hash}; cd ..
-else
-	git clone https://github.com/pingcap/raft-rs; cd raft-rs; git checkout ${raft_rs_hash}; cd ..
-fi
+CURRENT_DIR=$(pwd)
+TIKV_CLIENT_HOME="$(
+	cd "$(dirname "$0")"/.. || exit
+	pwd
+)"
+cd "$TIKV_CLIENT_HOME" || exit
 
-if [ -d "tipb" ]; then
-	cd tipb; git fetch -p; git checkout ${tipb_hash}; cd ..
+if [ -d "$kvproto_dir" ]; then
+	git -C ${kvproto_dir} fetch -p
 else
-	git clone https://github.com/pingcap/tipb; cd tipb; git checkout ${tipb_hash}; cd ..
+	git clone https://github.com/pingcap/kvproto ${kvproto_dir}
 fi
+git -C ${kvproto_dir} checkout ${kvproto_hash}
 
-cd $CURRENT_DIR
+if [ -d "$raft_rs_dir" ]; then
+	git -C ${raft_rs_dir} fetch -p
+else
+	git clone https://github.com/pingcap/raft-rs ${raft_rs_dir}
+fi
+git -C ${raft_rs_dir} checkout ${raft_rs_hash}
+
+if [ -d "$tipb_dir" ]; then
+	git -C ${tipb_dir} fetch -p
+else
+	git clone https://github.com/pingcap/tipb ${tipb_dir}
+fi
+git -C ${tipb_dir} checkout ${tipb_hash}
+
+cd "$CURRENT_DIR" || exit
