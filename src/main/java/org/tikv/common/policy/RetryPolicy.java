@@ -17,6 +17,7 @@ package org.tikv.common.policy;
 
 import com.google.common.collect.ImmutableSet;
 import io.grpc.Status;
+import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
 import java.util.concurrent.Callable;
 import org.tikv.common.exception.GrpcException;
@@ -30,6 +31,12 @@ public abstract class RetryPolicy<RespT> {
       Histogram.build()
           .name("client_java_grpc_single_requests_latency")
           .help("grpc request latency.")
+          .labelNames("type")
+          .register();
+  public static final Counter GRPC_REQUEST_RETRY_NUM =
+      Counter.build()
+          .name("client_java_grpc_requests_retry_num")
+          .help("grpc request retry num.")
           .labelNames("type")
           .register();
 
@@ -70,6 +77,7 @@ public abstract class RetryPolicy<RespT> {
         // Handle request call error
         boolean retry = handler.handleRequestError(backOffer, e);
         if (retry) {
+          GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
           continue;
         }
       }
@@ -78,7 +86,7 @@ public abstract class RetryPolicy<RespT> {
       if (handler != null) {
         boolean retry = handler.handleResponseError(backOffer, result);
         if (retry) {
-          // add retry counter
+          GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
           continue;
         }
       }
