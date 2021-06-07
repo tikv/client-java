@@ -3,7 +3,7 @@
 (
   pkgs.buildFHSUserEnv {
     name = "client-java-shell";
-    targetPkgs = pkgs: with pkgs;[ maven openjdk11 git ];
+    targetPkgs = pkgs: with pkgs;[ maven openjdk8 git ];
     runScript = "bash";
   }
 ).env
