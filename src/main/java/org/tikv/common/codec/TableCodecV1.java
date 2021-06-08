@@ -49,7 +49,7 @@ public class TableCodecV1 {
     return cdo.toBytes();
   }
 
-  protected static Row decodeRow(byte[] value, Long handle, TiTableInfo tableInfo) {
+  protected static Object[] decodeObjects(byte[] value, Long handle, TiTableInfo tableInfo) {
     if (handle == null && tableInfo.isPkHandle()) {
       throw new IllegalArgumentException("when pk is handle, handle cannot be null");
     }
@@ -80,7 +80,10 @@ public class TableCodecV1 {
         res[i] = decodedDataMap.get(col.getId());
       }
     }
+    return res;
+  }
 
-    return ObjectRowImpl.create(res);
+  protected static Row decodeRow(byte[] value, Long handle, TiTableInfo tableInfo) {
+    return ObjectRowImpl.create(decodeObjects(value, handle, tableInfo));
   }
 }

@@ -82,17 +82,21 @@ public class TwoPhaseCommitter {
   private final ExecutorService executorService;
 
   public TwoPhaseCommitter(TiSession session, long startTime) {
-    this.kvClient = session.createTxnClient();
-    this.regionManager = kvClient.getRegionManager();
-    this.startTs = startTime;
-    this.lockTTL = DEFAULT_BATCH_WRITE_LOCK_TTL;
-    this.retryCommitSecondaryKeys = true;
-    this.txnPrewriteBatchSize = TXN_COMMIT_BATCH_SIZE;
-    this.txnCommitBatchSize = TXN_COMMIT_BATCH_SIZE;
-    this.writeBufferSize = WRITE_BUFFER_SIZE;
-    this.writeThreadPerTask = 1;
-    this.prewriteMaxRetryTimes = 3;
-    this.executorService = createExecutorService();
+    this(session, startTime, DEFAULT_BATCH_WRITE_LOCK_TTL);
+  }
+
+  public TwoPhaseCommitter(TiSession session, long startTime, long lockTTL) {
+    this(
+        session,
+        startTime,
+        lockTTL,
+        TXN_COMMIT_BATCH_SIZE,
+        TXN_COMMIT_BATCH_SIZE,
+        WRITE_BUFFER_SIZE,
+        1,
+        true,
+        3,
+        createExecutorService(WRITE_BUFFER_SIZE));
   }
 
   public TwoPhaseCommitter(
@@ -104,7 +108,8 @@ public class TwoPhaseCommitter {
       int writeBufferSize,
       int writeThreadPerTask,
       boolean retryCommitSecondaryKeys,
-      int prewriteMaxRetryTimes) {
+      int prewriteMaxRetryTimes,
+      ExecutorService executorService) {
     this.kvClient = session.createTxnClient();
     this.regionManager = kvClient.getRegionManager();
     this.startTs = startTime;
@@ -115,13 +120,12 @@ public class TwoPhaseCommitter {
     this.writeBufferSize = writeBufferSize;
     this.writeThreadPerTask = writeThreadPerTask;
     this.prewriteMaxRetryTimes = prewriteMaxRetryTimes;
-    this.executorService = createExecutorService();
+    this.executorService = executorService;
   }
 
-  private ExecutorService createExecutorService() {
+  private static ExecutorService createExecutorService(int size) {
     return Executors.newFixedThreadPool(
-        writeThreadPerTask,
-        new ThreadFactoryBuilder().setNameFormat("2pc-pool-%d").setDaemon(true).build());
+        size, new ThreadFactoryBuilder().setNameFormat("2pc-pool-%d").setDaemon(true).build());
   }
 
   public void close() throws Exception {
