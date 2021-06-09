@@ -345,6 +345,49 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
+  /**
+   * Create a new `batch scan` request with `keyOnly` option Once resolved this request will result
+   * in a set of scanners over the given keys.
+   *
+   * <p>WARNING: This method is experimental. The `each_limit` parameter does not work as expected.
+   * It does not limit the number of results returned of each range, instead it limits the number of
+   * results in each region of each range. As a result, you may get more than each_limit key-value
+   * pairs for each range. But you should not miss any entries.
+   *
+   * @param ranges a list of ranges
+   * @return a set of scanners for keys over the given keys.
+   */
+  public List<List<ByteString>> batchScanKeys(
+      List<Pair<ByteString, ByteString>> ranges, int eachLimit) {
+    return batchScan(
+            ranges
+                .stream()
+                .map(
+                    range ->
+                        ScanOption.newBuilder()
+                            .setStartKey(range.first)
+                            .setEndKey(range.second)
+                            .setLimit(eachLimit)
+                            .setKeyOnly(true)
+                            .build())
+                .collect(Collectors.toList()))
+        .stream()
+        .map(kvs -> kvs.stream().map(kv -> kv.getKey()).collect(Collectors.toList()))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Create a new `batch scan` request. Once resolved this request will result in a set of scanners
+   * over the given keys.
+   *
+   * <p>WARNING: This method is experimental. The `each_limit` parameter does not work as expected.
+   * It does not limit the number of results returned of each range, instead it limits the number of
+   * results in each region of each range. As a result, you may get more than each_limit key-value
+   * pairs for each range. But you should not miss any entries.
+   *
+   * @param ranges a list of `ScanOption` for each range
+   * @return a set of scanners over the given keys.
+   */
   public List<List<KvPair>> batchScan(List<ScanOption> ranges) {
     String label = "client_raw_batch_scan";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
