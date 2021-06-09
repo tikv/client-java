@@ -418,7 +418,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return createLeaderWrapper(leaderUrlStr);
   }
 
-  private boolean createLeaderWrapper(String leaderUrlStr) {
+  private synchronized boolean createLeaderWrapper(String leaderUrlStr) {
     try {
       URI newLeader = addrToUri(leaderUrlStr);
       leaderUrlStr = uriToAddr(newLeader);
