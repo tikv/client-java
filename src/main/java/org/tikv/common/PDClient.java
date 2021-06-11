@@ -34,6 +34,7 @@ import io.prometheus.client.Histogram;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -522,7 +523,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                         .setDaemon(true)
                         .build()))
             .build();
-    this.hostMapping = new HostMapping(this.etcdClient, conf.getNetworkMappingName());
+    this.hostMapping =
+        Optional.ofNullable(getConf().getHostMapping())
+            .orElseGet(() -> new DefaultHostMapping(this.etcdClient, conf.getNetworkMappingName()));
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
