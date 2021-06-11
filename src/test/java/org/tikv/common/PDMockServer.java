@@ -43,7 +43,7 @@ public class PDMockServer extends PDGrpc.PDImplBase {
   @Override
   public void getMembers(GetMembersRequest request, StreamObserver<GetMembersResponse> resp) {
     try {
-      resp.onNext(getMembersResp.removeFirst().get());
+      resp.onNext(getMembersResp.getFirst().get());
       resp.onCompleted();
     } catch (Exception e) {
       resp.onError(Status.INTERNAL.asRuntimeException());

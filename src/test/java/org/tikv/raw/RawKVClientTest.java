@@ -18,6 +18,7 @@ import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.FastByteComparisons;
+import org.tikv.common.util.Pair;
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
@@ -644,6 +645,11 @@ public class RawKVClientTest {
         scanOptions.add(scanOption);
       }
       checkBatchScan(scanOptions);
+      checkBatchScanKeys(
+          scanOptions
+              .stream()
+              .map(scanOption -> Pair.create(scanOption.getStartKey(), scanOption.getEndKey()))
+              .collect(Collectors.toList()));
     }
   }
 
@@ -801,6 +807,7 @@ public class RawKVClientTest {
   }
 
   private void checkBatchScan(List<ScanOption> scanOptions) {
+    logger.info("checking batch scan");
     List<List<Kvrpcpb.KvPair>> result = client.batchScan(scanOptions);
     int i = 0;
     for (ScanOption scanOption : scanOptions) {
@@ -817,6 +824,17 @@ public class RawKVClientTest {
               .collect(Collectors.toList());
       assert result.get(i).equals(partialResult);
       i++;
+    }
+  }
+
+  private void checkBatchScanKeys(List<Pair<ByteString, ByteString>> ranges) {
+    logger.info("checking batch scan keys");
+    List<List<ByteString>> result = client.batchScanKeys(ranges, limit);
+    for (int i = 0; i < ranges.size(); i++) {
+      Pair<ByteString, ByteString> range = ranges.get(i);
+      List<ByteString> partialResult =
+          new ArrayList<>(data.subMap(range.first, range.second).keySet());
+      assert result.get(i).equals(partialResult);
     }
   }
 

@@ -27,10 +27,4 @@ If applicable, add screenshots to help explain your problem.
  -->
 
 **Java Client and TiDB/TiKV version info**
-<!-- What version of Spark and TiSpark are you using? (Provide Spark version and run `spark.sql(“select ti_version()”).show(false)` in spark-shell) -->
 
-<!--
-**Additional context**
-Add any other context about the problem here.
-You may also provide TiDB version here if it is related to the issue.
--->

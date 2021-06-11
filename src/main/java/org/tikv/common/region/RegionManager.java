@@ -131,6 +131,9 @@ public class RegionManager {
     if (storeType == TiStoreType.TiKV) {
       Peer peer = region.getCurrentReplica();
       store = cache.getStoreById(peer.getStoreId(), backOffer);
+      if (store == null) {
+        cache.clearAll();
+      }
     } else {
       outerLoop:
       for (Peer peer : region.getLearnerList()) {
@@ -320,8 +323,8 @@ public class RegionManager {
 
       // remove region
       for (TiRegion r : regionToRemove) {
-        regionCache.remove(r.getId());
         keyToRegionIdCache.remove(makeRange(r.getStartKey(), r.getEndKey()));
+        regionCache.remove(r.getId());
       }
     }
 
@@ -363,6 +366,11 @@ public class RegionManager {
           conf.getIsolationLevel(),
           conf.getCommandPriority(),
           conf.getReplicaSelector());
+    }
+
+    public synchronized void clearAll() {
+      keyToRegionIdCache.clear();
+      regionCache.clear();
     }
   }
 }
