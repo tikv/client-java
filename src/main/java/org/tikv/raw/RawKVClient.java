@@ -141,7 +141,8 @@ public class RawKVClient implements AutoCloseable {
    * @param key key
    * @param value value
    */
-  public void compareAndSet(ByteString key, Optional<ByteString> prevValue, ByteString value)  throws RawCASConflictException {
+  public void compareAndSet(ByteString key, Optional<ByteString> prevValue, ByteString value)
+      throws RawCASConflictException {
     compareAndSet(key, prevValue, value, 0L);
   }
 
