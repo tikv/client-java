@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
+import org.tikv.common.exception.RawCASConflictException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.FastByteComparisons;
@@ -102,17 +103,12 @@ public class RawKVClientTest {
     ByteString value = ByteString.copyFromUtf8("value");
     ByteString value2 = ByteString.copyFromUtf8("value2");
     client.delete(key);
-    ByteString res1 = client.putIfAbsent(key, value, ttl);
-    assert res1.isEmpty();
-    ByteString res2 = client.putIfAbsent(key, value2, ttl);
-    assert res2.equals(value);
+    client.compareAndSet(key, null, value, ttl);
     try {
-      Thread.sleep(ttl * 1000);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      client.compareAndSet(key, null, value2, ttl);
+    } catch (RawCASConflictException err) {
+      assert err.getCurrValue() == Optional.of(value);
     }
-    ByteString res3 = client.putIfAbsent(key, value, ttl);
-    assert res3.isEmpty();
   }
 
   // tikv-4.0 doest not support ttl
@@ -124,19 +120,19 @@ public class RawKVClientTest {
     ByteString value = ByteString.copyFromUtf8("value");
     client.put(key, value, ttl);
     for (int i = 0; i < 9; i++) {
-      Long t = client.getKeyTTL(key);
-      logger.info("current ttl of key is " + t);
+      Optional<Long> t = client.getKeyTTL(key);
+      logger.info("current ttl of key is " + t.orElse(null));
       try {
         Thread.sleep(1000);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       }
     }
-    Long t = client.getKeyTTL(key);
-    if (t == null) {
-      logger.info("key outdated.");
+    Optional<Long> t = client.getKeyTTL(key);
+    if (t.isPresent()) {
+      logger.info("key not outdated: " + t.get());
     } else {
-      logger.info("key not outdated: " + t);
+      logger.info("key outdated.");
     }
   }
 
@@ -267,8 +263,8 @@ public class RawKVClientTest {
     Kvrpcpb.KvPair kv2 = Kvrpcpb.KvPair.newBuilder().setKey(key2).setValue(value2).build();
 
     try {
-      checkEmpty(key1);
-      checkEmpty(key2);
+      checkNotExist(key1);
+      checkNotExist(key2);
       checkPut(key1, value1);
       checkPut(key2, value2);
       List<Kvrpcpb.KvPair> result = new ArrayList<>();
@@ -513,7 +509,7 @@ public class RawKVClientTest {
     } else {
       int i = 0;
       for (Map.Entry<ByteString, ByteString> pair : data.entrySet()) {
-        assert client.get(pair.getKey()).equals(pair.getValue());
+        assert client.get(pair.getKey()).equals(Optional.of(pair.getValue()));
         i++;
         if (i >= getCases) {
           break;
@@ -772,13 +768,13 @@ public class RawKVClientTest {
 
   private void checkPut(ByteString key, ByteString value) {
     client.put(key, value);
-    assert client.get(key).equals(value);
+    assert client.get(key).orElse(null).equals(value);
   }
 
   private void checkBatchPut(Map<ByteString, ByteString> kvPairs) {
     client.batchPut(kvPairs);
     for (Map.Entry<ByteString, ByteString> kvPair : kvPairs.entrySet()) {
-      assert client.get(kvPair.getKey()).equals(kvPair.getValue());
+      assert client.get(kvPair.getKey()).orElse(null).equals(kvPair.getValue());
     }
   }
 
@@ -840,7 +836,7 @@ public class RawKVClientTest {
 
   private void checkDelete(ByteString key) {
     client.delete(key);
-    checkEmpty(key);
+    checkNotExist(key);
   }
 
   private void checkDeleteRange(ByteString startKey, ByteString endKey) {
@@ -853,26 +849,26 @@ public class RawKVClientTest {
 
   private void checkPutTTL(ByteString key, ByteString value, long ttl) {
     client.put(key, value, ttl);
-    assert client.get(key).equals(value);
+    assert client.get(key).orElse(null).equals(value);
   }
 
   private void checkGetKeyTTL(ByteString key, long ttl) {
-    Long t = client.getKeyTTL(key);
-    assert t != null;
-    assert t <= ttl && t > 0;
+    Optional<Long> t = client.getKeyTTL(key);
+    assert t.isPresent();
+    assert t.get() <= ttl && t.get() > 0;
   }
 
   private void checkGetTTLTimeOut(ByteString key) {
-    assert client.get(key).isEmpty();
+    assert !client.get(key).isPresent();
   }
 
   private void checkGetKeyTTLTimeOut(ByteString key) {
-    Long t = client.getKeyTTL(key);
-    assert t == null;
+    Optional<Long> t = client.getKeyTTL(key);
+    assert !t.isPresent();
   }
 
-  private void checkEmpty(ByteString key) {
-    assert client.get(key).isEmpty();
+  private void checkNotExist(ByteString key) {
+    assert !client.get(key).isPresent();
   }
 
   private static ByteString rawKey(String key) {

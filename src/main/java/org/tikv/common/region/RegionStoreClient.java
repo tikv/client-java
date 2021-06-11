@@ -796,7 +796,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   // APIs for Raw Scan/Put/Get/Delete
 
-  public ByteString rawGet(BackOffer backOffer, ByteString key) {
+  public Optional<ByteString> rawGet(BackOffer backOffer, ByteString key) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get").startTimer();
     try {
@@ -816,7 +816,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  private ByteString rawGetHelper(RawGetResponse resp) {
+  private Optional<ByteString> rawGetHelper(RawGetResponse resp) {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("RawGetResponse failed without a cause");
@@ -828,10 +828,14 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
     }
-    return resp.getValue();
+    if (resp.getNotFound()) {
+      return Optional.empty();
+    } else {
+      return Optional.of(resp.getValue());
+    }
   }
 
-  public Long rawGetKeyTTL(BackOffer backOffer, ByteString key) {
+  public Optional<Long> rawGetKeyTTL(BackOffer backOffer, ByteString key) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get_key_ttl").startTimer();
     try {
@@ -852,7 +856,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  private Long rawGetKeyTTLHelper(RawGetKeyTTLResponse resp) {
+  private Optional<Long> rawGetKeyTTLHelper(RawGetKeyTTLResponse resp) {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("RawGetResponse failed without a cause");
@@ -865,9 +869,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throw new RegionException(resp.getRegionError());
     }
     if (resp.getNotFound()) {
-      return null;
+      return Optional.empty();
     }
-    return resp.getTtl();
+    return Optional.of(resp.getTtl());
   }
 
   public void rawDelete(BackOffer backOffer, ByteString key) {
@@ -943,8 +947,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  public ByteString rawPutIfAbsent(
-      BackOffer backOffer, ByteString key, ByteString value, long ttl) {
+  public void rawCompareAndSet(
+      BackOffer backOffer,
+      ByteString key,
+      Optional<ByteString> prevValue,
+      ByteString value,
+      long ttl)
+      throws RawCASConflictException {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put_if_absent").startTimer();
     try {
@@ -954,7 +963,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getReplicaContext(storeType))
                   .setKey(key)
                   .setValue(value)
-                  .setPreviousNotExist(true)
+                  .setPreviousValue(prevValue.orElse(ByteString.EMPTY))
+                  .setPreviousNotExist(!prevValue.isPresent())
                   .setTtl(ttl)
                   .build();
 
@@ -963,13 +973,15 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawCASResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawCompareAndSwapMethod(), factory, handler);
-      return rawPutIfAbsentHelper(resp);
+      rawCompareAndSetHelper(key, prevValue, resp);
     } finally {
       requestTimer.observeDuration();
     }
   }
 
-  private ByteString rawPutIfAbsentHelper(RawCASResponse resp) {
+  private void rawCompareAndSetHelper(
+      ByteString key, Optional<ByteString> expectedPrevValue, RawCASResponse resp)
+      throws RawCASConflictException {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("RawPutResponse failed without a cause");
@@ -981,10 +993,14 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
     }
-    if (resp.getSucceed()) {
-      return ByteString.EMPTY;
+    if (!resp.getSucceed()) {
+      if (resp.getPreviousNotExist()) {
+        throw new RawCASConflictException(key, expectedPrevValue, Optional.empty());
+      } else {
+        throw new RawCASConflictException(
+            key, expectedPrevValue, Optional.of(resp.getPreviousValue()));
+      }
     }
-    return resp.getPreviousValue();
   }
 
   public List<KvPair> rawBatchGet(BackOffer backoffer, List<ByteString> keys) {
