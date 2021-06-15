@@ -1,5 +1,6 @@
 package org.tikv.common;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.List;
@@ -29,7 +30,7 @@ public class MockServerTest extends PDMockServerTest {
             .build();
 
     List<Metapb.Store> s =
-        List.of(
+        ImmutableList.of(
             Metapb.Store.newBuilder()
                 .setAddress("localhost:1234")
                 .setVersion("5.0.0")
