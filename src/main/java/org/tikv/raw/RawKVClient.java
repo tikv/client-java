@@ -136,6 +136,36 @@ public class RawKVClient implements AutoCloseable {
   }
 
   /**
+   * Put a key-value pair if it does not exist. This API is atomic.
+   *
+   * @param key key
+   * @param value value
+   * @return a ByteString. returns Optional.EMPTY if the value is written successfully. returns the
+   *     previous key if the value already exists, and does not write to TiKV.
+   */
+  public Optional<ByteString> putIfAbsent(ByteString key, ByteString value) {
+    return putIfAbsent(key, value, 0L);
+  }
+
+  /**
+   * Put a key-value pair with TTL if it does not exist. This API is atomic.
+   *
+   * @param key key
+   * @param value value
+   * @param ttl TTL of key (in seconds), 0 means the key will never be outdated.
+   * @return a ByteString. returns Optional.EMPTY if the value is written successfully. returns the
+   *     previous key if the value already exists, and does not write to TiKV.
+   */
+  public Optional<ByteString> putIfAbsent(ByteString key, ByteString value, long ttl) {
+    try {
+      compareAndSet(key, Optional.empty(), value, ttl);
+      return Optional.empty();
+    } catch (RawCASConflictException e) {
+      return e.getCurrValue();
+    }
+  }
+
+  /**
    * Put a key-value pair if the prevValue matched the value in TiKV. This API is atomic.
    *
    * @param key key
@@ -147,7 +177,7 @@ public class RawKVClient implements AutoCloseable {
   }
 
   /**
-   * Put a key-value pair if the prevValue matched the value in TiKV. This API is atomic.
+   * pair if the prevValue matched the value in TiKV. This API is atomic.
    *
    * @param key key
    * @param value value

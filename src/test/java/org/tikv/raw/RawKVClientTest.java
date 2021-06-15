@@ -96,7 +96,7 @@ public class RawKVClientTest {
 
   // tikv-4.0 does not support atomic api
   @Ignore
-  public void atomicAPITest() {
+  public void rawCASTest() {
     if (!initialized) return;
     long ttl = 10;
     ByteString key = ByteString.copyFromUtf8("key_atomic");
@@ -109,6 +109,28 @@ public class RawKVClientTest {
     } catch (RawCASConflictException err) {
       assert err.getCurrValue() == Optional.of(value);
     }
+  }
+
+  // tikv-4.0 does not support atomic api
+  @Ignore
+  public void rawPutIfAbsentTest() {
+    if (!initialized) return;
+    long ttl = 10;
+    ByteString key = ByteString.copyFromUtf8("key_atomic");
+    ByteString value = ByteString.copyFromUtf8("value");
+    ByteString value2 = ByteString.copyFromUtf8("value2");
+    client.delete(key);
+    ByteString res1 = client.putIfAbsent(key, value, ttl);
+    assert res1.isEmpty();
+    ByteString res2 = client.putIfAbsent(key, value2, ttl);
+    assert res2.equals(value);
+    try {
+      Thread.sleep(ttl * 1000);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    ByteString res3 = client.putIfAbsent(key, value, ttl);
+    assert res3.isEmpty();
   }
 
   // tikv-4.0 doest not support ttl
