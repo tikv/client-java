@@ -161,7 +161,7 @@ public class RawKVClient implements AutoCloseable {
       compareAndSet(key, Optional.empty(), value, ttl);
       return Optional.empty();
     } catch (RawCASConflictException e) {
-      return e.getCurrValue();
+      return e.getPrevValue();
     }
   }
 

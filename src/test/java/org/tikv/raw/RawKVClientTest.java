@@ -107,7 +107,7 @@ public class RawKVClientTest {
     try {
       client.compareAndSet(key, null, value2, ttl);
     } catch (RawCASConflictException err) {
-      assert err.getCurrValue() == Optional.of(value);
+      assert err.getPrevValue() == Optional.of(value);
     }
   }
 

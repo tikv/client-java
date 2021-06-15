@@ -23,17 +23,17 @@ public class RawCASConflictException extends RuntimeException {
 
   private final ByteString key;
   private final Optional<ByteString> expectedPrevValue;
-  private final Optional<ByteString> currValue;
+  private final Optional<ByteString> prevValue;
 
   public RawCASConflictException(
-      ByteString key, Optional<ByteString> expectedPrevValue, Optional<ByteString> currValue) {
+      ByteString key, Optional<ByteString> expectedPrevValue, Optional<ByteString> prevValue) {
     super(
         String.format(
-            "key=%s expectedPrevValue=%s currValue=%s",
-            KeyUtils.formatBytes(key), expectedPrevValue, currValue));
+            "key=%s expectedPrevValue=%s prevValue=%s",
+            KeyUtils.formatBytes(key), expectedPrevValue, prevValue));
     this.key = key;
     this.expectedPrevValue = expectedPrevValue;
-    this.currValue = currValue;
+    this.prevValue = prevValue;
   }
 
   public ByteString getKey() {
@@ -44,7 +44,7 @@ public class RawCASConflictException extends RuntimeException {
     return this.expectedPrevValue;
   }
 
-  public Optional<ByteString> getCurrValue() {
-    return this.currValue;
+  public Optional<ByteString> getPrevValue() {
+    return this.prevValue;
   }
 }
