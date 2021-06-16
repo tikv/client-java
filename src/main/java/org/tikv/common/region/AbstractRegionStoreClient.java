@@ -22,6 +22,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
+import io.grpc.health.v1.HealthCheckRequest;
+import io.grpc.health.v1.HealthCheckResponse;
+import io.grpc.health.v1.HealthGrpc;
 import io.grpc.stub.MetadataUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -77,7 +80,7 @@ public abstract class AbstractRegionStoreClient
   /**
    * onNotLeader deals with NotLeaderError and returns whether re-splitting key range is needed
    *
-   * @param newStore the new store presented by NotLeader Error
+   * @param newRegion the new region presented by NotLeader Error
    * @return false when re-split is needed.
    */
   @Override
@@ -110,15 +113,21 @@ public abstract class AbstractRegionStoreClient
       if (checkHealth(store)) {
         return true;
       } else {
-        store.invalid();
+        if (store.invalid()) {
+          this.regionManager.scheduleHealthCheckJob(store);
+        }
         region = region.switchProxyStore(null);
         regionManager.updateRegion(region);
       }
     } else {
-      if (checkHealth(targetStore)) {
-        return true;
-      } else {
-        targetStore.invalid();
+      if (!targetStore.isUnreachable()) {
+        if (checkHealth(targetStore)) {
+          return true;
+        } else {
+          if (targetStore.invalid()) {
+            this.regionManager.scheduleHealthCheckJob(targetStore);
+          }
+        }
       }
     }
     TiRegion proxyRegion = switchProxyStore();
@@ -138,6 +147,19 @@ public abstract class AbstractRegionStoreClient
   }
 
   private boolean checkHealth(TiStore store) {
+    String addressStr = store.getStore().getAddress();
+    ManagedChannel channel =
+        channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
+    HealthGrpc.HealthBlockingStub stub = HealthGrpc.newBlockingStub(channel);
+    HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
+    try {
+      HealthCheckResponse resp = stub.check(req);
+      if (resp.getStatus() != HealthCheckResponse.ServingStatus.SERVING) {
+        return false;
+      }
+    } catch (Exception e) {
+      return false;
+    }
     return true;
   }
 

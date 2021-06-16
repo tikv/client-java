@@ -12,8 +12,12 @@ public class TiStore {
     this.unreachable.set(false);
   }
 
-  public void invalid() {
-    this.unreachable.set(true);
+  public boolean invalid() {
+    return this.unreachable.compareAndSet(false, true);
+  }
+
+  public void markReachable() {
+    this.unreachable.set(false);
   }
 
   public boolean isUnreachable() {
@@ -22,5 +26,9 @@ public class TiStore {
 
   public Metapb.Store getStore() {
     return this.store;
+  }
+
+  public long getId() {
+    return this.store.getId();
   }
 }
