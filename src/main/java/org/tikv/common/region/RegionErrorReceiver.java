@@ -17,14 +17,10 @@
 
 package org.tikv.common.region;
 
-import org.tikv.kvproto.Metapb.Store;
-
 public interface RegionErrorReceiver {
-  boolean onNotLeader(Store store, TiRegion region);
+  boolean onNotLeader(TiRegion region);
 
   boolean onStoreUnreachable();
-
-  void onStoreNotMatch(Store store);
 
   TiRegion getRegion();
 }

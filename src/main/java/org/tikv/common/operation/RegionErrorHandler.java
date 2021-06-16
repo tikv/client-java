@@ -73,9 +73,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
         // onNotLeader is only needed when updateLeader succeeds, thus switch
         // to a new store address.
         TiRegion newRegion = this.regionManager.updateLeader(recv.getRegion(), newStoreId);
-        retry =
-            newRegion != null
-                && recv.onNotLeader(this.regionManager.getStoreById(newStoreId), newRegion);
+        retry = newRegion != null && recv.onNotLeader(newRegion);
 
         backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
       } else {
@@ -107,7 +105,6 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
 
       this.regionManager.invalidateRegion(recv.getRegion());
       this.regionManager.invalidateStore(storeId);
-      // recv.onStoreNotMatch(this.regionManager.getStoreById(storeId));
       // assume this is a low probability error, do not retry, just re-split the request by
       // throwing it out.
       return false;
@@ -169,7 +166,16 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
 
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
-    regionManager.onRequestFail(recv.getRegion());
+    Status status = Status.fromThrowable(e);
+    if (status == Status.UNAVAILABLE || status == Status.DEADLINE_EXCEEDED) {
+      if (recv.onStoreUnreachable()) {
+        return true;
+      } else {
+        regionManager.onRequestFail(recv.getRegion());
+      }
+    } else {
+      regionManager.onRequestFail(recv.getRegion());
+    }
 
     backOffer.doBackOff(
         BackOffFunction.BackOffFuncType.BoTiKVRPC,

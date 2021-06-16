@@ -26,6 +26,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.pingcap.tidb.tipb.DAGRequest;
 import com.pingcap.tidb.tipb.SelectResponse;
 import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
 import java.util.*;
 import java.util.function.Supplier;
@@ -44,7 +46,6 @@ import org.tikv.common.util.*;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Kvrpcpb.*;
-import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvStub;
@@ -88,7 +89,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   private RegionStoreClient(
       TiConfiguration conf,
       TiRegion region,
-      Store store,
+      TiStore store,
       TiStoreType storeType,
       ChannelFactory channelFactory,
       TikvBlockingStub blockingStub,
@@ -113,10 +114,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               clientBuilder);
 
     } else {
-      Store tikvStore =
+      TiStore tikvStore =
           regionManager.getRegionStorePairByKey(region.getStartKey(), TiStoreType.TiKV).second;
 
-      String addressStr = tikvStore.getAddress();
+      String addressStr = tikvStore.getStore().getAddress();
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("Create region store client on address %s", addressStr));
       }
@@ -1245,20 +1246,34 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       this.pdClient = pdClient;
     }
 
-    public RegionStoreClient build(TiRegion region, Store store, TiStoreType storeType)
+    public RegionStoreClient build(TiRegion region, TiStore store, TiStoreType storeType)
         throws GrpcException {
       Objects.requireNonNull(region, "region is null");
       Objects.requireNonNull(store, "store is null");
       Objects.requireNonNull(storeType, "storeType is null");
 
-      String addressStr = store.getAddress();
+      String addressStr = store.getStore().getAddress();
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("Create region store client on address %s", addressStr));
       }
-      ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
+      ManagedChannel channel = null;
 
-      TikvBlockingStub blockingStub = TikvGrpc.newBlockingStub(channel);
-      TikvStub asyncStub = TikvGrpc.newStub(channel);
+      TikvBlockingStub blockingStub = null;
+      TikvStub asyncStub = null;
+
+      if (conf.getEnableGrpcForward() && region.getProxyStore() != null) {
+        addressStr = region.getProxyStore().getStore().getAddress();
+        channel =
+            channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
+        Metadata header = new Metadata();
+        header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
+        blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel), header);
+        asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newStub(channel), header);
+      } else {
+        channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
+        blockingStub = TikvGrpc.newBlockingStub(channel);
+        asyncStub = TikvGrpc.newStub(channel);
+      }
 
       return new RegionStoreClient(
           conf,
@@ -1273,7 +1288,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           this);
     }
 
-    public synchronized RegionStoreClient build(TiRegion region, Store store) throws GrpcException {
+    public synchronized RegionStoreClient build(TiRegion region, TiStore store)
+        throws GrpcException {
       return build(region, store, TiStoreType.TiKV);
     }
 
@@ -1283,12 +1299,12 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     public synchronized RegionStoreClient build(ByteString key, TiStoreType storeType)
         throws GrpcException {
-      Pair<TiRegion, Store> pair = regionManager.getRegionStorePairByKey(key, storeType);
+      Pair<TiRegion, TiStore> pair = regionManager.getRegionStorePairByKey(key, storeType);
       return build(pair.first, pair.second, storeType);
     }
 
     public synchronized RegionStoreClient build(TiRegion region) throws GrpcException {
-      Store store = regionManager.getStoreById(region.getLeader().getStoreId());
+      TiStore store = regionManager.getStoreById(region.getLeader().getStoreId());
       return build(region, store, TiStoreType.TiKV);
     }
 

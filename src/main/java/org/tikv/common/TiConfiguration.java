@@ -17,6 +17,7 @@ package org.tikv.common;
 
 import static org.tikv.common.ConfigUtils.*;
 
+import io.grpc.Metadata;
 import java.io.Serializable;
 import java.net.URI;
 import java.util.*;
@@ -32,6 +33,8 @@ public class TiConfiguration implements Serializable {
 
   private static final Logger logger = LoggerFactory.getLogger(TiConfiguration.class);
   private static final ConcurrentHashMap<String, String> settings = new ConcurrentHashMap<>();
+  public static final Metadata.Key FORWARD_META_DATA_KEY =
+      Metadata.Key.of("tikv-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
 
   static {
     loadFromSystemProperties();
@@ -72,6 +75,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_METRICS_ENABLE, DEF_METRICS_ENABLE);
     setIfMissing(TIKV_METRICS_PORT, DEF_METRICS_PORT);
     setIfMissing(TIKV_NETWORK_MAPPING_NAME, DEF_TIKV_NETWORK_MAPPING_NAME);
+    setIfMissing(TIKV_ENABLE_GRPC_FORWARD, false);
   }
 
   public static void listAll() {

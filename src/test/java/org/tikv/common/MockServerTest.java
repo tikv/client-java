@@ -32,6 +32,7 @@ public class MockServerTest extends PDMockServerTest {
         new TiRegion(
             r,
             r.getPeers(0),
+            null,
             session.getConf().getIsolationLevel(),
             session.getConf().getCommandPriority(),
             KVMode.TXN,

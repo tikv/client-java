@@ -43,8 +43,8 @@ import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
-import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.txn.KVClient;
 import org.tikv.txn.TxnKVClient;
@@ -419,10 +419,10 @@ public class TiSession implements AutoCloseable {
         groupKeysByRegion(regionManager, splitKeys, backOffer);
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
 
-      Pair<TiRegion, Metapb.Store> pair =
+      Pair<TiRegion, TiStore> pair =
           getRegionManager().getRegionStorePairByKey(entry.getKey().getStartKey());
       TiRegion region = pair.first;
-      Metapb.Store store = pair.second;
+      TiStore store = pair.second;
       List<ByteString> splits =
           entry
               .getValue()

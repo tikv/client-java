@@ -42,6 +42,7 @@ import org.tikv.common.region.AbstractRegionStoreClient;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiRegion.RegionVerID;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.TsoUtils;
@@ -49,7 +50,6 @@ import org.tikv.kvproto.Kvrpcpb.CleanupRequest;
 import org.tikv.kvproto.Kvrpcpb.CleanupResponse;
 import org.tikv.kvproto.Kvrpcpb.ResolveLockRequest;
 import org.tikv.kvproto.Kvrpcpb.ResolveLockResponse;
-import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvStub;
@@ -75,7 +75,7 @@ public class LockResolverClientV2 extends AbstractRegionStoreClient
   public LockResolverClientV2(
       TiConfiguration conf,
       TiRegion region,
-      Metapb.Store store,
+      TiStore store,
       TikvBlockingStub blockingStub,
       TikvStub asyncStub,
       ChannelFactory channelFactory,

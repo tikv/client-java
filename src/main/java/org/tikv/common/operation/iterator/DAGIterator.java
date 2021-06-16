@@ -32,12 +32,12 @@ import org.tikv.common.meta.TiDAGRequest.PushDownType;
 import org.tikv.common.operation.SchemaInfer;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.region.TiStoreType;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.RangeSplitter;
 import org.tikv.kvproto.Coprocessor;
-import org.tikv.kvproto.Metapb;
 
 public abstract class DAGIterator<T>
     extends org.tikv.common.operation.iterator.CoprocessorIterator<T> {
@@ -204,7 +204,7 @@ public abstract class DAGIterator<T>
       }
       List<Coprocessor.KeyRange> ranges = task.getRanges();
       TiRegion region = task.getRegion();
-      Metapb.Store store = task.getStore();
+      TiStore store = task.getStore();
 
       try {
         RegionStoreClient client =
@@ -245,7 +245,7 @@ public abstract class DAGIterator<T>
   private Iterator<SelectResponse> processByStreaming(RangeSplitter.RegionTask regionTask) {
     List<Coprocessor.KeyRange> ranges = regionTask.getRanges();
     TiRegion region = regionTask.getRegion();
-    Metapb.Store store = regionTask.getStore();
+    TiStore store = regionTask.getStore();
 
     RegionStoreClient client;
     try {

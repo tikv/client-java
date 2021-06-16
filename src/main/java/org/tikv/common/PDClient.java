@@ -241,6 +241,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       return new TiRegion(
           resp.getRegion(),
           resp.getLeader(),
+          null,
           conf.getIsolationLevel(),
           conf.getCommandPriority(),
           conf.getKvMode(),
@@ -258,6 +259,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                 new TiRegion(
                     resp.getRegion(),
                     resp.getLeader(),
+                    null,
                     conf.getIsolationLevel(),
                     conf.getCommandPriority(),
                     conf.getKvMode(),
@@ -285,6 +287,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return new TiRegion(
         resp.getRegion(),
         resp.getLeader(),
+        null,
         conf.getIsolationLevel(),
         conf.getCommandPriority(),
         conf.getKvMode(),
@@ -299,6 +302,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                 new TiRegion(
                     resp.getRegion(),
                     resp.getLeader(),
+                    null,
                     conf.getIsolationLevel(),
                     conf.getCommandPriority(),
                     conf.getKvMode(),

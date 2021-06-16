@@ -20,22 +20,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.Pair;
-import org.tikv.kvproto.Metapb;
 
 public class GroupKeyResult {
 
-  private Map<Pair<TiRegion, Metapb.Store>, List<ByteString>> groupsResult;
+  private Map<Pair<TiRegion, TiStore>, List<ByteString>> groupsResult;
 
   public GroupKeyResult() {
     this.groupsResult = new HashMap<>();
   }
 
-  public Map<Pair<TiRegion, Metapb.Store>, List<ByteString>> getGroupsResult() {
+  public Map<Pair<TiRegion, TiStore>, List<ByteString>> getGroupsResult() {
     return groupsResult;
   }
 
-  public void setGroupsResult(Map<Pair<TiRegion, Metapb.Store>, List<ByteString>> groupsResult) {
+  public void setGroupsResult(Map<Pair<TiRegion, TiStore>, List<ByteString>> groupsResult) {
     this.groupsResult = groupsResult;
   }
 }
