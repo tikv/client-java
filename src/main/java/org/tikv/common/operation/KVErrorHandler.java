@@ -19,20 +19,14 @@ package org.tikv.common.operation;
 
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
 
-import com.google.protobuf.ByteString;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import java.util.Collections;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.KeyException;
 import org.tikv.common.region.RegionErrorReceiver;
 import org.tikv.common.region.RegionManager;
-import org.tikv.common.region.TiRegion;
-import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Kvrpcpb;
@@ -43,16 +37,12 @@ import org.tikv.txn.ResolveLockResult;
 // TODO: consider refactor to Builder mode
 public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   private static final Logger logger = LoggerFactory.getLogger(KVErrorHandler.class);
-  // if a store does not have leader currently, store id is set to 0
-  private static final int NO_LEADER_STORE_ID = 0;
-  private final Function<RespT, Errorpb.Error> getRegionError;
   private final Function<RespT, Kvrpcpb.KeyError> getKeyError;
   private final Function<ResolveLockResult, Object> resolveLockResultCallback;
-  private final RegionManager regionManager;
-  private final RegionErrorReceiver recv;
   private final AbstractLockResolverClient lockResolverClient;
   private final long callerStartTS;
   private final boolean forWrite;
+  private final RegionErrorHandler<RespT> regionHandler;
 
   public KVErrorHandler(
       RegionManager regionManager,
@@ -63,40 +53,12 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
       Function<ResolveLockResult, Object> resolveLockResultCallback,
       long callerStartTS,
       boolean forWrite) {
-    this.recv = recv;
+    this.regionHandler = new RegionErrorHandler<>(regionManager, recv, getRegionError);
     this.lockResolverClient = lockResolverClient;
-    this.regionManager = regionManager;
-    this.getRegionError = getRegionError;
     this.getKeyError = getKeyError;
     this.resolveLockResultCallback = resolveLockResultCallback;
     this.callerStartTS = callerStartTS;
     this.forWrite = forWrite;
-  }
-
-  public KVErrorHandler(
-      RegionManager regionManager,
-      RegionErrorReceiver recv,
-      Function<RespT, Errorpb.Error> getRegionError) {
-    this.recv = recv;
-    this.lockResolverClient = null;
-    this.regionManager = regionManager;
-    this.getRegionError = getRegionError;
-    this.getKeyError = resp -> null;
-    this.resolveLockResultCallback = resolveLock -> null;
-    this.callerStartTS = 0;
-    this.forWrite = false;
-  }
-
-  private Errorpb.Error getRegionError(RespT resp) {
-    if (getRegionError != null) {
-      return getRegionError.apply(resp);
-    }
-    return null;
-  }
-
-  private void invalidateRegionStoreCache(TiRegion ctxRegion) {
-    regionManager.invalidateRegion(ctxRegion);
-    regionManager.invalidateStore(ctxRegion.getLeader().getStoreId());
   }
 
   private void resolveLock(BackOffer backOffer, Lock lock) {
@@ -123,14 +85,15 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleResponseError(BackOffer backOffer, RespT resp) {
     if (resp == null) {
-      String msg = String.format("Request Failed with unknown reason for [%s]", recv.getRegion());
+      String msg =
+          String.format("Request Failed with unknown reason for [%s]", regionHandler.getRegion());
       logger.warn(msg);
       return handleRequestError(backOffer, new GrpcException(msg));
     }
 
-    // Region error handling logic
-    Errorpb.Error error = getRegionError(resp);
+    Errorpb.Error error = regionHandler.getRegionError(resp);
     if (error != null) {
+<<<<<<< HEAD
       if (error.hasNotLeader()) {
         // this error is reported from raftstore:
         // peer of current request is not leader, the following might be its causes:
@@ -246,9 +209,10 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
             BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.getMessage()));
         return true;
       }
+=======
+      return regionHandler.handleRegionError(backOffer, error);
+>>>>>>> 4a40177... refactor kverrorhandler (#196)
     }
-
-    boolean retry = false;
 
     // Key error handling logic
     Kvrpcpb.KeyError keyError = getKeyError.apply(resp);
@@ -256,24 +220,16 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
       try {
         Lock lock = AbstractLockResolverClient.extractLockFromKeyErr(keyError);
         resolveLock(backOffer, lock);
-        retry = true;
+        return true;
       } catch (KeyException e) {
         logger.warn("Unable to handle KeyExceptions other than LockException", e);
       }
     }
-    return retry;
+    return false;
   }
 
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
-    regionManager.onRequestFail(recv.getRegion());
-
-    backOffer.doBackOff(
-        BackOffFunction.BackOffFuncType.BoTiKVRPC,
-        new GrpcException(
-            "send tikv request error: " + e.getMessage() + ", try next peer later", e));
-    // TiKV maybe down, so do not retry in `callWithRetry`
-    // should re-fetch the new leader from PD and send request to it
-    return false;
+    return regionHandler.handleRequestError(backOffer, e);
   }
 }
