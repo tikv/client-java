@@ -50,11 +50,13 @@ public class TiRegion implements Serializable {
   private final Peer leader;
   private final ReplicaSelector replicaSelector;
   private final List<Peer> replicaList;
+  private final Metapb.Store proxyStore;
   private int replicaIdx;
 
   public TiRegion(
       Region meta,
       Peer leader,
+      Metapb.Store proxyStore,
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
       KVMode kvMode,
@@ -65,6 +67,7 @@ public class TiRegion implements Serializable {
     this.isolationLevel = isolationLevel;
     this.commandPri = commandPri;
     this.replicaSelector = replicaSelector;
+    this.proxyStore = proxyStore;
     if (leader == null || leader.getId() == 0) {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());
@@ -209,7 +212,13 @@ public class TiRegion implements Serializable {
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
         return new TiRegion(
-            this.meta, p, this.isolationLevel, this.commandPri, this.kvMode, this.replicaSelector);
+            this.meta,
+            p,
+            this.proxyStore,
+            this.isolationLevel,
+            this.commandPri,
+            this.kvMode,
+            this.replicaSelector);
       }
     }
     return null;

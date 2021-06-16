@@ -88,7 +88,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   private RegionStoreClient(
       TiConfiguration conf,
       TiRegion region,
-      String storeVersion,
+      Store store,
       TiStoreType storeType,
       ChannelFactory channelFactory,
       TikvBlockingStub blockingStub,
@@ -96,15 +96,15 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       RegionManager regionManager,
       PDClient pdClient,
       RegionStoreClient.RegionStoreClientBuilder clientBuilder) {
-    super(conf, region, channelFactory, blockingStub, asyncStub, regionManager);
+    super(conf, region, store, channelFactory, blockingStub, asyncStub, regionManager);
     this.storeType = storeType;
 
     if (this.storeType == TiStoreType.TiKV) {
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
-              storeVersion,
               conf,
               region,
+              store,
               this.blockingStub,
               this.asyncStub,
               channelFactory,
@@ -127,9 +127,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
-              tikvStore.getVersion(),
               conf,
               region,
+              tikvStore,
               tikvBlockingStub,
               tikvAsyncStub,
               channelFactory,
@@ -788,6 +788,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                 new TiRegion(
                     region,
                     null,
+                    null,
                     conf.getIsolationLevel(),
                     conf.getCommandPriority(),
                     conf.getKvMode(),
@@ -1262,7 +1263,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       return new RegionStoreClient(
           conf,
           region,
-          store.getVersion(),
+          store,
           storeType,
           channelFactory,
           blockingStub,

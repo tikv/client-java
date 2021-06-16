@@ -71,6 +71,7 @@ public class TiSession implements AutoCloseable {
   private volatile ExecutorService batchScanThreadPool;
   private volatile ExecutorService deleteRangeThreadPool;
   private volatile RegionManager regionManager;
+  private volatile boolean enableGrpcForward;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private boolean isClosed = false;
   private HTTPServer server;
@@ -90,6 +91,7 @@ public class TiSession implements AutoCloseable {
         this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
         this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
         this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
+        this.enableGrpcForward = conf.getEnableGrpcForward();
         this.server =
             new HTTPServer(
                 new InetSocketAddress(conf.getMetricsPort()), this.collectorRegistry, true);
@@ -199,7 +201,9 @@ public class TiSession implements AutoCloseable {
     if (res == null) {
       synchronized (this) {
         if (regionManager == null) {
-          regionManager = new RegionManager(getPDClient(), this.cacheInvalidateCallback);
+          regionManager =
+              new RegionManager(
+                  getPDClient(), this.cacheInvalidateCallback, this.enableGrpcForward);
         }
         res = regionManager;
       }

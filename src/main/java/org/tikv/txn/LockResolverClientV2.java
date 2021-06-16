@@ -49,6 +49,7 @@ import org.tikv.kvproto.Kvrpcpb.CleanupRequest;
 import org.tikv.kvproto.Kvrpcpb.CleanupResponse;
 import org.tikv.kvproto.Kvrpcpb.ResolveLockRequest;
 import org.tikv.kvproto.Kvrpcpb.ResolveLockResponse;
+import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvStub;
@@ -74,11 +75,12 @@ public class LockResolverClientV2 extends AbstractRegionStoreClient
   public LockResolverClientV2(
       TiConfiguration conf,
       TiRegion region,
+      Metapb.Store store,
       TikvBlockingStub blockingStub,
       TikvStub asyncStub,
       ChannelFactory channelFactory,
       RegionManager regionManager) {
-    super(conf, region, channelFactory, blockingStub, asyncStub, regionManager);
+    super(conf, region, store, channelFactory, blockingStub, asyncStub, regionManager);
     resolved = new HashMap<>();
     recentResolved = new LinkedList<>();
     readWriteLock = new ReentrantReadWriteLock();

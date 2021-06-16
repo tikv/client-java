@@ -35,10 +35,12 @@ public abstract class AbstractRegionStoreClient
 
   protected final RegionManager regionManager;
   protected TiRegion region;
+  protected Metapb.Store store;
 
   protected AbstractRegionStoreClient(
       TiConfiguration conf,
       TiRegion region,
+      Metapb.Store store,
       ChannelFactory channelFactory,
       TikvGrpc.TikvBlockingStub blockingStub,
       TikvGrpc.TikvStub asyncStub,
@@ -49,6 +51,7 @@ public abstract class AbstractRegionStoreClient
     checkArgument(region.getLeader() != null, "Leader Peer is null");
     this.region = region;
     this.regionManager = regionManager;
+    this.store = store;
   }
 
   public TiRegion getRegion() {
@@ -109,5 +112,14 @@ public abstract class AbstractRegionStoreClient
               + " address = "
               + addressStr);
     }
+  }
+
+  @Override
+  public boolean onStoreUnreachable() {
+    return false;
+  }
+
+  private boolean checkHealth() {
+    return false;
   }
 }

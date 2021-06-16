@@ -50,6 +50,7 @@ public class RegionManager {
   // TODO: the region cache logic need rewrite.
   // https://github.com/pingcap/tispark/issues/1170
   private final RegionCache cache;
+  private final boolean enableGrpcForward;
 
   private final Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
 
@@ -65,11 +66,22 @@ public class RegionManager {
       ReadOnlyPDClient pdClient, Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
     this.cache = new RegionCache(pdClient);
     this.cacheInvalidateCallback = cacheInvalidateCallback;
+    this.enableGrpcForward = false;
+  }
+
+  public RegionManager(
+      ReadOnlyPDClient pdClient,
+      Function<CacheInvalidateEvent, Void> cacheInvalidateCallback,
+      boolean enableGrpcForward) {
+    this.cache = new RegionCache(pdClient);
+    this.cacheInvalidateCallback = cacheInvalidateCallback;
+    this.enableGrpcForward = enableGrpcForward;
   }
 
   public RegionManager(ReadOnlyPDClient pdClient) {
     this.cache = new RegionCache(pdClient);
     this.cacheInvalidateCallback = null;
+    this.enableGrpcForward = false;
   }
 
   public Function<CacheInvalidateEvent, Void> getCacheInvalidateCallback() {
@@ -194,8 +206,10 @@ public class RegionManager {
   }
 
   private void onRequestFail(TiRegion region, long storeId) {
-    cache.invalidateRegion(region);
-    cache.invalidateAllRegionForStore(storeId);
+    if (this.enableGrpcForward) {
+      cache.invalidateRegion(region);
+      cache.invalidateAllRegionForStore(storeId);
+    }
   }
 
   public void invalidateStore(long storeId) {

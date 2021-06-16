@@ -48,6 +48,7 @@ public class ConfigUtils {
   public static final String TIKV_METRICS_PORT = "tikv.metrics.port";
 
   public static final String TIKV_NETWORK_MAPPING_NAME = "tikv.network.mapping";
+  public static final String TIKV_ENABLE_GRPC_FORWARD = "tikv.enable_grpc_forward";
 
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "600ms";

@@ -245,6 +245,7 @@ public class TiConfiguration implements Serializable {
   private boolean showRowId = getBoolean(TIKV_SHOW_ROWID);
   private String dbPrefix = get(TIKV_DB_PREFIX);
   private KVMode kvMode = getKvMode(TIKV_KV_MODE);
+  private boolean enableGrpcForward = getBoolean(TIKV_ENABLE_GRPC_FORWARD);
 
   private int kvClientConcurrency = getInt(TIKV_KV_CLIENT_CONCURRENCY);
   private ReplicaRead replicaRead = getReplicaRead(TIKV_REPLICA_READ);
@@ -531,5 +532,9 @@ public class TiConfiguration implements Serializable {
 
   public String getNetworkMappingName() {
     return this.networkMappingName;
+  }
+
+  public boolean getEnableGrpcForward() {
+    return this.enableGrpcForward;
   }
 }
