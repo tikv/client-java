@@ -50,11 +50,8 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
       int limit,
       boolean keyOnly) {
     this.startKey = requireNonNull(startKey, "start key is null");
-    if (startKey.isEmpty()) {
-      throw new IllegalArgumentException("start key cannot be empty");
-    }
     this.endKey = Key.toRawKey(requireNonNull(endKey, "end key is null"));
-    this.hasEndKey = !endKey.equals(ByteString.EMPTY);
+    this.hasEndKey = !endKey.isEmpty();
     this.limit = limit;
     this.keyOnly = keyOnly;
     this.conf = conf;
@@ -74,7 +71,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
     if (endOfScan || processingLastBatch) {
       return true;
     }
-    if (startKey == null || startKey.isEmpty()) {
+    if (startKey == null) {
       return true;
     }
     try {
@@ -107,7 +104,8 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
         startKey = lastKey.next().toByteString();
       }
       // notify last batch if lastKey is greater than or equal to endKey
-      if (hasEndKey && lastKey.compareTo(endKey) >= 0) {
+      // if startKey is empty, it indicates +∞
+      if (hasEndKey && lastKey.compareTo(endKey) >= 0 || startKey.isEmpty()) {
         processingLastBatch = true;
         startKey = null;
       }

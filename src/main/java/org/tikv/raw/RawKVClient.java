@@ -853,7 +853,9 @@ public class RawKVClient implements AutoCloseable {
   private List<TiRegion> fetchRegionsFromRange(
       BackOffer backOffer, ByteString startKey, ByteString endKey) {
     List<TiRegion> regions = new ArrayList<>();
-    while (startKey.isEmpty() || Key.toRawKey(startKey).compareTo(Key.toRawKey(endKey)) < 0) {
+    while (startKey.isEmpty()
+        || endKey.isEmpty()
+        || Key.toRawKey(startKey).compareTo(Key.toRawKey(endKey)) < 0) {
       TiRegion currentRegion = clientBuilder.getRegionManager().getRegionByKey(startKey, backOffer);
       regions.add(currentRegion);
       startKey = currentRegion.getEndKey();
