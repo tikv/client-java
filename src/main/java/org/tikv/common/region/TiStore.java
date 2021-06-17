@@ -12,7 +12,8 @@ public class TiStore {
     this.unreachable.set(false);
   }
 
-  public boolean invalid() {
+  // return whether the old value is false, which means this operation has successes.
+  public boolean markUnreachable() {
     return this.unreachable.compareAndSet(false, true);
   }
 

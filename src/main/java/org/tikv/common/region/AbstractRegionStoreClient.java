@@ -113,7 +113,7 @@ public abstract class AbstractRegionStoreClient
       if (checkHealth(store)) {
         return true;
       } else {
-        if (store.invalid()) {
+        if (store.markUnreachable()) {
           this.regionManager.scheduleHealthCheckJob(store);
         }
         region = region.switchProxyStore(null);
@@ -124,7 +124,7 @@ public abstract class AbstractRegionStoreClient
         if (checkHealth(targetStore)) {
           return true;
         } else {
-          if (targetStore.invalid()) {
+          if (targetStore.markUnreachable()) {
             this.regionManager.scheduleHealthCheckJob(targetStore);
           }
         }
@@ -148,19 +148,7 @@ public abstract class AbstractRegionStoreClient
 
   private boolean checkHealth(TiStore store) {
     String addressStr = store.getStore().getAddress();
-    ManagedChannel channel =
-        channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
-    HealthGrpc.HealthBlockingStub stub = HealthGrpc.newBlockingStub(channel);
-    HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
-    try {
-      HealthCheckResponse resp = stub.check(req);
-      if (resp.getStatus() != HealthCheckResponse.ServingStatus.SERVING) {
-        return false;
-      }
-    } catch (Exception e) {
-      return false;
-    }
-    return true;
+    return checkHealth(addressStr, regionManager.getPDClient().getHostMapping());
   }
 
   private TiRegion switchProxyStore() {
