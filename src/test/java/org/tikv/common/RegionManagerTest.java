@@ -61,6 +61,7 @@ public class RegionManagerTest extends PDMockServerTest {
     int confVer = 1026;
     int ver = 1027;
     long regionId = 233;
+    String testAddress = "testAddress";
     pdServer.addGetRegionResp(
         GrpcUtils.makeGetRegionResponse(
             pdServer.getClusterId(),
@@ -71,6 +72,18 @@ public class RegionManagerTest extends PDMockServerTest {
                 GrpcUtils.makeRegionEpoch(confVer, ver),
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
+    for (long id : new long[] {10, 20}) {
+      pdServer.addGetStoreResp(
+          GrpcUtils.makeGetStoreResponse(
+              pdServer.getClusterId(),
+              GrpcUtils.makeStore(
+                  id,
+                  testAddress,
+                  Metapb.StoreState.Up,
+                  GrpcUtils.makeStoreLabel("k1", "v1"),
+                  GrpcUtils.makeStoreLabel("k2", "v2"))));
+    }
+
     TiRegion region = mgr.getRegionByKey(startKey);
     assertEquals(region.getId(), regionId);
 
@@ -106,15 +119,18 @@ public class RegionManagerTest extends PDMockServerTest {
                 GrpcUtils.makeRegionEpoch(confVer, ver),
                 GrpcUtils.makePeer(storeId, 10),
                 GrpcUtils.makePeer(storeId + 1, 20))));
-    pdServer.addGetStoreResp(
-        GrpcUtils.makeGetStoreResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeStore(
-                storeId,
-                testAddress,
-                Metapb.StoreState.Up,
-                GrpcUtils.makeStoreLabel("k1", "v1"),
-                GrpcUtils.makeStoreLabel("k2", "v2"))));
+    for (long id : new long[] {10, 20}) {
+      pdServer.addGetStoreResp(
+          GrpcUtils.makeGetStoreResponse(
+              pdServer.getClusterId(),
+              GrpcUtils.makeStore(
+                  id,
+                  testAddress,
+                  Metapb.StoreState.Up,
+                  GrpcUtils.makeStoreLabel("k1", "v1"),
+                  GrpcUtils.makeStoreLabel("k2", "v2"))));
+    }
+
     Pair<TiRegion, Store> pair = mgr.getRegionStorePairByKey(searchKey);
     assertEquals(pair.first.getId(), regionId);
     assertEquals(pair.first.getId(), storeId);
