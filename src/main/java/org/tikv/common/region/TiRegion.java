@@ -78,10 +78,9 @@ public class TiRegion implements Serializable {
     }
 
     // init replicaList
-    // replicaList = replicaSelector.select(this.leader, getFollowerList(), getLearnerList());
     replicaList =
         replicaSelector
-            .select(new org.tikv.common.replica.Region(meta, leader, peers, stores))
+            .select(new org.tikv.common.replica.Region(meta, this.leader, peers, stores))
             .stream()
             .map(org.tikv.common.replica.Store::getPeer)
             .collect(Collectors.toList());

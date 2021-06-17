@@ -250,7 +250,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   @Override
   public Future<Pair<Metapb.Region, Metapb.Peer>> getRegionByKeyAsync(
       BackOffer backOffer, ByteString key) {
-    // TODO do not call blocking get store
     FutureObserver<Pair<Metapb.Region, Metapb.Peer>, GetRegionResponse> responseObserver =
         new FutureObserver<>(
             resp ->
