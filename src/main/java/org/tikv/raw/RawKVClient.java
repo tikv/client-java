@@ -186,7 +186,7 @@ public class RawKVClient implements AutoCloseable {
   public void compareAndSet(
       ByteString key, Optional<ByteString> prevValue, ByteString value, long ttl)
       throws RawCASConflictException {
-    String label = "client_raw_compare_and_swap";
+    String label = "client_raw_compare_and_set";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
       BackOffer backOffer = defaultBackOff();
@@ -195,6 +195,7 @@ public class RawKVClient implements AutoCloseable {
         try {
           client.rawCompareAndSet(backOffer, key, prevValue, value, ttl);
           RAW_REQUEST_SUCCESS.labels(label).inc();
+          return;
         } catch (final TiKVException e) {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
         }
