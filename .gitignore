@@ -5,6 +5,7 @@ pub.sh
 
 # ignore compiled classes
 target
+.classpath
 
 # ignore version info
 src/main/java/com/pingcap/tikv/TiVersion.java

@@ -124,7 +124,7 @@ public class RawKVClientTest {
     Optional<ByteString> res1 = client.putIfAbsent(key, value, ttl);
     assertFalse(res1.isPresent());
     Optional<ByteString> res2 = client.putIfAbsent(key, value2, ttl);
-    assertEquals(res2, Optional.of(value));
+    assertEquals(res2.get(), value);
     try {
       Thread.sleep(ttl * 1000);
     } catch (InterruptedException e) {
@@ -291,10 +291,10 @@ public class RawKVClientTest {
 
     try {
       checkDeleteRange(ByteString.EMPTY, ByteString.EMPTY);
-      checkNotExist(kv);
-      checkNotExist(kv1);
-      checkNotExist(kv2);
-      checkNotExist(kv3);
+      checkNotExist(key);
+      checkNotExist(key1);
+      checkNotExist(key2);
+      checkNotExist(key3);
       checkPut(kv);
       checkPut(kv1);
       checkPut(kv2);
