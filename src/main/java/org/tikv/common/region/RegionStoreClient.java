@@ -38,6 +38,7 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.Version;
 import org.tikv.common.exception.*;
 import org.tikv.common.operation.KVErrorHandler;
+import org.tikv.common.operation.RegionErrorHandler;
 import org.tikv.common.streaming.StreamingResponse;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Coprocessor;
@@ -806,8 +807,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getReplicaContext(storeType))
                   .setKey(key)
                   .build();
-      KVErrorHandler<RawGetResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawGetResponse> handler =
+          new RegionErrorHandler<RawGetResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawGetResponse resp = callWithRetry(backOffer, TikvGrpc.getRawGetMethod(), factory, handler);
       return rawGetHelper(resp);
@@ -845,8 +846,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getReplicaContext(storeType))
                   .setKey(key)
                   .build();
-      KVErrorHandler<RawGetKeyTTLResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawGetKeyTTLResponse> handler =
+          new RegionErrorHandler<RawGetKeyTTLResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawGetKeyTTLResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawGetKeyTTLMethod(), factory, handler);
@@ -885,8 +886,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setKey(key)
                   .build();
 
-      KVErrorHandler<RawDeleteResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawDeleteResponse> handler =
+          new RegionErrorHandler<RawDeleteResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawDeleteResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawDeleteMethod(), factory, handler);
@@ -923,8 +924,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setTtl(ttl)
                   .build();
 
-      KVErrorHandler<RawPutResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawPutResponse> handler =
+          new RegionErrorHandler<RawPutResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawPutResponse resp = callWithRetry(backOffer, TikvGrpc.getRawPutMethod(), factory, handler);
       rawPutHelper(resp);
@@ -968,8 +969,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setTtl(ttl)
                   .build();
 
-      KVErrorHandler<RawCASResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawCASResponse> handler =
+          new RegionErrorHandler<RawCASResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawCASResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawCompareAndSwapMethod(), factory, handler);
@@ -1016,8 +1017,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getReplicaContext(storeType))
                   .addAllKeys(keys)
                   .build();
-      KVErrorHandler<RawBatchGetResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawBatchGetResponse> handler =
+          new RegionErrorHandler<RawBatchGetResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawBatchGetResponse resp =
           callWithRetry(backoffer, TikvGrpc.getRawBatchGetMethod(), factory, handler);
@@ -1053,8 +1054,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setTtl(ttl)
                   .setForCas(atomic)
                   .build();
-      KVErrorHandler<RawBatchPutResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawBatchPutResponse> handler =
+          new RegionErrorHandler<RawBatchPutResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawBatchPutResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawBatchPutMethod(), factory, handler);
@@ -1104,8 +1105,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .addAllKeys(keys)
                   .setForCas(atomic)
                   .build();
-      KVErrorHandler<RawBatchDeleteResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawBatchDeleteResponse> handler =
+          new RegionErrorHandler<RawBatchDeleteResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawBatchDeleteResponse resp =
           callWithRetry(backoffer, TikvGrpc.getRawBatchDeleteMethod(), factory, handler);
@@ -1151,8 +1152,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setLimit(limit)
                   .build();
 
-      KVErrorHandler<RawScanResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawScanResponse> handler =
+          new RegionErrorHandler<RawScanResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawScanResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawScanMethod(), factory, handler);
@@ -1196,8 +1197,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setEndKey(endKey)
                   .build();
 
-      KVErrorHandler<RawDeleteRangeResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawDeleteRangeResponse> handler =
+          new RegionErrorHandler<RawDeleteRangeResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawDeleteRangeResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawDeleteRangeMethod(), factory, handler);
