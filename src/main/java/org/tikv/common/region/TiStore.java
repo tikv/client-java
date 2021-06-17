@@ -9,7 +9,7 @@ public class TiStore {
 
   public TiStore(Metapb.Store store) {
     this.store = store;
-    this.unreachable.set(false);
+    this.unreachable = new AtomicBoolean(false);
   }
 
   public boolean invalid() {
