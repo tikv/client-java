@@ -37,7 +37,7 @@ public class PDClientTest extends PDMockServerTest {
   @Test
   public void testCreate() throws Exception {
     try (PDClient client = session.getPDClient()) {
-      assertEquals(client.getLeaderWrapper().getLeaderInfo(), LOCAL_ADDR + ":" + pdServer.port);
+      assertEquals(client.getPdClientWrapper().getLeaderInfo(), LOCAL_ADDR + ":" + pdServer.port);
       assertEquals(client.getHeader().getClusterId(), CLUSTER_ID);
     }
   }
@@ -47,7 +47,7 @@ public class PDClientTest extends PDMockServerTest {
     try (PDClient client = session.getPDClient()) {
       client.switchLeader(ImmutableList.of("http://" + LOCAL_ADDR + ":" + (pdServer.port + 1)));
       assertEquals(
-          client.getLeaderWrapper().getLeaderInfo(), LOCAL_ADDR + ":" + (pdServer.port + 1));
+          client.getPdClientWrapper().getLeaderInfo(), LOCAL_ADDR + ":" + (pdServer.port + 1));
     }
     tearDown();
     setUp(LOCAL_ADDR_IPV6);
@@ -55,7 +55,7 @@ public class PDClientTest extends PDMockServerTest {
       client.switchLeader(
           ImmutableList.of("http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2)));
       assertEquals(
-          client.getLeaderWrapper().getLeaderInfo(), LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
+          client.getPdClientWrapper().getLeaderInfo(), LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
     }
   }
 

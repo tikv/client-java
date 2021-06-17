@@ -44,7 +44,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,7 +87,6 @@ import org.tikv.kvproto.Pdpb.ScatterRegionResponse;
 import org.tikv.kvproto.Pdpb.Timestamp;
 import org.tikv.kvproto.Pdpb.TsoRequest;
 import org.tikv.kvproto.Pdpb.TsoResponse;
-import org.tikv.kvproto.TikvGrpc;
 
 public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     implements ReadOnlyPDClient {
@@ -96,13 +94,14 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private final Logger logger = LoggerFactory.getLogger(PDClient.class);
   private RequestHeader header;
   private TsoRequest tsoReq;
-  private volatile LeaderWrapper leaderWrapper;
+  private volatile PDClientWrapper pdClientWrapper;
   private ScheduledExecutorService service;
   private ScheduledExecutorService tiflashReplicaService;
   private List<URI> pdAddrs;
   private Client etcdClient;
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
   private HostMapping hostMapping;
+  private ConcurrentHashMap<String, String> checkHealthMembers;
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
       Histogram.build()
@@ -394,8 +393,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   @VisibleForTesting
-  LeaderWrapper getLeaderWrapper() {
-    return leaderWrapper;
+  PDClientWrapper getPdClientWrapper() {
+    return pdClientWrapper;
   }
 
   private GetMembersResponse getMembers(URI uri) {
@@ -416,69 +415,61 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return null;
   }
 
+  // return whether the leader has changed to target address `leaderUrlStr`.
   synchronized boolean trySwitchLeader(String leaderUrlStr) {
-    // TODO: Why not strip protocol info on server side since grpc does not need it
-    if (unreachable.get()) {
-      if (leaderUrlStr.equals(leaderWrapper.getLeaderInfo())) {
-        return false;
+    if (pdClientWrapper != null) {
+      if (leaderUrlStr.equals(pdClientWrapper.getLeaderInfo())) {
+        // The message to leader is not forwarded by follower.
+        if (leaderUrlStr.equals(pdClientWrapper.getStoreAddress())) {
+          return true;
+        } else {
+          // The leader is still unavailable.
+          if (!checkHealth(leaderUrlStr, hostMapping)) {
+            return false;
+          }
+          // If leader is not change but becomes available, we can cancel follower forward.
+        }
       }
-    } else {
-      if (leaderWrapper != null && leaderUrlStr.equals(leaderWrapper.getLeaderInfo())) {
-        return true;
-      }
+      // If leader has transfered to another member, we can create another leaderwrapper.
     }
     // switch leader
-    return createLeaderWrapper(leaderUrlStr);
+    return createLeaderClientWrapper(leaderUrlStr);
   }
 
-  private synchronized boolean createLeaderWrapper(String leaderUrlStr) {
+  private synchronized boolean createLeaderClientWrapper(String leaderUrlStr) {
     try {
       // create new Leader
       ManagedChannel clientChannel = channelFactory.getChannel(leaderUrlStr, hostMapping);
-      leaderWrapper =
-          new LeaderWrapper(
-              leaderUrlStr,
-              leaderUrlStr,
-              clientChannel,
-              System.nanoTime());
+      pdClientWrapper =
+          new PDClientWrapper(leaderUrlStr, leaderUrlStr, clientChannel, System.nanoTime());
     } catch (IllegalArgumentException e) {
       logger.error("Error updating leader. " + leaderUrlStr, e);
       return false;
     }
-    logger.info(String.format("Switched to new leader: %s", leaderWrapper));
+    logger.info(String.format("Switched to new leader: %s", pdClientWrapper));
     return true;
   }
 
-  synchronized boolean trySwitchFollower(String followerUrlStr, String leaderUrls) {
-   // TODO: Why not strip protocol info on server side since grpc does not need it
-    if (!conf.getEnableGrpcForward() && !checkHealth(followerUrlStr, hostMapping)) {
-      return false;
-    }
+  synchronized boolean createFollowerClientWrapper(String followerUrlStr, String leaderUrls) {
+    // TODO: Why not strip protocol info on server side since grpc does not need it
 
     try {
+      if (!checkHealth(followerUrlStr, hostMapping)) {
+        return false;
+      }
+
       // create new Leader
       ManagedChannel channel = channelFactory.getChannel(followerUrlStr, hostMapping);
-      leaderWrapper =
-              new LeaderWrapper(
-                      followerUrlStr,
-                      leaderUrls,
-                      channel,
-                      System.nanoTime());
+      pdClientWrapper = new PDClientWrapper(followerUrlStr, leaderUrls, channel, System.nanoTime());
     } catch (IllegalArgumentException e) {
       logger.error("Error updating leader. " + followerUrlStr, e);
       return false;
     }
-    logger.info(String.format("Switched to new leader: %s", leaderWrapper));
+    logger.info(String.format("Switched to new leader by follower forward: %s", pdClientWrapper));
     return true;
   }
 
-
   public void updateLeaderOrforwardFollower() {
-    if (leaderWrapper != null && leaderWrapper.getLeaderInfo().equals(leaderWrapper.getStoreAddress())) {
-      if (checkHealth(leaderWrapper.getStoreAddress(), hostMapping)) {
-        return;
-      }
-    }
     for (URI url : this.pdAddrs) {
       // since resp is null, we need update leader's address by walking through all pd server.
       GetMembersResponse resp = getMembers(url);
@@ -497,25 +488,30 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         return;
       }
 
+      if (!conf.getEnableGrpcForward()) {
+        continue;
+      }
+
       List<Pdpb.Member> members = resp.getMembersList();
 
       boolean hasReachNextMember = false;
-      if (leaderWrapper != null && leaderWrapper.getLeaderInfo().equals(leaderUrlStr)) {
+      // If we have not used follower forward, try the first follower.
+      if (pdClientWrapper != null && pdClientWrapper.getStoreAddress().equals(leaderUrlStr)) {
         hasReachNextMember = true;
       }
 
-      for (int i = 0; i < members.size() * 2; i ++) {
+      for (int i = 0; i < members.size() * 2; i++) {
         Pdpb.Member member = members.get(i % members.size());
         if (member.getMemberId() == resp.getLeader().getMemberId()) {
           continue;
         }
         String followerUrlStr = member.getClientUrlsList().get(0);
         followerUrlStr = uriToAddr(addrToUri(followerUrlStr));
-        if (leaderWrapper != null && leaderWrapper.getLeaderInfo().equals(followerUrlStr)) {
+        if (pdClientWrapper != null && pdClientWrapper.getStoreAddress().equals(followerUrlStr)) {
           hasReachNextMember = true;
           continue;
         }
-        if (hasReachNextMember && trySwitchFollower(followerUrlStr, leaderUrlStr)) {
+        if (hasReachNextMember && createFollowerClientWrapper(followerUrlStr, leaderUrlStr)) {
           return;
         }
       }
@@ -540,10 +536,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
     }
     throw new TiClientInternalException(
-            "already tried all address on file, but not leader found yet.");
+        "already tried all address on file, but not leader found yet.");
   }
-
-
 
   public void updateTiFlashReplicaStatus() {
     ByteSequence prefix =
@@ -600,18 +594,18 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   @Override
   protected PDBlockingStub getBlockingStub() {
-    if (leaderWrapper == null) {
+    if (pdClientWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
-    return leaderWrapper.getBlockingStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+    return pdClientWrapper.getBlockingStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
   }
 
   @Override
   protected PDStub getAsyncStub() {
-    if (leaderWrapper == null) {
+    if (pdClientWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
-    return leaderWrapper.getAsyncStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+    return pdClientWrapper.getAsyncStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
   }
 
   private void initCluster() {
@@ -629,6 +623,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                         .build()))
             .build();
     this.hostMapping = new HostMapping(this.etcdClient, conf.getNetworkMappingName());
+    this.checkHealthMembers = new ConcurrentHashMap<>();
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
@@ -642,7 +637,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     this.tiflashReplicaMap = new ConcurrentHashMap<>();
     String leaderUrlStr = resp.getLeader().getClientUrls(0);
     leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
-    createLeaderWrapper(leaderUrlStr);
+    createLeaderClientWrapper(leaderUrlStr);
     service =
         Executors.newSingleThreadScheduledExecutor(
             new ThreadFactoryBuilder()
@@ -658,9 +653,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
             logger.warn("Update leader failed", e);
           }
         },
-        1,
-        1,
-        TimeUnit.MINUTES);
+        10,
+        10,
+        TimeUnit.SECONDS);
     tiflashReplicaService =
         Executors.newSingleThreadScheduledExecutor(
             new ThreadFactoryBuilder()
@@ -671,22 +666,20 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         this::updateTiFlashReplicaStatus, 10, 10, TimeUnit.SECONDS);
   }
 
-  static class LeaderWrapper {
+  static class PDClientWrapper {
     private final String leaderInfo;
     private final PDBlockingStub blockingStub;
     private final PDStub asyncStub;
     private final long createTime;
     private final String storeAddress;
 
-    LeaderWrapper(
-        String leaderInfo,
-        String storeAddress,
-        ManagedChannel clientChannel,
-        long createTime) {
+    PDClientWrapper(
+        String leaderInfo, String storeAddress, ManagedChannel clientChannel, long createTime) {
       if (storeAddress != leaderInfo) {
         Metadata header = new Metadata();
         header.put(TiConfiguration.FORWARD_META_DATA_KEY, leaderInfo);
-        this.blockingStub = MetadataUtils.attachHeaders(PDGrpc.newBlockingStub(clientChannel), header);
+        this.blockingStub =
+            MetadataUtils.attachHeaders(PDGrpc.newBlockingStub(clientChannel), header);
         this.asyncStub = MetadataUtils.attachHeaders(PDGrpc.newStub(clientChannel), header);
       } else {
         this.blockingStub = PDGrpc.newBlockingStub(clientChannel);

@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.operation.ErrorHandler;
 import org.tikv.common.policy.RetryMaxMs.Builder;
 import org.tikv.common.policy.RetryPolicy;
-import org.tikv.common.region.TiStore;
 import org.tikv.common.streaming.StreamingResponse;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
@@ -191,5 +190,4 @@ public abstract class AbstractGRPCClient<
     }
     return true;
   }
-
 }

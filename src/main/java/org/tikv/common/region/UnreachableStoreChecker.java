@@ -4,7 +4,6 @@ import io.grpc.ManagedChannel;
 import io.grpc.health.v1.HealthCheckRequest;
 import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.health.v1.HealthGrpc;
-
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -71,7 +70,8 @@ public class UnreachableStoreChecker implements Callable<Object> {
       if (checkStoreExistTick > MAX_CHECK_STORE_EXIST_TICK) {
         try {
           Metapb.Store s = pdClient.getStore(ConcreteBackOffer.newGetBackOff(), store.getId());
-          if (s.getState() == Metapb.StoreState.Offline || s.getState() == Metapb.StoreState.Tombstone) {
+          if (s.getState() == Metapb.StoreState.Offline
+              || s.getState() == Metapb.StoreState.Tombstone) {
             continue;
           }
         } finally {

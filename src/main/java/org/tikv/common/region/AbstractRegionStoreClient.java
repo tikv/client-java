@@ -22,9 +22,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
-import io.grpc.health.v1.HealthCheckRequest;
-import io.grpc.health.v1.HealthCheckResponse;
-import io.grpc.health.v1.HealthGrpc;
 import io.grpc.stub.MetadataUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
