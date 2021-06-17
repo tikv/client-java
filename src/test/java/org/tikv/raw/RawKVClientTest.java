@@ -7,8 +7,8 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,25 +94,24 @@ public class RawKVClientTest {
     }
   }
 
-  // tikv-4.0 does not support atomic api
-  @Ignore
+  @Test
   public void rawCASTest() {
     if (!initialized) return;
-    long ttl = 10;
     ByteString key = ByteString.copyFromUtf8("key_atomic");
     ByteString value = ByteString.copyFromUtf8("value");
     ByteString value2 = ByteString.copyFromUtf8("value2");
     client.delete(key);
-    client.compareAndSet(key, null, value, ttl);
+    client.compareAndSet(key, Optional.empty(), value);
+    Assert.assertEquals(value, client.get(key).get());
     try {
-      client.compareAndSet(key, null, value2, ttl);
+      client.compareAndSet(key, Optional.empty(), value2);
+      Assert.fail("compareAndSet should fail.");
     } catch (RawCASConflictException err) {
-      assert err.getPrevValue() == Optional.of(value);
+      Assert.assertEquals(value, err.getPrevValue().get());
     }
   }
 
-  // tikv-4.0 does not support atomic api
-  @Ignore
+  @Test
   public void rawPutIfAbsentTest() {
     if (!initialized) return;
     long ttl = 10;
@@ -120,21 +119,20 @@ public class RawKVClientTest {
     ByteString value = ByteString.copyFromUtf8("value");
     ByteString value2 = ByteString.copyFromUtf8("value2");
     client.delete(key);
-    ByteString res1 = client.putIfAbsent(key, value, ttl);
-    assert res1.isEmpty();
-    ByteString res2 = client.putIfAbsent(key, value2, ttl);
-    assert res2.equals(value);
+    Optional<ByteString> res1 = client.putIfAbsent(key, value, ttl);
+    assert !res1.isPresent();
+    Optional<ByteString> res2 = client.putIfAbsent(key, value2, ttl);
+    assert res2.equals(Optional.of(value));
     try {
       Thread.sleep(ttl * 1000);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    ByteString res3 = client.putIfAbsent(key, value, ttl);
-    assert res3.isEmpty();
+    Optional<ByteString> res3 = client.putIfAbsent(key, value, ttl);
+    assert !res3.isPresent();
   }
 
-  // tikv-4.0 doest not support ttl
-  @Ignore
+  @Test
   public void getKeyTTLTest() {
     if (!initialized) return;
     long ttl = 10;
