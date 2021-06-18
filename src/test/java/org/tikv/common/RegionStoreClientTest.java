@@ -20,6 +20,7 @@ import static org.junit.Assert.*;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.util.List;
+import java.util.Optional;
 import org.junit.Test;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
@@ -65,13 +66,13 @@ public class RegionStoreClientTest extends MockServerTest {
 
   public void doRawGetTest(RegionStoreClient client) throws Exception {
     server.put("key1", "value1");
-    ByteString value = client.rawGet(defaultBackOff(), ByteString.copyFromUtf8("key1"));
-    assertEquals(ByteString.copyFromUtf8("value1"), value);
+    Optional<ByteString> value = client.rawGet(defaultBackOff(), ByteString.copyFromUtf8("key1"));
+    assertEquals(ByteString.copyFromUtf8("value1"), value.get());
 
     server.putError("error1", KVMockServer.NOT_LEADER);
     // since not_leader is retryable, so the result should be correct.
     value = client.rawGet(defaultBackOff(), ByteString.copyFromUtf8("key1"));
-    assertEquals(ByteString.copyFromUtf8("value1"), value);
+    assertEquals(ByteString.copyFromUtf8("value1"), value.get());
 
     server.putError("failure", KVMockServer.STALE_EPOCH);
     try {
