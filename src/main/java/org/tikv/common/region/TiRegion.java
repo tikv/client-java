@@ -148,7 +148,8 @@ public class TiRegion implements Serializable {
 
   private Kvrpcpb.Context getContext(
       Peer currentPeer, Set<Long> resolvedLocks, TiStoreType storeType) {
-    boolean replicaRead = !isLeader(getCurrentReplica()) && TiStoreType.TiKV.equals(storeType);
+    currentPeer = getCurrentReplica();
+    boolean replicaRead = !isLeader(currentPeer) && TiStoreType.TiKV.equals(storeType);
 
     Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
     builder
