@@ -81,6 +81,7 @@ public class TiSession implements AutoCloseable {
     this.conf = conf;
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
     this.client = PDClient.createRaw(conf, channelFactory);
+    this.enableGrpcForward = conf.getEnableGrpcForward();
     if (conf.isMetricsEnable()) {
       try {
         this.collectorRegistry = new CollectorRegistry();

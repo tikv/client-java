@@ -75,7 +75,8 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_METRICS_ENABLE, DEF_METRICS_ENABLE);
     setIfMissing(TIKV_METRICS_PORT, DEF_METRICS_PORT);
     setIfMissing(TIKV_NETWORK_MAPPING_NAME, DEF_TIKV_NETWORK_MAPPING_NAME);
-    setIfMissing(TIKV_ENABLE_GRPC_FORWARD, false);
+    setIfMissing(TIKV_ENABLE_GRPC_FORWARD, DEF_GRPC_FORWARD_ENABLE);
+    setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
   }
 
   public static void listAll() {
@@ -258,6 +259,7 @@ public class TiConfiguration implements Serializable {
 
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
+  private int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
 
@@ -540,5 +542,9 @@ public class TiConfiguration implements Serializable {
 
   public boolean getEnableGrpcForward() {
     return this.enableGrpcForward;
+  }
+
+  public long getGrpcHealthCheckTimeout() {
+    return this.grpcHealthCheckTimeout;
   }
 }

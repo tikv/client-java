@@ -78,26 +78,22 @@ public class RawScanIterator extends ScanIterator {
       endOfScan = true;
       return false;
     }
+    // continue when cache is empty but not null
+    while (currentCache != null && currentCache.isEmpty()) {
+      if (cacheLoadFails()) {
+        return false;
+      }
+    }
     return notEndOfScan();
   }
 
   private Kvrpcpb.KvPair getCurrent() {
-    if (isCacheDrained()) {
-      return null;
-    }
     --limit;
     return currentCache.get(index++);
   }
 
   @Override
   public Kvrpcpb.KvPair next() {
-    Kvrpcpb.KvPair kv;
-    // continue when cache is empty but not null
-    for (kv = getCurrent(); currentCache != null && kv == null; kv = getCurrent()) {
-      if (cacheLoadFails()) {
-        return null;
-      }
-    }
-    return kv;
+    return getCurrent();
   }
 }

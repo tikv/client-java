@@ -1,8 +1,8 @@
 def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPullDescription, credentialsId) {
 
-    def TIDB_BRANCH = "release-4.0"
-    def TIKV_BRANCH = "release-4.0"
-    def PD_BRANCH = "release-4.0"
+    def TIDB_BRANCH = "release-5.0"
+    def TIKV_BRANCH = "release-5.0"
+    def PD_BRANCH = "release-5.0"
 
     // parse tidb branch
     def m1 = ghprbCommentBody =~ /tidb\s*=\s*([^\s\\]+)(\s|\\|$)/

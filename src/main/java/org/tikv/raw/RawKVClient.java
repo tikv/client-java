@@ -27,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.exception.RawCASConflictException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.operation.iterator.RawScanIterator;
@@ -139,10 +140,10 @@ public class RawKVClient implements AutoCloseable {
    *
    * @param key key
    * @param value value
-   * @return a ByteString. returns ByteString.EMPTY if the value is written successfully. returns
-   *     the previous key if the value already exists, and does not write to TiKV.
+   * @return a ByteString. returns Optional.EMPTY if the value is written successfully. returns the
+   *     previous key if the value already exists, and does not write to TiKV.
    */
-  public ByteString putIfAbsent(ByteString key, ByteString value) {
+  public Optional<ByteString> putIfAbsent(ByteString key, ByteString value) {
     return putIfAbsent(key, value, 0L);
   }
 
@@ -152,20 +153,49 @@ public class RawKVClient implements AutoCloseable {
    * @param key key
    * @param value value
    * @param ttl TTL of key (in seconds), 0 means the key will never be outdated.
-   * @return a ByteString. returns ByteString.EMPTY if the value is written successfully. returns
-   *     the previous key if the value already exists, and does not write to TiKV.
+   * @return a ByteString. returns Optional.EMPTY if the value is written successfully. returns the
+   *     previous key if the value already exists, and does not write to TiKV.
    */
-  public ByteString putIfAbsent(ByteString key, ByteString value, long ttl) {
-    String label = "client_raw_put_if_absent";
+  public Optional<ByteString> putIfAbsent(ByteString key, ByteString value, long ttl) {
+    try {
+      compareAndSet(key, Optional.empty(), value, ttl);
+      return Optional.empty();
+    } catch (RawCASConflictException e) {
+      return e.getPrevValue();
+    }
+  }
+
+  /**
+   * Put a key-value pair if the prevValue matched the value in TiKV. This API is atomic.
+   *
+   * @param key key
+   * @param value value
+   */
+  public void compareAndSet(ByteString key, Optional<ByteString> prevValue, ByteString value)
+      throws RawCASConflictException {
+    compareAndSet(key, prevValue, value, 0L);
+  }
+
+  /**
+   * pair if the prevValue matched the value in TiKV. This API is atomic.
+   *
+   * @param key key
+   * @param value value
+   * @param ttl TTL of key (in seconds), 0 means the key will never be outdated.
+   */
+  public void compareAndSet(
+      ByteString key, Optional<ByteString> prevValue, ByteString value, long ttl)
+      throws RawCASConflictException {
+    String label = "client_raw_compare_and_set";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
       BackOffer backOffer = defaultBackOff();
       while (true) {
         RegionStoreClient client = clientBuilder.build(key);
         try {
-          ByteString result = client.rawPutIfAbsent(backOffer, key, value, ttl);
+          client.rawCompareAndSet(backOffer, key, prevValue, value, ttl);
           RAW_REQUEST_SUCCESS.labels(label).inc();
-          return result;
+          return;
         } catch (final TiKVException e) {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
         }
@@ -236,7 +266,7 @@ public class RawKVClient implements AutoCloseable {
    * @param key raw key
    * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
    */
-  public ByteString get(ByteString key) {
+  public Optional<ByteString> get(ByteString key) {
     String label = "client_raw_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
@@ -244,7 +274,7 @@ public class RawKVClient implements AutoCloseable {
       while (true) {
         RegionStoreClient client = clientBuilder.build(key);
         try {
-          ByteString result = client.rawGet(defaultBackOff(), key);
+          Optional<ByteString> result = client.rawGet(defaultBackOff(), key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return result;
         } catch (final TiKVException e) {
@@ -322,7 +352,7 @@ public class RawKVClient implements AutoCloseable {
    * @return a Long indicating the TTL of key ttl is a non-null long value indicating TTL if key
    *     exists. - ttl=0 if the key will never be outdated. - ttl=null if the key does not exist
    */
-  public Long getKeyTTL(ByteString key) {
+  public Optional<Long> getKeyTTL(ByteString key) {
     String label = "client_raw_get_key_ttl";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
@@ -330,7 +360,7 @@ public class RawKVClient implements AutoCloseable {
       while (true) {
         RegionStoreClient client = clientBuilder.build(key);
         try {
-          Long result = client.rawGetKeyTTL(defaultBackOff(), key);
+          Optional<Long> result = client.rawGetKeyTTL(defaultBackOff(), key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return result;
         } catch (final TiKVException e) {
@@ -853,7 +883,9 @@ public class RawKVClient implements AutoCloseable {
   private List<TiRegion> fetchRegionsFromRange(
       BackOffer backOffer, ByteString startKey, ByteString endKey) {
     List<TiRegion> regions = new ArrayList<>();
-    while (startKey.isEmpty() || Key.toRawKey(startKey).compareTo(Key.toRawKey(endKey)) < 0) {
+    while (startKey.isEmpty()
+        || endKey.isEmpty()
+        || Key.toRawKey(startKey).compareTo(Key.toRawKey(endKey)) < 0) {
       TiRegion currentRegion = clientBuilder.getRegionManager().getRegionByKey(startKey, backOffer);
       regions.add(currentRegion);
       startKey = currentRegion.getEndKey();

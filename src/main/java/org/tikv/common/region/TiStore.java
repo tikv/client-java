@@ -9,10 +9,9 @@ public class TiStore {
 
   public TiStore(Metapb.Store store) {
     this.store = store;
-    this.unreachable.set(false);
+    this.unreachable = new AtomicBoolean(false);
   }
 
-  // return whether the old value is false, which means this operation has successes.
   public boolean markUnreachable() {
     return this.unreachable.compareAndSet(false, true);
   }

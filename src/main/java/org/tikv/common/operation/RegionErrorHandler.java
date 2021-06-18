@@ -166,13 +166,8 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
 
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
-    Status status = Status.fromThrowable(e);
-    if (status == Status.UNAVAILABLE || status == Status.DEADLINE_EXCEEDED) {
-      if (recv.onStoreUnreachable()) {
-        return true;
-      } else {
-        regionManager.onRequestFail(recv.getRegion());
-      }
+    if (recv.onStoreUnreachable()) {
+      return true;
     } else {
       regionManager.onRequestFail(recv.getRegion());
     }

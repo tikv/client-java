@@ -22,6 +22,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
+import io.grpc.health.v1.HealthCheckRequest;
+import io.grpc.health.v1.HealthCheckResponse;
+import io.grpc.health.v1.HealthGrpc;
 import io.grpc.stub.MetadataUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -105,18 +108,7 @@ public abstract class AbstractRegionStoreClient
     if (!conf.getEnableGrpcForward()) {
       return false;
     }
-    if (region.getProxyStore() != null) {
-      TiStore store = region.getProxyStore();
-      if (checkHealth(store)) {
-        return true;
-      } else {
-        if (store.markUnreachable()) {
-          this.regionManager.scheduleHealthCheckJob(store);
-        }
-        region = region.switchProxyStore(null);
-        regionManager.updateRegion(region);
-      }
-    } else {
+    if (region.getProxyStore() == null) {
       if (!targetStore.isUnreachable()) {
         if (checkHealth(targetStore)) {
           return true;
@@ -131,8 +123,8 @@ public abstract class AbstractRegionStoreClient
     if (proxyRegion == null) {
       return false;
     }
+    regionManager.updateRegion(region, proxyRegion);
     region = proxyRegion;
-    regionManager.updateRegion(proxyRegion);
     String addressStr = region.getProxyStore().getStore().getAddress();
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
@@ -144,8 +136,25 @@ public abstract class AbstractRegionStoreClient
   }
 
   private boolean checkHealth(TiStore store) {
+    if (store.getStore() == null) {
+      return false;
+    }
     String addressStr = store.getStore().getAddress();
-    return checkHealth(addressStr, regionManager.getPDClient().getHostMapping());
+    ManagedChannel channel =
+        channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
+    HealthGrpc.HealthBlockingStub stub =
+        HealthGrpc.newBlockingStub(channel)
+            .withDeadlineAfter(conf.getGrpcHealthCheckTimeout(), TimeUnit.MILLISECONDS);
+    HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
+    try {
+      HealthCheckResponse resp = stub.check(req);
+      if (resp.getStatus() != HealthCheckResponse.ServingStatus.SERVING) {
+        return false;
+      }
+    } catch (Exception e) {
+      return false;
+    }
+    return true;
   }
 
   private TiRegion switchProxyStore() {
@@ -157,7 +166,9 @@ public abstract class AbstractRegionStoreClient
       if (peer.getStoreId() != region.getLeader().getStoreId()) {
         if (region.getProxyStore() == null) {
           TiStore store = regionManager.getStoreById(peer.getStoreId());
-          return region.switchProxyStore(store);
+          if (checkHealth(store)) {
+            return region.switchProxyStore(store);
+          }
         } else {
           TiStore proxyStore = region.getProxyStore();
           if (peer.getStoreId() == proxyStore.getStore().getId()) {
