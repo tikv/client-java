@@ -45,6 +45,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration.KVMode;
@@ -460,7 +462,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
       // create new Leader
       ManagedChannel channel = channelFactory.getChannel(followerUrlStr, hostMapping);
-      pdClientWrapper = new PDClientWrapper(followerUrlStr, leaderUrls, channel, System.nanoTime());
+      pdClientWrapper = new PDClientWrapper(leaderUrls, followerUrlStr, channel, System.nanoTime());
     } catch (IllegalArgumentException e) {
       logger.error("Error updating leader. " + followerUrlStr, e);
       return false;
@@ -527,16 +529,24 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       if (resp == null) {
         continue;
       }
+      List<URI> urls = resp.getMembersList().stream().map(mem -> addrToUri(mem.getClientUrls(0))).collect(Collectors.toList());
       String leaderUrlStr = resp.getLeader().getClientUrlsList().get(0);
       leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
 
       // if leader is switched, just return.
       if (trySwitchLeader(leaderUrlStr)) {
+        if (!urls.equals(this.pdAddrs)) {
+            tryUpdateMembers(urls);
+        }
         return;
       }
     }
     throw new TiClientInternalException(
         "already tried all address on file, but not leader found yet.");
+  }
+
+  private synchronized void tryUpdateMembers(List<URI> members) {
+    this.pdAddrs = members;
   }
 
   public void updateTiFlashReplicaStatus() {

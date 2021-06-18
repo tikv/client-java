@@ -85,7 +85,7 @@ public class RegionManager {
       UnreachableStoreChecker storeChecker = new UnreachableStoreChecker(channelFactory, pdClient);
       this.storeChecker = storeChecker;
       this.executor = Executors.newScheduledThreadPool(1);
-      this.executor.scheduleAtFixedRate(storeChecker, 5, 5, TimeUnit.SECONDS);
+      this.executor.scheduleAtFixedRate(storeChecker, 10, 10, TimeUnit.SECONDS);
     } else {
       this.storeChecker = null;
       this.executor = null;

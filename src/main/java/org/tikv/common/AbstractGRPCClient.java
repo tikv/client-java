@@ -26,6 +26,8 @@ import io.grpc.health.v1.HealthGrpc;
 import io.grpc.stub.AbstractStub;
 import io.grpc.stub.ClientCalls;
 import io.grpc.stub.StreamObserver;
+
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -178,7 +180,7 @@ public abstract class AbstractGRPCClient<
 
   protected boolean checkHealth(String addressStr, HostMapping hostMapping) {
     ManagedChannel channel = channelFactory.getChannel(addressStr, hostMapping);
-    HealthGrpc.HealthBlockingStub stub = HealthGrpc.newBlockingStub(channel);
+    HealthGrpc.HealthBlockingStub stub = HealthGrpc.newBlockingStub(channel).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
     HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
     try {
       HealthCheckResponse resp = stub.check(req);
