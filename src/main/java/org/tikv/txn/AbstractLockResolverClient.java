@@ -26,6 +26,7 @@ import org.tikv.common.exception.KeyException;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.kvproto.Kvrpcpb;
@@ -66,22 +67,23 @@ public interface AbstractLockResolverClient {
   }
 
   static AbstractLockResolverClient getInstance(
-      String storeVersion,
       TiConfiguration conf,
       TiRegion region,
+      TiStore store,
       TikvGrpc.TikvBlockingStub blockingStub,
       TikvGrpc.TikvStub asyncStub,
       ChannelFactory channelFactory,
       RegionManager regionManager,
       PDClient pdClient,
       RegionStoreClient.RegionStoreClientBuilder clientBuilder) {
-    if (StoreVersion.compareTo(storeVersion, Version.RESOLVE_LOCK_V3) < 0) {
+    if (StoreVersion.compareTo(store.getStore().getVersion(), Version.RESOLVE_LOCK_V3) < 0) {
       return new LockResolverClientV2(
-          conf, region, blockingStub, asyncStub, channelFactory, regionManager);
-    } else if (StoreVersion.compareTo(storeVersion, Version.RESOLVE_LOCK_V4) < 0) {
+          conf, region, store, blockingStub, asyncStub, channelFactory, regionManager);
+    } else if (StoreVersion.compareTo(store.getStore().getVersion(), Version.RESOLVE_LOCK_V4) < 0) {
       return new LockResolverClientV3(
           conf,
           region,
+          store,
           blockingStub,
           asyncStub,
           channelFactory,
@@ -92,6 +94,7 @@ public interface AbstractLockResolverClient {
       return new LockResolverClientV4(
           conf,
           region,
+          store,
           blockingStub,
           asyncStub,
           channelFactory,

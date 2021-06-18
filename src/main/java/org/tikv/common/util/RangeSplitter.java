@@ -29,9 +29,9 @@ import org.tikv.common.key.RowKey;
 import org.tikv.common.pd.PDUtils;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.region.TiStoreType;
 import org.tikv.kvproto.Coprocessor.KeyRange;
-import org.tikv.kvproto.Metapb;
 
 public class RangeSplitter {
   private final RegionManager regionManager;
@@ -51,12 +51,11 @@ public class RangeSplitter {
    * @param handles Handle list
    * @return <Region, HandleList> map
    */
-  public Map<Pair<TiRegion, Metapb.Store>, TLongArrayList> groupByAndSortHandlesByRegionId(
+  public Map<Pair<TiRegion, TiStore>, TLongArrayList> groupByAndSortHandlesByRegionId(
       long tableId, TLongArrayList handles) {
     TLongObjectHashMap<TLongArrayList> regionHandles = new TLongObjectHashMap<>();
-    TLongObjectHashMap<Pair<TiRegion, Metapb.Store>> idToRegionStorePair =
-        new TLongObjectHashMap<>();
-    Map<Pair<TiRegion, Metapb.Store>, TLongArrayList> result = new HashMap<>();
+    TLongObjectHashMap<Pair<TiRegion, TiStore>> idToRegionStorePair = new TLongObjectHashMap<>();
+    Map<Pair<TiRegion, TiStore>, TLongArrayList> result = new HashMap<>();
     handles.sort();
 
     byte[] endKey = null;
@@ -71,7 +70,7 @@ public class RangeSplitter {
           regionHandles.put(curRegion.getId(), handlesInCurRegion);
           handlesInCurRegion = new TLongArrayList();
         }
-        Pair<TiRegion, Metapb.Store> regionStorePair =
+        Pair<TiRegion, TiStore> regionStorePair =
             regionManager.getRegionStorePairByKey(ByteString.copyFrom(key.getBytes()));
         curRegion = regionStorePair.first;
         idToRegionStorePair.put(curRegion.getId(), regionStorePair);
@@ -84,7 +83,7 @@ public class RangeSplitter {
     }
     regionHandles.forEachEntry(
         (k, v) -> {
-          Pair<TiRegion, Metapb.Store> regionStorePair = idToRegionStorePair.get(k);
+          Pair<TiRegion, TiStore> regionStorePair = idToRegionStorePair.get(k);
           result.put(regionStorePair, v);
           return true;
         });
@@ -110,7 +109,7 @@ public class RangeSplitter {
     // Max value for current index handle range
     ImmutableList.Builder<RegionTask> regionTasks = ImmutableList.builder();
 
-    Map<Pair<TiRegion, Metapb.Store>, TLongArrayList> regionHandlesMap =
+    Map<Pair<TiRegion, TiStore>, TLongArrayList> regionHandlesMap =
         groupByAndSortHandlesByRegionId(tableId, handles);
 
     regionHandlesMap.forEach((k, v) -> createTask(0, v.size(), tableId, v, k, regionTasks));
@@ -123,7 +122,7 @@ public class RangeSplitter {
       int endPos,
       long tableId,
       TLongArrayList handles,
-      Pair<TiRegion, Metapb.Store> regionStorePair,
+      Pair<TiRegion, TiStore> regionStorePair,
       ImmutableList.Builder<RegionTask> regionTasks) {
     List<KeyRange> newKeyRanges = new ArrayList<>(endPos - startPos + 1);
     long startHandle = handles.get(startPos);
@@ -163,10 +162,10 @@ public class RangeSplitter {
     int i = 0;
     KeyRange range = keyRanges.get(i++);
     Map<Long, List<KeyRange>> idToRange = new HashMap<>(); // region id to keyRange list
-    Map<Long, Pair<TiRegion, Metapb.Store>> idToRegion = new HashMap<>();
+    Map<Long, Pair<TiRegion, TiStore>> idToRegion = new HashMap<>();
 
     while (true) {
-      Pair<TiRegion, Metapb.Store> regionStorePair =
+      Pair<TiRegion, TiStore> regionStorePair =
           regionManager.getRegionStorePairByKey(range.getStart(), storeType);
 
       if (regionStorePair == null) {
@@ -203,7 +202,7 @@ public class RangeSplitter {
     ImmutableList.Builder<RegionTask> resultBuilder = ImmutableList.builder();
     idToRange.forEach(
         (k, v) -> {
-          Pair<TiRegion, Metapb.Store> regionStorePair = idToRegion.get(k);
+          Pair<TiRegion, TiStore> regionStorePair = idToRegion.get(k);
           resultBuilder.add(new RegionTask(regionStorePair.first, regionStorePair.second, v));
         });
     return resultBuilder.build();
@@ -221,24 +220,23 @@ public class RangeSplitter {
 
   public static class RegionTask implements Serializable {
     private final TiRegion region;
-    private final Metapb.Store store;
+    private final TiStore store;
     private final List<KeyRange> ranges;
     private final String host;
 
-    RegionTask(TiRegion region, Metapb.Store store, List<KeyRange> ranges) {
+    RegionTask(TiRegion region, TiStore store, List<KeyRange> ranges) {
       this.region = region;
       this.store = store;
       this.ranges = ranges;
       String host = null;
       try {
-        host = PDUtils.addrToUri(store.getAddress()).getHost();
+        host = PDUtils.addrToUri(store.getStore().getAddress()).getHost();
       } catch (Exception ignored) {
       }
       this.host = host;
     }
 
-    public static RegionTask newInstance(
-        TiRegion region, Metapb.Store store, List<KeyRange> ranges) {
+    public static RegionTask newInstance(TiRegion region, TiStore store, List<KeyRange> ranges) {
       return new RegionTask(region, store, ranges);
     }
 
@@ -246,7 +244,7 @@ public class RangeSplitter {
       return region;
     }
 
-    public Metapb.Store getStore() {
+    public TiStore getStore() {
       return store;
     }
 
