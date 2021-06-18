@@ -110,21 +110,15 @@ public abstract class AbstractRegionStoreClient
     }
     if (region.getProxyStore() != null) {
       TiStore store = region.getProxyStore();
-      if (checkHealth(store)) {
-        return true;
-      } else {
-        if (store.invalid()) {
-          this.regionManager.scheduleHealthCheckJob(store);
-        }
-        region = region.switchProxyStore(null);
-        regionManager.updateRegion(region);
+      if (!checkHealth(store) && store.markUnreachable()) {
+        this.regionManager.scheduleHealthCheckJob(store);
       }
     } else {
       if (!targetStore.isUnreachable()) {
         if (checkHealth(targetStore)) {
           return true;
         } else {
-          if (targetStore.invalid()) {
+          if (targetStore.markUnreachable()) {
             this.regionManager.scheduleHealthCheckJob(targetStore);
           }
         }
@@ -172,7 +166,9 @@ public abstract class AbstractRegionStoreClient
       if (peer.getStoreId() != region.getLeader().getStoreId()) {
         if (region.getProxyStore() == null) {
           TiStore store = regionManager.getStoreById(peer.getStoreId());
-          return region.switchProxyStore(store);
+          if (checkHealth(store)) {
+            return region.switchProxyStore(store);
+          }
         } else {
           TiStore proxyStore = region.getProxyStore();
           if (peer.getStoreId() == proxyStore.getStore().getId()) {

@@ -12,7 +12,7 @@ public class TiStore {
     this.unreachable = new AtomicBoolean(false);
   }
 
-  public boolean invalid() {
+  public boolean markUnreachable() {
     return this.unreachable.compareAndSet(false, true);
   }
 

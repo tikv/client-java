@@ -77,6 +77,7 @@ public class ConfigUtils {
   public static final boolean DEF_METRICS_ENABLE = false;
   public static final int DEF_METRICS_PORT = 3140;
   public static final String DEF_TIKV_NETWORK_MAPPING_NAME = "";
+  public static final boolean DEF_GRPC_FORWARD_ENABLE = true;
 
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";

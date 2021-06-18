@@ -75,7 +75,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_METRICS_ENABLE, DEF_METRICS_ENABLE);
     setIfMissing(TIKV_METRICS_PORT, DEF_METRICS_PORT);
     setIfMissing(TIKV_NETWORK_MAPPING_NAME, DEF_TIKV_NETWORK_MAPPING_NAME);
-    setIfMissing(TIKV_ENABLE_GRPC_FORWARD, false);
+    setIfMissing(TIKV_ENABLE_GRPC_FORWARD, DEF_GRPC_FORWARD_ENABLE);
   }
 
   public static void listAll() {
