@@ -81,6 +81,7 @@ public class TiSession implements AutoCloseable {
     this.conf = conf;
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
     this.client = PDClient.createRaw(conf, channelFactory);
+    this.enableGrpcForward = conf.getEnableGrpcForward();
     if (conf.isMetricsEnable()) {
       try {
         this.collectorRegistry = new CollectorRegistry();
@@ -91,7 +92,6 @@ public class TiSession implements AutoCloseable {
         this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
         this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
         this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
-        this.enableGrpcForward = conf.getEnableGrpcForward();
         this.server =
             new HTTPServer(
                 new InetSocketAddress(conf.getMetricsPort()), this.collectorRegistry, true);

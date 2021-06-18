@@ -6,12 +6,11 @@ import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.health.v1.HealthGrpc;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.util.ChannelFactory;
 
-public class UnreachableStoreChecker implements Callable<Object> {
+public class UnreachableStoreChecker implements Runnable {
   private ConcurrentHashMap<Long, TiStore> stores;
   private List<TiStore> taskQueue;
   private final ChannelFactory channelFactory;
@@ -44,7 +43,7 @@ public class UnreachableStoreChecker implements Callable<Object> {
   }
 
   @Override
-  public Object call() throws Exception {
+  public void run() {
     List<TiStore> unhealthStore = getUnhealthStore();
     List<TiStore> restStore = new LinkedList<>();
     for (TiStore store : unhealthStore) {
@@ -72,6 +71,5 @@ public class UnreachableStoreChecker implements Callable<Object> {
       }
       this.taskQueue = restStore;
     }
-    return null;
   }
 }

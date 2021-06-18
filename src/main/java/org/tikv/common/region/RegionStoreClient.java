@@ -1272,9 +1272,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       } else {
         // If the store is reachable, which is update by check-health thread
         if (!store.isUnreachable()) {
-          TiRegion newRegion = region.switchProxyStore(null);
-          if (regionManager.updateRegion(newRegion)) {
-            region = newRegion;
+          if (region.getProxyStore() != null) {
+            TiRegion newRegion = region.switchProxyStore(null);
+            if (regionManager.updateRegion(region, newRegion)) {
+              region = newRegion;
+            }
           }
         }
         channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());

@@ -128,8 +128,8 @@ public abstract class AbstractRegionStoreClient
     if (proxyRegion == null) {
       return false;
     }
+    regionManager.updateRegion(region, proxyRegion);
     region = proxyRegion;
-    regionManager.updateRegion(proxyRegion);
     String addressStr = region.getProxyStore().getStore().getAddress();
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
@@ -141,10 +141,15 @@ public abstract class AbstractRegionStoreClient
   }
 
   private boolean checkHealth(TiStore store) {
+    if (store.getStore() == null) {
+      return false;
+    }
     String addressStr = store.getStore().getAddress();
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
-    HealthGrpc.HealthBlockingStub stub = HealthGrpc.newBlockingStub(channel);
+    HealthGrpc.HealthBlockingStub stub =
+        HealthGrpc.newBlockingStub(channel)
+            .withDeadlineAfter(conf.getGrpcHealthCheckTimeout(), TimeUnit.MILLISECONDS);
     HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
     try {
       HealthCheckResponse resp = stub.check(req);

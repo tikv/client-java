@@ -85,7 +85,7 @@ public class RegionManager {
       UnreachableStoreChecker storeChecker = new UnreachableStoreChecker(channelFactory, pdClient);
       this.storeChecker = storeChecker;
       this.executor = Executors.newScheduledThreadPool(1);
-      this.executor.schedule(storeChecker, 2, TimeUnit.SECONDS);
+      this.executor.scheduleAtFixedRate(storeChecker, 5, 5, TimeUnit.SECONDS);
     } else {
       this.storeChecker = null;
       this.executor = null;
@@ -211,8 +211,8 @@ public class RegionManager {
     return null;
   }
 
-  public boolean updateRegion(TiRegion region) {
-    return cache.updateRegion(region);
+  public boolean updateRegion(TiRegion oldRegion, TiRegion region) {
+    return cache.updateRegion(oldRegion, region);
   }
 
   /**
@@ -335,13 +335,13 @@ public class RegionManager {
       }
     }
 
-    public synchronized boolean updateRegion(TiRegion region) {
+    public synchronized boolean updateRegion(TiRegion expected, TiRegion region) {
       try {
         if (logger.isDebugEnabled()) {
           logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
         }
         TiRegion oldRegion = regionCache.get(region.getId());
-        if (oldRegion != null && !oldRegion.getRegionEpoch().equals(region.getRegionEpoch())) {
+        if (expected != oldRegion) {
           return false;
         } else {
           if (oldRegion != null) {
