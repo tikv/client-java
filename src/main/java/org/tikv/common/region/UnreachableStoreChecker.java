@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
-
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.util.ChannelFactory;
 
@@ -56,7 +55,7 @@ public class UnreachableStoreChecker implements Runnable {
     List<TiStore> unhealthStore = getUnhealthStore();
     for (TiStore store : unhealthStore) {
       if (!store.isUnreachable()) {
-          continue;
+        continue;
       }
       String addressStr = store.getStore().getAddress();
       ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
@@ -70,7 +69,7 @@ public class UnreachableStoreChecker implements Runnable {
           continue;
         }
         this.taskQueue.add(store);
-      } catch (Exception e){
+      } catch (Exception e) {
         this.taskQueue.add(store);
       }
     }
