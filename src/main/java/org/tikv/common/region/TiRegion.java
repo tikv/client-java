@@ -50,11 +50,13 @@ public class TiRegion implements Serializable {
   private final Peer leader;
   private final ReplicaSelector replicaSelector;
   private final List<Peer> replicaList;
+  private final TiStore proxyStore;
   private int replicaIdx;
 
   public TiRegion(
       Region meta,
       Peer leader,
+      TiStore proxyStore,
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
       KVMode kvMode,
@@ -65,6 +67,7 @@ public class TiRegion implements Serializable {
     this.isolationLevel = isolationLevel;
     this.commandPri = commandPri;
     this.replicaSelector = replicaSelector;
+    this.proxyStore = proxyStore;
     if (leader == null || leader.getId() == 0) {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());
@@ -197,6 +200,10 @@ public class TiRegion implements Serializable {
         meta.getId(), meta.getRegionEpoch().getConfVer(), meta.getRegionEpoch().getVersion());
   }
 
+  public TiStore getProxyStore() {
+    return proxyStore;
+  }
+
   /**
    * switches current peer to the one on specific store. It return false if no peer matches the
    * storeID.
@@ -209,10 +216,27 @@ public class TiRegion implements Serializable {
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
         return new TiRegion(
-            this.meta, p, this.isolationLevel, this.commandPri, this.kvMode, this.replicaSelector);
+            this.meta,
+            p,
+            this.proxyStore,
+            this.isolationLevel,
+            this.commandPri,
+            this.kvMode,
+            this.replicaSelector);
       }
     }
     return null;
+  }
+
+  public TiRegion switchProxyStore(TiStore store) {
+    return new TiRegion(
+        this.meta,
+        this.leader,
+        store,
+        this.isolationLevel,
+        this.commandPri,
+        this.kvMode,
+        this.replicaSelector);
   }
 
   public boolean isMoreThan(ByteString key) {

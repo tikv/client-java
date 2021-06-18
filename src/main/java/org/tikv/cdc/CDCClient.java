@@ -149,7 +149,11 @@ public class CDCClient implements AutoCloseable {
     for (final TiRegion region : regions) {
       if (overlapWithRegion(region)) {
         final String address =
-            session.getRegionManager().getStoreById(region.getLeader().getStoreId()).getAddress();
+            session
+                .getRegionManager()
+                .getStoreById(region.getLeader().getStoreId())
+                .getStore()
+                .getAddress();
         final ManagedChannel channel =
             session.getChannelFactory().getChannel(address, session.getPDClient().getHostMapping());
         try {

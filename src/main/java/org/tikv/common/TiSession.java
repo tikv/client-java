@@ -43,8 +43,8 @@ import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
-import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.txn.KVClient;
 import org.tikv.txn.TxnKVClient;
@@ -71,6 +71,7 @@ public class TiSession implements AutoCloseable {
   private volatile ExecutorService batchScanThreadPool;
   private volatile ExecutorService deleteRangeThreadPool;
   private volatile RegionManager regionManager;
+  private volatile boolean enableGrpcForward;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private boolean isClosed = false;
   private HTTPServer server;
@@ -80,6 +81,7 @@ public class TiSession implements AutoCloseable {
     this.conf = conf;
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
     this.client = PDClient.createRaw(conf, channelFactory);
+    this.enableGrpcForward = conf.getEnableGrpcForward();
     if (conf.isMetricsEnable()) {
       try {
         this.collectorRegistry = new CollectorRegistry();
@@ -199,7 +201,12 @@ public class TiSession implements AutoCloseable {
     if (res == null) {
       synchronized (this) {
         if (regionManager == null) {
-          regionManager = new RegionManager(getPDClient(), this.cacheInvalidateCallback);
+          regionManager =
+              new RegionManager(
+                  getPDClient(),
+                  this.cacheInvalidateCallback,
+                  this.channelFactory,
+                  this.enableGrpcForward);
         }
         res = regionManager;
       }
@@ -415,10 +422,10 @@ public class TiSession implements AutoCloseable {
         groupKeysByRegion(regionManager, splitKeys, backOffer);
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
 
-      Pair<TiRegion, Metapb.Store> pair =
+      Pair<TiRegion, TiStore> pair =
           getRegionManager().getRegionStorePairByKey(entry.getKey().getStartKey());
       TiRegion region = pair.first;
-      Metapb.Store store = pair.second;
+      TiStore store = pair.second;
       List<ByteString> splits =
           entry
               .getValue()
