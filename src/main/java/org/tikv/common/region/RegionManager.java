@@ -374,7 +374,10 @@ public class RegionManager {
     }
 
     public synchronized void invalidateStore(long storeId) {
-      storeCache.remove(storeId);
+      TiStore store = storeCache.remove(storeId);
+      if (store != null) {
+        store.markReachable();
+      }
     }
 
     public synchronized TiStore getStoreById(long id, BackOffer backOffer) {
