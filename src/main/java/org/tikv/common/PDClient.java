@@ -423,12 +423,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         // The message to leader is not forwarded by follower.
         if (leaderUrlStr.equals(pdClientWrapper.getStoreAddress())) {
           return true;
-        } else {
-          // The leader is still unavailable.
-          if (!checkHealth(leaderUrlStr, hostMapping)) {
-            return false;
-          }
-          // If leader is not change but becomes available, we can cancel follower forward.
         }
       }
       // If leader has transfered to another member, we can create another leaderwrapper.
@@ -485,7 +479,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
 
       // if leader is switched, just return.
-      if (trySwitchLeader(leaderUrlStr)) {
+      if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
         return;
       }
 
@@ -536,8 +530,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       String leaderUrlStr = resp.getLeader().getClientUrlsList().get(0);
       leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
 
-      // if leader is switched, just return.
-      if (trySwitchLeader(leaderUrlStr)) {
+      // If leader is not change but becomes available, we can cancel follower forward.
+      if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
         if (!urls.equals(this.pdAddrs)) {
           tryUpdateMembers(urls);
         }
@@ -695,7 +689,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
     PDClientWrapper(
         String leaderInfo, String storeAddress, ManagedChannel clientChannel, long createTime) {
-      if (storeAddress != leaderInfo) {
+      if (!storeAddress.equals(leaderInfo)) {
         Metadata header = new Metadata();
         header.put(TiConfiguration.FORWARD_META_DATA_KEY, leaderInfo);
         this.blockingStub =
