@@ -46,7 +46,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration.KVMode;
@@ -464,7 +463,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       ManagedChannel channel = channelFactory.getChannel(followerUrlStr, hostMapping);
       pdClientWrapper = new PDClientWrapper(leaderUrls, followerUrlStr, channel, System.nanoTime());
     } catch (IllegalArgumentException e) {
-      logger.error("Error updating leader. " + followerUrlStr, e);
+      logger.error("Error updating follower. " + followerUrlStr, e);
       return false;
     }
     logger.info(String.format("Switched to new leader by follower forward: %s", pdClientWrapper));
@@ -529,14 +528,18 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       if (resp == null) {
         continue;
       }
-      List<URI> urls = resp.getMembersList().stream().map(mem -> addrToUri(mem.getClientUrls(0))).collect(Collectors.toList());
+      List<URI> urls =
+          resp.getMembersList()
+              .stream()
+              .map(mem -> addrToUri(mem.getClientUrls(0)))
+              .collect(Collectors.toList());
       String leaderUrlStr = resp.getLeader().getClientUrlsList().get(0);
       leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
 
       // if leader is switched, just return.
       if (trySwitchLeader(leaderUrlStr)) {
         if (!urls.equals(this.pdAddrs)) {
-            tryUpdateMembers(urls);
+          tryUpdateMembers(urls);
         }
         return;
       }
@@ -645,6 +648,13 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     header = RequestHeader.newBuilder().setClusterId(clusterId).build();
     tsoReq = TsoRequest.newBuilder().setHeader(header).setCount(1).build();
     this.tiflashReplicaMap = new ConcurrentHashMap<>();
+    this.pdAddrs =
+        resp.getMembersList()
+            .stream()
+            .map(mem -> addrToUri(mem.getClientUrls(0)))
+            .collect(Collectors.toList());
+    logger.info("init cluster with address: " + this.pdAddrs);
+
     String leaderUrlStr = resp.getLeader().getClientUrls(0);
     leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
     createLeaderClientWrapper(leaderUrlStr);

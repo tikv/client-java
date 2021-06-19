@@ -6,7 +6,6 @@ import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.health.v1.HealthGrpc;
 import java.util.LinkedList;
 import java.util.List;
-
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -71,9 +70,10 @@ public class UnreachableStoreChecker implements Runnable {
           this.stores.remove(Long.valueOf(store.getId()));
           continue;
         }
-        Metapb.Store newStore = pdClient.getStore(ConcreteBackOffer.newRawKVBackOff(), store.getId());
+        Metapb.Store newStore =
+            pdClient.getStore(ConcreteBackOffer.newRawKVBackOff(), store.getId());
         if (newStore.getState() == Metapb.StoreState.Tombstone) {
-            continue;
+          continue;
         }
         this.taskQueue.add(store);
       } catch (Exception e) {

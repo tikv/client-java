@@ -48,7 +48,9 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleResponseError(BackOffer backOffer, RespT resp) {
     if (resp == null) {
-      return false;
+      String msg = String.format("PD Request Failed with unknown reason");
+      logger.warn(msg);
+      return handleRequestError(backOffer, new GrpcException(msg));
     }
     PDError error = getError.apply(resp);
     if (error != null) {

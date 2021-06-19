@@ -18,7 +18,6 @@ package org.tikv.common;
 import static org.junit.Assert.*;
 import static org.tikv.common.GrpcUtils.encodeKey;
 
-import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.util.concurrent.*;
 import org.junit.Test;
@@ -45,15 +44,14 @@ public class PDClientTest extends PDMockServerTest {
   @Test
   public void testSwitchLeader() throws Exception {
     try (PDClient client = session.getPDClient()) {
-      client.switchLeader(ImmutableList.of("http://" + LOCAL_ADDR + ":" + (pdServer.port + 1)));
+      client.trySwitchLeader("http://" + LOCAL_ADDR + ":" + (pdServer.port + 1));
       assertEquals(
           client.getPdClientWrapper().getLeaderInfo(), LOCAL_ADDR + ":" + (pdServer.port + 1));
     }
     tearDown();
     setUp(LOCAL_ADDR_IPV6);
     try (PDClient client = session.getPDClient()) {
-      client.switchLeader(
-          ImmutableList.of("http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2)));
+      client.trySwitchLeader("http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
       assertEquals(
           client.getPdClientWrapper().getLeaderInfo(), LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
     }
