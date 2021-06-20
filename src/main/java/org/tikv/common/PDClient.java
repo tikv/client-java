@@ -464,7 +464,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return true;
   }
 
-  public void updateLeaderOrforwardFollower() {
+  public synchronized void updateLeaderOrforwardFollower() {
     for (URI url : this.pdAddrs) {
       // since resp is null, we need update leader's address by walking through all pd server.
       GetMembersResponse resp = getMembers(url);
@@ -691,7 +691,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         String leaderInfo, String storeAddress, ManagedChannel clientChannel, long createTime) {
       if (!storeAddress.equals(leaderInfo)) {
         Metadata header = new Metadata();
-        header.put(TiConfiguration.FORWARD_META_DATA_KEY, leaderInfo);
+        header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, addrToUri(leaderInfo).toString());
         this.blockingStub =
             MetadataUtils.attachHeaders(PDGrpc.newBlockingStub(clientChannel), header);
         this.asyncStub = MetadataUtils.attachHeaders(PDGrpc.newStub(clientChannel), header);
