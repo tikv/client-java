@@ -215,6 +215,11 @@ public class RegionManager {
     return cache.updateRegion(oldRegion, region);
   }
 
+  /** Clears all cache when some unexpected error occurs. */
+  public void clearRegionCache() {
+    cache.clearAll();
+  }
+
   /**
    * Clears all cache when a TiKV server does not respond
    *
