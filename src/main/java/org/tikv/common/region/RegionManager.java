@@ -194,24 +194,17 @@ public class RegionManager {
   }
 
   public synchronized TiRegion updateLeader(TiRegion region, long storeId) {
-    TiRegion r = cache.getRegionFromCache(region.getId());
-    if (r != null) {
-      if (r.getLeader().getStoreId() == storeId) {
-        return r;
-      }
-      TiRegion newRegion = r.switchPeer(storeId);
-      if (newRegion != null) {
-        cache.putRegion(newRegion);
-        return newRegion;
-      }
-      // failed to switch leader, possibly region is outdated, we need to drop region cache from
-      // regionCache
-      logger.warn("Cannot find peer when updating leader (" + region.getId() + "," + storeId + ")");
+    TiRegion newRegion = region.switchPeer(storeId);
+    if (cache.updateRegion(region, newRegion)) {
+      return newRegion;
     }
+    // failed to switch leader, possibly region is outdated, we need to drop region cache from
+    // regionCache
+    logger.warn("Cannot find peer when updating leader (" + region.getId() + "," + storeId + ")");
     return null;
   }
 
-  public boolean updateRegion(TiRegion oldRegion, TiRegion region) {
+  public synchronized boolean updateRegion(TiRegion oldRegion, TiRegion region) {
     return cache.updateRegion(oldRegion, region);
   }
 
