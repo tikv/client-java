@@ -102,7 +102,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private Client etcdClient;
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
   private HostMapping hostMapping;
-  private ConcurrentHashMap<String, String> checkHealthMembers;
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
       Histogram.build()
@@ -630,7 +629,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                         .build()))
             .build();
     this.hostMapping = new HostMapping(this.etcdClient, conf.getNetworkMappingName());
-    this.checkHealthMembers = new ConcurrentHashMap<>();
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
