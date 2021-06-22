@@ -41,7 +41,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -62,7 +61,6 @@ import org.tikv.common.util.BackOffFunction.BackOffFuncType;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
-import org.tikv.common.util.FutureObserver;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.PDGrpc.PDBlockingStub;
@@ -256,29 +254,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   @Override
-  public Future<TiRegion> getRegionByKeyAsync(BackOffer backOffer, ByteString key) {
-    FutureObserver<TiRegion, GetRegionResponse> responseObserver =
-        new FutureObserver<>(
-            resp ->
-                new TiRegion(
-                    resp.getRegion(),
-                    resp.getLeader(),
-                    null,
-                    conf.getIsolationLevel(),
-                    conf.getCommandPriority(),
-                    conf.getKvMode(),
-                    conf.getReplicaSelector()));
-    Supplier<GetRegionRequest> request =
-        () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
-
-    PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
-
-    callAsyncWithRetry(backOffer, PDGrpc.getGetRegionMethod(), request, responseObserver, handler);
-    return responseObserver.getFuture();
-  }
-
-  @Override
   public TiRegion getRegionByID(BackOffer backOffer, long id) {
     Supplier<GetRegionByIDRequest> request =
         () -> GetRegionByIDRequest.newBuilder().setHeader(header).setRegionId(id).build();
@@ -296,30 +271,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         conf.getCommandPriority(),
         conf.getKvMode(),
         conf.getReplicaSelector());
-  }
-
-  @Override
-  public Future<TiRegion> getRegionByIDAsync(BackOffer backOffer, long id) {
-    FutureObserver<TiRegion, GetRegionResponse> responseObserver =
-        new FutureObserver<>(
-            resp ->
-                new TiRegion(
-                    resp.getRegion(),
-                    resp.getLeader(),
-                    null,
-                    conf.getIsolationLevel(),
-                    conf.getCommandPriority(),
-                    conf.getKvMode(),
-                    conf.getReplicaSelector()));
-
-    Supplier<GetRegionByIDRequest> request =
-        () -> GetRegionByIDRequest.newBuilder().setHeader(header).setRegionId(id).build();
-    PDErrorHandler<GetRegionResponse> handler =
-        new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
-
-    callAsyncWithRetry(
-        backOffer, PDGrpc.getGetRegionByIDMethod(), request, responseObserver, handler);
-    return responseObserver.getFuture();
   }
 
   private Supplier<GetStoreRequest> buildGetStoreReq(long storeId) {
@@ -340,20 +291,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return callWithRetry(
             backOffer, PDGrpc.getGetStoreMethod(), buildGetStoreReq(storeId), buildPDErrorHandler())
         .getStore();
-  }
-
-  @Override
-  public Future<Store> getStoreAsync(BackOffer backOffer, long storeId) {
-    FutureObserver<Store, GetStoreResponse> responseObserver =
-        new FutureObserver<>(GetStoreResponse::getStore);
-
-    callAsyncWithRetry(
-        backOffer,
-        PDGrpc.getGetStoreMethod(),
-        buildGetStoreReq(storeId),
-        responseObserver,
-        buildPDErrorHandler());
-    return responseObserver.getFuture();
   }
 
   @Override
@@ -510,8 +447,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         }
       }
     }
-    throw new TiClientInternalException(
-        "already tried all address on file, but not leader found yet.");
+    if (pdClientWrapper == null) {
+      throw new TiClientInternalException(
+          "already tried all address on file, but not leader found yet.");
+    }
   }
 
   public void tryUpdateLeader() {
