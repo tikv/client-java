@@ -148,6 +148,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
           String.format(
               "Key not in region [%s] for key [%s], this error should not happen here.",
               recv.getRegion(), KeyUtils.formatBytesUTF8(invalidKey)));
+      regionManager.clearRegionCache();
       throw new StatusRuntimeException(Status.UNKNOWN.withDescription(error.toString()));
     }
 
