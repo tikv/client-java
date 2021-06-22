@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
@@ -37,36 +38,41 @@ import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Peer;
 import org.tikv.kvproto.Metapb.Region;
-import org.tikv.kvproto.Metapb.Store;
 
 public class TiRegion implements Serializable {
   private static final Logger logger = LoggerFactory.getLogger(TiRegion.class);
 
   private final Region meta;
+  private final KVMode kvMode;
   private final IsolationLevel isolationLevel;
   private final Kvrpcpb.CommandPri commandPri;
   private final Peer leader;
   private final ReplicaSelector replicaSelector;
   private final List<Peer> replicaList;
+  private final TiStore proxyStore;
   private int replicaIdx;
   private final List<Peer> peers;
-  private final List<Store> stores;
+  private final List<TiStore> stores;
 
   public TiRegion(
       Region meta,
       Peer leader,
       List<Peer> peers,
-      List<Store> stores,
+      List<TiStore> stores,
+      TiStore proxyStore,
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
+      KVMode kvMode,
       ReplicaSelector replicaSelector) {
     Objects.requireNonNull(meta, "meta is null");
     this.meta = meta;
+    this.kvMode = kvMode;
     this.isolationLevel = isolationLevel;
     this.commandPri = commandPri;
     this.peers = peers;
     this.stores = stores;
     this.replicaSelector = replicaSelector;
+    this.proxyStore = proxyStore;
     if (leader == null || leader.getId() == 0) {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());
@@ -89,6 +95,18 @@ public class TiRegion implements Serializable {
 
   public Peer getLeader() {
     return leader;
+  }
+
+  public List<Peer> getFollowerList() {
+    List<Peer> peers = new ArrayList<>();
+    for (Peer peer : getMeta().getPeersList()) {
+      if (!peer.equals(this.leader)) {
+        if (peer.getRole().equals(Metapb.PeerRole.Voter)) {
+          peers.add(peer);
+        }
+      }
+    }
+    return peers;
   }
 
   public List<Peer> getLearnerList() {
@@ -168,6 +186,10 @@ public class TiRegion implements Serializable {
         meta.getId(), meta.getRegionEpoch().getConfVer(), meta.getRegionEpoch().getVersion());
   }
 
+  public TiStore getProxyStore() {
+    return proxyStore;
+  }
+
   /**
    * switches current peer to the one on specific store. It return false if no peer matches the
    * storeID.
@@ -183,13 +205,28 @@ public class TiRegion implements Serializable {
             this.meta,
             p,
             peers,
-            stores,
+            this.stores,
+            this.proxyStore,
             this.isolationLevel,
             this.commandPri,
+            this.kvMode,
             this.replicaSelector);
       }
     }
     return null;
+  }
+
+  public TiRegion switchProxyStore(TiStore store) {
+    return new TiRegion(
+        this.meta,
+        this.leader,
+        this.peers,
+        this.stores,
+        store,
+        this.isolationLevel,
+        this.commandPri,
+        this.kvMode,
+        this.replicaSelector);
   }
 
   public boolean isMoreThan(ByteString key) {

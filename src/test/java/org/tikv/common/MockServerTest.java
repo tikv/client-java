@@ -4,8 +4,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.Before;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.replica.ReplicaSelector;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
@@ -42,9 +44,11 @@ public class MockServerTest extends PDMockServerTest {
             r,
             r.getPeers(0),
             r.getPeersList(),
-            s,
+            s.stream().map(TiStore::new).collect(Collectors.toList()),
+            null,
             session.getConf().getIsolationLevel(),
             session.getConf().getCommandPriority(),
+            TiConfiguration.KVMode.TXN,
             ReplicaSelector.LEADER);
     pdServer.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
     for (Metapb.Store store : s) {

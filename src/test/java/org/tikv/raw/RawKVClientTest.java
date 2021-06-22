@@ -1,5 +1,7 @@
 package org.tikv.raw;
 
+import static org.junit.Assert.*;
+
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.*;
@@ -7,14 +9,15 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
+import org.tikv.common.exception.RawCASConflictException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.FastByteComparisons;
@@ -93,30 +96,45 @@ public class RawKVClientTest {
     }
   }
 
-  // tikv-4.0 does not support atomic api
-  @Ignore
-  public void atomicAPITest() {
+  @Test
+  public void rawCASTest() {
+    if (!initialized) return;
+    ByteString key = ByteString.copyFromUtf8("key_atomic");
+    ByteString value = ByteString.copyFromUtf8("value");
+    ByteString value2 = ByteString.copyFromUtf8("value2");
+    client.delete(key);
+    client.compareAndSet(key, Optional.empty(), value);
+    Assert.assertEquals(value, client.get(key).get());
+    try {
+      client.compareAndSet(key, Optional.empty(), value2);
+      Assert.fail("compareAndSet should fail.");
+    } catch (RawCASConflictException err) {
+      Assert.assertEquals(value, err.getPrevValue().get());
+    }
+  }
+
+  @Test
+  public void rawPutIfAbsentTest() {
     if (!initialized) return;
     long ttl = 10;
     ByteString key = ByteString.copyFromUtf8("key_atomic");
     ByteString value = ByteString.copyFromUtf8("value");
     ByteString value2 = ByteString.copyFromUtf8("value2");
     client.delete(key);
-    ByteString res1 = client.putIfAbsent(key, value, ttl);
-    assert res1.isEmpty();
-    ByteString res2 = client.putIfAbsent(key, value2, ttl);
-    assert res2.equals(value);
+    Optional<ByteString> res1 = client.putIfAbsent(key, value, ttl);
+    assertFalse(res1.isPresent());
+    Optional<ByteString> res2 = client.putIfAbsent(key, value2, ttl);
+    assertEquals(res2.get(), value);
     try {
       Thread.sleep(ttl * 1000);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    ByteString res3 = client.putIfAbsent(key, value, ttl);
-    assert res3.isEmpty();
+    Optional<ByteString> res3 = client.putIfAbsent(key, value, ttl);
+    assertFalse(res3.isPresent());
   }
 
-  // tikv-4.0 doest not support ttl
-  @Ignore
+  @Test
   public void getKeyTTLTest() {
     if (!initialized) return;
     long ttl = 10;
@@ -124,19 +142,19 @@ public class RawKVClientTest {
     ByteString value = ByteString.copyFromUtf8("value");
     client.put(key, value, ttl);
     for (int i = 0; i < 9; i++) {
-      Long t = client.getKeyTTL(key);
-      logger.info("current ttl of key is " + t);
+      Optional<Long> t = client.getKeyTTL(key);
+      logger.info("current ttl of key is " + t.orElse(null));
       try {
         Thread.sleep(1000);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       }
     }
-    Long t = client.getKeyTTL(key);
-    if (t == null) {
-      logger.info("key outdated.");
+    Optional<Long> t = client.getKeyTTL(key);
+    if (t.isPresent()) {
+      logger.info("key not outdated: " + t.get());
     } else {
-      logger.info("key not outdated: " + t);
+      logger.info("key outdated.");
     }
   }
 
@@ -258,30 +276,47 @@ public class RawKVClientTest {
   public void simpleTest() {
     if (!initialized) return;
     ByteString key = rawKey("key");
+    ByteString key0 = rawKey("key0");
     ByteString key1 = rawKey("key1");
     ByteString key2 = rawKey("key2");
     ByteString key3 = rawKey("key3");
+    ByteString value = rawValue("value");
     ByteString value1 = rawValue("value1");
     ByteString value2 = rawValue("value2");
+    ByteString value3 = rawValue("value3");
+    Kvrpcpb.KvPair kv = Kvrpcpb.KvPair.newBuilder().setKey(key).setValue(value).build();
     Kvrpcpb.KvPair kv1 = Kvrpcpb.KvPair.newBuilder().setKey(key1).setValue(value1).build();
     Kvrpcpb.KvPair kv2 = Kvrpcpb.KvPair.newBuilder().setKey(key2).setValue(value2).build();
+    Kvrpcpb.KvPair kv3 = Kvrpcpb.KvPair.newBuilder().setKey(key3).setValue(value3).build();
 
     try {
-      checkEmpty(key1);
-      checkEmpty(key2);
-      checkPut(key1, value1);
-      checkPut(key2, value2);
-      List<Kvrpcpb.KvPair> result = new ArrayList<>();
-      List<Kvrpcpb.KvPair> result2 = new ArrayList<>();
-      result.add(kv1);
-      result.add(kv2);
-      checkScan(key, key3, result, limit);
-      checkScan(key1, key3, result, limit);
-      checkScan(key, key1, new ArrayList<>(), limit);
-      result2.add(kv1);
-      checkScan(key, key2, result2, limit);
+      checkDeleteRange(ByteString.EMPTY, ByteString.EMPTY);
+      checkNotExist(key);
+      checkNotExist(key1);
+      checkNotExist(key2);
+      checkNotExist(key3);
+      checkPut(kv);
+      checkPut(kv1);
+      checkPut(kv2);
+      checkPut(kv3);
+      // <key, value>, <key1,value1>, <key2,value2>, <key3,value3>
+      // (-∞, +∞)
+      checkScan(ByteString.EMPTY, ByteString.EMPTY, Arrays.asList(kv, kv1, kv2, kv3), limit);
+      // (-∞, key3)
+      checkScan(ByteString.EMPTY, key3, Arrays.asList(kv, kv1, kv2), limit);
+      // [key1, +∞)
+      checkScan(key1, ByteString.EMPTY, Arrays.asList(kv1, kv2, kv3), limit);
+      // [key, key3)
+      checkScan(key, key3, Arrays.asList(kv, kv1, kv2), limit);
+      // [key1, key3)
+      checkScan(key1, key3, Arrays.asList(kv1, kv2), limit);
+      // [key0, key1)
+      checkScan(key0, key1, new ArrayList<>(), limit);
+      // [key, key2)
+      checkScan(key, key2, Arrays.asList(kv, kv1), limit);
       checkDelete(key1);
       checkDelete(key2);
+      checkDeleteRange(ByteString.EMPTY, ByteString.EMPTY);
     } catch (final TiKVException e) {
       logger.warn("Test fails with Exception: " + e);
     }
@@ -513,7 +548,7 @@ public class RawKVClientTest {
     } else {
       int i = 0;
       for (Map.Entry<ByteString, ByteString> pair : data.entrySet()) {
-        assert client.get(pair.getKey()).equals(pair.getValue());
+        assertEquals(client.get(pair.getKey()), Optional.of(pair.getValue()));
         i++;
         if (i >= getCases) {
           break;
@@ -765,27 +800,31 @@ public class RawKVClientTest {
   private void checkBatchGet(List<ByteString> keys) {
     List<Kvrpcpb.KvPair> result = client.batchGet(keys);
     for (Kvrpcpb.KvPair kvPair : result) {
-      assert data.containsKey(kvPair.getKey());
-      assert kvPair.getValue().equals(data.get(kvPair.getKey()));
+      assertTrue(data.containsKey(kvPair.getKey()));
+      assertEquals(data.get(kvPair.getKey()), kvPair.getValue());
     }
+  }
+
+  private void checkPut(Kvrpcpb.KvPair kv) {
+    checkPut(kv.getKey(), kv.getValue());
   }
 
   private void checkPut(ByteString key, ByteString value) {
     client.put(key, value);
-    assert client.get(key).equals(value);
+    assertEquals(client.get(key).orElse(null), value);
   }
 
   private void checkBatchPut(Map<ByteString, ByteString> kvPairs) {
     client.batchPut(kvPairs);
     for (Map.Entry<ByteString, ByteString> kvPair : kvPairs.entrySet()) {
-      assert client.get(kvPair.getKey()).equals(kvPair.getValue());
+      assertEquals(client.get(kvPair.getKey()).orElse(null), kvPair.getValue());
     }
   }
 
   private void checkScan(
-      ByteString startKey, ByteString endKey, List<Kvrpcpb.KvPair> ans, int limit) {
+      ByteString startKey, ByteString endKey, List<Kvrpcpb.KvPair> expected, int limit) {
     List<Kvrpcpb.KvPair> result = client.scan(startKey, endKey, limit);
-    assert result.equals(ans);
+    assertEquals(expected, result);
   }
 
   private void checkScan(
@@ -822,7 +861,7 @@ public class RawKVClientTest {
                           .setValue(kvPair.getValue())
                           .build())
               .collect(Collectors.toList());
-      assert result.get(i).equals(partialResult);
+      assertEquals(partialResult, result.get(i));
       i++;
     }
   }
@@ -834,13 +873,13 @@ public class RawKVClientTest {
       Pair<ByteString, ByteString> range = ranges.get(i);
       List<ByteString> partialResult =
           new ArrayList<>(data.subMap(range.first, range.second).keySet());
-      assert result.get(i).equals(partialResult);
+      assertEquals(partialResult, result.get(i));
     }
   }
 
   private void checkDelete(ByteString key) {
     client.delete(key);
-    checkEmpty(key);
+    checkNotExist(key);
   }
 
   private void checkDeleteRange(ByteString startKey, ByteString endKey) {
@@ -848,31 +887,31 @@ public class RawKVClientTest {
     logger.info("delete range complete");
     List<Kvrpcpb.KvPair> result = client.scan(startKey, endKey);
     logger.info("checking scan complete. number of remaining keys in range: " + result.size());
-    assert result.isEmpty();
+    assertTrue(result.isEmpty());
   }
 
   private void checkPutTTL(ByteString key, ByteString value, long ttl) {
     client.put(key, value, ttl);
-    assert client.get(key).equals(value);
+    assert client.get(key).orElse(null).equals(value);
   }
 
   private void checkGetKeyTTL(ByteString key, long ttl) {
-    Long t = client.getKeyTTL(key);
-    assert t != null;
-    assert t <= ttl && t > 0;
+    Optional<Long> t = client.getKeyTTL(key);
+    assertTrue(t.isPresent());
+    assertTrue(t.get() <= ttl && t.get() > 0);
   }
 
   private void checkGetTTLTimeOut(ByteString key) {
-    assert client.get(key).isEmpty();
+    assertFalse(client.get(key).isPresent());
   }
 
   private void checkGetKeyTTLTimeOut(ByteString key) {
-    Long t = client.getKeyTTL(key);
-    assert t == null;
+    Optional<Long> t = client.getKeyTTL(key);
+    assertFalse(t.isPresent());
   }
 
-  private void checkEmpty(ByteString key) {
-    assert client.get(key).isEmpty();
+  private void checkNotExist(ByteString key) {
+    assertFalse(client.get(key).isPresent());
   }
 
   private static ByteString rawKey(String key) {

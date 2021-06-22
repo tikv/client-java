@@ -26,6 +26,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.pingcap.tidb.tipb.DAGRequest;
 import com.pingcap.tidb.tipb.SelectResponse;
 import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
 import java.util.*;
 import java.util.function.Supplier;
@@ -37,13 +39,13 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.Version;
 import org.tikv.common.exception.*;
 import org.tikv.common.operation.KVErrorHandler;
+import org.tikv.common.operation.RegionErrorHandler;
 import org.tikv.common.streaming.StreamingResponse;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Kvrpcpb.*;
 import org.tikv.kvproto.Metapb;
-import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvStub;
@@ -87,7 +89,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   private RegionStoreClient(
       TiConfiguration conf,
       TiRegion region,
-      String storeVersion,
+      TiStore store,
       TiStoreType storeType,
       ChannelFactory channelFactory,
       TikvBlockingStub blockingStub,
@@ -95,15 +97,15 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       RegionManager regionManager,
       PDClient pdClient,
       RegionStoreClient.RegionStoreClientBuilder clientBuilder) {
-    super(conf, region, channelFactory, blockingStub, asyncStub, regionManager);
+    super(conf, region, store, channelFactory, blockingStub, asyncStub, regionManager);
     this.storeType = storeType;
 
     if (this.storeType == TiStoreType.TiKV) {
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
-              storeVersion,
               conf,
               region,
+              store,
               this.blockingStub,
               this.asyncStub,
               channelFactory,
@@ -112,10 +114,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               clientBuilder);
 
     } else {
-      Store tikvStore =
+      TiStore tikvStore =
           regionManager.getRegionStorePairByKey(region.getStartKey(), TiStoreType.TiKV).second;
 
-      String addressStr = tikvStore.getAddress();
+      String addressStr = tikvStore.getStore().getAddress();
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("Create region store client on address %s", addressStr));
       }
@@ -126,9 +128,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
-              tikvStore.getVersion(),
               conf,
               region,
+              tikvStore,
               tikvBlockingStub,
               tikvAsyncStub,
               channelFactory,
@@ -785,7 +787,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   // APIs for Raw Scan/Put/Get/Delete
 
-  public ByteString rawGet(BackOffer backOffer, ByteString key) {
+  public Optional<ByteString> rawGet(BackOffer backOffer, ByteString key) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get").startTimer();
     try {
@@ -795,8 +797,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getReplicaContext(storeType))
                   .setKey(key)
                   .build();
-      KVErrorHandler<RawGetResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawGetResponse> handler =
+          new RegionErrorHandler<RawGetResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawGetResponse resp = callWithRetry(backOffer, TikvGrpc.getRawGetMethod(), factory, handler);
       return rawGetHelper(resp);
@@ -805,43 +807,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  private ByteString rawGetHelper(RawGetResponse resp) {
-    if (resp == null) {
-      this.regionManager.onRequestFail(region);
-      throw new TiClientInternalException("RawGetResponse failed without a cause");
-    }
-    String error = resp.getError();
-    if (!error.isEmpty()) {
-      throw new KeyException(resp.getError());
-    }
-    if (resp.hasRegionError()) {
-      throw new RegionException(resp.getRegionError());
-    }
-    return resp.getValue();
-  }
-
-  public Long rawGetKeyTTL(BackOffer backOffer, ByteString key) {
-    Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get_key_ttl").startTimer();
-    try {
-      Supplier<RawGetKeyTTLRequest> factory =
-          () ->
-              RawGetKeyTTLRequest.newBuilder()
-                  .setContext(region.getReplicaContext(storeType))
-                  .setKey(key)
-                  .build();
-      KVErrorHandler<RawGetKeyTTLResponse> handler =
-          new KVErrorHandler<>(
-              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
-      RawGetKeyTTLResponse resp =
-          callWithRetry(backOffer, TikvGrpc.getRawGetKeyTTLMethod(), factory, handler);
-      return rawGetKeyTTLHelper(resp);
-    } finally {
-      requestTimer.observeDuration();
-    }
-  }
-
-  private Long rawGetKeyTTLHelper(RawGetKeyTTLResponse resp) {
+  private Optional<ByteString> rawGetHelper(RawGetResponse resp) {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("RawGetResponse failed without a cause");
@@ -854,9 +820,49 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throw new RegionException(resp.getRegionError());
     }
     if (resp.getNotFound()) {
-      return null;
+      return Optional.empty();
+    } else {
+      return Optional.of(resp.getValue());
     }
-    return resp.getTtl();
+  }
+
+  public Optional<Long> rawGetKeyTTL(BackOffer backOffer, ByteString key) {
+    Histogram.Timer requestTimer =
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get_key_ttl").startTimer();
+    try {
+      Supplier<RawGetKeyTTLRequest> factory =
+          () ->
+              RawGetKeyTTLRequest.newBuilder()
+                  .setContext(region.getReplicaContext(storeType))
+                  .setKey(key)
+                  .build();
+      RegionErrorHandler<RawGetKeyTTLResponse> handler =
+          new RegionErrorHandler<RawGetKeyTTLResponse>(
+              regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+      RawGetKeyTTLResponse resp =
+          callWithRetry(backOffer, TikvGrpc.getRawGetKeyTTLMethod(), factory, handler);
+      return rawGetKeyTTLHelper(resp);
+    } finally {
+      requestTimer.observeDuration();
+    }
+  }
+
+  private Optional<Long> rawGetKeyTTLHelper(RawGetKeyTTLResponse resp) {
+    if (resp == null) {
+      this.regionManager.onRequestFail(region);
+      throw new TiClientInternalException("RawGetResponse failed without a cause");
+    }
+    String error = resp.getError();
+    if (!error.isEmpty()) {
+      throw new KeyException(resp.getError());
+    }
+    if (resp.hasRegionError()) {
+      throw new RegionException(resp.getRegionError());
+    }
+    if (resp.getNotFound()) {
+      return Optional.empty();
+    }
+    return Optional.of(resp.getTtl());
   }
 
   public void rawDelete(BackOffer backOffer, ByteString key) {
@@ -870,8 +876,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setKey(key)
                   .build();
 
-      KVErrorHandler<RawDeleteResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawDeleteResponse> handler =
+          new RegionErrorHandler<RawDeleteResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawDeleteResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawDeleteMethod(), factory, handler);
@@ -908,8 +914,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setTtl(ttl)
                   .build();
 
-      KVErrorHandler<RawPutResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawPutResponse> handler =
+          new RegionErrorHandler<RawPutResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawPutResponse resp = callWithRetry(backOffer, TikvGrpc.getRawPutMethod(), factory, handler);
       rawPutHelper(resp);
@@ -932,8 +938,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  public ByteString rawPutIfAbsent(
-      BackOffer backOffer, ByteString key, ByteString value, long ttl) {
+  public void rawCompareAndSet(
+      BackOffer backOffer,
+      ByteString key,
+      Optional<ByteString> prevValue,
+      ByteString value,
+      long ttl)
+      throws RawCASConflictException {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put_if_absent").startTimer();
     try {
@@ -943,22 +954,25 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getReplicaContext(storeType))
                   .setKey(key)
                   .setValue(value)
-                  .setPreviousNotExist(true)
+                  .setPreviousValue(prevValue.orElse(ByteString.EMPTY))
+                  .setPreviousNotExist(!prevValue.isPresent())
                   .setTtl(ttl)
                   .build();
 
-      KVErrorHandler<RawCASResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawCASResponse> handler =
+          new RegionErrorHandler<RawCASResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawCASResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawCompareAndSwapMethod(), factory, handler);
-      return rawPutIfAbsentHelper(resp);
+      rawCompareAndSetHelper(key, prevValue, resp);
     } finally {
       requestTimer.observeDuration();
     }
   }
 
-  private ByteString rawPutIfAbsentHelper(RawCASResponse resp) {
+  private void rawCompareAndSetHelper(
+      ByteString key, Optional<ByteString> expectedPrevValue, RawCASResponse resp)
+      throws RawCASConflictException {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("RawPutResponse failed without a cause");
@@ -970,10 +984,14 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
     }
-    if (resp.getSucceed()) {
-      return ByteString.EMPTY;
+    if (!resp.getSucceed()) {
+      if (resp.getPreviousNotExist()) {
+        throw new RawCASConflictException(key, expectedPrevValue, Optional.empty());
+      } else {
+        throw new RawCASConflictException(
+            key, expectedPrevValue, Optional.of(resp.getPreviousValue()));
+      }
     }
-    return resp.getPreviousValue();
   }
 
   public List<KvPair> rawBatchGet(BackOffer backoffer, List<ByteString> keys) {
@@ -989,8 +1007,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getReplicaContext(storeType))
                   .addAllKeys(keys)
                   .build();
-      KVErrorHandler<RawBatchGetResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawBatchGetResponse> handler =
+          new RegionErrorHandler<RawBatchGetResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawBatchGetResponse resp =
           callWithRetry(backoffer, TikvGrpc.getRawBatchGetMethod(), factory, handler);
@@ -1026,8 +1044,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setTtl(ttl)
                   .setForCas(atomic)
                   .build();
-      KVErrorHandler<RawBatchPutResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawBatchPutResponse> handler =
+          new RegionErrorHandler<RawBatchPutResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawBatchPutResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawBatchPutMethod(), factory, handler);
@@ -1077,8 +1095,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .addAllKeys(keys)
                   .setForCas(atomic)
                   .build();
-      KVErrorHandler<RawBatchDeleteResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawBatchDeleteResponse> handler =
+          new RegionErrorHandler<RawBatchDeleteResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawBatchDeleteResponse resp =
           callWithRetry(backoffer, TikvGrpc.getRawBatchDeleteMethod(), factory, handler);
@@ -1124,8 +1142,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setLimit(limit)
                   .build();
 
-      KVErrorHandler<RawScanResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawScanResponse> handler =
+          new RegionErrorHandler<RawScanResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawScanResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawScanMethod(), factory, handler);
@@ -1169,8 +1187,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setEndKey(endKey)
                   .build();
 
-      KVErrorHandler<RawDeleteRangeResponse> handler =
-          new KVErrorHandler<>(
+      RegionErrorHandler<RawDeleteRangeResponse> handler =
+          new RegionErrorHandler<RawDeleteRangeResponse>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawDeleteRangeResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawDeleteRangeMethod(), factory, handler);
@@ -1232,25 +1250,48 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       this.pdClient = pdClient;
     }
 
-    public RegionStoreClient build(TiRegion region, Store store, TiStoreType storeType)
+    public RegionStoreClient build(TiRegion region, TiStore store, TiStoreType storeType)
         throws GrpcException {
       Objects.requireNonNull(region, "region is null");
       Objects.requireNonNull(store, "store is null");
       Objects.requireNonNull(storeType, "storeType is null");
 
-      String addressStr = store.getAddress();
+      String addressStr = store.getStore().getAddress();
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("Create region store client on address %s", addressStr));
       }
-      ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
+      ManagedChannel channel = null;
 
-      TikvBlockingStub blockingStub = TikvGrpc.newBlockingStub(channel);
-      TikvStub asyncStub = TikvGrpc.newStub(channel);
+      TikvBlockingStub blockingStub = null;
+      TikvStub asyncStub = null;
+
+      if (conf.getEnableGrpcForward() && region.getProxyStore() != null && store.isUnreachable()) {
+        addressStr = region.getProxyStore().getStore().getAddress();
+        channel =
+            channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
+        Metadata header = new Metadata();
+        header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
+        blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel), header);
+        asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newStub(channel), header);
+      } else {
+        // If the store is reachable, which is update by check-health thread
+        if (!store.isUnreachable()) {
+          if (region.getProxyStore() != null) {
+            TiRegion newRegion = region.switchProxyStore(null);
+            if (regionManager.updateRegion(region, newRegion)) {
+              region = newRegion;
+            }
+          }
+        }
+        channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
+        blockingStub = TikvGrpc.newBlockingStub(channel);
+        asyncStub = TikvGrpc.newStub(channel);
+      }
 
       return new RegionStoreClient(
           conf,
           region,
-          store.getVersion(),
+          store,
           storeType,
           channelFactory,
           blockingStub,
@@ -1260,7 +1301,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           this);
     }
 
-    public synchronized RegionStoreClient build(TiRegion region, Store store) throws GrpcException {
+    public synchronized RegionStoreClient build(TiRegion region, TiStore store)
+        throws GrpcException {
       return build(region, store, TiStoreType.TiKV);
     }
 
@@ -1270,12 +1312,12 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     public synchronized RegionStoreClient build(ByteString key, TiStoreType storeType)
         throws GrpcException {
-      Pair<TiRegion, Store> pair = regionManager.getRegionStorePairByKey(key, storeType);
+      Pair<TiRegion, TiStore> pair = regionManager.getRegionStorePairByKey(key, storeType);
       return build(pair.first, pair.second, storeType);
     }
 
     public synchronized RegionStoreClient build(TiRegion region) throws GrpcException {
-      Store store = regionManager.getStoreById(region.getLeader().getStoreId());
+      TiStore store = regionManager.getStoreById(region.getLeader().getStoreId());
       return build(region, store, TiStoreType.TiKV);
     }
 

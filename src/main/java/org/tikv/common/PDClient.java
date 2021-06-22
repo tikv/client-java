@@ -255,6 +255,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
             resp ->
                 new Pair<Metapb.Region, Metapb.Peer>(
                     decodeRegion(resp.getRegion()), resp.getLeader()));
+
     Supplier<GetRegionRequest> request =
         () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(key).build();
 
