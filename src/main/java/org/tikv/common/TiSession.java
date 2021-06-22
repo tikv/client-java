@@ -92,6 +92,7 @@ public class TiSession implements AutoCloseable {
         this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
         this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
         this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
+        this.enableGrpcForward = conf.getEnableGrpcForward();
         this.server =
             new HTTPServer(
                 new InetSocketAddress(conf.getMetricsPort()), this.collectorRegistry, true);

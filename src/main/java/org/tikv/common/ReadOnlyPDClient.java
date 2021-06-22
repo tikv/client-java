@@ -17,7 +17,6 @@ package org.tikv.common;
 
 import com.google.protobuf.ByteString;
 import java.util.List;
-import java.util.concurrent.Future;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
@@ -40,8 +39,6 @@ public interface ReadOnlyPDClient {
    */
   TiRegion getRegionByKey(BackOffer backOffer, ByteString key);
 
-  Future<TiRegion> getRegionByKeyAsync(BackOffer backOffer, ByteString key);
-
   /**
    * Get Region by Region Id
    *
@@ -49,8 +46,6 @@ public interface ReadOnlyPDClient {
    * @return the region corresponding to the given Id
    */
   TiRegion getRegionByID(BackOffer backOffer, long id);
-
-  Future<TiRegion> getRegionByIDAsync(BackOffer backOffer, long id);
 
   HostMapping getHostMapping();
 
@@ -61,8 +56,6 @@ public interface ReadOnlyPDClient {
    * @return the Store corresponding to the given Id
    */
   Store getStore(BackOffer backOffer, long storeId);
-
-  Future<Store> getStoreAsync(BackOffer backOffer, long storeId);
 
   List<Store> getAllStores(BackOffer backOffer);
 

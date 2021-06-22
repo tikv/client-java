@@ -11,6 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.kvproto.Metapb;
 
 public class UnreachableStoreChecker implements Runnable {
   private ConcurrentHashMap<Long, TiStore> stores;
@@ -66,6 +68,11 @@ public class UnreachableStoreChecker implements Runnable {
         if (resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING) {
           store.markReachable();
           this.stores.remove(Long.valueOf(store.getId()));
+          continue;
+        }
+        Metapb.Store newStore =
+            pdClient.getStore(ConcreteBackOffer.newRawKVBackOff(), store.getId());
+        if (newStore.getState() == Metapb.StoreState.Tombstone) {
           continue;
         }
         this.taskQueue.add(store);
