@@ -194,7 +194,7 @@ public class TiSession implements AutoCloseable {
     return res;
   }
 
-  public synchronized RegionManager getRegionManager() {
+  public RegionManager getRegionManager() {
     RegionManager res = regionManager;
     if (res == null) {
       synchronized (this) {
@@ -466,7 +466,9 @@ public class TiSession implements AutoCloseable {
     synchronized (sessionCachedMap) {
       sessionCachedMap.remove(conf.getPdAddrsString());
     }
-
+    if (regionManager != null) {
+      regionManager.close();
+    }
     if (tableScanThreadPool != null) {
       tableScanThreadPool.shutdownNow();
     }
