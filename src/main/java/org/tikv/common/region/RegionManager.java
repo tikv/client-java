@@ -123,24 +123,8 @@ public class RegionManager {
 
     Store store = null;
     if (storeType == TiStoreType.TiKV) {
-<<<<<<< HEAD
-      if (isReplicaRead) {
-        Peer peer = region.getCurrentFollower();
-        store = cache.getStoreById(peer.getStoreId(), backOffer);
-        if (store == null) {
-          cache.invalidateRegion(region);
-        }
-      } else {
-        Peer leader = region.getLeader();
-        store = cache.getStoreById(leader.getStoreId(), backOffer);
-        if (store == null) {
-          cache.clearAll();
-        }
-      }
-=======
       Peer peer = region.getCurrentReplica();
       store = cache.getStoreById(peer.getStoreId(), backOffer);
->>>>>>> e84f2f8... refactor follower read (#126)
     } else {
       outerLoop:
       for (Peer peer : region.getLearnerList()) {
