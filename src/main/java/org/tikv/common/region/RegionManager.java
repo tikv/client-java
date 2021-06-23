@@ -417,16 +417,7 @@ public class RegionManager {
     private TiRegion createRegion(Metapb.Region region, Metapb.Peer leader, BackOffer backOffer) {
       List<Metapb.Peer> peers = region.getPeersList();
       List<TiStore> stores = getRegionStore(peers, backOffer);
-      return new TiRegion(
-          region,
-          leader,
-          peers,
-          stores,
-          null,
-          conf.getIsolationLevel(),
-          conf.getCommandPriority(),
-          conf.getKvMode(),
-          conf.getReplicaSelector());
+      return new TiRegion(conf, region, leader, peers, stores, null);
     }
 
     public synchronized void clearAll() {

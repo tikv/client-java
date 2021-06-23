@@ -607,7 +607,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   private Metapb.Region decodeRegion(Metapb.Region region) {
-    boolean isRawRegion = getConf().getKvMode() == KVMode.RAW;
+    final boolean isRawRegion = conf.getKvMode() == KVMode.RAW;
     Metapb.Region.Builder builder =
         Metapb.Region.newBuilder()
             .setId(region.getId())
