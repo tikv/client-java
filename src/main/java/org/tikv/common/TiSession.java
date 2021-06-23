@@ -473,10 +473,8 @@ public class TiSession implements AutoCloseable {
     synchronized (sessionCachedMap) {
       sessionCachedMap.remove(conf.getPdAddrsString());
     }
-    synchronized (this) {
-      if (regionManager != null) {
-        regionManager.close();
-      }
+    if (regionManager != null) {
+      regionManager.close();
     }
     if (tableScanThreadPool != null) {
       tableScanThreadPool.shutdownNow();
