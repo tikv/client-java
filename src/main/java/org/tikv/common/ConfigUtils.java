@@ -42,7 +42,7 @@ public class ConfigUtils {
   public static final String TIKV_KV_CLIENT_CONCURRENCY = "tikv.kv_client_concurrency";
 
   public static final String TIKV_KV_MODE = "tikv.kv_mode";
-  public static final String TIKV_IS_REPLICA_READ = "tikv.is_replica_read";
+  public static final String TIKV_REPLICA_READ = "tikv.replica_read";
 
   public static final String TIKV_METRICS_ENABLE = "tikv.metrics.enable";
   public static final String TIKV_METRICS_PORT = "tikv.metrics.port";
@@ -72,7 +72,7 @@ public class ConfigUtils {
   public static final String DEF_DB_PREFIX = "";
   public static final int DEF_KV_CLIENT_CONCURRENCY = 10;
   public static final TiConfiguration.KVMode DEF_KV_MODE = TiConfiguration.KVMode.TXN;
-  public static final boolean DEF_IS_REPLICA_READ = false;
+  public static final String DEF_REPLICA_READ = "LEADER";
   public static final boolean DEF_METRICS_ENABLE = false;
   public static final int DEF_METRICS_PORT = 3140;
   public static final String DEF_TIKV_NETWORK_MAPPING_NAME = "";
@@ -86,4 +86,8 @@ public class ConfigUtils {
 
   public static final String RAW_KV_MODE = "RAW";
   public static final String TXN_KV_MODE = "TXN";
+
+  public static final String LEADER = "LEADER";
+  public static final String FOLLOWER = "FOLLOWER";
+  public static final String LEADER_AND_FOLLOWER = "LEADER_AND_FOLLOWER";
 }

@@ -66,5 +66,5 @@ public interface ReadOnlyPDClient {
 
   List<Store> getAllStores(BackOffer backOffer);
 
-  boolean isReplicaRead();
+  TiConfiguration.ReplicaRead getReplicaRead();
 }
