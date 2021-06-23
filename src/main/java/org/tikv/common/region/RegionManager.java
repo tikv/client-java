@@ -104,6 +104,12 @@ public class RegionManager {
     this.executor = null;
   }
 
+  public synchronized void close() {
+    if (this.executor != null) {
+      this.executor.shutdownNow();
+    }
+  }
+
   public Function<CacheInvalidateEvent, Void> getCacheInvalidateCallback() {
     return cacheInvalidateCallback;
   }
