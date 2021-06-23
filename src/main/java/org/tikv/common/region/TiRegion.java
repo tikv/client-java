@@ -22,14 +22,16 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.key.Key;
+import org.tikv.common.replica.ReplicaSelector;
 import org.tikv.common.util.FastByteComparisons;
 import org.tikv.common.util.KeyRangeUtils;
 import org.tikv.kvproto.Kvrpcpb;
@@ -39,44 +41,33 @@ import org.tikv.kvproto.Metapb.Peer;
 import org.tikv.kvproto.Metapb.Region;
 
 public class TiRegion implements Serializable {
+  private static final Logger logger = LoggerFactory.getLogger(TiRegion.class);
+
   private final Region meta;
+  private final KVMode kvMode;
   private final IsolationLevel isolationLevel;
   private final Kvrpcpb.CommandPri commandPri;
   private final Peer leader;
-  private int followerIdx = 0;
-  private final boolean isReplicaRead;
+  private final ReplicaSelector replicaSelector;
+  private final List<Peer> replicaList;
+  private final TiStore proxyStore;
+  private int replicaIdx;
 
   public TiRegion(
       Region meta,
       Peer leader,
-      IsolationLevel isolationLevel,
-      Kvrpcpb.CommandPri commandPri,
-      KVMode kvMode) {
-    this(meta, leader, isolationLevel, commandPri, kvMode, false);
-  }
-
-  private TiRegion(
-      Region meta,
-      Peer leader,
-      IsolationLevel isolationLevel,
-      Kvrpcpb.CommandPri commandPri,
-      boolean isReplicaRead) {
-    this.meta = meta;
-    this.leader = leader;
-    this.isolationLevel = isolationLevel;
-    this.commandPri = commandPri;
-    this.isReplicaRead = isReplicaRead;
-  }
-
-  public TiRegion(
-      Region meta,
-      Peer leader,
+      TiStore proxyStore,
       IsolationLevel isolationLevel,
       Kvrpcpb.CommandPri commandPri,
       KVMode kvMode,
-      boolean isReplicaRead) {
+      ReplicaSelector replicaSelector) {
     Objects.requireNonNull(meta, "meta is null");
     this.meta = decodeRegion(meta, kvMode == KVMode.RAW);
+    this.kvMode = kvMode;
+    this.isolationLevel = isolationLevel;
+    this.commandPri = commandPri;
+    this.replicaSelector = replicaSelector;
+    this.proxyStore = proxyStore;
     if (leader == null || leader.getId() == 0) {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());
@@ -86,17 +77,10 @@ public class TiRegion implements Serializable {
     } else {
       this.leader = leader;
     }
-    if (isReplicaRead && meta.getPeersCount() > 0) {
-      // try to get first follower
-      try {
-        chooseRandomFollower();
-      } catch (Exception ignore) {
-        // ignore
-      }
-    }
-    this.isolationLevel = isolationLevel;
-    this.commandPri = commandPri;
-    this.isReplicaRead = isReplicaRead;
+
+    // init replicaList
+    replicaList = replicaSelector.select(this.leader, getFollowerList(), getLearnerList());
+    replicaIdx = 0;
   }
 
   private Region decodeRegion(Region region, boolean isRawRegion) {
@@ -127,34 +111,39 @@ public class TiRegion implements Serializable {
     return leader;
   }
 
-  public Peer getCurrentFollower() {
-    return meta.getPeers(followerIdx);
-  }
-
-  private boolean isValidFollower(Peer peer) {
-    return Metapb.PeerRole.valueOf(peer.getRole().getValueDescriptor()) == Metapb.PeerRole.Voter;
-  }
-
-  private void chooseRandomFollower() {
-    int cnt = meta.getPeersCount();
-    followerIdx = new Random().nextInt(cnt);
-    for (int retry = cnt - 1; retry > 0; retry--) {
-      followerIdx = (followerIdx + 1) % cnt;
-      Peer cur = meta.getPeers(followerIdx);
-      if (isValidFollower(cur)) {
-        return;
+  public List<Peer> getFollowerList() {
+    List<Peer> peers = new ArrayList<>();
+    for (Peer peer : getMeta().getPeersList()) {
+      if (!peer.equals(this.leader)) {
+        if (peer.getRole().equals(Metapb.PeerRole.Voter)) {
+          peers.add(peer);
+        }
       }
     }
+    return peers;
   }
 
   public List<Peer> getLearnerList() {
     List<Peer> peers = new ArrayList<>();
     for (Peer peer : getMeta().getPeersList()) {
-      if (isValidFollower(peer)) {
+      if (peer.getRole().equals(Metapb.PeerRole.Learner)) {
         peers.add(peer);
       }
     }
     return peers;
+  }
+
+  public Peer getCurrentReplica() {
+    return replicaList.get(replicaIdx);
+  }
+
+  public Peer getNextReplica() {
+    replicaIdx = (replicaIdx + 1) % replicaList.size();
+    return getCurrentReplica();
+  }
+
+  private boolean isLeader(Peer peer) {
+    return getLeader().equals(peer);
   }
 
   public long getId() {
@@ -177,26 +166,30 @@ public class TiRegion implements Serializable {
     return Key.toRawKey(getEndKey());
   }
 
-  public Kvrpcpb.Context getContext() {
-    return getContext(java.util.Collections.emptySet());
+  public Kvrpcpb.Context getLeaderContext() {
+    return getContext(this.leader, java.util.Collections.emptySet(), TiStoreType.TiKV);
   }
 
-  public Kvrpcpb.Context getContext(Set<Long> resolvedLocks) {
+  public Kvrpcpb.Context getReplicaContext(TiStoreType storeType) {
+    return getContext(getCurrentReplica(), java.util.Collections.emptySet(), storeType);
+  }
+
+  public Kvrpcpb.Context getReplicaContext(Set<Long> resolvedLocks, TiStoreType storeType) {
+    return getContext(getCurrentReplica(), resolvedLocks, storeType);
+  }
+
+  private Kvrpcpb.Context getContext(
+      Peer currentPeer, Set<Long> resolvedLocks, TiStoreType storeType) {
+    boolean replicaRead = !isLeader(getCurrentReplica()) && TiStoreType.TiKV.equals(storeType);
+
     Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
-    builder.setIsolationLevel(this.isolationLevel);
-    builder.setPriority(this.commandPri);
-    if (isReplicaRead) {
-      builder
-          .setRegionId(meta.getId())
-          .setPeer(getCurrentFollower())
-          .setReplicaRead(true)
-          .setRegionEpoch(this.meta.getRegionEpoch());
-    } else {
-      builder
-          .setRegionId(meta.getId())
-          .setPeer(this.leader)
-          .setRegionEpoch(this.meta.getRegionEpoch());
-    }
+    builder
+        .setIsolationLevel(this.isolationLevel)
+        .setPriority(this.commandPri)
+        .setRegionId(meta.getId())
+        .setPeer(currentPeer)
+        .setReplicaRead(replicaRead)
+        .setRegionEpoch(this.meta.getRegionEpoch());
     builder.addAllResolvedLocks(resolvedLocks);
     return builder.build();
   }
@@ -205,6 +198,10 @@ public class TiRegion implements Serializable {
   public RegionVerID getVerID() {
     return new RegionVerID(
         meta.getId(), meta.getRegionEpoch().getConfVer(), meta.getRegionEpoch().getVersion());
+  }
+
+  public TiStore getProxyStore() {
+    return proxyStore;
   }
 
   /**
@@ -218,10 +215,28 @@ public class TiRegion implements Serializable {
     List<Peer> peers = meta.getPeersList();
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
-        return new TiRegion(this.meta, p, this.isolationLevel, this.commandPri, this.isReplicaRead);
+        return new TiRegion(
+            this.meta,
+            p,
+            this.proxyStore,
+            this.isolationLevel,
+            this.commandPri,
+            this.kvMode,
+            this.replicaSelector);
       }
     }
     return null;
+  }
+
+  public TiRegion switchProxyStore(TiStore store) {
+    return new TiRegion(
+        this.meta,
+        this.leader,
+        store,
+        this.isolationLevel,
+        this.commandPri,
+        this.kvMode,
+        this.replicaSelector);
   }
 
   public boolean isMoreThan(ByteString key) {

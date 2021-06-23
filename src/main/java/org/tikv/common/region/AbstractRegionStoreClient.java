@@ -21,6 +21,12 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.health.v1.HealthCheckRequest;
+import io.grpc.health.v1.HealthCheckResponse;
+import io.grpc.health.v1.HealthGrpc;
+import io.grpc.stub.MetadataUtils;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
@@ -35,10 +41,12 @@ public abstract class AbstractRegionStoreClient
 
   protected final RegionManager regionManager;
   protected TiRegion region;
+  protected TiStore targetStore;
 
   protected AbstractRegionStoreClient(
       TiConfiguration conf,
       TiRegion region,
+      TiStore store,
       ChannelFactory channelFactory,
       TikvGrpc.TikvBlockingStub blockingStub,
       TikvGrpc.TikvStub asyncStub,
@@ -49,6 +57,7 @@ public abstract class AbstractRegionStoreClient
     checkArgument(region.getLeader() != null, "Leader Peer is null");
     this.region = region;
     this.regionManager = regionManager;
+    this.targetStore = store;
   }
 
   public TiRegion getRegion() {
@@ -71,13 +80,13 @@ public abstract class AbstractRegionStoreClient
   /**
    * onNotLeader deals with NotLeaderError and returns whether re-splitting key range is needed
    *
-   * @param newStore the new store presented by NotLeader Error
+   * @param newRegion the new region presented by NotLeader Error
    * @return false when re-split is needed.
    */
   @Override
-  public boolean onNotLeader(Metapb.Store newStore, TiRegion newRegion) {
+  public boolean onNotLeader(TiRegion newRegion) {
     if (logger.isDebugEnabled()) {
-      logger.debug(region + ", new leader = " + newStore.getId());
+      logger.debug(region + ", new leader = " + newRegion.getLeader().getStoreId());
     }
     // When switch leader fails or the region changed its region epoch,
     // it would be necessary to re-split task's key range for new region.
@@ -85,7 +94,8 @@ public abstract class AbstractRegionStoreClient
       return false;
     }
     region = newRegion;
-    String addressStr = regionManager.getStoreById(region.getLeader().getStoreId()).getAddress();
+    targetStore = regionManager.getStoreById(region.getLeader().getStoreId());
+    String addressStr = targetStore.getStore().getAddress();
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
     blockingStub = TikvGrpc.newBlockingStub(channel);
@@ -94,20 +104,84 @@ public abstract class AbstractRegionStoreClient
   }
 
   @Override
-  public void onStoreNotMatch(Metapb.Store store) {
-    String addressStr = store.getAddress();
+  public boolean onStoreUnreachable() {
+    if (!conf.getEnableGrpcForward()) {
+      return false;
+    }
+    if (region.getProxyStore() == null) {
+      if (!targetStore.isUnreachable()) {
+        if (checkHealth(targetStore)) {
+          return true;
+        } else {
+          if (targetStore.markUnreachable()) {
+            this.regionManager.scheduleHealthCheckJob(targetStore);
+          }
+        }
+      }
+    }
+    TiRegion proxyRegion = switchProxyStore();
+    if (proxyRegion == null) {
+      return false;
+    }
+    regionManager.updateRegion(region, proxyRegion);
+    region = proxyRegion;
+    String addressStr = region.getProxyStore().getStore().getAddress();
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
-    blockingStub = TikvGrpc.newBlockingStub(channel);
-    asyncStub = TikvGrpc.newStub(channel);
-    if (region.getLeader().getStoreId() != store.getId()) {
-      logger.warn(
-          "store_not_match may occur? "
-              + region
-              + ", original store = "
-              + store.getId()
-              + " address = "
-              + addressStr);
+    Metadata header = new Metadata();
+    header.put(TiConfiguration.FORWARD_META_DATA_KEY, targetStore.getStore().getAddress());
+    blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel), header);
+    asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newStub(channel), header);
+    return true;
+  }
+
+  private boolean checkHealth(TiStore store) {
+    if (store.getStore() == null) {
+      return false;
     }
+    String addressStr = store.getStore().getAddress();
+    ManagedChannel channel =
+        channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
+    HealthGrpc.HealthBlockingStub stub =
+        HealthGrpc.newBlockingStub(channel)
+            .withDeadlineAfter(conf.getGrpcHealthCheckTimeout(), TimeUnit.MILLISECONDS);
+    HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
+    try {
+      HealthCheckResponse resp = stub.check(req);
+      if (resp.getStatus() != HealthCheckResponse.ServingStatus.SERVING) {
+        return false;
+      }
+    } catch (Exception e) {
+      return false;
+    }
+    return true;
+  }
+
+  private TiRegion switchProxyStore() {
+    boolean hasVisitedStore = false;
+    List<Metapb.Peer> peers = region.getFollowerList();
+    for (int i = 0; i < peers.size() * 2; i++) {
+      int idx = i % peers.size();
+      Metapb.Peer peer = peers.get(idx);
+      if (peer.getStoreId() != region.getLeader().getStoreId()) {
+        if (region.getProxyStore() == null) {
+          TiStore store = regionManager.getStoreById(peer.getStoreId());
+          if (checkHealth(store)) {
+            return region.switchProxyStore(store);
+          }
+        } else {
+          TiStore proxyStore = region.getProxyStore();
+          if (peer.getStoreId() == proxyStore.getStore().getId()) {
+            hasVisitedStore = true;
+          } else if (hasVisitedStore) {
+            proxyStore = regionManager.getStoreById(peer.getStoreId());
+            if (!proxyStore.isUnreachable() && checkHealth(proxyStore)) {
+              return region.switchProxyStore(proxyStore);
+            }
+          }
+        }
+      }
+    }
+    return null;
   }
 }

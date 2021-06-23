@@ -39,10 +39,7 @@ import org.tikv.common.exception.KeyException;
 import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.operation.KVErrorHandler;
-import org.tikv.common.region.AbstractRegionStoreClient;
-import org.tikv.common.region.RegionManager;
-import org.tikv.common.region.RegionStoreClient;
-import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.*;
 import org.tikv.common.region.TiRegion.RegionVerID;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
@@ -79,13 +76,14 @@ public class LockResolverClientV3 extends AbstractRegionStoreClient
   public LockResolverClientV3(
       TiConfiguration conf,
       TiRegion region,
+      TiStore store,
       TikvBlockingStub blockingStub,
       TikvStub asyncStub,
       ChannelFactory channelFactory,
       RegionManager regionManager,
       PDClient pdClient,
       RegionStoreClient.RegionStoreClientBuilder clientBuilder) {
-    super(conf, region, channelFactory, blockingStub, asyncStub, regionManager);
+    super(conf, region, store, channelFactory, blockingStub, asyncStub, regionManager);
     resolved = new HashMap<>();
     recentResolved = new LinkedList<>();
     readWriteLock = new ReentrantReadWriteLock();
@@ -151,7 +149,7 @@ public class LockResolverClientV3 extends AbstractRegionStoreClient
 
       Kvrpcpb.ResolveLockRequest.Builder builder =
           Kvrpcpb.ResolveLockRequest.newBuilder()
-              .setContext(region.getContext())
+              .setContext(region.getLeaderContext())
               .setStartVersion(lock.getTxnID());
 
       if (txnStatus.isCommitted()) {
@@ -230,7 +228,7 @@ public class LockResolverClientV3 extends AbstractRegionStoreClient
         () -> {
           TiRegion primaryKeyRegion = regionManager.getRegionByKey(primary);
           return CleanupRequest.newBuilder()
-              .setContext(primaryKeyRegion.getContext())
+              .setContext(primaryKeyRegion.getLeaderContext())
               .setKey(primary)
               .setStartVersion(txnID)
               .setCurrentTs(currentTS)

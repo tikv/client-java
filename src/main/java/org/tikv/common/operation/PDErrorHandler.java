@@ -48,7 +48,9 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleResponseError(BackOffer backOffer, RespT resp) {
     if (resp == null) {
-      return false;
+      String msg = String.format("PD Request Failed with unknown reason");
+      logger.warn(msg);
+      return handleRequestError(backOffer, new GrpcException(msg));
     }
     PDError error = getError.apply(resp);
     if (error != null) {
@@ -56,7 +58,7 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
         case PD_ERROR:
           backOffer.doBackOff(
               BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
-          client.updateLeader();
+          client.updateLeaderOrforwardFollower();
           return true;
         case REGION_PEER_NOT_ELECTED:
           logger.debug(error.getMessage());
@@ -73,7 +75,7 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
     backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoPDRPC, e);
-    client.updateLeader();
+    client.updateLeaderOrforwardFollower();
     return true;
   }
 }

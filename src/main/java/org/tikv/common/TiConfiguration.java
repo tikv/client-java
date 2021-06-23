@@ -17,6 +17,7 @@ package org.tikv.common;
 
 import static org.tikv.common.ConfigUtils.*;
 
+import io.grpc.Metadata;
 import java.io.Serializable;
 import java.net.URI;
 import java.util.*;
@@ -24,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.pd.PDUtils;
+import org.tikv.common.replica.ReplicaSelector;
 import org.tikv.kvproto.Kvrpcpb.CommandPri;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
@@ -31,6 +33,10 @@ public class TiConfiguration implements Serializable {
 
   private static final Logger logger = LoggerFactory.getLogger(TiConfiguration.class);
   private static final ConcurrentHashMap<String, String> settings = new ConcurrentHashMap<>();
+  public static final Metadata.Key FORWARD_META_DATA_KEY =
+      Metadata.Key.of("tikv-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
+  public static final Metadata.Key PD_FORWARD_META_DATA_KEY =
+      Metadata.Key.of("pd-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
 
   static {
     loadFromSystemProperties();
@@ -67,10 +73,12 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_DB_PREFIX, DEF_DB_PREFIX);
     setIfMissing(TIKV_KV_CLIENT_CONCURRENCY, DEF_KV_CLIENT_CONCURRENCY);
     setIfMissing(TIKV_KV_MODE, TXN_KV_MODE);
-    setIfMissing(TIKV_IS_REPLICA_READ, DEF_IS_REPLICA_READ);
+    setIfMissing(TIKV_REPLICA_READ, DEF_REPLICA_READ);
     setIfMissing(TIKV_METRICS_ENABLE, DEF_METRICS_ENABLE);
     setIfMissing(TIKV_METRICS_PORT, DEF_METRICS_PORT);
     setIfMissing(TIKV_NETWORK_MAPPING_NAME, DEF_TIKV_NETWORK_MAPPING_NAME);
+    setIfMissing(TIKV_ENABLE_GRPC_FORWARD, DEF_GRPC_FORWARD_ENABLE);
+    setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
   }
 
   public static void listAll() {
@@ -216,6 +224,17 @@ public class TiConfiguration implements Serializable {
     }
   }
 
+  private static ReplicaRead getReplicaRead(String key) {
+    String value = get(key).toUpperCase(Locale.ROOT);
+    if (FOLLOWER.equals(value)) {
+      return ReplicaRead.FOLLOWER;
+    } else if (LEADER_AND_FOLLOWER.equals(value)) {
+      return ReplicaRead.LEADER_AND_FOLLOWER;
+    } else {
+      return ReplicaRead.LEADER;
+    }
+  }
+
   private long timeout = getTimeAsMs(TIKV_GRPC_TIMEOUT);
   private long scanTimeout = getTimeAsMs(TIKV_GRPC_SCAN_TIMEOUT);
   private int maxFrameSize = getInt(TIKV_GRPC_MAX_FRAME_SIZE);
@@ -233,18 +252,28 @@ public class TiConfiguration implements Serializable {
   private boolean showRowId = getBoolean(TIKV_SHOW_ROWID);
   private String dbPrefix = get(TIKV_DB_PREFIX);
   private KVMode kvMode = getKvMode(TIKV_KV_MODE);
+  private boolean enableGrpcForward = getBoolean(TIKV_ENABLE_GRPC_FORWARD);
 
   private int kvClientConcurrency = getInt(TIKV_KV_CLIENT_CONCURRENCY);
-  private boolean isReplicaRead = getBoolean(TIKV_IS_REPLICA_READ);
+  private ReplicaRead replicaRead = getReplicaRead(TIKV_REPLICA_READ);
+  private ReplicaSelector internalReplicaSelector = getReplicaSelector(replicaRead);
+  private ReplicaSelector replicaSelector;
 
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
+  private int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
 
   public enum KVMode {
     TXN,
     RAW
+  }
+
+  public enum ReplicaRead {
+    LEADER,
+    FOLLOWER,
+    LEADER_AND_FOLLOWER
   }
 
   public static TiConfiguration createDefault() {
@@ -457,13 +486,38 @@ public class TiConfiguration implements Serializable {
     return this;
   }
 
-  public boolean isReplicaRead() {
-    return isReplicaRead;
+  public ReplicaRead getReplicaRead() {
+    return replicaRead;
   }
 
-  public TiConfiguration setReplicaRead(boolean isReplicaRead) {
-    this.isReplicaRead = isReplicaRead;
+  public TiConfiguration setReplicaRead(ReplicaRead replicaRead) {
+    this.replicaRead = replicaRead;
+    this.internalReplicaSelector = getReplicaSelector(this.replicaRead);
     return this;
+  }
+
+  private ReplicaSelector getReplicaSelector(ReplicaRead replicaRead) {
+    if (TiConfiguration.ReplicaRead.LEADER.equals(replicaRead)) {
+      return ReplicaSelector.LEADER;
+    } else if (TiConfiguration.ReplicaRead.FOLLOWER.equals(replicaRead)) {
+      return ReplicaSelector.FOLLOWER;
+    } else if (TiConfiguration.ReplicaRead.LEADER_AND_FOLLOWER.equals(replicaRead)) {
+      return ReplicaSelector.LEADER_AND_FOLLOWER;
+    } else {
+      return null;
+    }
+  }
+
+  public ReplicaSelector getReplicaSelector() {
+    if (replicaSelector != null) {
+      return replicaSelector;
+    } else {
+      return internalReplicaSelector;
+    }
+  }
+
+  public void setReplicaSelector(ReplicaSelector replicaSelector) {
+    this.replicaSelector = replicaSelector;
   }
 
   public boolean isMetricsEnable() {
@@ -486,5 +540,13 @@ public class TiConfiguration implements Serializable {
 
   public String getNetworkMappingName() {
     return this.networkMappingName;
+  }
+
+  public boolean getEnableGrpcForward() {
+    return this.enableGrpcForward;
+  }
+
+  public long getGrpcHealthCheckTimeout() {
+    return this.grpcHealthCheckTimeout;
   }
 }

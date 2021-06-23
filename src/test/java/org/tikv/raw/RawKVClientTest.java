@@ -94,6 +94,7 @@ public class RawKVClientTest {
     }
   }
 
+  // tikv-4.0 does not support atomic api
   @Ignore
   public void atomicAPITest() {
     if (!initialized) return;
@@ -115,6 +116,7 @@ public class RawKVClientTest {
     assertTrue(res3.isEmpty());
   }
 
+  // tikv-4.0 doest not support ttl
   @Ignore
   public void getKeyTTLTest() {
     if (!initialized) return;

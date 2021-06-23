@@ -26,6 +26,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.pingcap.tidb.tipb.DAGRequest;
 import com.pingcap.tidb.tipb.SelectResponse;
 import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
 import java.util.*;
 import java.util.function.Supplier;
@@ -43,7 +45,6 @@ import org.tikv.common.util.*;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Kvrpcpb.*;
-import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvStub;
@@ -87,7 +88,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   private RegionStoreClient(
       TiConfiguration conf,
       TiRegion region,
-      String storeVersion,
+      TiStore store,
       TiStoreType storeType,
       ChannelFactory channelFactory,
       TikvBlockingStub blockingStub,
@@ -95,15 +96,15 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       RegionManager regionManager,
       PDClient pdClient,
       RegionStoreClient.RegionStoreClientBuilder clientBuilder) {
-    super(conf, region, channelFactory, blockingStub, asyncStub, regionManager);
+    super(conf, region, store, channelFactory, blockingStub, asyncStub, regionManager);
     this.storeType = storeType;
 
     if (this.storeType == TiStoreType.TiKV) {
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
-              storeVersion,
               conf,
               region,
+              store,
               this.blockingStub,
               this.asyncStub,
               channelFactory,
@@ -112,10 +113,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               clientBuilder);
 
     } else {
-      Store tikvStore =
+      TiStore tikvStore =
           regionManager.getRegionStorePairByKey(region.getStartKey(), TiStoreType.TiKV).second;
 
-      String addressStr = tikvStore.getAddress();
+      String addressStr = tikvStore.getStore().getAddress();
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("Create region store client on address %s", addressStr));
       }
@@ -126,9 +127,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
-              tikvStore.getVersion(),
               conf,
               region,
+              tikvStore,
               tikvBlockingStub,
               tikvAsyncStub,
               channelFactory,
@@ -169,7 +170,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Supplier<GetRequest> factory =
         () ->
             GetRequest.newBuilder()
-                .setContext(region.getContext(getResolvedLocks(version)))
+                .setContext(region.getReplicaContext(getResolvedLocks(version), this.storeType))
                 .setKey(key)
                 .setVersion(version)
                 .build();
@@ -214,7 +215,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Supplier<BatchGetRequest> request =
         () ->
             BatchGetRequest.newBuilder()
-                .setContext(region.getContext(getResolvedLocks(version)))
+                .setContext(region.getReplicaContext(getResolvedLocks(version), this.storeType))
                 .addAllKeys(keys)
                 .setVersion(version)
                 .build();
@@ -277,7 +278,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Supplier<ScanRequest> request =
           () ->
               ScanRequest.newBuilder()
-                  .setContext(region.getContext(getResolvedLocks(version)))
+                  .setContext(region.getReplicaContext(getResolvedLocks(version), this.storeType))
                   .setStartKey(startKey)
                   .setVersion(version)
                   .setKeyOnly(keyOnly)
@@ -379,7 +380,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               getIsV4()
                   ? PrewriteRequest.newBuilder()
-                      .setContext(region.getContext())
+                      .setContext(region.getReplicaContext(storeType))
                       .setStartVersion(startTs)
                       .setPrimaryLock(primaryLock)
                       .addAllMutations(mutations)
@@ -389,7 +390,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                       .setTxnSize(16)
                       .build()
                   : PrewriteRequest.newBuilder()
-                      .setContext(region.getContext())
+                      .setContext(region.getReplicaContext(storeType))
                       .setStartVersion(startTs)
                       .setPrimaryLock(primaryLock)
                       .addAllMutations(mutations)
@@ -469,7 +470,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Supplier<TxnHeartBeatRequest> factory =
           () ->
               TxnHeartBeatRequest.newBuilder()
-                  .setContext(region.getContext())
+                  .setContext(region.getReplicaContext(storeType))
                   .setStartVersion(startTs)
                   .setPrimaryLock(primaryLock)
                   .setAdviseLockTtl(ttl)
@@ -527,7 +528,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                 .setStartVersion(startTs)
                 .setCommitVersion(commitTs)
                 .addAllKeys(keys)
-                .setContext(region.getContext())
+                .setContext(region.getReplicaContext(storeType))
                 .build();
     KVErrorHandler<CommitResponse> handler =
         new KVErrorHandler<>(
@@ -588,7 +589,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Supplier<Coprocessor.Request> reqToSend =
         () ->
             Coprocessor.Request.newBuilder()
-                .setContext(region.getContext(getResolvedLocks(startTs)))
+                .setContext(region.getReplicaContext(getResolvedLocks(startTs), this.storeType))
                 .setTp(REQ_TYPE_DAG.getValue())
                 .setStartTs(startTs)
                 .setData(req.toByteString())
@@ -711,7 +712,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Supplier<Coprocessor.Request> reqToSend =
         () ->
             Coprocessor.Request.newBuilder()
-                .setContext(region.getContext(getResolvedLocks(startTs)))
+                .setContext(region.getReplicaContext(getResolvedLocks(startTs), this.storeType))
                 // TODO: If no executors...?
                 .setTp(REQ_TYPE_DAG.getValue())
                 .setData(req.toByteString())
@@ -749,7 +750,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Supplier<SplitRegionRequest> request =
         () ->
             SplitRegionRequest.newBuilder()
-                .setContext(region.getContext())
+                .setContext(region.getReplicaContext(storeType))
                 .addAllSplitKeys(splitKeys)
                 .build();
 
@@ -787,10 +788,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                 new TiRegion(
                     region,
                     null,
+                    null,
                     conf.getIsolationLevel(),
                     conf.getCommandPriority(),
                     conf.getKvMode(),
-                    conf.isReplicaRead()))
+                    conf.getReplicaSelector()))
         .collect(Collectors.toList());
   }
 
@@ -801,7 +803,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get").startTimer();
     try {
       Supplier<RawGetRequest> factory =
-          () -> RawGetRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
+          () ->
+              RawGetRequest.newBuilder()
+                  .setContext(region.getReplicaContext(storeType))
+                  .setKey(key)
+                  .build();
       KVErrorHandler<RawGetResponse> handler =
           new KVErrorHandler<>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
@@ -833,7 +839,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     try {
       Supplier<RawGetKeyTTLRequest> factory =
           () ->
-              RawGetKeyTTLRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
+              RawGetKeyTTLRequest.newBuilder()
+                  .setContext(region.getReplicaContext(storeType))
+                  .setKey(key)
+                  .build();
       KVErrorHandler<RawGetKeyTTLResponse> handler =
           new KVErrorHandler<>(
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
@@ -868,7 +877,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete").startTimer();
     try {
       Supplier<RawDeleteRequest> factory =
-          () -> RawDeleteRequest.newBuilder().setContext(region.getContext()).setKey(key).build();
+          () ->
+              RawDeleteRequest.newBuilder()
+                  .setContext(region.getReplicaContext(storeType))
+                  .setKey(key)
+                  .build();
 
       KVErrorHandler<RawDeleteResponse> handler =
           new KVErrorHandler<>(
@@ -902,7 +915,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Supplier<RawPutRequest> factory =
           () ->
               RawPutRequest.newBuilder()
-                  .setContext(region.getContext())
+                  .setContext(region.getReplicaContext(storeType))
                   .setKey(key)
                   .setValue(value)
                   .setTtl(ttl)
@@ -940,7 +953,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Supplier<RawCASRequest> factory =
           () ->
               RawCASRequest.newBuilder()
-                  .setContext(region.getContext())
+                  .setContext(region.getReplicaContext(storeType))
                   .setKey(key)
                   .setValue(value)
                   .setPreviousNotExist(true)
@@ -986,7 +999,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Supplier<RawBatchGetRequest> factory =
           () ->
               RawBatchGetRequest.newBuilder()
-                  .setContext(region.getContext())
+                  .setContext(region.getReplicaContext(storeType))
                   .addAllKeys(keys)
                   .build();
       KVErrorHandler<RawBatchGetResponse> handler =
@@ -1021,7 +1034,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Supplier<RawBatchPutRequest> factory =
           () ->
               RawBatchPutRequest.newBuilder()
-                  .setContext(region.getContext())
+                  .setContext(region.getReplicaContext(storeType))
                   .addAllPairs(kvPairs)
                   .setTtl(ttl)
                   .setForCas(atomic)
@@ -1073,7 +1086,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Supplier<RawBatchDeleteRequest> factory =
           () ->
               RawBatchDeleteRequest.newBuilder()
-                  .setContext(region.getContext())
+                  .setContext(region.getReplicaContext(storeType))
                   .addAllKeys(keys)
                   .setForCas(atomic)
                   .build();
@@ -1118,7 +1131,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Supplier<RawScanRequest> factory =
           () ->
               RawScanRequest.newBuilder()
-                  .setContext(region.getContext())
+                  .setContext(region.getReplicaContext(storeType))
                   .setStartKey(key)
                   .setKeyOnly(keyOnly)
                   .setLimit(limit)
@@ -1164,7 +1177,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Supplier<RawDeleteRangeRequest> factory =
           () ->
               RawDeleteRangeRequest.newBuilder()
-                  .setContext(region.getContext())
+                  .setContext(region.getReplicaContext(storeType))
                   .setStartKey(startKey)
                   .setEndKey(endKey)
                   .build();
@@ -1232,25 +1245,48 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       this.pdClient = pdClient;
     }
 
-    public RegionStoreClient build(TiRegion region, Store store, TiStoreType storeType)
+    public RegionStoreClient build(TiRegion region, TiStore store, TiStoreType storeType)
         throws GrpcException {
       Objects.requireNonNull(region, "region is null");
       Objects.requireNonNull(store, "store is null");
       Objects.requireNonNull(storeType, "storeType is null");
 
-      String addressStr = store.getAddress();
+      String addressStr = store.getStore().getAddress();
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("Create region store client on address %s", addressStr));
       }
-      ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
+      ManagedChannel channel = null;
 
-      TikvBlockingStub blockingStub = TikvGrpc.newBlockingStub(channel);
-      TikvStub asyncStub = TikvGrpc.newStub(channel);
+      TikvBlockingStub blockingStub = null;
+      TikvStub asyncStub = null;
+
+      if (conf.getEnableGrpcForward() && region.getProxyStore() != null && store.isUnreachable()) {
+        addressStr = region.getProxyStore().getStore().getAddress();
+        channel =
+            channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
+        Metadata header = new Metadata();
+        header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
+        blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel), header);
+        asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newStub(channel), header);
+      } else {
+        // If the store is reachable, which is update by check-health thread
+        if (!store.isUnreachable()) {
+          if (region.getProxyStore() != null) {
+            TiRegion newRegion = region.switchProxyStore(null);
+            if (regionManager.updateRegion(region, newRegion)) {
+              region = newRegion;
+            }
+          }
+        }
+        channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
+        blockingStub = TikvGrpc.newBlockingStub(channel);
+        asyncStub = TikvGrpc.newStub(channel);
+      }
 
       return new RegionStoreClient(
           conf,
           region,
-          store.getVersion(),
+          store,
           storeType,
           channelFactory,
           blockingStub,
@@ -1260,7 +1296,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           this);
     }
 
-    public synchronized RegionStoreClient build(TiRegion region, Store store) throws GrpcException {
+    public synchronized RegionStoreClient build(TiRegion region, TiStore store)
+        throws GrpcException {
       return build(region, store, TiStoreType.TiKV);
     }
 
@@ -1270,12 +1307,12 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     public synchronized RegionStoreClient build(ByteString key, TiStoreType storeType)
         throws GrpcException {
-      Pair<TiRegion, Store> pair = regionManager.getRegionStorePairByKey(key, storeType);
+      Pair<TiRegion, TiStore> pair = regionManager.getRegionStorePairByKey(key, storeType);
       return build(pair.first, pair.second, storeType);
     }
 
     public synchronized RegionStoreClient build(TiRegion region) throws GrpcException {
-      Store store = regionManager.getStoreById(region.getLeader().getStoreId());
+      TiStore store = regionManager.getStoreById(region.getLeader().getStoreId());
       return build(region, store, TiStoreType.TiKV);
     }
 

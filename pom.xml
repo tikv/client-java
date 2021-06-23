@@ -128,6 +128,11 @@
         </dependency>
         <dependency>
             <groupId>io.grpc</groupId>
+            <artifactId>grpc-services</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
             <artifactId>grpc-testing</artifactId>
             <version>${grpc.version}</version>
             <scope>test</scope>

@@ -19,16 +19,15 @@ import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.List;
 import org.tikv.common.region.TiRegion;
-import org.tikv.kvproto.Metapb;
+import org.tikv.common.region.TiStore;
 
 public class BatchKeys {
   private final TiRegion region;
-  private final Metapb.Store store;
+  private final TiStore store;
   private List<ByteString> keys;
   private final int sizeInBytes;
 
-  public BatchKeys(
-      TiRegion region, Metapb.Store store, List<ByteString> keysInput, int sizeInBytes) {
+  public BatchKeys(TiRegion region, TiStore store, List<ByteString> keysInput, int sizeInBytes) {
     this.region = region;
     this.store = store;
     this.keys = new ArrayList<>();
@@ -48,7 +47,7 @@ public class BatchKeys {
     return region;
   }
 
-  public Metapb.Store getStore() {
+  public TiStore getStore() {
     return store;
   }
 

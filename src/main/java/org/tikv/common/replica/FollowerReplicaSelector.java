@@ -1,6 +1,5 @@
 /*
- *
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 PingCAP, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,16 +11,21 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
-package org.tikv.common.region;
+package org.tikv.common.replica;
 
-public interface RegionErrorReceiver {
-  boolean onNotLeader(TiRegion region);
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import org.tikv.kvproto.Metapb;
 
-  /// return whether we need to retry this request.
-  boolean onStoreUnreachable();
-
-  TiRegion getRegion();
+public class FollowerReplicaSelector implements ReplicaSelector {
+  @Override
+  public List<Metapb.Peer> select(
+      Metapb.Peer leader, List<Metapb.Peer> followers, List<Metapb.Peer> learners) {
+    List<Metapb.Peer> list = new ArrayList<>(followers);
+    Collections.shuffle(list);
+    return list;
+  }
 }

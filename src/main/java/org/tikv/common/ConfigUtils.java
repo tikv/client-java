@@ -42,16 +42,19 @@ public class ConfigUtils {
   public static final String TIKV_KV_CLIENT_CONCURRENCY = "tikv.kv_client_concurrency";
 
   public static final String TIKV_KV_MODE = "tikv.kv_mode";
-  public static final String TIKV_IS_REPLICA_READ = "tikv.is_replica_read";
+  public static final String TIKV_REPLICA_READ = "tikv.replica_read";
 
   public static final String TIKV_METRICS_ENABLE = "tikv.metrics.enable";
   public static final String TIKV_METRICS_PORT = "tikv.metrics.port";
 
   public static final String TIKV_NETWORK_MAPPING_NAME = "tikv.network.mapping";
+  public static final String TIKV_ENABLE_GRPC_FORWARD = "tikv.enable_grpc_forward";
+  public static final String TIKV_GRPC_HEALTH_CHECK_TIMEOUT = "tikv.grpc.health_check_timeout";
 
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "600ms";
   public static final String DEF_SCAN_TIMEOUT = "20s";
+  public static final int DEF_CHECK_HEALTH_TIMEOUT = 40;
   public static final int DEF_SCAN_BATCH_SIZE = 10240;
   public static final int DEF_MAX_FRAME_SIZE = 268435456 * 2; // 256 * 2 MB
   public static final int DEF_INDEX_SCAN_BATCH_SIZE = 20000;
@@ -72,10 +75,11 @@ public class ConfigUtils {
   public static final String DEF_DB_PREFIX = "";
   public static final int DEF_KV_CLIENT_CONCURRENCY = 10;
   public static final TiConfiguration.KVMode DEF_KV_MODE = TiConfiguration.KVMode.TXN;
-  public static final boolean DEF_IS_REPLICA_READ = false;
+  public static final String DEF_REPLICA_READ = "LEADER";
   public static final boolean DEF_METRICS_ENABLE = false;
   public static final int DEF_METRICS_PORT = 3140;
   public static final String DEF_TIKV_NETWORK_MAPPING_NAME = "";
+  public static final boolean DEF_GRPC_FORWARD_ENABLE = true;
 
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";
@@ -86,4 +90,8 @@ public class ConfigUtils {
 
   public static final String RAW_KV_MODE = "RAW";
   public static final String TXN_KV_MODE = "TXN";
+
+  public static final String LEADER = "LEADER";
+  public static final String FOLLOWER = "FOLLOWER";
+  public static final String LEADER_AND_FOLLOWER = "LEADER_AND_FOLLOWER";
 }

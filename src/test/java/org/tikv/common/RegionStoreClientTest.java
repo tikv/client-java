@@ -24,6 +24,7 @@ import org.junit.Test;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
@@ -40,13 +41,14 @@ public class RegionStoreClientTest extends MockServerTest {
   }
 
   private RegionStoreClient createClient(String version) {
-    Metapb.Store store =
+    Metapb.Store meta =
         Metapb.Store.newBuilder()
             .setAddress(LOCAL_ADDR + ":" + port)
             .setId(1)
             .setState(Metapb.StoreState.Up)
             .setVersion(version)
             .build();
+    TiStore store = new TiStore(meta);
 
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(
