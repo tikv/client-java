@@ -46,14 +46,16 @@ public class PDClientTest extends PDMockServerTest {
     try (PDClient client = session.getPDClient()) {
       client.trySwitchLeader("http://" + LOCAL_ADDR + ":" + (pdServer.port + 1));
       assertEquals(
-          client.getPdClientWrapper().getLeaderInfo(), "http://" + LOCAL_ADDR + ":" + (pdServer.port + 1));
+          client.getPdClientWrapper().getLeaderInfo(),
+          "http://" + LOCAL_ADDR + ":" + (pdServer.port + 1));
     }
     tearDown();
     setUp(LOCAL_ADDR_IPV6);
     try (PDClient client = session.getPDClient()) {
       client.trySwitchLeader("http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
       assertEquals(
-          client.getPdClientWrapper().getLeaderInfo(), "http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
+          client.getPdClientWrapper().getLeaderInfo(),
+          "http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
     }
   }
 
