@@ -108,12 +108,7 @@ public abstract class AbstractRegionStoreClient
     if (!conf.getEnableGrpcForward()) {
       return false;
     }
-    if (region.getProxyStore() != null) {
-      TiStore store = region.getProxyStore();
-      if (!checkHealth(store) && store.markUnreachable()) {
-        this.regionManager.scheduleHealthCheckJob(store);
-      }
-    } else {
+    if (region.getProxyStore() == null) {
       if (!targetStore.isUnreachable()) {
         if (checkHealth(targetStore)) {
           return true;

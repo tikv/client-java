@@ -700,7 +700,7 @@ public class RawKVClient implements AutoCloseable {
     } catch (final TiKVException e) {
       // TODO: any elegant way to re-split the ranges if fails?
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-      logger.warn("ReSplitting ranges for BatchPutRequest");
+      logger.debug("ReSplitting ranges for BatchPutRequest");
       // retry
       return doSendBatchPutWithRefetchRegion(backOffer, batch);
     }
@@ -758,7 +758,7 @@ public class RawKVClient implements AutoCloseable {
     } catch (final TiKVException e) {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       clientBuilder.getRegionManager().invalidateRegion(batch.getRegion());
-      logger.warn("ReSplitting ranges for BatchGetRequest", e);
+      logger.debug("ReSplitting ranges for BatchGetRequest", e);
 
       // retry
       return Pair.create(doSendBatchGetWithRefetchRegion(backOffer, batch), new ArrayList<>());
@@ -799,7 +799,7 @@ public class RawKVClient implements AutoCloseable {
     } catch (final TiKVException e) {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       clientBuilder.getRegionManager().invalidateRegion(batch.getRegion());
-      logger.warn("ReSplitting ranges for BatchGetRequest", e);
+      logger.debug("ReSplitting ranges for BatchGetRequest", e);
 
       // retry
       return doSendBatchDeleteWithRefetchRegion(backOffer, batch);
@@ -849,7 +849,7 @@ public class RawKVClient implements AutoCloseable {
     } catch (final TiKVException e) {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       clientBuilder.getRegionManager().invalidateRegion(range.getRegion());
-      logger.warn("ReSplitting ranges for BatchDeleteRangeRequest", e);
+      logger.debug("ReSplitting ranges for BatchDeleteRangeRequest", e);
 
       // retry
       return doSendDeleteRangeWithRefetchRegion(backOffer, range);
