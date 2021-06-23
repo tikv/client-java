@@ -264,6 +264,7 @@ public class TiConfiguration implements Serializable {
   private int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
+  private HostMapping hostMapping = null;
 
   public enum KVMode {
     TXN,
@@ -540,6 +541,14 @@ public class TiConfiguration implements Serializable {
 
   public String getNetworkMappingName() {
     return this.networkMappingName;
+  }
+
+  public HostMapping getHostMapping() {
+    return hostMapping;
+  }
+
+  public void setHostMapping(HostMapping mapping) {
+    this.hostMapping = mapping;
   }
 
   public boolean getEnableGrpcForward() {

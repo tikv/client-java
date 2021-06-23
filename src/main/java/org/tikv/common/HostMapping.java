@@ -15,73 +15,9 @@
 
 package org.tikv.common;
 
-import static org.tikv.common.pd.PDUtils.addrToUri;
-
-import com.google.common.annotations.Beta;
-import io.etcd.jetcd.ByteSequence;
-import io.etcd.jetcd.Client;
-import io.etcd.jetcd.KeyValue;
-import io.etcd.jetcd.kv.GetResponse;
+import java.io.Serializable;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class HostMapping {
-  private static final String NETWORK_MAPPING_PATH = "/client/url-mapping";
-  private final Client etcdClient;
-  private final String networkMappingName;
-  private final ConcurrentMap<String, String> hostMapping;
-  private final Logger logger = LoggerFactory.getLogger(HostMapping.class);
-
-  public HostMapping(Client etcdClient, String networkMappingName) {
-    this.etcdClient = etcdClient;
-    this.networkMappingName = networkMappingName;
-    this.hostMapping = new ConcurrentHashMap<>();
-  }
-
-  private ByteSequence hostToNetworkMappingKey(String host) {
-    String path = NETWORK_MAPPING_PATH + "/" + networkMappingName + "/" + host;
-    return ByteSequence.from(path, StandardCharsets.UTF_8);
-  }
-
-  @Beta
-  private String getMappedHostFromPD(String host) {
-    ByteSequence hostKey = hostToNetworkMappingKey(host);
-    for (int i = 0; i < 5; i++) {
-      CompletableFuture<GetResponse> future = etcdClient.getKVClient().get(hostKey);
-      try {
-        GetResponse resp = future.get();
-        List<KeyValue> kvs = resp.getKvs();
-        if (kvs.size() != 1) {
-          break;
-        }
-        return kvs.get(0).getValue().toString(StandardCharsets.UTF_8);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      } catch (ExecutionException e) {
-        logger.info("failed to get mapped Host from PD: " + host, e);
-        break;
-      } catch (Exception ignore) {
-        // ignore
-        break;
-      }
-    }
-    return host;
-  }
-
-  public URI getMappedURI(URI uri) {
-    if (networkMappingName.isEmpty()) {
-      return uri;
-    }
-    return addrToUri(
-        hostMapping.computeIfAbsent(uri.getHost(), this::getMappedHostFromPD)
-            + ":"
-            + uri.getPort());
-  }
+public interface HostMapping extends Serializable {
+  URI getMappedURI(URI uri);
 }

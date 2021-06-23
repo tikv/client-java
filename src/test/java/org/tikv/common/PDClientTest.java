@@ -23,9 +23,9 @@ import java.util.concurrent.*;
 import org.junit.Test;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.meta.TiTimestamp;
-import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
@@ -46,16 +46,26 @@ public class PDClientTest extends PDMockServerTest {
     try (PDClient client = session.getPDClient()) {
       client.trySwitchLeader("http://" + LOCAL_ADDR + ":" + (pdServer.port + 1));
       assertEquals(
+<<<<<<< HEAD
           "http://" + LOCAL_ADDR + ":" + (pdServer.port + 1),
           client.getPdClientWrapper().getLeaderInfo());
+=======
+          client.getPdClientWrapper().getLeaderInfo(),
+          "http://" + LOCAL_ADDR + ":" + (pdServer.port + 1));
+>>>>>>> fe6617e... Support select replica with rich meta data (#171)
     }
     tearDown();
     setUp(LOCAL_ADDR_IPV6);
     try (PDClient client = session.getPDClient()) {
       client.trySwitchLeader("http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
       assertEquals(
+<<<<<<< HEAD
           "http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2),
           client.getPdClientWrapper().getLeaderInfo());
+=======
+          client.getPdClientWrapper().getLeaderInfo(),
+          "http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
+>>>>>>> fe6617e... Support select replica with rich meta data (#171)
     }
   }
 
@@ -85,13 +95,16 @@ public class PDClientTest extends PDMockServerTest {
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
     try (PDClient client = session.getPDClient()) {
-      TiRegion r = client.getRegionByKey(defaultBackOff(), ByteString.EMPTY);
+      Pair<Metapb.Region, Metapb.Peer> rl =
+          client.getRegionByKey(defaultBackOff(), ByteString.EMPTY);
+      Metapb.Region r = rl.first;
+      Metapb.Peer l = rl.second;
       assertEquals(r.getStartKey(), ByteString.copyFrom(startKey));
       assertEquals(r.getEndKey(), ByteString.copyFrom(endKey));
       assertEquals(r.getRegionEpoch().getConfVer(), confVer);
       assertEquals(r.getRegionEpoch().getVersion(), ver);
-      assertEquals(r.getLeader().getId(), 1);
-      assertEquals(r.getLeader().getStoreId(), 10);
+      assertEquals(l.getId(), 1);
+      assertEquals(l.getStoreId(), 10);
     }
   }
 
@@ -113,13 +126,15 @@ public class PDClientTest extends PDMockServerTest {
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
     try (PDClient client = session.getPDClient()) {
-      TiRegion r = client.getRegionByID(defaultBackOff(), 0);
+      Pair<Metapb.Region, Metapb.Peer> rl = client.getRegionByID(defaultBackOff(), 0);
+      Metapb.Region r = rl.first;
+      Metapb.Peer l = rl.second;
       assertEquals(r.getStartKey(), ByteString.copyFrom(startKey));
       assertEquals(r.getEndKey(), ByteString.copyFrom(endKey));
       assertEquals(r.getRegionEpoch().getConfVer(), confVer);
       assertEquals(r.getRegionEpoch().getVersion(), ver);
-      assertEquals(r.getLeader().getId(), 1);
-      assertEquals(r.getLeader().getStoreId(), 10);
+      assertEquals(l.getId(), 1);
+      assertEquals(l.getStoreId(), 10);
     }
   }
 
