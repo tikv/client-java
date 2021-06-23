@@ -79,6 +79,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_NETWORK_MAPPING_NAME, DEF_TIKV_NETWORK_MAPPING_NAME);
     setIfMissing(TIKV_ENABLE_GRPC_FORWARD, DEF_GRPC_FORWARD_ENABLE);
     setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
+    setIfMissing(TIKV_ENABLE_ATOMIC_FOR_CAS, DEF_TIKV_ENABLE_ATOMIC_FOR_CAS);
   }
 
   public static void listAll() {
@@ -265,6 +266,8 @@ public class TiConfiguration implements Serializable {
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
   private HostMapping hostMapping = null;
+
+  private boolean enableAtomicForCAS = getBoolean(TIKV_ENABLE_ATOMIC_FOR_CAS);
 
   public enum KVMode {
     TXN,
@@ -557,5 +560,13 @@ public class TiConfiguration implements Serializable {
 
   public long getGrpcHealthCheckTimeout() {
     return this.grpcHealthCheckTimeout;
+  }
+
+  public boolean isEnableAtomicForCAS() {
+    return enableAtomicForCAS;
+  }
+
+  public void setEnableAtomicForCAS(boolean enableAtomicForCAS) {
+    this.enableAtomicForCAS = enableAtomicForCAS;
   }
 }
