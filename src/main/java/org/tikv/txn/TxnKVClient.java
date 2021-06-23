@@ -33,11 +33,11 @@ import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
-import org.tikv.kvproto.Metapb;
 import org.tikv.txn.type.ClientRPCResult;
 
 /** KV client of transaction APIs for GET/PUT/DELETE/SCAN */
@@ -94,7 +94,7 @@ public class TxnKVClient implements AutoCloseable {
       long lockTTL,
       long startTs,
       TiRegion tiRegion,
-      Metapb.Store store) {
+      TiStore store) {
     ClientRPCResult result = new ClientRPCResult(true, false, null);
     // send request
     RegionStoreClient client = clientBuilder.build(tiRegion, store);
@@ -116,7 +116,7 @@ public class TxnKVClient implements AutoCloseable {
       long startTs,
       long ttl,
       TiRegion tiRegion,
-      Metapb.Store store) {
+      TiStore store) {
     ClientRPCResult result = new ClientRPCResult(true, false, null);
     // send request
     RegionStoreClient client = clientBuilder.build(tiRegion, store);
@@ -148,7 +148,7 @@ public class TxnKVClient implements AutoCloseable {
       long startTs,
       long commitTs,
       TiRegion tiRegion,
-      Metapb.Store store) {
+      TiStore store) {
     ClientRPCResult result = new ClientRPCResult(true, false, null);
     // send request
     RegionStoreClient client = clientBuilder.build(tiRegion, store);

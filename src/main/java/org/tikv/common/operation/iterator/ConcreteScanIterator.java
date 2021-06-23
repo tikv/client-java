@@ -27,11 +27,11 @@ import org.tikv.common.key.Key;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
-import org.tikv.kvproto.Metapb;
 
 public class ConcreteScanIterator extends ScanIterator {
   private final long version;
@@ -82,10 +82,10 @@ public class ConcreteScanIterator extends ScanIterator {
 
   private ByteString resolveCurrentLock(Kvrpcpb.KvPair current) {
     logger.warn(String.format("resolve current key error %s", current.getError().toString()));
-    Pair<TiRegion, Metapb.Store> pair =
+    Pair<TiRegion, TiStore> pair =
         builder.getRegionManager().getRegionStorePairByKey(current.getKey());
     TiRegion region = pair.first;
-    Metapb.Store store = pair.second;
+    TiStore store = pair.second;
     BackOffer backOffer = ConcreteBackOffer.newGetBackOff();
     try (RegionStoreClient client = builder.build(region, store)) {
       return client.get(backOffer, current.getKey(), version);

@@ -30,11 +30,11 @@ import org.tikv.common.exception.TiBatchWriteException;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
-import org.tikv.kvproto.Metapb;
 import org.tikv.txn.type.ClientRPCResult;
 
 /**
@@ -105,9 +105,9 @@ public class TTLManager {
   }
 
   private void sendTxnHeartBeat(BackOffer bo, long ttl) {
-    Pair<TiRegion, Metapb.Store> pair = regionManager.getRegionStorePairByKey(primaryLock);
+    Pair<TiRegion, TiStore> pair = regionManager.getRegionStorePairByKey(primaryLock);
     TiRegion tiRegion = pair.first;
-    Metapb.Store store = pair.second;
+    TiStore store = pair.second;
 
     ClientRPCResult result = kvClient.txnHeartBeat(bo, primaryLock, startTS, ttl, tiRegion, store);
 
@@ -121,7 +121,7 @@ public class TTLManager {
             new GrpcException(
                 String.format("sendTxnHeartBeat failed, regionId=%s", tiRegion.getId()),
                 result.getException()));
-        this.regionManager.invalidateStore(store.getId());
+        this.regionManager.invalidateStore(store.getStore().getId());
         this.regionManager.invalidateRegion(tiRegion);
         // re-split keys and commit again.
         sendTxnHeartBeat(bo, ttl);

@@ -17,6 +17,7 @@ package org.tikv.common;
 
 import static org.tikv.common.ConfigUtils.*;
 
+import io.grpc.Metadata;
 import java.io.Serializable;
 import java.net.URI;
 import java.util.*;
@@ -32,6 +33,8 @@ public class TiConfiguration implements Serializable {
 
   private static final Logger logger = LoggerFactory.getLogger(TiConfiguration.class);
   private static final ConcurrentHashMap<String, String> settings = new ConcurrentHashMap<>();
+  public static final Metadata.Key FORWARD_META_DATA_KEY =
+      Metadata.Key.of("tikv-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
 
   static {
     loadFromSystemProperties();
@@ -72,6 +75,8 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_METRICS_ENABLE, DEF_METRICS_ENABLE);
     setIfMissing(TIKV_METRICS_PORT, DEF_METRICS_PORT);
     setIfMissing(TIKV_NETWORK_MAPPING_NAME, DEF_TIKV_NETWORK_MAPPING_NAME);
+    setIfMissing(TIKV_ENABLE_GRPC_FORWARD, DEF_GRPC_FORWARD_ENABLE);
+    setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
   }
 
   public static void listAll() {
@@ -245,6 +250,7 @@ public class TiConfiguration implements Serializable {
   private boolean showRowId = getBoolean(TIKV_SHOW_ROWID);
   private String dbPrefix = get(TIKV_DB_PREFIX);
   private KVMode kvMode = getKvMode(TIKV_KV_MODE);
+  private boolean enableGrpcForward = getBoolean(TIKV_ENABLE_GRPC_FORWARD);
 
   private int kvClientConcurrency = getInt(TIKV_KV_CLIENT_CONCURRENCY);
   private ReplicaRead replicaRead = getReplicaRead(TIKV_REPLICA_READ);
@@ -253,6 +259,7 @@ public class TiConfiguration implements Serializable {
 
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
+  private int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
 
@@ -531,5 +538,13 @@ public class TiConfiguration implements Serializable {
 
   public String getNetworkMappingName() {
     return this.networkMappingName;
+  }
+
+  public boolean getEnableGrpcForward() {
+    return this.enableGrpcForward;
+  }
+
+  public long getGrpcHealthCheckTimeout() {
+    return this.grpcHealthCheckTimeout;
   }
 }

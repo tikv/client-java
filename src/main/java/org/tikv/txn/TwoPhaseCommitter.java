@@ -38,13 +38,13 @@ import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiBatchWriteException;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.Op;
-import org.tikv.kvproto.Metapb;
 import org.tikv.txn.type.BatchKeys;
 import org.tikv.txn.type.ClientRPCResult;
 import org.tikv.txn.type.GroupKeyResult;
@@ -146,9 +146,9 @@ public class TwoPhaseCommitter {
 
   private void doPrewritePrimaryKeyWithRetry(BackOffer backOffer, ByteString key, ByteString value)
       throws TiBatchWriteException {
-    Pair<TiRegion, Metapb.Store> pair = this.regionManager.getRegionStorePairByKey(key, backOffer);
+    Pair<TiRegion, TiStore> pair = this.regionManager.getRegionStorePairByKey(key, backOffer);
     TiRegion tiRegion = pair.first;
-    Metapb.Store store = pair.second;
+    TiStore store = pair.second;
 
     Kvrpcpb.Mutation mutation;
     if (!value.isEmpty()) {
@@ -201,9 +201,9 @@ public class TwoPhaseCommitter {
 
   private void doCommitPrimaryKeyWithRetry(BackOffer backOffer, ByteString key, long commitTs)
       throws TiBatchWriteException {
-    Pair<TiRegion, Metapb.Store> pair = this.regionManager.getRegionStorePairByKey(key, backOffer);
+    Pair<TiRegion, TiStore> pair = this.regionManager.getRegionStorePairByKey(key, backOffer);
     TiRegion tiRegion = pair.first;
-    Metapb.Store store = pair.second;
+    TiStore store = pair.second;
     ByteString[] keys = new ByteString[] {key};
 
     // send rpc request to tikv server
@@ -335,11 +335,11 @@ public class TwoPhaseCommitter {
     // groups keys by region
     GroupKeyResult groupResult = this.groupKeysByRegion(keys, size, backOffer);
     List<BatchKeys> batchKeyList = new LinkedList<>();
-    Map<Pair<TiRegion, Metapb.Store>, List<ByteString>> groupKeyMap = groupResult.getGroupsResult();
+    Map<Pair<TiRegion, TiStore>, List<ByteString>> groupKeyMap = groupResult.getGroupsResult();
 
-    for (Map.Entry<Pair<TiRegion, Metapb.Store>, List<ByteString>> entry : groupKeyMap.entrySet()) {
+    for (Map.Entry<Pair<TiRegion, TiStore>, List<ByteString>> entry : groupKeyMap.entrySet()) {
       TiRegion tiRegion = entry.getKey().first;
-      Metapb.Store store = entry.getKey().second;
+      TiStore store = entry.getKey().second;
       this.appendBatchBySize(batchKeyList, tiRegion, store, entry.getValue(), true, mutations);
     }
 
@@ -450,7 +450,7 @@ public class TwoPhaseCommitter {
   private void appendBatchBySize(
       List<BatchKeys> batchKeyList,
       TiRegion tiRegion,
-      Metapb.Store store,
+      TiStore store,
       List<ByteString> keys,
       boolean sizeIncludeValue,
       Map<ByteString, Kvrpcpb.Mutation> mutations) {
@@ -571,11 +571,11 @@ public class TwoPhaseCommitter {
     // groups keys by region
     GroupKeyResult groupResult = this.groupKeysByRegion(keys, size, backOffer);
     List<BatchKeys> batchKeyList = new ArrayList<>();
-    Map<Pair<TiRegion, Metapb.Store>, List<ByteString>> groupKeyMap = groupResult.getGroupsResult();
+    Map<Pair<TiRegion, TiStore>, List<ByteString>> groupKeyMap = groupResult.getGroupsResult();
 
-    for (Map.Entry<Pair<TiRegion, Metapb.Store>, List<ByteString>> entry : groupKeyMap.entrySet()) {
+    for (Map.Entry<Pair<TiRegion, TiStore>, List<ByteString>> entry : groupKeyMap.entrySet()) {
       TiRegion tiRegion = entry.getKey().first;
-      Metapb.Store store = entry.getKey().second;
+      TiStore store = entry.getKey().second;
       this.appendBatchBySize(batchKeyList, tiRegion, store, entry.getValue(), false, null);
     }
 
@@ -615,13 +615,12 @@ public class TwoPhaseCommitter {
 
   private GroupKeyResult groupKeysByRegion(ByteString[] keys, int size, BackOffer backOffer)
       throws TiBatchWriteException {
-    Map<Pair<TiRegion, Metapb.Store>, List<ByteString>> groups = new HashMap<>();
+    Map<Pair<TiRegion, TiStore>, List<ByteString>> groups = new HashMap<>();
     int index = 0;
     try {
       for (; index < size; index++) {
         ByteString key = keys[index];
-        Pair<TiRegion, Metapb.Store> pair =
-            this.regionManager.getRegionStorePairByKey(key, backOffer);
+        Pair<TiRegion, TiStore> pair = this.regionManager.getRegionStorePairByKey(key, backOffer);
         if (pair != null) {
           groups.computeIfAbsent(pair, e -> new ArrayList<>()).add(key);
         }

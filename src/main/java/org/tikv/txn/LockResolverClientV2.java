@@ -42,6 +42,7 @@ import org.tikv.common.region.AbstractRegionStoreClient;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiRegion.RegionVerID;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.TsoUtils;
@@ -74,11 +75,12 @@ public class LockResolverClientV2 extends AbstractRegionStoreClient
   public LockResolverClientV2(
       TiConfiguration conf,
       TiRegion region,
+      TiStore store,
       TikvBlockingStub blockingStub,
       TikvStub asyncStub,
       ChannelFactory channelFactory,
       RegionManager regionManager) {
-    super(conf, region, channelFactory, blockingStub, asyncStub, regionManager);
+    super(conf, region, store, channelFactory, blockingStub, asyncStub, regionManager);
     resolved = new HashMap<>();
     recentResolved = new LinkedList<>();
     readWriteLock = new ReentrantReadWriteLock();
