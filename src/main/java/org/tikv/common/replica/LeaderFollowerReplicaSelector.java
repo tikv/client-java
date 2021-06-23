@@ -18,13 +18,18 @@ package org.tikv.common.replica;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.tikv.kvproto.Metapb;
 
 public class LeaderFollowerReplicaSelector implements ReplicaSelector {
   @Override
-  public List<Metapb.Peer> select(
-      Metapb.Peer leader, List<Metapb.Peer> followers, List<Metapb.Peer> learners) {
-    List<Metapb.Peer> list = new ArrayList<>(followers);
+  public List<Store> select(Region region) {
+    Store[] stores = region.getStores();
+    Store leader = region.getLeader();
+    List<Store> list = new ArrayList<>(stores.length);
+    for (Store store : stores) {
+      if (!store.isLearner() && !leader.equals(store)) {
+        list.add(store);
+      }
+    }
     Collections.shuffle(list);
     list.add(leader);
     return list;

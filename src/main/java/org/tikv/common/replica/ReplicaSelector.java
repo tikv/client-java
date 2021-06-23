@@ -17,13 +17,11 @@ package org.tikv.common.replica;
 
 import java.io.Serializable;
 import java.util.List;
-import org.tikv.kvproto.Metapb;
 
 public interface ReplicaSelector extends Serializable {
-  public static final ReplicaSelector LEADER = new LeaderReplicaSelector();
-  public static final ReplicaSelector FOLLOWER = new FollowerReplicaSelector();
-  public static final ReplicaSelector LEADER_AND_FOLLOWER = new LeaderFollowerReplicaSelector();
+  ReplicaSelector LEADER = new LeaderReplicaSelector();
+  ReplicaSelector FOLLOWER = new FollowerReplicaSelector();
+  ReplicaSelector LEADER_AND_FOLLOWER = new LeaderFollowerReplicaSelector();
 
-  List<Metapb.Peer> select(
-      Metapb.Peer leader, List<Metapb.Peer> followers, List<Metapb.Peer> learners);
+  List<Store> select(Region region);
 }

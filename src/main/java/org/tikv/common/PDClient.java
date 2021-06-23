@@ -36,6 +36,7 @@ import io.prometheus.client.Histogram;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -49,6 +50,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
+import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
@@ -56,11 +58,12 @@ import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.NoopHandler;
 import org.tikv.common.operation.PDErrorHandler;
-import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction.BackOffFuncType;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.PDGrpc.PDBlockingStub;
@@ -145,7 +148,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
    *
    * @param region represents a region info
    */
-  void scatterRegion(TiRegion region, BackOffer backOffer) {
+  void scatterRegion(Metapb.Region region, BackOffer backOffer) {
     Supplier<ScatterRegionRequest> request =
         () ->
             ScatterRegionRequest.newBuilder().setHeader(header).setRegionId(region.getId()).build();
@@ -169,7 +172,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
    *
    * @param region
    */
-  void waitScatterRegionFinish(TiRegion region, BackOffer backOffer) {
+  void waitScatterRegionFinish(Metapb.Region region, BackOffer backOffer) {
     for (; ; ) {
       GetOperatorResponse resp = getOperator(region.getId());
       if (resp != null) {
@@ -222,7 +225,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   @Override
-  public TiRegion getRegionByKey(BackOffer backOffer, ByteString key) {
+  public Pair<Metapb.Region, Metapb.Peer> getRegionByKey(BackOffer backOffer, ByteString key) {
     Histogram.Timer requestTimer = PD_GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
     try {
       if (conf.getKvMode() == KVMode.TXN) {
@@ -240,21 +243,14 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
       GetRegionResponse resp =
           callWithRetry(backOffer, PDGrpc.getGetRegionMethod(), request, handler);
-      return new TiRegion(
-          resp.getRegion(),
-          resp.getLeader(),
-          null,
-          conf.getIsolationLevel(),
-          conf.getCommandPriority(),
-          conf.getKvMode(),
-          conf.getReplicaSelector());
+      return new Pair<Metapb.Region, Metapb.Peer>(decodeRegion(resp.getRegion()), resp.getLeader());
     } finally {
       requestTimer.observeDuration();
     }
   }
 
   @Override
-  public TiRegion getRegionByID(BackOffer backOffer, long id) {
+  public Pair<Metapb.Region, Metapb.Peer> getRegionByID(BackOffer backOffer, long id) {
     Supplier<GetRegionByIDRequest> request =
         () -> GetRegionByIDRequest.newBuilder().setHeader(header).setRegionId(id).build();
     PDErrorHandler<GetRegionResponse> handler =
@@ -262,15 +258,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
     GetRegionResponse resp =
         callWithRetry(backOffer, PDGrpc.getGetRegionByIDMethod(), request, handler);
-    // Instead of using default leader instance, explicitly set no leader to null
-    return new TiRegion(
-        resp.getRegion(),
-        resp.getLeader(),
-        null,
-        conf.getIsolationLevel(),
-        conf.getCommandPriority(),
-        conf.getKvMode(),
-        conf.getReplicaSelector());
+    return new Pair<Metapb.Region, Metapb.Peer>(decodeRegion(resp.getRegion()), resp.getLeader());
   }
 
   private Supplier<GetStoreRequest> buildGetStoreReq(long storeId) {
@@ -567,12 +555,15 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                         .setDaemon(true)
                         .build()))
             .build();
-    this.hostMapping = new HostMapping(this.etcdClient, conf.getNetworkMappingName());
+    this.hostMapping =
+        Optional.ofNullable(getConf().getHostMapping())
+            .orElseGet(() -> new DefaultHostMapping(this.etcdClient, conf.getNetworkMappingName()));
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
         break;
       }
+      logger.info("Could not get leader member with pd: " + u);
     }
     checkNotNull(resp, "Failed to init client for PD cluster.");
     long clusterId = resp.getHeader().getClusterId();
@@ -665,5 +656,30 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     public String toString() {
       return "[leaderInfo: " + leaderInfo + "]";
     }
+  }
+
+  private Metapb.Region decodeRegion(Metapb.Region region) {
+    final boolean isRawRegion = conf.getKvMode() == KVMode.RAW;
+    Metapb.Region.Builder builder =
+        Metapb.Region.newBuilder()
+            .setId(region.getId())
+            .setRegionEpoch(region.getRegionEpoch())
+            .addAllPeers(region.getPeersList());
+
+    if (region.getStartKey().isEmpty() || isRawRegion) {
+      builder.setStartKey(region.getStartKey());
+    } else {
+      byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
+      builder.setStartKey(ByteString.copyFrom(decodedStartKey));
+    }
+
+    if (region.getEndKey().isEmpty() || isRawRegion) {
+      builder.setEndKey(region.getEndKey());
+    } else {
+      byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
+      builder.setEndKey(ByteString.copyFrom(decodedEndKey));
+    }
+
+    return builder.build();
   }
 }

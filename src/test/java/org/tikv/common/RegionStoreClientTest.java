@@ -55,7 +55,7 @@ public class RegionStoreClientTest extends MockServerTest {
         new RegionStoreClientBuilder(
             session.getConf(),
             session.getChannelFactory(),
-            new RegionManager(session.getPDClient()),
+            new RegionManager(session.getConf(), session.getPDClient()),
             session.getPDClient());
 
     return builder.build(region, store);

@@ -18,8 +18,9 @@ package org.tikv.common;
 import com.google.protobuf.ByteString;
 import java.util.List;
 import org.tikv.common.meta.TiTimestamp;
-import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 
 /** Readonly PD client including only reading related interface Supposed for TiDB-like use cases */
@@ -37,7 +38,7 @@ public interface ReadOnlyPDClient {
    * @param key key in bytes for locating a region
    * @return the region whose startKey and endKey range covers the given key
    */
-  TiRegion getRegionByKey(BackOffer backOffer, ByteString key);
+  Pair<Metapb.Region, Metapb.Peer> getRegionByKey(BackOffer backOffer, ByteString key);
 
   /**
    * Get Region by Region Id
@@ -45,7 +46,7 @@ public interface ReadOnlyPDClient {
    * @param id Region Id
    * @return the region corresponding to the given Id
    */
-  TiRegion getRegionByID(BackOffer backOffer, long id);
+  Pair<Metapb.Region, Metapb.Peer> getRegionByID(BackOffer backOffer, long id);
 
   HostMapping getHostMapping();
 
