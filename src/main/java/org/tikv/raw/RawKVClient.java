@@ -112,6 +112,21 @@ public class RawKVClient implements AutoCloseable {
    * @param ttl the ttl of the key (in seconds), 0 means the key will never be outdated
    */
   public void put(ByteString key, ByteString value, long ttl) {
+    put(key, value, ttl, false);
+  }
+
+  /**
+   * Put a raw key-value pair to TiKV. This API is atomic.
+   *
+   * @param key raw key
+   * @param value raw value
+   * @param ttl the ttl of the key (in seconds), 0 means the key will never be outdated
+   */
+  public void putAtomic(ByteString key, ByteString value, long ttl) {
+    put(key, value, ttl, true);
+  }
+
+  private void put(ByteString key, ByteString value, long ttl, boolean atomic) {
     String label = "client_raw_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
@@ -119,7 +134,7 @@ public class RawKVClient implements AutoCloseable {
       while (true) {
         RegionStoreClient client = clientBuilder.build(key);
         try {
-          client.rawPut(backOffer, key, value, ttl);
+          client.rawPut(backOffer, key, value, ttl, atomic);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return;
         } catch (final TiKVException e) {
@@ -528,6 +543,19 @@ public class RawKVClient implements AutoCloseable {
    * @param key raw key to be deleted
    */
   public void delete(ByteString key) {
+    delete(key, false);
+  }
+
+  /**
+   * Delete a raw key-value pair from TiKV if key exists. This API is atomic.
+   *
+   * @param key raw key to be deleted
+   */
+  public void deleteAtomic(ByteString key) {
+    delete(key, true);
+  }
+
+  private void delete(ByteString key, boolean atomic) {
     String label = "client_raw_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
@@ -535,7 +563,7 @@ public class RawKVClient implements AutoCloseable {
       while (true) {
         RegionStoreClient client = clientBuilder.build(key);
         try {
-          client.rawDelete(defaultBackOff(), key);
+          client.rawDelete(defaultBackOff(), key, atomic);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return;
         } catch (final TiKVException e) {
