@@ -51,6 +51,8 @@ public class ConfigUtils {
   public static final String TIKV_ENABLE_GRPC_FORWARD = "tikv.enable_grpc_forward";
   public static final String TIKV_GRPC_HEALTH_CHECK_TIMEOUT = "tikv.grpc.health_check_timeout";
 
+  public static final String TIKV_ENABLE_ATOMIC_FOR_CAS = "tikv.enable_atomic_for_cas";
+
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "600ms";
   public static final String DEF_SCAN_TIMEOUT = "20s";
@@ -80,6 +82,7 @@ public class ConfigUtils {
   public static final int DEF_METRICS_PORT = 3140;
   public static final String DEF_TIKV_NETWORK_MAPPING_NAME = "";
   public static final boolean DEF_GRPC_FORWARD_ENABLE = true;
+  public static final boolean DEF_TIKV_ENABLE_ATOMIC_FOR_CAS = false;
 
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";

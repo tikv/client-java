@@ -865,7 +865,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return Optional.of(resp.getTtl());
   }
 
-  public void rawDelete(BackOffer backOffer, ByteString key) {
+  public void rawDelete(BackOffer backOffer, ByteString key, boolean atomicForCAS) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete").startTimer();
     try {
@@ -874,6 +874,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               RawDeleteRequest.newBuilder()
                   .setContext(region.getReplicaContext(storeType))
                   .setKey(key)
+                  .setForCas(atomicForCAS)
                   .build();
 
       RegionErrorHandler<RawDeleteResponse> handler =
@@ -901,7 +902,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  public void rawPut(BackOffer backOffer, ByteString key, ByteString value, long ttl) {
+  public void rawPut(
+      BackOffer backOffer, ByteString key, ByteString value, long ttl, boolean atomicForCAS) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put").startTimer();
     try {
@@ -912,6 +914,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setKey(key)
                   .setValue(value)
                   .setTtl(ttl)
+                  .setForCas(atomicForCAS)
                   .build();
 
       RegionErrorHandler<RawPutResponse> handler =
@@ -1029,7 +1032,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return resp.getPairsList();
   }
 
-  public void rawBatchPut(BackOffer backOffer, List<KvPair> kvPairs, long ttl, boolean atomic) {
+  public void rawBatchPut(
+      BackOffer backOffer, List<KvPair> kvPairs, long ttl, boolean atomicForCAS) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_put").startTimer();
     try {
@@ -1042,7 +1046,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(region.getReplicaContext(storeType))
                   .addAllPairs(kvPairs)
                   .setTtl(ttl)
-                  .setForCas(atomic)
+                  .setForCas(atomicForCAS)
                   .build();
       RegionErrorHandler<RawBatchPutResponse> handler =
           new RegionErrorHandler<RawBatchPutResponse>(
@@ -1055,7 +1059,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  public void rawBatchPut(BackOffer backOffer, Batch batch, long ttl, boolean atomic) {
+  public void rawBatchPut(BackOffer backOffer, Batch batch, long ttl, boolean atomicForCAS) {
     List<KvPair> pairs = new ArrayList<>();
     for (int i = 0; i < batch.getKeys().size(); i++) {
       pairs.add(
@@ -1064,7 +1068,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               .setValue(batch.getValues().get(i))
               .build());
     }
-    rawBatchPut(backOffer, pairs, ttl, atomic);
+    rawBatchPut(backOffer, pairs, ttl, atomicForCAS);
   }
 
   private void handleRawBatchPut(RawBatchPutResponse resp) {
@@ -1081,7 +1085,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  public void rawBatchDelete(BackOffer backoffer, List<ByteString> keys, boolean atomic) {
+  public void rawBatchDelete(BackOffer backoffer, List<ByteString> keys, boolean atomicForCAS) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_delete").startTimer();
     try {
@@ -1093,7 +1097,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               RawBatchDeleteRequest.newBuilder()
                   .setContext(region.getReplicaContext(storeType))
                   .addAllKeys(keys)
-                  .setForCas(atomic)
+                  .setForCas(atomicForCAS)
                   .build();
       RegionErrorHandler<RawBatchDeleteResponse> handler =
           new RegionErrorHandler<RawBatchDeleteResponse>(

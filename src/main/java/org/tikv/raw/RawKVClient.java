@@ -40,6 +40,7 @@ import org.tikv.kvproto.Kvrpcpb.KvPair;
 public class RawKVClient implements AutoCloseable {
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
+  private final boolean atomicForCAS;
   private final ExecutorService batchGetThreadPool;
   private final ExecutorService batchPutThreadPool;
   private final ExecutorService batchDeleteThreadPool;
@@ -90,6 +91,7 @@ public class RawKVClient implements AutoCloseable {
     this.batchDeleteThreadPool = session.getThreadPoolForBatchDelete();
     this.batchScanThreadPool = session.getThreadPoolForBatchScan();
     this.deleteRangeThreadPool = session.getThreadPoolForDeleteRange();
+    this.atomicForCAS = conf.isEnableAtomicForCAS();
   }
 
   @Override
@@ -120,7 +122,7 @@ public class RawKVClient implements AutoCloseable {
       while (true) {
         RegionStoreClient client = clientBuilder.build(key);
         try {
-          client.rawPut(backOffer, key, value, ttl);
+          client.rawPut(backOffer, key, value, ttl, atomicForCAS);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return;
         } catch (final TiKVException e) {
@@ -138,6 +140,8 @@ public class RawKVClient implements AutoCloseable {
   /**
    * Put a key-value pair if it does not exist. This API is atomic.
    *
+   * <p>To use this API, please enable `tikv.enable_atomic_for_cas`.
+   *
    * @param key key
    * @param value value
    * @return a ByteString. returns Optional.EMPTY if the value is written successfully. returns the
@@ -149,6 +153,8 @@ public class RawKVClient implements AutoCloseable {
 
   /**
    * Put a key-value pair with TTL if it does not exist. This API is atomic.
+   *
+   * <p>To use this API, please enable `tikv.enable_atomic_for_cas`.
    *
    * @param key key
    * @param value value
@@ -168,6 +174,8 @@ public class RawKVClient implements AutoCloseable {
   /**
    * Put a key-value pair if the prevValue matched the value in TiKV. This API is atomic.
    *
+   * <p>To use this API, please enable `tikv.enable_atomic_for_cas`.
+   *
    * @param key key
    * @param value value
    */
@@ -179,6 +187,8 @@ public class RawKVClient implements AutoCloseable {
   /**
    * pair if the prevValue matched the value in TiKV. This API is atomic.
    *
+   * <p>To use this API, please enable `tikv.enable_atomic_for_cas`.
+   *
    * @param key key
    * @param value value
    * @param ttl TTL of key (in seconds), 0 means the key will never be outdated.
@@ -186,6 +196,11 @@ public class RawKVClient implements AutoCloseable {
   public void compareAndSet(
       ByteString key, Optional<ByteString> prevValue, ByteString value, long ttl)
       throws RawCASConflictException {
+    if (!atomicForCAS) {
+      throw new IllegalArgumentException(
+          "To use compareAndSet or putIfAbsent, please enable the config tikv.enable_atomic_for_cas.");
+    }
+
     String label = "client_raw_compare_and_set";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
@@ -209,7 +224,7 @@ public class RawKVClient implements AutoCloseable {
   }
 
   /**
-   * Put a set of raw key-value pair to TiKV, this API does not ensure the operation is atomic.
+   * Put a set of raw key-value pair to TiKV.
    *
    * @param kvPairs kvPairs
    */
@@ -218,39 +233,16 @@ public class RawKVClient implements AutoCloseable {
   }
 
   /**
-   * Put a set of raw key-value pair to TiKV, this API does not ensure the operation is atomic.
+   * Put a set of raw key-value pair to TiKV.
    *
    * @param kvPairs kvPairs
    * @param ttl the TTL of keys to be put (in seconds), 0 means the keys will never be outdated
    */
   public void batchPut(Map<ByteString, ByteString> kvPairs, long ttl) {
-    batchPut(kvPairs, ttl, false);
-  }
-
-  /**
-   * Put a set of raw key-value pair to TiKV, this API is atomic
-   *
-   * @param kvPairs kvPairs
-   */
-  public void batchPutAtomic(Map<ByteString, ByteString> kvPairs) {
-    batchPutAtomic(kvPairs, 0);
-  }
-
-  /**
-   * Put a set of raw key-value pair to TiKV, this API is atomic.
-   *
-   * @param kvPairs kvPairs
-   * @param ttl the TTL of keys to be put (in seconds), 0 means the keys will never be outdated
-   */
-  public void batchPutAtomic(Map<ByteString, ByteString> kvPairs, long ttl) {
-    batchPut(kvPairs, ttl, true);
-  }
-
-  private void batchPut(Map<ByteString, ByteString> kvPairs, long ttl, boolean atomic) {
     String label = "client_raw_batch_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      doSendBatchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs, ttl, atomic);
+      doSendBatchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs, ttl);
       RAW_REQUEST_SUCCESS.labels(label).inc();
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
@@ -317,24 +309,11 @@ public class RawKVClient implements AutoCloseable {
    * @param keys list of raw key
    */
   public void batchDelete(List<ByteString> keys) {
-    batchDelete(keys, false);
-  }
-
-  /**
-   * Delete a list of raw key-value pair from TiKV if key exists, this API is atomic
-   *
-   * @param keys list of raw key
-   */
-  public void batchDeleteAtomic(List<ByteString> keys) {
-    batchDelete(keys, true);
-  }
-
-  private void batchDelete(List<ByteString> keys, boolean atomic) {
     String label = "client_raw_batch_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
       BackOffer backOffer = defaultBackOff();
-      doSendBatchDelete(backOffer, keys, atomic);
+      doSendBatchDelete(backOffer, keys);
       RAW_REQUEST_SUCCESS.labels(label).inc();
       return;
     } catch (Exception e) {
@@ -608,7 +587,7 @@ public class RawKVClient implements AutoCloseable {
       while (true) {
         RegionStoreClient client = clientBuilder.build(key);
         try {
-          client.rawDelete(defaultBackOff(), key);
+          client.rawDelete(defaultBackOff(), key, atomicForCAS);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return;
         } catch (final TiKVException e) {
@@ -660,8 +639,7 @@ public class RawKVClient implements AutoCloseable {
     deleteRange(key, endKey);
   }
 
-  private void doSendBatchPut(
-      BackOffer backOffer, Map<ByteString, ByteString> kvPairs, long ttl, boolean atomic) {
+  private void doSendBatchPut(BackOffer backOffer, Map<ByteString, ByteString> kvPairs, long ttl) {
     ExecutorCompletionService<List<Batch>> completionService =
         new ExecutorCompletionService<>(batchPutThreadPool);
 
@@ -686,16 +664,15 @@ public class RawKVClient implements AutoCloseable {
       List<Batch> task = taskQueue.poll();
       for (Batch batch : task) {
         completionService.submit(
-            () -> doSendBatchPutInBatchesWithRetry(batch.getBackOffer(), batch, ttl, atomic));
+            () -> doSendBatchPutInBatchesWithRetry(batch.getBackOffer(), batch, ttl));
       }
       getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
     }
   }
 
-  private List<Batch> doSendBatchPutInBatchesWithRetry(
-      BackOffer backOffer, Batch batch, long ttl, boolean atomic) {
+  private List<Batch> doSendBatchPutInBatchesWithRetry(BackOffer backOffer, Batch batch, long ttl) {
     try (RegionStoreClient client = clientBuilder.build(batch.getRegion())) {
-      client.rawBatchPut(backOffer, batch, ttl, atomic);
+      client.rawBatchPut(backOffer, batch, ttl, atomicForCAS);
       return new ArrayList<>();
     } catch (final TiKVException e) {
       // TODO: any elegant way to re-split the ranges if fails?
@@ -770,7 +747,7 @@ public class RawKVClient implements AutoCloseable {
         backOffer, batch.getKeys(), RAW_BATCH_GET_SIZE, MAX_RAW_BATCH_LIMIT, clientBuilder);
   }
 
-  private void doSendBatchDelete(BackOffer backOffer, List<ByteString> keys, boolean atomic) {
+  private void doSendBatchDelete(BackOffer backOffer, List<ByteString> keys) {
     ExecutorCompletionService<List<Batch>> completionService =
         new ExecutorCompletionService<>(batchDeleteThreadPool);
 
@@ -784,17 +761,16 @@ public class RawKVClient implements AutoCloseable {
       List<Batch> task = taskQueue.poll();
       for (Batch batch : task) {
         completionService.submit(
-            () -> doSendBatchDeleteInBatchesWithRetry(batch.getBackOffer(), batch, atomic));
+            () -> doSendBatchDeleteInBatchesWithRetry(batch.getBackOffer(), batch));
       }
       getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
     }
   }
 
-  private List<Batch> doSendBatchDeleteInBatchesWithRetry(
-      BackOffer backOffer, Batch batch, boolean atomic) {
+  private List<Batch> doSendBatchDeleteInBatchesWithRetry(BackOffer backOffer, Batch batch) {
     RegionStoreClient client = clientBuilder.build(batch.getRegion());
     try {
-      client.rawBatchDelete(backOffer, batch.getKeys(), atomic);
+      client.rawBatchDelete(backOffer, batch.getKeys(), atomicForCAS);
       return new ArrayList<>();
     } catch (final TiKVException e) {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);

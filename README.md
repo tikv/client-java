@@ -176,5 +176,9 @@ The following includes ThreadPool related parameters, which can be passed in thr
 - the thread pool size of deleteRange on client side
 - default: 20
 
+#### tikv.enable_atomic_for_cas
+- whether to enable `Compare And Set`, set true if using `RawKVClient.compareAndSet` or `RawKVClient.putIfAbsent`
+- default: false
+
 ## License
 Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.
