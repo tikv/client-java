@@ -198,7 +198,7 @@ public class RawKVClient implements AutoCloseable {
       throws RawCASConflictException {
     if (!atomicForCAS) {
       throw new IllegalArgumentException(
-          "To use Compare And Swap, please enable the config tikv.enable_atomic_for_cas.");
+          "To use compareAndSet or putIfAbsent, please enable the config tikv.enable_atomic_for_cas.");
     }
 
     String label = "client_raw_compare_and_set";

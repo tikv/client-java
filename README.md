@@ -177,7 +177,7 @@ The following includes ThreadPool related parameters, which can be passed in thr
 - default: 20
 
 #### tikv.enable_atomic_for_cas
-- whether to enable Compare And Swap, set true if using `RawKVClient.compareAndSet` or `RawKVClient.putIfAbsent`
+- whether to enable `Compare And Set`, set true if using `RawKVClient.compareAndSet` or `RawKVClient.putIfAbsent`
 - default: false
 
 ## License
