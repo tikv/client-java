@@ -56,7 +56,7 @@ After building, add following lines into your `pom.xml` if you are using Maven
 <dependency>
 	<groupId>org.tikv</groupId>
 	<artifactId>tikv-client-java</artifactId>
-	<version>3.0.1</version>
+	<version>3.1.0</version>
 </dependency>
 ```
 
@@ -78,60 +78,6 @@ public class Main {
 		RawKVClient client = session.createRawClient();
 	}
 }
-```
-
-### API
-
-```java
-/**
- * Put a raw key-value pair to TiKV
- *
- * @param key raw key
- * @param value raw value
- */
-void put(ByteString key, ByteString value)
-```
-
-```java
-/**
- * Get a raw key-value pair from TiKV if key exists
- *
- * @param key raw key
- * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
- */
-ByteString get(ByteString key)
-```
-
-```java
-/**
- * Scan raw key-value pairs from TiKV in range [startKey, endKey)
- *
- * @param startKey raw start key, inclusive
- * @param endKey raw end key, exclusive
- * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
- * @return list of key-value pairs in range
- */
-List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey, int limit)
-```
-
-```java
-/**
- * Scan raw key-value pairs from TiKV in range [startKey, endKey)
- *
- * @param startKey raw start key, inclusive
- * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
- * @return list of key-value pairs in range
- */
-List<Kvrpcpb.KvPair> scan(ByteString startKey, int limit)
-```
-
-```java
-/**
- * Delete a raw key-value pair from TiKV if key exists
- *
- * @param key raw key to be deleted
- */
-void delete(ByteString key)
 ```
 
 ## Java Client Configuration Parameter
