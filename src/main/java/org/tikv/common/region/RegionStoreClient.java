@@ -872,7 +872,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return resp.getTtl();
   }
 
-  public void rawDelete(BackOffer backOffer, ByteString key) {
+  public void rawDelete(BackOffer backOffer, ByteString key, boolean atomic) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete").startTimer();
     try {
@@ -881,6 +881,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               RawDeleteRequest.newBuilder()
                   .setContext(region.getReplicaContext(storeType))
                   .setKey(key)
+                  .setForCas(atomic)
                   .build();
 
       KVErrorHandler<RawDeleteResponse> handler =
@@ -908,7 +909,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  public void rawPut(BackOffer backOffer, ByteString key, ByteString value, long ttl) {
+  public void rawPut(
+      BackOffer backOffer, ByteString key, ByteString value, long ttl, boolean atomic) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put").startTimer();
     try {
@@ -919,6 +921,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setKey(key)
                   .setValue(value)
                   .setTtl(ttl)
+                  .setForCas(atomic)
                   .build();
 
       KVErrorHandler<RawPutResponse> handler =
