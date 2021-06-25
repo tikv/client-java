@@ -27,7 +27,7 @@ The jar can be found in `./target/`
 
 ## Usage
 
-This project is designed to hook with `pd` and `tikv` which you can find in `PingCAP` github page.
+This project is designed to hook with `[pd](https://github.com/tikv/pd)` and `[tikv](https://github.com/tikv/tikv)`.
 
 When you work with this project, you have to communicate with `pd` and `tikv`. Please run TiKV and PD in advance.
 
@@ -56,7 +56,7 @@ After building, add following lines into your `pom.xml` if you are using Maven
 <dependency>
 	<groupId>org.tikv</groupId>
 	<artifactId>tikv-client-java</artifactId>
-	<version>3.0.0</version>
+	<version>3.0.1</version>
 </dependency>
 ```
 
@@ -66,6 +66,7 @@ After building, add following lines into your `pom.xml` if you are using Maven
 ### Create a RawKVClient
 
 ```java
+import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
 
@@ -74,7 +75,7 @@ public class Main {
 		// You MUST create a raw configuration if you are using RawKVClient.
 		TiConfiguration conf = TiConfiguration.createRawDefault(YOUR_PD_ADDRESSES);
 		TiSession session = TiSession.create(conf);
-		RawKVClient = session.createRawKVClient();
+		RawKVClient client = session.createRawClient();
 	}
 }
 ```
@@ -133,49 +134,47 @@ List<Kvrpcpb.KvPair> scan(ByteString startKey, int limit)
 void delete(ByteString key)
 ```
 
-## Java Client 配置参数
+## Java Client Configuration Parameter
 
-本文介绍了与部署使用 Java Client 相关的配置参数。
+### JVM Parameter
 
-### 常用配置 JVM 参数
+The following includes JVM related parameters.
 
-以下包括常用配置的 JVM 相关参数。
+#### tikv.pd.addresses
+- pd addresses, separated by comma
+- default: 127.0.0.1:2379
 
-####tikv.pd.addresses
-- pd 集群的地址，逗号分隔
-- 默认值 127.0.0.1:2379
+#### tikv.grpc.timeout_in_ms
+- timeout of grpc request  
+- default: 600ms
 
-####tikv.grpc.timeout_in_ms
-- grpc 请求的 timeout 时间
-- 默认值 600ms
+#### tikv.grpc.scan_timeout_in_ms
+- timeout of scan/delete range grpc request
+- default: 20s
 
-####tikv.grpc.scan_timeout_in_ms
-- scan/delete range grpc 请求的 timeout 时间
-- 默认值 20s
+### ThreadPool Parameter
 
-### ThreadPool 配置 JVM 参数
+The following includes ThreadPool related parameters, which can be passed in through JVM parameters.
 
-以下包括 ThreadPool 相关的参数及其默认配置，可通过 JVM 参数传入。
+#### tikv.batch_get_concurrency
+- the thread pool size of batchGet on client side
+- default: 20
 
-####tikv.batch_get_concurrency
-- Client 端 batchGet 请求的线程池大小
-- 默认值 20
+#### tikv.batch_put_concurrency
+- the thread pool size of batchPut on client side
+- default: 20
 
-####tikv.batch_put_concurrency
-- Client 端 batchPut 请求的线程池大小
-- 默认值 20
+#### tikv.batch_delete_concurrency
+- the thread pool size of batchDelete on client side
+- default: 20
 
-####tikv.batch_delete_concurrency
-- Client 端 batchDelete 请求的线程池大小
-- 默认值 20
+#### tikv.batch_scan_concurrency
+- the thread pool size of batchScan on client side
+- default: 5
 
-####tikv.batch_scan_concurrency
-- Client 端 batchScan 请求的线程池大小
-- 默认值 5
-
-####tikv.delete_range_concurrency
-- Client 端 deleteRange 请求的线程池大小
-- 默认值 20
+#### tikv.delete_range_concurrency
+- the thread pool size of deleteRange on client side
+- default: 20
 
 
 ## License
