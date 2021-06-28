@@ -217,7 +217,13 @@ public class RegionManager {
 
   public synchronized void updateStore(TiStore oldStore, TiStore newStore) {
     if (cache.updateStore(oldStore, newStore)) {
-      this.storeChecker.scheduleStoreHealthCheck(newStore);
+      logger.warn(
+          String.format(
+              "check health for store [%s] in background thread",
+              newStore.getStore().getAddress()));
+      if (newStore.isUnreachable()) {
+        this.storeChecker.scheduleStoreHealthCheck(newStore);
+      }
     }
   }
 
@@ -372,10 +378,13 @@ public class RegionManager {
       TiStore originStore = storeCache.get(oldStore.getId());
       if (originStore == oldStore) {
         storeCache.put(newStore.getId(), newStore);
+        if (oldStore != null && oldStore.isUnreachable()) {
+          oldStore.markReachable();
+        }
         if (newStore.getProxyStore() != null) {
           newStore.markUnreachable();
-          return true;
         }
+        return true;
       }
       return false;
     }

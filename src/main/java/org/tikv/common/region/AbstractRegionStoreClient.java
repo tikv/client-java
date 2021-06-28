@@ -28,6 +28,8 @@ import io.grpc.health.v1.HealthGrpc;
 import io.grpc.stub.MetadataUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
@@ -38,6 +40,7 @@ import org.tikv.kvproto.TikvGrpc;
 public abstract class AbstractRegionStoreClient
     extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvStub>
     implements RegionErrorReceiver {
+  private static final Logger logger = LoggerFactory.getLogger(AbstractRegionStoreClient.class);
 
   protected final RegionManager regionManager;
   protected TiRegion region;
@@ -127,6 +130,12 @@ public abstract class AbstractRegionStoreClient
     if (originStore == null) {
       originStore = targetStore;
     }
+    logger.warn(
+        String.format(
+            "forward request to store [%s] by store [%s] for region[%d]",
+            targetStore.getStore().getAddress(),
+            targetStore.getProxyStore().getAddress(),
+            region.getId()));
     targetStore = proxyStore;
     String addressStr = targetStore.getProxyStore().getAddress();
     ManagedChannel channel =

@@ -1278,9 +1278,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
         blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel), header);
         asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newStub(channel), header);
       } else {
-        // If the store is reachable, which is update by check-health thread
+        // If the store is reachable, which is update by check-health thread, cancel proxy forward.
         if (!store.isUnreachable()) {
           if (store.getProxyStore() != null) {
+            logger.warn(
+                String.format(
+                    "cancel request to store [%s] forward by store[%s]",
+                    store.getStore().getAddress(), store.getProxyStore().getAddress()));
             TiStore newStore = store.withProxy(null);
             regionManager.updateStore(store, newStore);
             store = newStore;
