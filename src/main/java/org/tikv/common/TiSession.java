@@ -102,6 +102,9 @@ public class TiSession implements AutoCloseable {
         throw new RuntimeException(e);
       }
     }
+    if (this.enableGrpcForward) {
+      logger.info("enable grpc forward for high available");
+    }
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
 

@@ -443,6 +443,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
           continue;
         }
         if (hasReachNextMember && createFollowerClientWrapper(followerUrlStr, leaderUrlStr)) {
+          logger.warn(String.format("forward request to pd [%s] by pd [%s]", leaderUrlStr, followerUrlStr));
           return;
         }
       }
