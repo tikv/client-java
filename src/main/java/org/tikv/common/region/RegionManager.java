@@ -158,6 +158,9 @@ public class RegionManager {
     if (storeType == TiStoreType.TiKV) {
       Peer peer = region.getCurrentReplica();
       store = cache.getStoreById(peer.getStoreId(), backOffer);
+      if (store == null) {
+        cache.clearAll();
+      }
     } else {
       outerLoop:
       for (Peer peer : region.getLearnerList()) {

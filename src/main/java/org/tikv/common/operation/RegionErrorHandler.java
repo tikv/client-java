@@ -73,9 +73,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
         // onNotLeader is only needed when updateLeader succeeds, thus switch
         // to a new store address.
         TiRegion newRegion = this.regionManager.updateLeader(recv.getRegion(), newStoreId);
-        retry =
-            newRegion != null
-                && recv.onNotLeader(this.regionManager.getStoreById(newStoreId), newRegion);
+        retry = newRegion != null && recv.onNotLeader(newRegion);
 
         backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
       } else {
@@ -151,6 +149,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
           String.format(
               "Key not in region [%s] for key [%s], this error should not happen here.",
               recv.getRegion(), KeyUtils.formatBytesUTF8(invalidKey)));
+      regionManager.clearRegionCache();
       throw new StatusRuntimeException(Status.UNKNOWN.withDescription(error.toString()));
     }
 
@@ -169,7 +168,11 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
 
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
-    regionManager.onRequestFail(recv.getRegion());
+    if (recv.onStoreUnreachable()) {
+      return true;
+    } else {
+      regionManager.onRequestFail(recv.getRegion());
+    }
 
     backOffer.doBackOff(
         BackOffFunction.BackOffFuncType.BoTiKVRPC,
