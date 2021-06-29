@@ -39,7 +39,7 @@ public class MetricsTest {
     session.close();
   }
 
-  /*@Test
+  @Test
   public void twoTiSession() throws Exception {
     TiConfiguration conf = TiConfiguration.createRawDefault();
     conf.setMetricsEnable(true);
@@ -63,7 +63,7 @@ public class MetricsTest {
 
     client2.close();
     session2.close();
-  }*/
+  }
 
   @Test
   public void twoTiSessionWithDifferentPort() {
