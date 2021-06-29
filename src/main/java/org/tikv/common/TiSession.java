@@ -20,9 +20,6 @@ import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
-import io.prometheus.client.CollectorRegistry;
-import io.prometheus.client.exporter.HTTPServer;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +35,6 @@ import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
-import org.tikv.common.policy.RetryPolicy;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
@@ -74,14 +70,14 @@ public class TiSession implements AutoCloseable {
   private volatile boolean enableGrpcForward;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private boolean isClosed = false;
-  private HTTPServer server;
-  private CollectorRegistry collectorRegistry;
+  private MetricsServer metricsServer;
 
   public TiSession(TiConfiguration conf) {
     this.conf = conf;
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
     this.client = PDClient.createRaw(conf, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
+<<<<<<< HEAD
     if (conf.isMetricsEnable()) {
       try {
         this.collectorRegistry = new CollectorRegistry();
@@ -105,6 +101,9 @@ public class TiSession implements AutoCloseable {
     if (this.enableGrpcForward) {
       logger.info("enable grpc forward for high available");
     }
+=======
+    this.metricsServer = MetricsServer.getInstance(conf);
+>>>>>>> 630e151... Support metrics with multiple TiSessions with the same port (#220)
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
 
@@ -353,10 +352,6 @@ public class TiSession implements AutoCloseable {
     return channelFactory;
   }
 
-  public CollectorRegistry getCollectorRegistry() {
-    return collectorRegistry;
-  }
-
   /**
    * This is used for setting call back function to invalidate cache information
    *
@@ -468,9 +463,8 @@ public class TiSession implements AutoCloseable {
       return;
     }
 
-    if (server != null) {
-      server.stop();
-      logger.info("Metrics server on " + server.getPort() + " is stopped");
+    if (metricsServer != null) {
+      metricsServer.close();
     }
 
     isClosed = true;
