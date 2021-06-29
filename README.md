@@ -98,6 +98,16 @@ The following includes JVM related parameters.
 - timeout of scan/delete range grpc request
 - default: 20s
 
+### Metrics Parameter
+
+#### tikv.metrics.enable
+- whether to enable metrics exporting
+- default: false
+
+#### tikv.metrics.port
+- the metrics exporting http port
+- default: 3140
+
 ### ThreadPool Parameter
 
 The following includes ThreadPool related parameters, which can be passed in through JVM parameters.
@@ -122,6 +132,40 @@ The following includes ThreadPool related parameters, which can be passed in thr
 - the thread pool size of deleteRange on client side
 - default: 20
 
+
+## Metrics
+
+Client Java supports exporting metrics to Prometheus using poll mode and viewing on Grafana. The following steps shows how to enable this function.
+
+### Step 1: Enable metrics exporting
+
+- set the config `tikv.metrics.enable` to `true`
+- call TiConfiguration.setMetricsEnable(true)
+
+### Step 2: Set the metrics port
+
+- set the config `tikv.metrics.port`
+- call TiConfiguration.setMetricsPort
+
+Default port is 3140.
+
+### Step 3: Config Prometheus
+
+Add the following config to `conf/prometheus.yml` and restart Prometheus.
+
+```yaml
+- job_name: "tikv-client"
+    honor_labels: true
+    static_configs:
+    - targets:
+        - '127.0.0.1:3140'
+        - '127.0.0.2:3140'
+        - '127.0.0.3:3140'
+```
+
+### Step 4: Config Grafana
+
+Import the [Client-Java-Summary dashboard config](/metrics/grafana/client_java_summary.json) to Grafana.
 
 ## License
 Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.

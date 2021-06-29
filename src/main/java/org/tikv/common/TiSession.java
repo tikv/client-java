@@ -20,9 +20,6 @@ import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
-import io.prometheus.client.CollectorRegistry;
-import io.prometheus.client.exporter.HTTPServer;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +35,6 @@ import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
-import org.tikv.common.policy.RetryPolicy;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
@@ -74,37 +70,14 @@ public class TiSession implements AutoCloseable {
   private volatile boolean enableGrpcForward;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private boolean isClosed = false;
-  private HTTPServer server;
-  private CollectorRegistry collectorRegistry;
+  private MetricsServer metricsServer;
 
   public TiSession(TiConfiguration conf) {
     this.conf = conf;
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
     this.client = PDClient.createRaw(conf, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
-    if (conf.isMetricsEnable()) {
-      try {
-        this.collectorRegistry = new CollectorRegistry();
-        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_LATENCY);
-        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_FAILURE);
-        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_SUCCESS);
-        this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_REQUEST_LATENCY);
-        this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
-        this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
-        this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
-        this.enableGrpcForward = conf.getEnableGrpcForward();
-        this.server =
-            new HTTPServer(
-                new InetSocketAddress(conf.getMetricsPort()), this.collectorRegistry, true);
-        logger.info("http server is up " + this.server.getPort());
-      } catch (Exception e) {
-        logger.error("http server not up");
-        throw new RuntimeException(e);
-      }
-    }
-    if (this.enableGrpcForward) {
-      logger.info("enable grpc forward for high available");
-    }
+    this.metricsServer = MetricsServer.getInstance(conf);
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
 
@@ -353,10 +326,6 @@ public class TiSession implements AutoCloseable {
     return channelFactory;
   }
 
-  public CollectorRegistry getCollectorRegistry() {
-    return collectorRegistry;
-  }
-
   /**
    * This is used for setting call back function to invalidate cache information
    *
@@ -468,9 +437,8 @@ public class TiSession implements AutoCloseable {
       return;
     }
 
-    if (server != null) {
-      server.stop();
-      logger.info("Metrics server on " + server.getPort() + " is stopped");
+    if (metricsServer != null) {
+      metricsServer.close();
     }
 
     isClosed = true;
