@@ -46,26 +46,16 @@ public class PDClientTest extends PDMockServerTest {
     try (PDClient client = session.getPDClient()) {
       client.trySwitchLeader("http://" + LOCAL_ADDR + ":" + (pdServer.port + 1));
       assertEquals(
-<<<<<<< HEAD
           "http://" + LOCAL_ADDR + ":" + (pdServer.port + 1),
           client.getPdClientWrapper().getLeaderInfo());
-=======
-          client.getPdClientWrapper().getLeaderInfo(),
-          "http://" + LOCAL_ADDR + ":" + (pdServer.port + 1));
->>>>>>> fe6617e... Support select replica with rich meta data (#171)
     }
     tearDown();
     setUp(LOCAL_ADDR_IPV6);
     try (PDClient client = session.getPDClient()) {
       client.trySwitchLeader("http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
       assertEquals(
-<<<<<<< HEAD
           "http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2),
           client.getPdClientWrapper().getLeaderInfo());
-=======
-          client.getPdClientWrapper().getLeaderInfo(),
-          "http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
->>>>>>> fe6617e... Support select replica with rich meta data (#171)
     }
   }
 
