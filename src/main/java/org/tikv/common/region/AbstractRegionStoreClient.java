@@ -116,7 +116,7 @@ public abstract class AbstractRegionStoreClient
   @Override
   public boolean onStoreUnreachable() {
     if (!conf.getEnableGrpcForward()) {
-      regionManager.onRequestFail(region, targetStore);
+      regionManager.onRequestFail(region);
       return false;
     }
     if (targetStore.getProxyStore() == null) {
@@ -130,9 +130,7 @@ public abstract class AbstractRegionStoreClient
           String.format(
               "retry time exceed for region[%d], invalid this region and store[%d]",
               region.getId(), targetStore.getId()));
-      if (originStore != null) {
-        regionManager.onRequestFail(region, originStore);
-      }
+      regionManager.onRequestFail(region);
       return false;
     }
     TiStore proxyStore = switchProxyStore();

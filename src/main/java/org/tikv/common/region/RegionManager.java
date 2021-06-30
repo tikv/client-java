@@ -241,11 +241,6 @@ public class RegionManager {
     cache.invalidateRegion(region);
   }
 
-  public synchronized void onRequestFail(TiRegion region, TiStore store) {
-    cache.invalidateRegion(region);
-    cache.invalidateAllRegionForStore(store);
-  }
-
   public void invalidateStore(long storeId) {
     cache.invalidateStore(storeId);
   }
