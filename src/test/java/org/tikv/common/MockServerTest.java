@@ -44,8 +44,7 @@ public class MockServerTest extends PDMockServerTest {
             r,
             r.getPeers(0),
             r.getPeersList(),
-            s.stream().map(TiStore::new).collect(Collectors.toList()),
-            null);
+            s.stream().map(TiStore::new).collect(Collectors.toList()));
     pdServer.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
     for (Metapb.Store store : s) {
       pdServer.addGetStoreResp(Pdpb.GetStoreResponse.newBuilder().setStore(store).build());

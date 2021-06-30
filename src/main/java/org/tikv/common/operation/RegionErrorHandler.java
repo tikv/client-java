@@ -169,8 +169,6 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
     if (recv.onStoreUnreachable()) {
       return true;
-    } else {
-      regionManager.onRequestFail(recv.getRegion());
     }
 
     backOffer.doBackOff(
