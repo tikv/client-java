@@ -54,6 +54,7 @@ public class TiConfiguration implements Serializable {
   private static void loadFromDefaultProperties() {
     setIfMissing(TIKV_PD_ADDRESSES, DEF_PD_ADDRESSES);
     setIfMissing(TIKV_GRPC_TIMEOUT, DEF_TIMEOUT);
+    setIfMissing(TIKV_GRPC_FORWARD_TIMEOUT, DEF_FORWARD_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_TIMEOUT, DEF_SCAN_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_BATCH_SIZE, DEF_SCAN_BATCH_SIZE);
     setIfMissing(TIKV_GRPC_MAX_FRAME_SIZE, DEF_MAX_FRAME_SIZE);
@@ -236,6 +237,7 @@ public class TiConfiguration implements Serializable {
   }
 
   private long timeout = getTimeAsMs(TIKV_GRPC_TIMEOUT);
+  private long forwardTimeout = getTimeAsMs(TIKV_GRPC_FORWARD_TIMEOUT);
   private long scanTimeout = getTimeAsMs(TIKV_GRPC_SCAN_TIMEOUT);
   private int maxFrameSize = getInt(TIKV_GRPC_MAX_FRAME_SIZE);
   private List<URI> pdAddrs = getPdAddrs(TIKV_PD_ADDRESSES);
@@ -328,6 +330,15 @@ public class TiConfiguration implements Serializable {
 
   public TiConfiguration setTimeout(long timeout) {
     this.timeout = timeout;
+    return this;
+  }
+
+  public long getForwardTimeout() {
+    return forwardTimeout;
+  }
+
+  public TiConfiguration setForwardTimeout(long timeout) {
+    this.forwardTimeout = timeout;
     return this;
   }
 

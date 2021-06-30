@@ -215,8 +215,16 @@ public class RegionManager {
     return null;
   }
 
-  public synchronized boolean updateRegion(TiRegion oldRegion, TiRegion region) {
-    return cache.updateRegion(oldRegion, region);
+  public synchronized void updateStore(TiStore oldStore, TiStore newStore) {
+    if (cache.updateStore(oldStore, newStore)) {
+      if (newStore.isUnreachable()) {
+        logger.warn(
+            String.format(
+                "check health for store [%s] in background thread",
+                newStore.getStore().getAddress()));
+        this.storeChecker.scheduleStoreHealthCheck(newStore);
+      }
+    }
   }
 
   /** Clears all cache when some unexpected error occurs. */
@@ -229,15 +237,8 @@ public class RegionManager {
    *
    * @param region region
    */
-  public void onRequestFail(TiRegion region) {
-    onRequestFail(region, region.getLeader().getStoreId());
-  }
-
-  private void onRequestFail(TiRegion region, long storeId) {
-    if (this.storeChecker != null) {
-      cache.invalidateRegion(region);
-      cache.invalidateAllRegionForStore(storeId);
-    }
+  public synchronized void onRequestFail(TiRegion region) {
+    cache.invalidateRegion(region);
   }
 
   public void invalidateStore(long storeId) {
@@ -246,10 +247,6 @@ public class RegionManager {
 
   public void invalidateRegion(TiRegion region) {
     cache.invalidateRegion(region);
-  }
-
-  public void scheduleHealthCheckJob(TiStore store) {
-    this.storeChecker.scheduleStoreHealthCheck(store);
   }
 
   public static class RegionCache {
@@ -370,10 +367,29 @@ public class RegionManager {
       }
     }
 
-    public synchronized void invalidateAllRegionForStore(long storeId) {
+    public synchronized boolean updateStore(TiStore oldStore, TiStore newStore) {
+      TiStore originStore = storeCache.get(oldStore.getId());
+      if (originStore == oldStore) {
+        storeCache.put(newStore.getId(), newStore);
+        if (oldStore != null && oldStore.isUnreachable()) {
+          oldStore.markReachable();
+        }
+        if (newStore.getProxyStore() != null) {
+          newStore.markUnreachable();
+        }
+        return true;
+      }
+      return false;
+    }
+
+    public synchronized void invalidateAllRegionForStore(TiStore store) {
+      TiStore oldStore = storeCache.get(store.getId());
+      if (oldStore != store) {
+        return;
+      }
       List<TiRegion> regionToRemove = new ArrayList<>();
       for (TiRegion r : regionCache.values()) {
-        if (r.getLeader().getStoreId() == storeId) {
+        if (r.getLeader().getStoreId() == store.getId()) {
           if (logger.isDebugEnabled()) {
             logger.debug(String.format("invalidateAllRegionForStore Region[%s]", r));
           }
@@ -381,6 +397,7 @@ public class RegionManager {
         }
       }
 
+      logger.warn(String.format("invalid store [%d]", store.getId()));
       // remove region
       for (TiRegion r : regionToRemove) {
         keyToRegionIdCache.remove(makeRange(r.getStartKey(), r.getEndKey()));
@@ -421,7 +438,7 @@ public class RegionManager {
     private TiRegion createRegion(Metapb.Region region, Metapb.Peer leader, BackOffer backOffer) {
       List<Metapb.Peer> peers = region.getPeersList();
       List<TiStore> stores = getRegionStore(peers, backOffer);
-      return new TiRegion(conf, region, leader, peers, stores, null);
+      return new TiRegion(conf, region, leader, peers, stores);
     }
 
     public synchronized void clearAll() {

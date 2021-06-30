@@ -45,6 +45,8 @@ public abstract class AbstractRegionStoreClient
   protected final RegionManager regionManager;
   protected TiRegion region;
   protected TiStore targetStore;
+  protected TiStore originStore;
+  protected long retryTimes;
 
   protected AbstractRegionStoreClient(
       TiConfiguration conf,
@@ -61,6 +63,11 @@ public abstract class AbstractRegionStoreClient
     this.region = region;
     this.regionManager = regionManager;
     this.targetStore = store;
+    this.originStore = null;
+    this.retryTimes = 0;
+    if (this.targetStore.getProxyStore() != null) {
+      this.timeout = conf.getForwardTimeout();
+    }
   }
 
   public TiRegion getRegion() {
@@ -109,32 +116,46 @@ public abstract class AbstractRegionStoreClient
   @Override
   public boolean onStoreUnreachable() {
     if (!conf.getEnableGrpcForward()) {
+      regionManager.onRequestFail(region);
       return false;
     }
-    if (region.getProxyStore() == null) {
+    if (targetStore.getProxyStore() == null) {
       if (!targetStore.isUnreachable()) {
-        if (checkHealth(targetStore)) {
+        if (checkHealth(targetStore.getStore())) {
           return true;
-        } else {
-          if (targetStore.markUnreachable()) {
-            this.regionManager.scheduleHealthCheckJob(targetStore);
-          }
         }
       }
-    }
-    TiRegion proxyRegion = switchProxyStore();
-    if (proxyRegion == null) {
+    } else if (retryTimes > region.getFollowerList().size()) {
+      logger.warn(
+          String.format(
+              "retry time exceed for region[%d], invalid this region and store[%d]",
+              region.getId(), targetStore.getId()));
+      regionManager.onRequestFail(region);
       return false;
     }
+    TiStore proxyStore = switchProxyStore();
+    if (proxyStore == null) {
+      logger.warn(
+          String.format(
+              "no forward store can be selected for store [%s] and region[%d]",
+              targetStore.getStore().getAddress(), region.getId()));
+      return false;
+    }
+    if (originStore == null) {
+      originStore = targetStore;
+      if (this.targetStore.getProxyStore() != null) {
+        this.timeout = conf.getForwardTimeout();
+      }
+    }
+    targetStore = proxyStore;
+    retryTimes += 1;
     logger.warn(
         String.format(
             "forward request to store [%s] by store [%s] for region[%d]",
             targetStore.getStore().getAddress(),
-            proxyRegion.getProxyStore().getStore().getAddress(),
-            proxyRegion.getId()));
-    regionManager.updateRegion(region, proxyRegion);
-    region = proxyRegion;
-    String addressStr = region.getProxyStore().getStore().getAddress();
+            targetStore.getProxyStore().getAddress(),
+            region.getId()));
+    String addressStr = targetStore.getProxyStore().getAddress();
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
     Metadata header = new Metadata();
@@ -144,11 +165,15 @@ public abstract class AbstractRegionStoreClient
     return true;
   }
 
-  private boolean checkHealth(TiStore store) {
-    if (store.getStore() == null) {
-      return false;
+  @Override
+  protected void tryUpdateProxy() {
+    if (originStore != null) {
+      regionManager.updateStore(originStore, targetStore);
     }
-    String addressStr = store.getStore().getAddress();
+  }
+
+  private boolean checkHealth(Metapb.Store store) {
+    String addressStr = store.getAddress();
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
     HealthGrpc.HealthBlockingStub stub =
@@ -166,26 +191,25 @@ public abstract class AbstractRegionStoreClient
     return true;
   }
 
-  private TiRegion switchProxyStore() {
+  private TiStore switchProxyStore() {
     boolean hasVisitedStore = false;
     List<Metapb.Peer> peers = region.getFollowerList();
     for (int i = 0; i < peers.size() * 2; i++) {
       int idx = i % peers.size();
       Metapb.Peer peer = peers.get(idx);
       if (peer.getStoreId() != region.getLeader().getStoreId()) {
-        if (region.getProxyStore() == null) {
+        if (targetStore.getProxyStore() == null) {
           TiStore store = regionManager.getStoreById(peer.getStoreId());
-          if (checkHealth(store)) {
-            return region.switchProxyStore(store);
+          if (checkHealth(store.getStore())) {
+            return targetStore.withProxy(store.getStore());
           }
         } else {
-          TiStore proxyStore = region.getProxyStore();
-          if (peer.getStoreId() == proxyStore.getStore().getId()) {
+          if (peer.getStoreId() == targetStore.getProxyStore().getId()) {
             hasVisitedStore = true;
           } else if (hasVisitedStore) {
-            proxyStore = regionManager.getStoreById(peer.getStoreId());
-            if (!proxyStore.isUnreachable() && checkHealth(proxyStore)) {
-              return region.switchProxyStore(proxyStore);
+            TiStore proxyStore = regionManager.getStoreById(peer.getStoreId());
+            if (!proxyStore.isUnreachable() && checkHealth(proxyStore.getStore())) {
+              return targetStore.withProxy(proxyStore.getStore());
             }
           }
         }

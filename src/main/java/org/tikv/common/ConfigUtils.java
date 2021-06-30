@@ -20,6 +20,7 @@ import org.tikv.kvproto.Kvrpcpb;
 public class ConfigUtils {
   public static final String TIKV_PD_ADDRESSES = "tikv.pd.addresses";
   public static final String TIKV_GRPC_TIMEOUT = "tikv.grpc.timeout_in_ms";
+  public static final String TIKV_GRPC_FORWARD_TIMEOUT = "tikv.grpc.forward_timeout_in_ms";
   public static final String TIKV_GRPC_SCAN_TIMEOUT = "tikv.grpc.scan_timeout_in_ms";
   public static final String TIKV_GRPC_SCAN_BATCH_SIZE = "tikv.grpc.scan_batch_size";
   public static final String TIKV_GRPC_MAX_FRAME_SIZE = "tikv.grpc.max_frame_size";
@@ -52,7 +53,8 @@ public class ConfigUtils {
   public static final String TIKV_GRPC_HEALTH_CHECK_TIMEOUT = "tikv.grpc.health_check_timeout";
 
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
-  public static final String DEF_TIMEOUT = "600ms";
+  public static final String DEF_TIMEOUT = "150ms";
+  public static final String DEF_FORWARD_TIMEOUT = "600ms";
   public static final String DEF_SCAN_TIMEOUT = "20s";
   public static final int DEF_CHECK_HEALTH_TIMEOUT = 40;
   public static final int DEF_SCAN_BATCH_SIZE = 10240;

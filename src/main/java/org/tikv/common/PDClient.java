@@ -325,7 +325,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private GetMembersResponse getMembers(URI uri) {
     try {
       ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
-      PDGrpc.PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
+      PDGrpc.PDBlockingStub stub =
+          PDGrpc.newBlockingStub(probChan).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
       GetMembersRequest request =
           GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
       GetMembersResponse resp = stub.getMembers(request);
@@ -335,7 +336,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
       return resp;
     } catch (Exception e) {
-      logger.warn("failed to get member from pd server.", e);
+      logger.debug("failed to get member from pd server.", e);
     }
     return null;
   }
@@ -361,6 +362,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       ManagedChannel clientChannel = channelFactory.getChannel(leaderUrlStr, hostMapping);
       pdClientWrapper =
           new PDClientWrapper(leaderUrlStr, leaderUrlStr, clientChannel, System.nanoTime());
+      timeout = conf.getTimeout();
     } catch (IllegalArgumentException e) {
       logger.error("Error updating leader. " + leaderUrlStr, e);
       return false;
@@ -380,6 +382,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       // create new Leader
       ManagedChannel channel = channelFactory.getChannel(followerUrlStr, hostMapping);
       pdClientWrapper = new PDClientWrapper(leaderUrls, followerUrlStr, channel, System.nanoTime());
+      timeout = conf.getForwardTimeout();
     } catch (IllegalArgumentException e) {
       logger.error("Error updating follower. " + followerUrlStr, e);
       return false;
@@ -411,6 +414,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         continue;
       }
 
+      logger.info(String.format("can not switch to new leader, try follower forward"));
       List<Pdpb.Member> members = resp.getMembersList();
 
       boolean hasReachNextMember = false;
@@ -466,8 +470,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         return;
       }
     }
-    throw new TiClientInternalException(
-        "already tried all address on file, but not leader found yet.");
+    if (pdClientWrapper == null) {
+      throw new TiClientInternalException(
+          "already tried all address on file, but not leader found yet.");
+    }
   }
 
   private synchronized void tryUpdateMembers(List<URI> members) {
@@ -543,6 +549,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return pdClientWrapper.getAsyncStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
   }
 
+  @Override
+  protected void tryUpdateProxy() {}
+
   private void initCluster() {
     GetMembersResponse resp = null;
     List<URI> pdAddrs = getConf().getPdAddrs();
@@ -560,6 +569,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     this.hostMapping =
         Optional.ofNullable(getConf().getHostMapping())
             .orElseGet(() -> new DefaultHostMapping(this.etcdClient, conf.getNetworkMappingName()));
+    // The first request may cost too much latency
+    long originTimeout = this.timeout;
+    this.timeout = 2000;
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
@@ -567,6 +579,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
       logger.info("Could not get leader member with pd: " + u);
     }
+    this.timeout = originTimeout;
     checkNotNull(resp, "Failed to init client for PD cluster.");
     long clusterId = resp.getHeader().getClusterId();
     header = RequestHeader.newBuilder().setClusterId(clusterId).build();
@@ -656,7 +669,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
     @Override
     public String toString() {
-      return "[leaderInfo: " + leaderInfo + "]";
+      return "[leaderInfo: " + leaderInfo + ", storeAddress: " + storeAddress + "]";
     }
   }
 
