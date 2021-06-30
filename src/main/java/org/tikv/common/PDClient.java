@@ -325,7 +325,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private GetMembersResponse getMembers(URI uri) {
     try {
       ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
-      PDGrpc.PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
+      PDGrpc.PDBlockingStub stub =
+          PDGrpc.newBlockingStub(probChan).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
       GetMembersRequest request =
           GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
       GetMembersResponse resp = stub.getMembers(request);
@@ -335,7 +336,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
       return resp;
     } catch (Exception e) {
-      logger.debug("failed to get member from pd server.", e);
+      logger.warn("failed to get member from pd server.", e);
     }
     return null;
   }
@@ -568,6 +569,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     this.hostMapping =
         Optional.ofNullable(getConf().getHostMapping())
             .orElseGet(() -> new DefaultHostMapping(this.etcdClient, conf.getNetworkMappingName()));
+    // The first request may cost too much latency
+    long originTimeout = this.timeout;
+    this.timeout = 2000;
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
@@ -575,6 +579,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
       logger.info("Could not get leader member with pd: " + u);
     }
+    this.timeout = originTimeout;
     checkNotNull(resp, "Failed to init client for PD cluster.");
     long clusterId = resp.getHeader().getClusterId();
     header = RequestHeader.newBuilder().setClusterId(clusterId).build();
