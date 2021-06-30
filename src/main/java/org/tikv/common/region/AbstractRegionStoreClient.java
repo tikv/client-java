@@ -46,6 +46,7 @@ public abstract class AbstractRegionStoreClient
   protected TiRegion region;
   protected TiStore targetStore;
   protected TiStore originStore;
+  protected long retryTimes;
 
   protected AbstractRegionStoreClient(
       TiConfiguration conf,
@@ -63,6 +64,7 @@ public abstract class AbstractRegionStoreClient
     this.regionManager = regionManager;
     this.targetStore = store;
     this.originStore = null;
+    this.retryTimes = 0;
     if (this.targetStore.getProxyStore() != null) {
       this.timeout = conf.getForwardTimeout();
     }
@@ -122,6 +124,12 @@ public abstract class AbstractRegionStoreClient
           return true;
         }
       }
+    } else if (retryTimes > region.getFollowerList().size()) {
+      logger.warn(
+          String.format(
+              "retry time exceed for region[%d], invalid this region and store[%d]",
+              region.getId(), targetStore.getId()));
+      return false;
     }
     TiStore proxyStore = switchProxyStore();
     if (proxyStore == null) {
@@ -129,8 +137,12 @@ public abstract class AbstractRegionStoreClient
     }
     if (originStore == null) {
       originStore = targetStore;
+      if (this.targetStore.getProxyStore() != null) {
+        this.timeout = conf.getForwardTimeout();
+      }
     }
     targetStore = proxyStore;
+    retryTimes += 1;
     logger.warn(
         String.format(
             "forward request to store [%s] by store [%s] for region[%d]",

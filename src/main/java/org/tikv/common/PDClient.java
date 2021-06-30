@@ -342,6 +342,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   // return whether the leader has changed to target address `leaderUrlStr`.
   synchronized boolean trySwitchLeader(String leaderUrlStr) {
+
     if (pdClientWrapper != null) {
       if (leaderUrlStr.equals(pdClientWrapper.getLeaderInfo())) {
         // The message to leader is not forwarded by follower.
@@ -468,8 +469,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         return;
       }
     }
-    throw new TiClientInternalException(
-        "already tried all address on file, but not leader found yet.");
+    if (pdClientWrapper == null) {
+      throw new TiClientInternalException(
+          "already tried all address on file, but not leader found yet.");
+    }
   }
 
   private synchronized void tryUpdateMembers(List<URI> members) {
@@ -661,7 +664,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
     @Override
     public String toString() {
-      return "[leaderInfo: " + leaderInfo + "]";
+      return "[leaderInfo: " + leaderInfo + ", storeAddress: " + storeAddress + "]";
     }
   }
 
