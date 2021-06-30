@@ -116,6 +116,7 @@ public abstract class AbstractRegionStoreClient
   @Override
   public boolean onStoreUnreachable() {
     if (!conf.getEnableGrpcForward()) {
+      regionManager.onRequestFail(region, targetStore);
       return false;
     }
     if (targetStore.getProxyStore() == null) {
@@ -129,10 +130,17 @@ public abstract class AbstractRegionStoreClient
           String.format(
               "retry time exceed for region[%d], invalid this region and store[%d]",
               region.getId(), targetStore.getId()));
+      if (originStore != null) {
+        regionManager.onRequestFail(region, originStore);
+      }
       return false;
     }
     TiStore proxyStore = switchProxyStore();
     if (proxyStore == null) {
+      logger.warn(
+          String.format(
+              "no forward store can be selected for store [%s] and region[%d]",
+              targetStore.getStore().getAddress(), region.getId()));
       return false;
     }
     if (originStore == null) {
@@ -198,7 +206,7 @@ public abstract class AbstractRegionStoreClient
             return targetStore.withProxy(store.getStore());
           }
         } else {
-          if (peer.getStoreId() == targetStore.getStore().getId()) {
+          if (peer.getStoreId() == targetStore.getProxyStore().getId()) {
             hasVisitedStore = true;
           } else if (hasVisitedStore) {
             TiStore proxyStore = regionManager.getStoreById(peer.getStoreId());

@@ -238,15 +238,12 @@ public class RegionManager {
    * @param region region
    */
   public synchronized void onRequestFail(TiRegion region) {
-    onRequestFail(region, region.getLeader().getStoreId());
+    cache.invalidateRegion(region);
   }
 
-  private void onRequestFail(TiRegion region, long storeId) {
-    logger.warn(String.format("invalid store [%d]", storeId));
+  public synchronized void onRequestFail(TiRegion region, TiStore store) {
     cache.invalidateRegion(region);
-    if (cache.storeCache.get(storeId) != null) {
-      cache.invalidateAllRegionForStore(storeId);
-    }
+    cache.invalidateAllRegionForStore(store);
   }
 
   public void invalidateStore(long storeId) {
@@ -390,10 +387,14 @@ public class RegionManager {
       return false;
     }
 
-    public synchronized void invalidateAllRegionForStore(long storeId) {
+    public synchronized void invalidateAllRegionForStore(TiStore store) {
+      TiStore oldStore = storeCache.get(store.getId());
+      if (oldStore != store) {
+        return;
+      }
       List<TiRegion> regionToRemove = new ArrayList<>();
       for (TiRegion r : regionCache.values()) {
-        if (r.getLeader().getStoreId() == storeId) {
+        if (r.getLeader().getStoreId() == store.getId()) {
           if (logger.isDebugEnabled()) {
             logger.debug(String.format("invalidateAllRegionForStore Region[%s]", r));
           }
@@ -401,6 +402,7 @@ public class RegionManager {
         }
       }
 
+      logger.warn(String.format("invalid store [%d]", store.getId()));
       // remove region
       for (TiRegion r : regionToRemove) {
         keyToRegionIdCache.remove(makeRange(r.getStartKey(), r.getEndKey()));

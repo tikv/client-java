@@ -342,7 +342,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   // return whether the leader has changed to target address `leaderUrlStr`.
   synchronized boolean trySwitchLeader(String leaderUrlStr) {
-
     if (pdClientWrapper != null) {
       if (leaderUrlStr.equals(pdClientWrapper.getLeaderInfo())) {
         // The message to leader is not forwarded by follower.
@@ -414,6 +413,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         continue;
       }
 
+      logger.info(String.format("can not switch to new leader, try follower forward"));
       List<Pdpb.Member> members = resp.getMembersList();
 
       boolean hasReachNextMember = false;
