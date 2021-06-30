@@ -14,14 +14,14 @@ public class TiStore {
     this.proxyStore = null;
   }
 
-  private TiStore(Metapb.Store store, Metapb.Store proxyStore, boolean unreachable) {
+  private TiStore(Metapb.Store store, Metapb.Store proxyStore) {
     this.store = store;
-    this.unreachable = new AtomicBoolean(unreachable);
+    this.unreachable = new AtomicBoolean(false);
     this.proxyStore = proxyStore;
   }
 
   public TiStore withProxy(Metapb.Store proxyStore) {
-    return new TiStore(this.store, proxyStore, this.unreachable.get());
+    return new TiStore(this.store, proxyStore);
   }
 
   public void markUnreachable() {
