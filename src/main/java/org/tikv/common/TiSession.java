@@ -41,6 +41,7 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
+import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.txn.KVClient;
 import org.tikv.txn.TxnKVClient;
@@ -180,6 +181,7 @@ public class TiSession implements AutoCloseable {
         if (regionManager == null) {
           regionManager =
               new RegionManager(
+                  getConf(),
                   getPDClient(),
                   this.cacheInvalidateCallback,
                   this.channelFactory,
@@ -349,7 +351,7 @@ public class TiSession implements AutoCloseable {
     long startMS = System.currentTimeMillis();
 
     // split region
-    List<TiRegion> newRegions =
+    List<Metapb.Region> newRegions =
         splitRegion(
             splitKeys
                 .stream()
@@ -358,7 +360,7 @@ public class TiSession implements AutoCloseable {
             ConcreteBackOffer.newCustomBackOff(splitRegionBackoffMS));
 
     // scatter region
-    for (TiRegion newRegion : newRegions) {
+    for (Metapb.Region newRegion : newRegions) {
       try {
         getPDClient()
             .scatterRegion(newRegion, ConcreteBackOffer.newCustomBackOff(scatterRegionBackoffMS));
@@ -371,7 +373,7 @@ public class TiSession implements AutoCloseable {
     if (scatterWaitMS > 0) {
       logger.info("start to wait scatter region finish");
       long scatterRegionStartMS = System.currentTimeMillis();
-      for (TiRegion newRegion : newRegions) {
+      for (Metapb.Region newRegion : newRegions) {
         long remainMS = (scatterRegionStartMS + scatterWaitMS) - System.currentTimeMillis();
         if (remainMS <= 0) {
           logger.warn("wait scatter region timeout");
@@ -388,8 +390,8 @@ public class TiSession implements AutoCloseable {
     logger.info("splitRegionAndScatter cost {} seconds", (endMS - startMS) / 1000);
   }
 
-  private List<TiRegion> splitRegion(List<ByteString> splitKeys, BackOffer backOffer) {
-    List<TiRegion> regions = new ArrayList<>();
+  private List<Metapb.Region> splitRegion(List<ByteString> splitKeys, BackOffer backOffer) {
+    List<Metapb.Region> regions = new ArrayList<>();
 
     Map<TiRegion, List<ByteString>> groupKeys =
         groupKeysByRegion(regionManager, splitKeys, backOffer);
@@ -411,7 +413,7 @@ public class TiSession implements AutoCloseable {
             "split key equal to region start key or end key. Region splitting is not needed.");
       } else {
         logger.info("start to split region id={}, split size={}", region.getId(), splits.size());
-        List<TiRegion> newRegions;
+        List<Metapb.Region> newRegions;
         try {
           newRegions = getRegionStoreClientBuilder().build(region, store).splitRegion(splits);
         } catch (final TiKVException e) {

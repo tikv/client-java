@@ -10,8 +10,9 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.replica.Region;
 import org.tikv.common.replica.ReplicaSelector;
-import org.tikv.kvproto.Metapb;
+import org.tikv.common.replica.Store;
 
 public class ReplicaReadTest extends TXNTest {
   private TiSession session;
@@ -41,12 +42,11 @@ public class ReplicaReadTest extends TXNTest {
     conf.setReplicaSelector(
         new ReplicaSelector() {
           @Override
-          public List<Metapb.Peer> select(
-              Metapb.Peer leader, List<Metapb.Peer> followers, List<Metapb.Peer> learners) {
-            List<Metapb.Peer> list = new ArrayList<>();
-            list.addAll(followers);
-            list.addAll(learners);
-            list.add(leader);
+          public List<Store> select(Region region) {
+            List<Store> list = new ArrayList<>();
+            for (Store store : region.getStores()) {
+              list.add(store);
+            }
             return list;
           }
         });
