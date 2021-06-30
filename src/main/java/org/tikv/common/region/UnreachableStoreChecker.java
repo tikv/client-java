@@ -9,12 +9,15 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Metapb;
 
 public class UnreachableStoreChecker implements Runnable {
+  private static final Logger logger = LoggerFactory.getLogger(UnreachableStoreChecker.class);
   private ConcurrentHashMap<Long, TiStore> stores;
   private BlockingQueue<TiStore> taskQueue;
   private final ChannelFactory channelFactory;
@@ -67,6 +70,9 @@ public class UnreachableStoreChecker implements Runnable {
         HealthCheckResponse resp = stub.check(req);
         if (resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING) {
           store.markReachable();
+          logger.warn(
+              String.format("store [%s] recovers to be reachable", store.getStore().getAddress()));
+
           this.stores.remove(Long.valueOf(store.getId()));
           continue;
         }

@@ -79,6 +79,9 @@ public class TiSession implements AutoCloseable {
     this.client = PDClient.createRaw(conf, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
     this.metricsServer = MetricsServer.getInstance(conf);
+    if (this.enableGrpcForward) {
+      logger.info("enable grpc forward for high available");
+    }
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
 

@@ -89,6 +89,9 @@ public abstract class AbstractGRPCClient<
                       stub.getChannel(), method, stub.getCallOptions(), requestFactory.get());
                 },
                 method.getFullMethodName());
+    if (resp != null && this.conf.getEnableGrpcForward()) {
+      tryUpdateProxy();
+    }
 
     if (logger.isTraceEnabled()) {
       logger.trace(String.format("leaving %s...", method.getFullMethodName()));
@@ -176,6 +179,8 @@ public abstract class AbstractGRPCClient<
   protected abstract BlockingStubT getBlockingStub();
 
   protected abstract StubT getAsyncStub();
+
+  protected abstract void tryUpdateProxy();
 
   protected boolean checkHealth(String addressStr, HostMapping hostMapping) {
     ManagedChannel channel = channelFactory.getChannel(addressStr, hostMapping);

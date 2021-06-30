@@ -650,6 +650,7 @@ public class RawKVClient implements AutoCloseable {
   private List<Batch> doSendBatchPutInBatchesWithRetry(
       BackOffer backOffer, Batch batch, long ttl, boolean atomic) {
     try (RegionStoreClient client = clientBuilder.build(batch.getRegion())) {
+      client.setTimeout(conf.getScanTimeout());
       client.rawBatchPut(backOffer, batch, ttl, atomic);
       return new ArrayList<>();
     } catch (final TiKVException e) {
