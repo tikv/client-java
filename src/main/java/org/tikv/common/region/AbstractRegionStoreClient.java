@@ -130,13 +130,13 @@ public abstract class AbstractRegionStoreClient
     if (originStore == null) {
       originStore = targetStore;
     }
+    targetStore = proxyStore;
     logger.warn(
         String.format(
             "forward request to store [%s] by store [%s] for region[%d]",
             targetStore.getStore().getAddress(),
             targetStore.getProxyStore().getAddress(),
             region.getId()));
-    targetStore = proxyStore;
     String addressStr = targetStore.getProxyStore().getAddress();
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
