@@ -335,7 +335,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
       return resp;
     } catch (Exception e) {
-      logger.warn("failed to get member from pd server.", e);
+      logger.debug("failed to get member from pd server.", e);
     }
     return null;
   }
