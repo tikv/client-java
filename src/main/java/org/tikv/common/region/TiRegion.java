@@ -49,18 +49,12 @@ public class TiRegion implements Serializable {
   private final Peer leader;
   private final ReplicaSelector replicaSelector;
   private final List<Peer> replicaList;
-  private final TiStore proxyStore;
   private int replicaIdx;
   private final List<Peer> peers;
   private final List<TiStore> stores;
 
   public TiRegion(
-      TiConfiguration conf,
-      Region meta,
-      Peer leader,
-      List<Peer> peers,
-      List<TiStore> stores,
-      TiStore proxyStore) {
+      TiConfiguration conf, Region meta, Peer leader, List<Peer> peers, List<TiStore> stores) {
     this.conf = Objects.requireNonNull(conf, "conf is null");
     this.meta = Objects.requireNonNull(meta, "meta is null");
     this.isolationLevel = conf.getIsolationLevel();
@@ -68,7 +62,6 @@ public class TiRegion implements Serializable {
     this.peers = peers;
     this.stores = stores;
     this.replicaSelector = conf.getReplicaSelector();
-    this.proxyStore = proxyStore;
     if (leader == null || leader.getId() == 0) {
       if (meta.getPeersCount() == 0) {
         throw new TiClientInternalException("Empty peer list for region " + meta.getId());
@@ -182,10 +175,6 @@ public class TiRegion implements Serializable {
         meta.getId(), meta.getRegionEpoch().getConfVer(), meta.getRegionEpoch().getVersion());
   }
 
-  public TiStore getProxyStore() {
-    return proxyStore;
-  }
-
   /**
    * switches current peer to the one on specific store. It return false if no peer matches the
    * storeID.
@@ -197,14 +186,10 @@ public class TiRegion implements Serializable {
     List<Peer> peers = meta.getPeersList();
     for (Peer p : peers) {
       if (p.getStoreId() == leaderStoreID) {
-        return new TiRegion(this.conf, this.meta, p, peers, this.stores, this.proxyStore);
+        return new TiRegion(this.conf, this.meta, p, peers, this.stores);
       }
     }
     return null;
-  }
-
-  public TiRegion switchProxyStore(TiStore store) {
-    return new TiRegion(this.conf, this.meta, this.leader, this.peers, this.stores, store);
   }
 
   public boolean isMoreThan(ByteString key) {

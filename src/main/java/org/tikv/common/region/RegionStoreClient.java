@@ -1269,8 +1269,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       TikvBlockingStub blockingStub = null;
       TikvStub asyncStub = null;
 
-      if (conf.getEnableGrpcForward() && region.getProxyStore() != null && store.isUnreachable()) {
-        addressStr = region.getProxyStore().getStore().getAddress();
+      if (conf.getEnableGrpcForward() && store.getProxyStore() != null && store.isUnreachable()) {
+        addressStr = store.getProxyStore().getAddress();
         channel =
             channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
         Metadata header = new Metadata();
@@ -1280,11 +1280,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       } else {
         // If the store is reachable, which is update by check-health thread
         if (!store.isUnreachable()) {
-          if (region.getProxyStore() != null) {
-            TiRegion newRegion = region.switchProxyStore(null);
-            if (regionManager.updateRegion(region, newRegion)) {
-              region = newRegion;
-            }
+          if (store.getProxyStore() != null) {
+            TiStore newStore = store.withProxy(null);
+            regionManager.updateStore(store, newStore);
+            store = newStore;
           }
         }
         channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());

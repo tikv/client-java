@@ -215,8 +215,10 @@ public class RegionManager {
     return null;
   }
 
-  public synchronized boolean updateRegion(TiRegion oldRegion, TiRegion region) {
-    return cache.updateRegion(oldRegion, region);
+  public synchronized void updateStore(TiStore oldStore, TiStore newStore) {
+    if (cache.updateStore(oldStore, newStore)) {
+      this.storeChecker.scheduleStoreHealthCheck(newStore);
+    }
   }
 
   /** Clears all cache when some unexpected error occurs. */
@@ -246,10 +248,6 @@ public class RegionManager {
 
   public void invalidateRegion(TiRegion region) {
     cache.invalidateRegion(region);
-  }
-
-  public void scheduleHealthCheckJob(TiStore store) {
-    this.storeChecker.scheduleStoreHealthCheck(store);
   }
 
   public static class RegionCache {
@@ -370,6 +368,18 @@ public class RegionManager {
       }
     }
 
+    public synchronized boolean updateStore(TiStore oldStore, TiStore newStore) {
+      TiStore originStore = storeCache.get(oldStore.getId());
+      if (originStore == oldStore) {
+        storeCache.put(newStore.getId(), newStore);
+        if (newStore.getProxyStore() != null) {
+          newStore.markUnreachable();
+          return true;
+        }
+      }
+      return false;
+    }
+
     public synchronized void invalidateAllRegionForStore(long storeId) {
       List<TiRegion> regionToRemove = new ArrayList<>();
       for (TiRegion r : regionCache.values()) {
@@ -421,7 +431,7 @@ public class RegionManager {
     private TiRegion createRegion(Metapb.Region region, Metapb.Peer leader, BackOffer backOffer) {
       List<Metapb.Peer> peers = region.getPeersList();
       List<TiStore> stores = getRegionStore(peers, backOffer);
-      return new TiRegion(conf, region, leader, peers, stores, null);
+      return new TiRegion(conf, region, leader, peers, stores);
     }
 
     public synchronized void clearAll() {
