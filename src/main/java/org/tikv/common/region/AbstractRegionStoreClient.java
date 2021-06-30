@@ -60,6 +60,9 @@ public abstract class AbstractRegionStoreClient
     this.regionManager = regionManager;
     this.targetStore = store;
     this.originStore = null;
+    if (this.targetStore.getProxyStore() != null) {
+      this.timeout = conf.getForwardTimeout();
+    }
   }
 
   public TiRegion getRegion() {

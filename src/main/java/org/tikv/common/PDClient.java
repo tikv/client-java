@@ -361,6 +361,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       ManagedChannel clientChannel = channelFactory.getChannel(leaderUrlStr, hostMapping);
       pdClientWrapper =
           new PDClientWrapper(leaderUrlStr, leaderUrlStr, clientChannel, System.nanoTime());
+      timeout = conf.getTimeout();
     } catch (IllegalArgumentException e) {
       logger.error("Error updating leader. " + leaderUrlStr, e);
       return false;
@@ -380,6 +381,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       // create new Leader
       ManagedChannel channel = channelFactory.getChannel(followerUrlStr, hostMapping);
       pdClientWrapper = new PDClientWrapper(leaderUrls, followerUrlStr, channel, System.nanoTime());
+      timeout = conf.getForwardTimeout();
     } catch (IllegalArgumentException e) {
       logger.error("Error updating follower. " + followerUrlStr, e);
       return false;
