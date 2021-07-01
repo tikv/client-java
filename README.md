@@ -92,10 +92,18 @@ The following includes JVM related parameters.
 
 #### tikv.grpc.timeout_in_ms
 - timeout of grpc request  
+- default: 150ms
+
+#### tikv.grpc.forward_timeout_in_ms
+- timeout of grpc request when forward request by follower
 - default: 600ms
 
+#### tikv.grpc.health_check_timeout
+- timeout of grpc request to check health status of TiKV node. unit: ms
+- default: 40
+
 #### tikv.grpc.scan_timeout_in_ms
-- timeout of scan/delete range grpc request
+- timeout of scan/delete_range/batch_put grpc request
 - default: 20s
 
 ### Metrics Parameter
