@@ -383,13 +383,15 @@ public class RegionManager {
           logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
         }
         TiRegion oldRegion = regionCache.get(region.getId());
-        if (expected != oldRegion) {
+        if (!expected.getMeta().equals(oldRegion.getMeta())) {
           return false;
         } else {
           if (oldRegion != null) {
             keyToRegionIdCache.remove(makeRange(oldRegion.getStartKey(), oldRegion.getEndKey()));
           }
-          putRegion(region);
+          regionCache.put(region.getId(), region);
+          keyToRegionIdCache.put(
+              makeRange(region.getStartKey(), region.getEndKey()), region.getId());
           return true;
         }
       } catch (Exception ignore) {
