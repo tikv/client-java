@@ -120,13 +120,18 @@ public abstract class AbstractRegionStoreClient
       regionManager.onRequestFail(region);
       return false;
     }
+
+    if (!targetStore.isValid()) {
+      return false;
+    }
+
     if (targetStore.getProxyStore() == null) {
-      if (!targetStore.isUnreachable()) {
-        if (checkHealth(targetStore.getStore())) {
-          return true;
-        }
+      if (targetStore.isReachable()) {
+        return true;
       }
-    } else if (retryTimes > region.getFollowerList().size()) {
+    }
+
+    if (retryTimes > region.getFollowerList().size()) {
       logger.warn(
           String.format(
               "retry time exceed for region[%d], invalid this region[%d]",
@@ -206,7 +211,7 @@ public abstract class AbstractRegionStoreClient
       if (peer.getStoreId() != region.getLeader().getStoreId()) {
         if (targetStore.getProxyStore() == null) {
           TiStore store = regionManager.getStoreById(peer.getStoreId());
-          if (checkHealth(store.getStore())) {
+          if (store.isReachable() && store.getProxyStore() == null) {
             return targetStore.withProxy(store.getStore());
           }
         } else {
@@ -214,7 +219,7 @@ public abstract class AbstractRegionStoreClient
             hasVisitedStore = true;
           } else if (hasVisitedStore) {
             TiStore proxyStore = regionManager.getStoreById(peer.getStoreId());
-            if (!proxyStore.isUnreachable() && checkHealth(proxyStore.getStore())) {
+            if (proxyStore.isReachable() && proxyStore.getProxyStore() == null) {
               return targetStore.withProxy(proxyStore.getStore());
             }
           }

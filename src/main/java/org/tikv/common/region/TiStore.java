@@ -6,18 +6,43 @@ import org.tikv.kvproto.Metapb;
 public class TiStore {
   private final Metapb.Store store;
   private final Metapb.Store proxyStore;
-  private AtomicBoolean unreachable;
+  private AtomicBoolean reachable;
+  private AtomicBoolean valid;
 
   public TiStore(Metapb.Store store) {
     this.store = store;
-    this.unreachable = new AtomicBoolean(false);
+    this.reachable = new AtomicBoolean(true);
+    this.valid = new AtomicBoolean(true);
     this.proxyStore = null;
   }
 
   private TiStore(Metapb.Store store, Metapb.Store proxyStore) {
     this.store = store;
-    this.unreachable = new AtomicBoolean(false);
+    this.reachable = new AtomicBoolean(true);
+    this.valid = new AtomicBoolean(true);
     this.proxyStore = proxyStore;
+  }
+
+  @java.lang.Override
+  public boolean equals(final java.lang.Object obj) {
+    if (obj == this) {
+      return true;
+    }
+    if (!(obj instanceof TiStore)) {
+      return super.equals(obj);
+    }
+    TiStore other = (TiStore) obj;
+    if (!this.store.equals(other.store)) {
+      return false;
+    }
+
+    if (proxyStore == null && other.proxyStore == null) {
+      return true;
+    }
+    if (proxyStore != null && other.proxyStore != null) {
+      return proxyStore.equals(other.proxyStore);
+    }
+    return false;
   }
 
   public TiStore withProxy(Metapb.Store proxyStore) {
@@ -25,15 +50,23 @@ public class TiStore {
   }
 
   public void markUnreachable() {
-    this.unreachable.set(true);
+    this.reachable.set(false);
   }
 
   public void markReachable() {
-    this.unreachable.set(false);
+    this.reachable.set(true);
   }
 
-  public boolean isUnreachable() {
-    return this.unreachable.get();
+  public boolean isReachable() {
+    return this.reachable.get();
+  }
+
+  public boolean isValid() {
+    return this.valid.get();
+  }
+
+  public void markInvalid() {
+    this.valid.set(false);
   }
 
   public Metapb.Store getStore() {
