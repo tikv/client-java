@@ -132,7 +132,14 @@ public class RegionManager {
   }
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
-    return cache.getRegionByKey(key, backOffer);
+    TiRegion region = cache.getRegionByKey(key, backOffer);
+    if (region == null) {
+      logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
+      Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
+      region =
+          cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
+    }
+    return region;
   }
 
   @Deprecated
@@ -168,13 +175,7 @@ public class RegionManager {
 
   public Pair<TiRegion, TiStore> getRegionStorePairByKey(
       ByteString key, TiStoreType storeType, BackOffer backOffer) {
-    TiRegion region = cache.getRegionByKey(key, backOffer);
-    if (region == null) {
-      logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
-      Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
-      region =
-          cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
-    }
+    TiRegion region = getRegionByKey(key, backOffer);
     if (!region.isValid()) {
       throw new TiClientInternalException("Region invalid: " + region.toString());
     }
