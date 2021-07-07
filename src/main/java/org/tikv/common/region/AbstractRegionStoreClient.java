@@ -22,9 +22,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
-import io.grpc.health.v1.HealthCheckRequest;
-import io.grpc.health.v1.HealthCheckResponse;
-import io.grpc.health.v1.HealthGrpc;
 import io.grpc.stub.MetadataUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -122,12 +119,15 @@ public abstract class AbstractRegionStoreClient
     }
 
     if (!targetStore.isValid()) {
+      logger.warn(
+          String.format("store [%d] has been invalid", region.getId(), targetStore.getId()));
       return false;
     }
 
     if (targetStore.getProxyStore() == null) {
       if (targetStore.isReachable()) {
-        return true;
+        regionManager.onRequestFail(region);
+        return false;
       }
     }
 
@@ -173,7 +173,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   @Override
-  protected void tryUpdateProxy() {
+  public void tryUpdateProxy() {
     if (originStore != null) {
       logger.warn(
           String.format(
@@ -181,25 +181,6 @@ public abstract class AbstractRegionStoreClient
               targetStore.getStore().getAddress(), targetStore.getProxyStore().getAddress()));
       regionManager.updateStore(originStore, targetStore);
     }
-  }
-
-  private boolean checkHealth(Metapb.Store store) {
-    String addressStr = store.getAddress();
-    ManagedChannel channel =
-        channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
-    HealthGrpc.HealthBlockingStub stub =
-        HealthGrpc.newBlockingStub(channel)
-            .withDeadlineAfter(conf.getGrpcHealthCheckTimeout(), TimeUnit.MILLISECONDS);
-    HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
-    try {
-      HealthCheckResponse resp = stub.check(req);
-      if (resp.getStatus() != HealthCheckResponse.ServingStatus.SERVING) {
-        return false;
-      }
-    } catch (Exception e) {
-      return false;
-    }
-    return true;
   }
 
   private TiStore switchProxyStore() {

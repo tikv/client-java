@@ -23,5 +23,7 @@ public interface RegionErrorReceiver {
   /// return whether we need to retry this request.
   boolean onStoreUnreachable();
 
+  void tryUpdateProxy();
+
   TiRegion getRegion();
 }

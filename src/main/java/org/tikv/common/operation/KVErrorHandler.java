@@ -94,6 +94,8 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
     Errorpb.Error error = regionHandler.getRegionError(resp);
     if (error != null) {
       return regionHandler.handleRegionError(backOffer, error);
+    } else {
+      regionHandler.tryUpdateProxy();
     }
 
     // Key error handling logic

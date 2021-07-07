@@ -38,7 +38,6 @@ public class UnreachableStoreChecker implements Runnable {
   public boolean scheduleStoreHealthCheck(TiStore store) {
     if (!this.taskQueue.add(store)) {
       // add queue false, mark it reachable so that it can be put again.
-      store.markInvalid();
       return false;
     }
     return true;

@@ -42,8 +42,14 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     Errorpb.Error error = getRegionError(resp);
     if (error != null) {
       return handleRegionError(backOffer, error);
+    } else {
+      tryUpdateProxy();
     }
     return false;
+  }
+
+  public void tryUpdateProxy() {
+    recv.tryUpdateProxy();
   }
 
   public boolean handleRegionError(BackOffer backOffer, Errorpb.Error error) {

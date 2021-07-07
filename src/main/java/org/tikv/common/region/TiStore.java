@@ -18,7 +18,11 @@ public class TiStore {
 
   private TiStore(Metapb.Store store, Metapb.Store proxyStore) {
     this.store = store;
-    this.reachable = new AtomicBoolean(true);
+    if (proxyStore != null) {
+      this.reachable = new AtomicBoolean(false);
+    } else {
+      this.reachable = new AtomicBoolean(true);
+    }
     this.valid = new AtomicBoolean(true);
     this.proxyStore = proxyStore;
   }

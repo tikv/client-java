@@ -132,6 +132,9 @@ public class RegionCache {
   }
 
   public synchronized boolean updateStore(TiStore oldStore, TiStore newStore) {
+    if (!newStore.isValid()) {
+      return false;
+    }
     TiStore originStore = storeCache.get(oldStore.getId());
     if (originStore == oldStore) {
       oldStore.markInvalid();
