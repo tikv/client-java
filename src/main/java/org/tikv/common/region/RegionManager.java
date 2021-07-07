@@ -55,6 +55,8 @@ public class RegionManager {
   // TODO: the region cache logic need rewrite.
   // https://github.com/pingcap/tispark/issues/1170
   private final RegionCache cache;
+  private final ReadOnlyPDClient pdClient;
+  private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
   private final UnreachableStoreChecker storeChecker;
 
@@ -72,7 +74,9 @@ public class RegionManager {
       TiConfiguration conf,
       ReadOnlyPDClient pdClient,
       Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
-    this.cache = new RegionCache(conf, pdClient);
+    this.cache = new RegionCache();
+    this.pdClient = pdClient;
+    this.conf = conf;
     this.cacheInvalidateCallback = cacheInvalidateCallback;
     this.executor = null;
     this.storeChecker = null;
@@ -84,8 +88,11 @@ public class RegionManager {
       Function<CacheInvalidateEvent, Void> cacheInvalidateCallback,
       ChannelFactory channelFactory,
       boolean enableGrpcForward) {
-    this.cache = new RegionCache(conf, pdClient);
+    this.cache = new RegionCache();
     this.cacheInvalidateCallback = cacheInvalidateCallback;
+    this.pdClient = pdClient;
+    this.conf = conf;
+
     if (enableGrpcForward) {
       UnreachableStoreChecker storeChecker = new UnreachableStoreChecker(channelFactory, pdClient);
       this.storeChecker = storeChecker;
@@ -98,7 +105,9 @@ public class RegionManager {
   }
 
   public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
-    this.cache = new RegionCache(conf, pdClient);
+    this.cache = new RegionCache();
+    this.pdClient = pdClient;
+    this.conf = conf;
     this.cacheInvalidateCallback = null;
     this.storeChecker = null;
     this.executor = null;
@@ -115,7 +124,7 @@ public class RegionManager {
   }
 
   public ReadOnlyPDClient getPDClient() {
-    return this.cache.pdClient;
+    return this.pdClient;
   }
 
   public TiRegion getRegionByKey(ByteString key) {
@@ -123,7 +132,14 @@ public class RegionManager {
   }
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
-    return cache.getRegionByKey(key, backOffer);
+    TiRegion region = cache.getRegionByKey(key, backOffer);
+    if (region == null) {
+      logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
+      Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
+      region =
+          cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
+    }
+    return region;
   }
 
   @Deprecated
@@ -134,7 +150,15 @@ public class RegionManager {
   // Consider region A, B. After merge of (A, B) -> A, region ID B does not exist.
   // This request is unrecoverable.
   public TiRegion getRegionById(long regionId) {
-    return cache.getRegionById(ConcreteBackOffer.newGetBackOff(), regionId);
+    BackOffer backOffer = ConcreteBackOffer.newGetBackOff();
+    TiRegion region = cache.getRegionById(regionId);
+    if (region == null) {
+      Pair<Metapb.Region, Metapb.Peer> regionAndLeader =
+          pdClient.getRegionByID(backOffer, regionId);
+      region = createRegion(regionAndLeader.first, regionAndLeader.second, backOffer);
+      return cache.putRegion(region);
+    }
+    return region;
   }
 
   public Pair<TiRegion, TiStore> getRegionStorePairByKey(ByteString key, BackOffer backOffer) {
@@ -151,10 +175,7 @@ public class RegionManager {
 
   public Pair<TiRegion, TiStore> getRegionStorePairByKey(
       ByteString key, TiStoreType storeType, BackOffer backOffer) {
-    TiRegion region = cache.getRegionByKey(key, backOffer);
-    if (region == null) {
-      throw new TiClientInternalException("Region not exist for key:" + formatBytesUTF8(key));
-    }
+    TiRegion region = getRegionByKey(key, backOffer);
     if (!region.isValid()) {
       throw new TiClientInternalException("Region invalid: " + region.toString());
     }
@@ -162,7 +183,7 @@ public class RegionManager {
     TiStore store = null;
     if (storeType == TiStoreType.TiKV) {
       Peer peer = region.getCurrentReplica();
-      store = cache.getStoreById(peer.getStoreId(), backOffer);
+      store = getStoreById(peer.getStoreId(), backOffer);
       if (store == null) {
         cache.clearAll();
       }
@@ -192,12 +213,33 @@ public class RegionManager {
     return Pair.create(region, store);
   }
 
-  public TiStore getStoreById(long id) {
-    return getStoreById(id, ConcreteBackOffer.newGetBackOff());
+  private TiRegion createRegion(Metapb.Region region, Metapb.Peer leader, BackOffer backOffer) {
+    List<Metapb.Peer> peers = region.getPeersList();
+    List<TiStore> stores = getRegionStore(peers, backOffer);
+    return new TiRegion(conf, region, leader, peers, stores);
+  }
+
+  private List<TiStore> getRegionStore(List<Metapb.Peer> peers, BackOffer backOffer) {
+    return peers.stream().map(p -> getStoreById(p.getStoreId())).collect(Collectors.toList());
   }
 
   public TiStore getStoreById(long id, BackOffer backOffer) {
-    return cache.getStoreById(id, backOffer);
+    try {
+      TiStore store = cache.getStoreById(id);
+      if (store == null) {
+        store = new TiStore(pdClient.getStore(backOffer, id));
+      }
+      if (store.getStore().getState().equals(StoreState.Tombstone)) {
+        return null;
+      }
+      return cache.putStore(id, store);
+    } catch (Exception e) {
+      throw new GrpcException(e);
+    }
+  }
+
+  public TiStore getStoreById(long id) {
+    return getStoreById(id, ConcreteBackOffer.newGetBackOff());
   }
 
   public void onRegionStale(TiRegion region) {
@@ -253,16 +295,12 @@ public class RegionManager {
     private final Map<Long, TiRegion> regionCache;
     private final Map<Long, TiStore> storeCache;
     private final RangeMap<Key, Long> keyToRegionIdCache;
-    private final ReadOnlyPDClient pdClient;
-    private final TiConfiguration conf;
 
-    public RegionCache(TiConfiguration conf, ReadOnlyPDClient pdClient) {
+    public RegionCache() {
       regionCache = new HashMap<>();
       storeCache = new HashMap<>();
 
       keyToRegionIdCache = TreeRangeMap.create();
-      this.conf = conf;
-      this.pdClient = pdClient;
     }
 
     public synchronized TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
@@ -281,14 +319,7 @@ public class RegionManager {
         }
 
         if (regionId == null) {
-          logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
-          Pair<Metapb.Region, Metapb.Peer> regionAndLeader =
-              pdClient.getRegionByKey(backOffer, key);
-          TiRegion region = createRegion(regionAndLeader.first, regionAndLeader.second, backOffer);
-          if (!putRegion(region)) {
-            throw new TiClientInternalException("Invalid Region: " + region.toString());
-          }
-          return region;
+          return null;
         }
         TiRegion region;
         region = regionCache.get(regionId);
@@ -302,28 +333,28 @@ public class RegionManager {
       }
     }
 
-    private synchronized boolean putRegion(TiRegion region) {
+    private synchronized TiRegion putRegion(TiRegion region) {
       if (logger.isDebugEnabled()) {
         logger.debug("putRegion: " + region);
       }
+      TiRegion oldRegion = regionCache.get(region.getId());
+      if (oldRegion != null) {
+        if (oldRegion.getMeta().equals(region.getMeta())) {
+          return oldRegion;
+        } else {
+          invalidateRegion(oldRegion);
+        }
+      }
       regionCache.put(region.getId(), region);
       keyToRegionIdCache.put(makeRange(region.getStartKey(), region.getEndKey()), region.getId());
-      return true;
+      return region;
     }
 
     @Deprecated
-    private synchronized TiRegion getRegionById(BackOffer backOffer, long regionId) {
+    private synchronized TiRegion getRegionById(long regionId) {
       TiRegion region = regionCache.get(regionId);
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
-      }
-      if (region == null) {
-        Pair<Metapb.Region, Metapb.Peer> regionAndLeader =
-            pdClient.getRegionByID(backOffer, regionId);
-        region = createRegion(regionAndLeader.first, regionAndLeader.second, backOffer);
-        if (!putRegion(region)) {
-          throw new TiClientInternalException("Invalid Region: " + region.toString());
-        }
       }
       return region;
     }
@@ -353,13 +384,15 @@ public class RegionManager {
           logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
         }
         TiRegion oldRegion = regionCache.get(region.getId());
-        if (expected != oldRegion) {
+        if (!expected.getMeta().equals(oldRegion.getMeta())) {
           return false;
         } else {
           if (oldRegion != null) {
             keyToRegionIdCache.remove(makeRange(oldRegion.getStartKey(), oldRegion.getEndKey()));
           }
-          putRegion(region);
+          regionCache.put(region.getId(), region);
+          keyToRegionIdCache.put(
+              makeRange(region.getStartKey(), region.getEndKey()), region.getId());
           return true;
         }
       } catch (Exception ignore) {
@@ -412,33 +445,17 @@ public class RegionManager {
       }
     }
 
-    public synchronized TiStore getStoreById(long id, BackOffer backOffer) {
-      try {
-        TiStore store = storeCache.get(id);
-        if (store == null) {
-          store = new TiStore(pdClient.getStore(backOffer, id));
-        }
-        if (store.getStore().getState().equals(StoreState.Tombstone)) {
-          return null;
-        }
-        storeCache.put(id, store);
-        return store;
-      } catch (Exception e) {
-        throw new GrpcException(e);
+    public synchronized TiStore getStoreById(long id) {
+      return storeCache.get(id);
+    }
+
+    public synchronized TiStore putStore(long id, TiStore store) {
+      TiStore oldStore = storeCache.get(id);
+      if (oldStore != null && oldStore.getStore().equals(store.getStore())) {
+        return oldStore;
       }
-    }
-
-    private List<TiStore> getRegionStore(List<Metapb.Peer> peers, BackOffer backOffer) {
-      return peers
-          .stream()
-          .map(p -> getStoreById(p.getStoreId(), backOffer))
-          .collect(Collectors.toList());
-    }
-
-    private TiRegion createRegion(Metapb.Region region, Metapb.Peer leader, BackOffer backOffer) {
-      List<Metapb.Peer> peers = region.getPeersList();
-      List<TiStore> stores = getRegionStore(peers, backOffer);
-      return new TiRegion(conf, region, leader, peers, stores);
+      storeCache.put(id, store);
+      return store;
     }
 
     public synchronized void clearAll() {

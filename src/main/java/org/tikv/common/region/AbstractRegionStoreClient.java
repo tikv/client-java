@@ -105,6 +105,7 @@ public abstract class AbstractRegionStoreClient
     }
     region = newRegion;
     targetStore = regionManager.getStoreById(region.getLeader().getStoreId());
+    originStore = null;
     String addressStr = targetStore.getStore().getAddress();
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
@@ -128,7 +129,7 @@ public abstract class AbstractRegionStoreClient
     } else if (retryTimes > region.getFollowerList().size()) {
       logger.warn(
           String.format(
-              "retry time exceed for region[%d], invalid this region and store[%d]",
+              "retry time exceed for region[%d], invalid this region[%d]",
               region.getId(), targetStore.getId()));
       regionManager.onRequestFail(region);
       return false;
@@ -139,6 +140,7 @@ public abstract class AbstractRegionStoreClient
           String.format(
               "no forward store can be selected for store [%s] and region[%d]",
               targetStore.getStore().getAddress(), region.getId()));
+      regionManager.onRequestFail(region);
       return false;
     }
     if (originStore == null) {
@@ -168,6 +170,10 @@ public abstract class AbstractRegionStoreClient
   @Override
   protected void tryUpdateProxy() {
     if (originStore != null) {
+      logger.warn(
+          String.format(
+              "update store [%s] by proxy-store [%s]",
+              targetStore.getStore().getAddress(), targetStore.getProxyStore().getAddress()));
       regionManager.updateStore(originStore, targetStore);
     }
   }
