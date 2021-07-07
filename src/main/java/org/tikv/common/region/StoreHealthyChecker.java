@@ -16,17 +16,17 @@ import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Metapb;
 
-public class UnreachableStoreChecker implements Runnable {
-  private static final Logger logger = LoggerFactory.getLogger(UnreachableStoreChecker.class);
+public class StoreHealthyChecker implements Runnable {
+  private static final Logger logger = LoggerFactory.getLogger(StoreHealthyChecker.class);
   private static final long MAX_CHECK_STORE_TOMBSTONE_TICK = 60;
-  private static final long SLEEP_MILLI_SECONDS_AFTER_DOUBLE_CHECK = 200;
+  private static final long SLEEP_MILLI_SECONDS_AFTER_DOUBLE_CHECK = 500;
   private BlockingQueue<TiStore> taskQueue;
   private final ChannelFactory channelFactory;
   private final ReadOnlyPDClient pdClient;
   private final RegionCache cache;
   private long checkTombstoneTick;
 
-  public UnreachableStoreChecker(
+  public StoreHealthyChecker(
       ChannelFactory channelFactory, ReadOnlyPDClient pdClient, RegionCache cache) {
     this.taskQueue = new LinkedBlockingQueue<>();
     this.channelFactory = channelFactory;

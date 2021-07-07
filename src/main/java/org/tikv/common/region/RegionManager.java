@@ -50,7 +50,7 @@ public class RegionManager {
   private final ReadOnlyPDClient pdClient;
   private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
-  private final UnreachableStoreChecker storeChecker;
+  private final StoreHealthyChecker storeChecker;
 
   private final Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
 
@@ -80,8 +80,8 @@ public class RegionManager {
     this.conf = conf;
 
     if (enableGrpcForward) {
-      UnreachableStoreChecker storeChecker =
-          new UnreachableStoreChecker(channelFactory, pdClient, this.cache);
+      StoreHealthyChecker storeChecker =
+          new StoreHealthyChecker(channelFactory, pdClient, this.cache);
       this.storeChecker = storeChecker;
       this.executor = Executors.newScheduledThreadPool(1);
       this.executor.scheduleAtFixedRate(storeChecker, 1, 1, TimeUnit.SECONDS);

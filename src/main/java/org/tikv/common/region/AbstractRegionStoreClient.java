@@ -119,9 +119,10 @@ public abstract class AbstractRegionStoreClient
     }
 
     if (!targetStore.isValid()) {
+      targetStore = regionManager.getStoreById(targetStore.getId());
       logger.warn(
           String.format("store [%d] has been invalid", region.getId(), targetStore.getId()));
-      return false;
+      return true;
     }
 
     if (targetStore.getProxyStore() == null) {
