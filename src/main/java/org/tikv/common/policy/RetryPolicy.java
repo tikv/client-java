@@ -79,6 +79,8 @@ public abstract class RetryPolicy<RespT> {
         if (retry) {
           GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
           continue;
+        } else {
+          return result;
         }
       }
 

@@ -36,7 +36,6 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   public boolean handleResponseError(BackOffer backOffer, RespT resp) {
     if (resp == null) {
       String msg = String.format("Request Failed with unknown reason for [%s]", recv.getRegion());
-      logger.warn(msg);
       return handleRequestError(backOffer, new GrpcException(msg));
     }
     // Region error handling logic
@@ -172,6 +171,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
       return true;
     }
 
+    logger.warn("request failed because of: " + e.getMessage());
     backOffer.doBackOff(
         BackOffFunction.BackOffFuncType.BoTiKVRPC,
         new GrpcException(

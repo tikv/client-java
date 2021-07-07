@@ -93,6 +93,7 @@ import org.tikv.kvproto.Pdpb.TsoResponse;
 public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     implements ReadOnlyPDClient {
   private static final String TIFLASH_TABLE_SYNC_PROGRESS_PATH = "/tiflash/table/sync";
+  private static final long MIN_TRY_UPDATE_DURATION = 50;
   private final Logger logger = LoggerFactory.getLogger(PDClient.class);
   private RequestHeader header;
   private TsoRequest tsoReq;
@@ -103,6 +104,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private Client etcdClient;
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
   private HostMapping hostMapping;
+  private long lastUpdateLeaderTime;
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
       Histogram.build()
@@ -392,6 +394,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   public synchronized void updateLeaderOrforwardFollower() {
+    if (System.currentTimeMillis() - lastUpdateLeaderTime < MIN_TRY_UPDATE_DURATION) {
+      return;
+    }
     for (URI url : this.pdAddrs) {
       // since resp is null, we need update leader's address by walking through all pd server.
       GetMembersResponse resp = getMembers(url);
@@ -407,6 +412,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
       // if leader is switched, just return.
       if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
+        lastUpdateLeaderTime = System.currentTimeMillis();
         return;
       }
 
@@ -441,6 +447,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         }
       }
     }
+    lastUpdateLeaderTime = System.currentTimeMillis();
     if (pdClientWrapper == null) {
       throw new TiClientInternalException(
           "already tried all address on file, but not leader found yet.");
@@ -470,6 +477,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         return;
       }
     }
+    lastUpdateLeaderTime = System.currentTimeMillis();
     if (pdClientWrapper == null) {
       throw new TiClientInternalException(
           "already tried all address on file, but not leader found yet.");
