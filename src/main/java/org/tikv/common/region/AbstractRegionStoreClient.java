@@ -132,6 +132,11 @@ public abstract class AbstractRegionStoreClient
       }
     }
 
+    TiRegion newRegion = regionManager.getRegionSkipCache(region);
+    if (newRegion != null) {
+      return onNotLeader(newRegion);
+    }
+
     if (retryTimes > region.getFollowerList().size()) {
       logger.warn(
           String.format(
