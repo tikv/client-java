@@ -137,8 +137,8 @@ public class RegionCache {
     }
     TiStore originStore = storeCache.get(oldStore.getId());
     if (originStore == oldStore) {
-      oldStore.markInvalid();
       storeCache.put(newStore.getId(), newStore);
+      oldStore.markInvalid();
       return true;
     }
     return false;
@@ -180,8 +180,12 @@ public class RegionCache {
 
   public synchronized boolean putStore(long id, TiStore store) {
     TiStore oldStore = storeCache.get(id);
-    if (oldStore != null && oldStore.equals(store)) {
-      return false;
+    if (oldStore != null) {
+      if (oldStore.equals(store)) {
+        return false;
+      } else {
+        oldStore.markInvalid();
+      }
     }
     storeCache.put(id, store);
     return true;

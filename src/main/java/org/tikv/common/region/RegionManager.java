@@ -267,14 +267,12 @@ public class RegionManager {
     cache.invalidateRegion(region);
   }
 
-  /**
-   * If region has changed, return the new one and update cache.
-   */
+  /** If region has changed, return the new one and update cache. */
   public TiRegion getRegionSkipCache(TiRegion region) {
     BackOffer backOffer = ConcreteBackOffer.newGetBackOff();
     try {
       Pair<Metapb.Region, Metapb.Peer> regionAndLeader =
-              pdClient.getRegionByID(backOffer, region.getId());
+          pdClient.getRegionByID(backOffer, region.getId());
       if (!regionAndLeader.first.equals(region.getMeta())) {
         region = createRegion(regionAndLeader.first, regionAndLeader.second, backOffer);
         return cache.putRegion(region);

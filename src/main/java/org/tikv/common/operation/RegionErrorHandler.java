@@ -43,13 +43,13 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     if (error != null) {
       return handleRegionError(backOffer, error);
     } else {
-      tryUpdateProxy();
+      tryUpdateRegionStore();
     }
     return false;
   }
 
-  public void tryUpdateProxy() {
-    recv.tryUpdateProxy();
+  public void tryUpdateRegionStore() {
+    recv.tryUpdateRegionStore();
   }
 
   public boolean handleRegionError(BackOffer backOffer, Errorpb.Error error) {
@@ -87,6 +87,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
                 "Received zero store id, from region %d try next time", recv.getRegion().getId()));
 
         backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
+        recv.onRegionNotFound();
         retry = false;
       }
 

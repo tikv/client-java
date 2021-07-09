@@ -100,17 +100,12 @@ public class StoreHealthyChecker implements Runnable {
     List<TiStore> unreachableStore = new LinkedList<>();
     for (TiStore store : allStores) {
       if (needCheckTombstoneStore && checkStoreTombstone(store)) {
-        store.markInvalid();
         continue;
       }
       if (checkStoreHealth(store)) {
         if (store.getProxyStore() != null) {
           TiStore newStore = store.withProxy(null);
-          if (cache.putStore(newStore.getId(), newStore)) {
-            store.markInvalid();
-          } else {
-            newStore.markInvalid();
-          }
+          cache.putStore(newStore.getId(), newStore);
           logger.warn(
               String.format("store [%s] recovers to be reachable", store.getStore().getAddress()));
         } else if (!store.isReachable()) {
