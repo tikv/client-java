@@ -70,6 +70,8 @@ public abstract class AbstractRegionStoreClient
     this.retryLeaderTimes = 0;
     if (this.targetStore.getProxyStore() != null) {
       this.timeout = conf.getForwardTimeout();
+    } else if (!this.targetStore.isReachable() && !this.targetStore.canForwardFirst()) {
+      onStoreUnreachable();
     }
   }
 

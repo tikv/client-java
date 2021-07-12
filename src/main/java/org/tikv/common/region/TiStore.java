@@ -82,8 +82,10 @@ public class TiStore {
   }
 
   public void forwardFail() {
-    if (this.failForwardCount.addAndGet(1) >= MAX_FAIL_FORWARD_TIMES) {
-      this.canForward.set(false);
+    if (this.canForward.get()) {
+      if (this.failForwardCount.addAndGet(1) >= MAX_FAIL_FORWARD_TIMES) {
+        this.canForward.set(false);
+      }
     }
   }
 
