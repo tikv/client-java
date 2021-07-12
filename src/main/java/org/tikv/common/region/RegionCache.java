@@ -6,7 +6,6 @@ import static org.tikv.common.util.KeyRangeUtils.makeRange;
 import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
 import com.google.protobuf.ByteString;
-import io.prometheus.client.Histogram;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,11 +17,6 @@ import org.tikv.common.util.BackOffer;
 
 public class RegionCache {
   private static final Logger logger = LoggerFactory.getLogger(RegionCache.class);
-  public static final Histogram GET_REGION_BY_KEY_REQUEST_LATENCY =
-      Histogram.build()
-          .name("client_java_get_region_by_requests_latency")
-          .help("getRegionByKey request latency.")
-          .register();
 
   private final Map<Long, TiRegion> regionCache;
   private final Map<Long, TiStore> storeCache;
@@ -36,33 +30,27 @@ public class RegionCache {
   }
 
   public synchronized TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
-    Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
-    try {
-      Long regionId;
-      if (key.isEmpty()) {
-        // if key is empty, it must be the start key.
-        regionId = keyToRegionIdCache.get(Key.toRawKey(key, true));
-      } else {
-        regionId = keyToRegionIdCache.get(Key.toRawKey(key));
-      }
-      if (logger.isDebugEnabled()) {
-        logger.debug(
-            String.format("getRegionByKey key[%s] -> ID[%s]", formatBytesUTF8(key), regionId));
-      }
-
-      if (regionId == null) {
-        return null;
-      }
-      TiRegion region;
-      region = regionCache.get(regionId);
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
-      }
-
-      return region;
-    } finally {
-      requestTimer.observeDuration();
+    Long regionId;
+    if (key.isEmpty()) {
+      // if key is empty, it must be the start key.
+      regionId = keyToRegionIdCache.get(Key.toRawKey(key, true));
+    } else {
+      regionId = keyToRegionIdCache.get(Key.toRawKey(key));
     }
+    if (logger.isDebugEnabled()) {
+      logger.debug(
+          String.format("getRegionByKey key[%s] -> ID[%s]", formatBytesUTF8(key), regionId));
+    }
+
+    if (regionId == null) {
+      return null;
+    }
+    TiRegion region;
+    region = regionCache.get(regionId);
+    if (logger.isDebugEnabled()) {
+      logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
+    }
+    return region;
   }
 
   public synchronized TiRegion putRegion(TiRegion region) {

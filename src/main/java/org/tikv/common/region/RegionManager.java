@@ -20,6 +20,7 @@ package org.tikv.common.region;
 import static org.tikv.common.codec.KeyUtils.formatBytesUTF8;
 
 import com.google.protobuf.ByteString;
+import io.prometheus.client.Histogram;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -44,6 +45,12 @@ import org.tikv.kvproto.Metapb.StoreState;
 @SuppressWarnings("UnstableApiUsage")
 public class RegionManager {
   private static final Logger logger = LoggerFactory.getLogger(RegionManager.class);
+  public static final Histogram GET_REGION_BY_KEY_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_get_region_by_requests_latency")
+          .help("getRegionByKey request latency.")
+          .register();
+
   // TODO: the region cache logic need rewrite.
   // https://github.com/pingcap/tispark/issues/1170
   private final RegionCache cache;
@@ -119,13 +126,21 @@ public class RegionManager {
   }
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
+    Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
     TiRegion region = cache.getRegionByKey(key, backOffer);
-    if (region == null) {
-      logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
-      Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
-      region =
-          cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
+    try {
+      if (region == null) {
+        logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
+        Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
+        region =
+            cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
+      }
+    } catch (Exception e) {
+      return null;
+    } finally {
+      requestTimer.observeDuration();
     }
+
     return region;
   }
 

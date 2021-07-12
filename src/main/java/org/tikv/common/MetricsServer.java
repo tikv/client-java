@@ -20,7 +20,7 @@ import java.net.InetSocketAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.policy.RetryPolicy;
-import org.tikv.common.region.RegionCache;
+import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.raw.RawKVClient;
 
@@ -64,7 +64,7 @@ public class MetricsServer {
       this.collectorRegistry.register(RawKVClient.RAW_REQUEST_SUCCESS);
       this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_REQUEST_LATENCY);
       this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
-      this.collectorRegistry.register(RegionCache.GET_REGION_BY_KEY_REQUEST_LATENCY);
+      this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
       this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
       this.port = port;
       this.server = new HTTPServer(new InetSocketAddress(port), this.collectorRegistry, true);
