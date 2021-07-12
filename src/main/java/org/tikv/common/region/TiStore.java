@@ -1,6 +1,7 @@
 package org.tikv.common.region;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import org.tikv.kvproto.Metapb;
 
 public class TiStore {
@@ -9,7 +10,7 @@ public class TiStore {
   private final Metapb.Store proxyStore;
   private AtomicBoolean reachable;
   private AtomicBoolean valid;
-  private long failForwardCount;
+  private AtomicLong failForwardCount;
   private AtomicBoolean canForward;
 
   public TiStore(Metapb.Store store) {
@@ -18,7 +19,7 @@ public class TiStore {
     this.valid = new AtomicBoolean(true);
     this.canForward = new AtomicBoolean(true);
     this.proxyStore = null;
-    this.failForwardCount = 0;
+    this.failForwardCount = new AtomicLong(0);
   }
 
   private TiStore(Metapb.Store store, Metapb.Store proxyStore) {
@@ -31,7 +32,7 @@ public class TiStore {
     this.valid = new AtomicBoolean(true);
     this.canForward = new AtomicBoolean(true);
     this.proxyStore = proxyStore;
-    this.failForwardCount = 0;
+    this.failForwardCount = new AtomicLong(0);
   }
 
   @java.lang.Override
@@ -80,9 +81,8 @@ public class TiStore {
     this.valid.set(false);
   }
 
-  public synchronized void forwardFail() {
-    this.failForwardCount += 1;
-    if (this.failForwardCount >= MAX_FAIL_FORWARD_TIMES) {
+  public void forwardFail() {
+    if (this.failForwardCount.addAndGet(1) >= MAX_FAIL_FORWARD_TIMES) {
       this.canForward.set(false);
     }
   }
