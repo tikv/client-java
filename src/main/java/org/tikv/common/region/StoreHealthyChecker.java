@@ -93,15 +93,19 @@ public class StoreHealthyChecker implements Runnable {
   public void run() {
     checkTombstoneTick += 1;
     boolean needCheckTombstoneStore = false;
-    if (checkTombstoneTick == MAX_CHECK_STORE_TOMBSTONE_TICK) {
+    if (checkTombstoneTick >= MAX_CHECK_STORE_TOMBSTONE_TICK) {
       needCheckTombstoneStore = true;
+      checkTombstoneTick = 0;
     }
     List<TiStore> allStores = getValidStores();
     List<TiStore> unreachableStore = new LinkedList<>();
     for (TiStore store : allStores) {
-      if (needCheckTombstoneStore && checkStoreTombstone(store)) {
-        continue;
+      if (needCheckTombstoneStore) {
+        if (checkStoreTombstone(store)) {
+          continue;
+        }
       }
+
       if (checkStoreHealth(store)) {
         if (store.getProxyStore() != null) {
           TiStore newStore = store.withProxy(null);

@@ -236,7 +236,10 @@ public class RegionManager {
     cache.invalidateRegion(region);
   }
 
-  public synchronized TiRegion updateLeader(TiRegion region, long storeId) {
+  public TiRegion updateLeader(TiRegion region, long storeId) {
+    if (region.getLeader().getStoreId() == storeId) {
+      return region;
+    }
     TiRegion newRegion = region.switchPeer(storeId);
     if (cache.updateRegion(region, newRegion)) {
       return newRegion;

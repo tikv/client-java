@@ -107,10 +107,16 @@ public abstract class AbstractRegionStoreClient
     if (!region.getRegionEpoch().equals(newRegion.getRegionEpoch())) {
       return false;
     }
+
+    // If we try one peer but find the leader has not changed, we do not need try other peers.
+    if (candidateLeader != null
+        && region.getLeader().getStoreId() == newRegion.getLeader().getStoreId()) {
+      retryLeaderTimes = newRegion.getFollowerList().size();
+      originStore = null;
+    }
     candidateLeader = null;
     region = newRegion;
     targetStore = regionManager.getStoreById(region.getLeader().getStoreId());
-    originStore = null;
     updateClientStub();
     return true;
   }
@@ -124,16 +130,26 @@ public abstract class AbstractRegionStoreClient
 
   @Override
   public boolean onStoreUnreachable() {
-    if (conf.getEnableGrpcForward()) {
-      if (retryForwardTimes <= region.getFollowerList().size()) {
+    // If this store has failed to forward request too many times, we shall try other peer at first
+    // so that we can
+    // reduce the latency cost by fail requests.
+    if (targetStore.canForwardFirst()) {
+      if (conf.getEnableGrpcForward() && retryForwardTimes <= region.getFollowerList().size()) {
+        return retryOtherStoreByProxyForward();
+      }
+      if (retryOtherStoreLeader()) {
+        return true;
+      }
+    } else {
+      if (retryOtherStoreLeader()) {
+        return true;
+      }
+      if (conf.getEnableGrpcForward() && retryForwardTimes <= region.getFollowerList().size()) {
         return retryOtherStoreByProxyForward();
       }
       return true;
     }
 
-    if (retryOtherStoreLeader()) {
-      return true;
-    }
     logger.warn(
         String.format(
             "retry time exceed for region[%d], invalid this region[%d]",
@@ -161,11 +177,23 @@ public abstract class AbstractRegionStoreClient
   @Override
   public void tryUpdateRegionStore() {
     if (originStore != null) {
-      logger.warn(
-          String.format(
-              "update store [%s] by proxy-store [%s]",
-              targetStore.getStore().getAddress(), targetStore.getProxyStore().getAddress()));
-      regionManager.updateStore(originStore, targetStore);
+      if (originStore.getId() == targetStore.getId()) {
+        logger.warn(
+            String.format(
+                "update store [%s] by proxy-store [%s]",
+                targetStore.getStore().getAddress(), targetStore.getProxyStore().getAddress()));
+        // We do not need to mark the store can-forward, because if one store has grpc forward
+        // successfully, it will
+        // create a new store object, which is can-forward.
+        regionManager.updateStore(originStore, targetStore);
+      } else {
+        // If we try to forward request to leader by follower failed, it means that the store of old
+        // leader may be
+        // unavailable but the new leader has not been report to PD. So we can ban this store for a
+        // short time to
+        // avoid too many request try forward rather than try other peer.
+        originStore.forwardFail();
+      }
     }
     if (candidateLeader != null) {
       logger.warn(
@@ -189,7 +217,10 @@ public abstract class AbstractRegionStoreClient
         if (store != null && store.isReachable()) {
           targetStore = store;
           candidateLeader = cur;
-          originStore = null;
+          logger.warn(
+              String.format(
+                  "try store [%d],peer[%d] for region[%d], which may be new leader",
+                  targetStore.getId(), candidateLeader.getId(), region.getId()));
           updateClientStub();
           return true;
         } else {
@@ -264,21 +295,21 @@ public abstract class AbstractRegionStoreClient
   private TiStore switchProxyStore() {
     boolean hasVisitedStore = false;
     List<Metapb.Peer> peers = region.getFollowerList();
-    for (Metapb.Peer peer: peers) {
-      if (targetStore.getProxyStore() == null) {
+    if (peers.isEmpty()) {
+      return null;
+    }
+    Metapb.Store proxyStore = targetStore.getProxyStore();
+    if (proxyStore == null || peers.get(peers.size() - 1).getStoreId() == proxyStore.getId()) {
+      hasVisitedStore = true;
+    }
+    for (Metapb.Peer peer : peers) {
+      if (hasVisitedStore) {
         TiStore store = regionManager.getStoreById(peer.getStoreId());
-        if (store.isReachable() && store.getProxyStore() == null) {
+        if (store.isReachable()) {
           return targetStore.withProxy(store.getStore());
         }
-      } else {
-        if (peer.getStoreId() == targetStore.getProxyStore().getId()) {
-          hasVisitedStore = true;
-        } else if (hasVisitedStore) {
-          TiStore proxyStore = regionManager.getStoreById(peer.getStoreId());
-          if (proxyStore.isReachable() && proxyStore.getProxyStore() == null) {
-            return targetStore.withProxy(proxyStore.getStore());
-          }
-        }
+      } else if (peer.getStoreId() == proxyStore.getId()) {
+        hasVisitedStore = true;
       }
     }
     return null;
