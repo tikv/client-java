@@ -87,7 +87,6 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
                 "Received zero store id, from region %d try next time", recv.getRegion().getId()));
 
         backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
-        recv.onRegionNotFound();
         retry = false;
       }
 

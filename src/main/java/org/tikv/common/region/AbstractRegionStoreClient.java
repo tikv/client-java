@@ -124,13 +124,6 @@ public abstract class AbstractRegionStoreClient
   }
 
   @Override
-  public void onRegionNotFound() {
-    if (candidateLeader != null) {
-      candidateLeader = null;
-    }
-  }
-
-  @Override
   public boolean onStoreUnreachable() {
     // If this store has failed to forward request too many times, we shall try other peer at first
     // so that we can

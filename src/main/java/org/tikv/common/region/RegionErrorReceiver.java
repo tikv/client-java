@@ -20,8 +20,6 @@ package org.tikv.common.region;
 public interface RegionErrorReceiver {
   boolean onNotLeader(TiRegion region);
 
-  void onRegionNotFound();
-
   /// return whether we need to retry this request.
   boolean onStoreUnreachable();
 
