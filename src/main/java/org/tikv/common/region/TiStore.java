@@ -89,6 +89,11 @@ public class TiStore {
     }
   }
 
+  public void makrCanForward() {
+    this.failForwardCount.set(0);
+    this.canForward.set(true);
+  }
+
   public boolean canForwardFirst() {
     return this.canForward.get();
   }
