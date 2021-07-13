@@ -125,6 +125,12 @@ public abstract class AbstractRegionStoreClient
 
   @Override
   public boolean onStoreUnreachable() {
+    if (targetStore.getProxyStore() == null) {
+      if (targetStore.isReachable()) {
+        return true;
+      }
+    }
+
     // If this store has failed to forward request too many times, we shall try other peer at first
     // so that we can
     // reduce the latency cost by fail requests.
@@ -246,21 +252,12 @@ public abstract class AbstractRegionStoreClient
       return true;
     }
 
-    if (targetStore.getProxyStore() == null) {
-      if (targetStore.isReachable()) {
-        regionManager.onRequestFail(region);
-        return false;
-      }
-    }
-
-    retryForwardTimes += 1;
     TiStore proxyStore = switchProxyStore();
     if (proxyStore == null) {
       logger.warn(
           String.format(
               "no forward store can be selected for store [%s] and region[%d]",
               targetStore.getStore().getAddress(), region.getId()));
-      regionManager.onRequestFail(region);
       return false;
     }
     if (originStore == null) {

@@ -111,10 +111,16 @@ public class StoreHealthyChecker implements Runnable {
           TiStore newStore = store.withProxy(null);
           cache.putStore(newStore.getId(), newStore);
           logger.warn(
-              String.format("store [%s] recovers to be reachable", store.getStore().getAddress()));
-        } else if (!store.isReachable()) {
-          store.markReachable();
-          store.makrCanForward();
+              String.format("store [%s] recovers to be reachable", store.getAddress()));
+        } else {
+          if (!store.isReachable()) {
+            logger.warn(
+                    String.format("store [%s] recovers to be reachable and canforward", store.getAddress()));
+            store.markReachable();
+          }
+          if (!store.canForwardFirst()) {
+            store.makrCanForward();
+          }
         }
       } else if (store.isReachable()) {
         unreachableStore.add(store);
@@ -131,6 +137,8 @@ public class StoreHealthyChecker implements Runnable {
       }
       for (TiStore store : unreachableStore) {
         if (!checkStoreHealth(store)) {
+          logger.warn(
+                  String.format("store [%s] is not reachable", store.getAddress()));
           store.markUnreachable();
         }
         this.taskQueue.add(store);
