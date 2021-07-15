@@ -142,20 +142,21 @@ public class TiRegion implements Serializable {
   }
 
   public Kvrpcpb.Context getLeaderContext() {
-    return getContext(this.leader, java.util.Collections.emptySet(), TiStoreType.TiKV);
-  }
-
-  public Kvrpcpb.Context getReplicaContext(TiStoreType storeType) {
-    return getContext(getCurrentReplica(), java.util.Collections.emptySet(), storeType);
+    return getContext(this.leader, java.util.Collections.emptySet(), false);
   }
 
   public Kvrpcpb.Context getReplicaContext(Set<Long> resolvedLocks, TiStoreType storeType) {
-    return getContext(getCurrentReplica(), resolvedLocks, storeType);
+    Peer currentPeer = getCurrentReplica();
+    boolean replicaRead = !isLeader(currentPeer) && TiStoreType.TiKV.equals(storeType);
+    return getContext(currentPeer, resolvedLocks, replicaRead);
+  }
+
+  public Kvrpcpb.Context getReplicaContext(Peer currentPeer, Set<Long> resolvedLocks) {
+    return getContext(currentPeer, resolvedLocks, false);
   }
 
   private Kvrpcpb.Context getContext(
-      Peer currentPeer, Set<Long> resolvedLocks, TiStoreType storeType) {
-    boolean replicaRead = !isLeader(currentPeer) && TiStoreType.TiKV.equals(storeType);
+      Peer currentPeer, Set<Long> resolvedLocks, boolean replicaRead) {
 
     Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
     builder

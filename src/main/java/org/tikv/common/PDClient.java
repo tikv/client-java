@@ -557,9 +557,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return pdClientWrapper.getAsyncStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
   }
 
-  @Override
-  protected void tryUpdateProxy() {}
-
   private void initCluster() {
     GetMembersResponse resp = null;
     List<URI> pdAddrs = getConf().getPdAddrs();
