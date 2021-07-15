@@ -18,16 +18,10 @@
 package org.tikv.common.region;
 
 import static org.tikv.common.codec.KeyUtils.formatBytesUTF8;
-import static org.tikv.common.util.KeyRangeUtils.makeRange;
 
-import com.google.common.collect.RangeMap;
-import com.google.common.collect.TreeRangeMap;
 import com.google.protobuf.ByteString;
 import io.prometheus.client.Histogram;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -40,7 +34,6 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
-import org.tikv.common.key.Key;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
@@ -52,21 +45,21 @@ import org.tikv.kvproto.Metapb.StoreState;
 @SuppressWarnings("UnstableApiUsage")
 public class RegionManager {
   private static final Logger logger = LoggerFactory.getLogger(RegionManager.class);
+  public static final Histogram GET_REGION_BY_KEY_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_get_region_by_requests_latency")
+          .help("getRegionByKey request latency.")
+          .register();
+
   // TODO: the region cache logic need rewrite.
   // https://github.com/pingcap/tispark/issues/1170
   private final RegionCache cache;
   private final ReadOnlyPDClient pdClient;
   private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
-  private final UnreachableStoreChecker storeChecker;
+  private final StoreHealthyChecker storeChecker;
 
   private final Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
-
-  public static final Histogram GET_REGION_BY_KEY_REQUEST_LATENCY =
-      Histogram.build()
-          .name("client_java_get_region_by_requests_latency")
-          .help("getRegionByKey request latency.")
-          .register();
 
   // To avoid double retrieval, we used the async version of grpc
   // When rpc not returned, instead of call again, it wait for previous one done
@@ -94,10 +87,11 @@ public class RegionManager {
     this.conf = conf;
 
     if (enableGrpcForward) {
-      UnreachableStoreChecker storeChecker = new UnreachableStoreChecker(channelFactory, pdClient);
+      StoreHealthyChecker storeChecker =
+          new StoreHealthyChecker(channelFactory, pdClient, this.cache);
       this.storeChecker = storeChecker;
       this.executor = Executors.newScheduledThreadPool(1);
-      this.executor.scheduleAtFixedRate(storeChecker, 10, 10, TimeUnit.SECONDS);
+      this.executor.scheduleAtFixedRate(storeChecker, 1, 1, TimeUnit.SECONDS);
     } else {
       this.storeChecker = null;
       this.executor = null;
@@ -132,13 +126,21 @@ public class RegionManager {
   }
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
+    Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
     TiRegion region = cache.getRegionByKey(key, backOffer);
-    if (region == null) {
-      logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
-      Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
-      region =
-          cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
+    try {
+      if (region == null) {
+        logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
+        Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
+        region =
+            cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
+      }
+    } catch (Exception e) {
+      return null;
+    } finally {
+      requestTimer.observeDuration();
     }
+
     return region;
   }
 
@@ -232,7 +234,10 @@ public class RegionManager {
       if (store.getStore().getState().equals(StoreState.Tombstone)) {
         return null;
       }
-      return cache.putStore(id, store);
+      if (cache.putStore(id, store)) {
+        storeChecker.scheduleStoreHealthCheck(store);
+      }
+      return store;
     } catch (Exception e) {
       throw new GrpcException(e);
     }
@@ -246,7 +251,10 @@ public class RegionManager {
     cache.invalidateRegion(region);
   }
 
-  public synchronized TiRegion updateLeader(TiRegion region, long storeId) {
+  public TiRegion updateLeader(TiRegion region, long storeId) {
+    if (region.getLeader().getStoreId() == storeId) {
+      return region;
+    }
     TiRegion newRegion = region.switchPeer(storeId);
     if (cache.updateRegion(region, newRegion)) {
       return newRegion;
@@ -259,13 +267,7 @@ public class RegionManager {
 
   public synchronized void updateStore(TiStore oldStore, TiStore newStore) {
     if (cache.updateStore(oldStore, newStore)) {
-      if (newStore.isUnreachable()) {
-        logger.warn(
-            String.format(
-                "check health for store [%s] in background thread",
-                newStore.getStore().getAddress()));
-        this.storeChecker.scheduleStoreHealthCheck(newStore);
-      }
+      storeChecker.scheduleStoreHealthCheck(newStore);
     }
   }
 
@@ -283,184 +285,29 @@ public class RegionManager {
     cache.invalidateRegion(region);
   }
 
+  /** If region has changed, return the new one and update cache. */
+  public TiRegion getRegionSkipCache(TiRegion region) {
+    BackOffer backOffer = ConcreteBackOffer.newGetBackOff();
+    try {
+      Pair<Metapb.Region, Metapb.Peer> regionAndLeader =
+          pdClient.getRegionByID(backOffer, region.getId());
+      if (!regionAndLeader.first.equals(region.getMeta())) {
+        region = createRegion(regionAndLeader.first, regionAndLeader.second, backOffer);
+        return cache.putRegion(region);
+      } else {
+        logger.warn("Cannot get region from PD for region id: " + region.getId());
+        return null;
+      }
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
   public void invalidateStore(long storeId) {
     cache.invalidateStore(storeId);
   }
 
   public void invalidateRegion(TiRegion region) {
     cache.invalidateRegion(region);
-  }
-
-  public static class RegionCache {
-    private final Map<Long, TiRegion> regionCache;
-    private final Map<Long, TiStore> storeCache;
-    private final RangeMap<Key, Long> keyToRegionIdCache;
-
-    public RegionCache() {
-      regionCache = new HashMap<>();
-      storeCache = new HashMap<>();
-
-      keyToRegionIdCache = TreeRangeMap.create();
-    }
-
-    public synchronized TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
-      Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
-      try {
-        Long regionId;
-        if (key.isEmpty()) {
-          // if key is empty, it must be the start key.
-          regionId = keyToRegionIdCache.get(Key.toRawKey(key, true));
-        } else {
-          regionId = keyToRegionIdCache.get(Key.toRawKey(key));
-        }
-        if (logger.isDebugEnabled()) {
-          logger.debug(
-              String.format("getRegionByKey key[%s] -> ID[%s]", formatBytesUTF8(key), regionId));
-        }
-
-        if (regionId == null) {
-          return null;
-        }
-        TiRegion region;
-        region = regionCache.get(regionId);
-        if (logger.isDebugEnabled()) {
-          logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
-        }
-
-        return region;
-      } finally {
-        requestTimer.observeDuration();
-      }
-    }
-
-    private synchronized TiRegion putRegion(TiRegion region) {
-      if (logger.isDebugEnabled()) {
-        logger.debug("putRegion: " + region);
-      }
-      TiRegion oldRegion = regionCache.get(region.getId());
-      if (oldRegion != null) {
-        if (oldRegion.getMeta().equals(region.getMeta())) {
-          return oldRegion;
-        } else {
-          invalidateRegion(oldRegion);
-        }
-      }
-      regionCache.put(region.getId(), region);
-      keyToRegionIdCache.put(makeRange(region.getStartKey(), region.getEndKey()), region.getId());
-      return region;
-    }
-
-    @Deprecated
-    private synchronized TiRegion getRegionById(long regionId) {
-      TiRegion region = regionCache.get(regionId);
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
-      }
-      return region;
-    }
-
-    private synchronized TiRegion getRegionFromCache(long regionId) {
-      return regionCache.get(regionId);
-    }
-
-    /** Removes region associated with regionId from regionCache. */
-    public synchronized void invalidateRegion(TiRegion region) {
-      try {
-        if (logger.isDebugEnabled()) {
-          logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
-        }
-        TiRegion oldRegion = regionCache.get(region.getId());
-        if (oldRegion != null && oldRegion == region) {
-          keyToRegionIdCache.remove(makeRange(region.getStartKey(), region.getEndKey()));
-          regionCache.remove(region.getId());
-        }
-      } catch (Exception ignore) {
-      }
-    }
-
-    public synchronized boolean updateRegion(TiRegion expected, TiRegion region) {
-      try {
-        if (logger.isDebugEnabled()) {
-          logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
-        }
-        TiRegion oldRegion = regionCache.get(region.getId());
-        if (!expected.getMeta().equals(oldRegion.getMeta())) {
-          return false;
-        } else {
-          if (oldRegion != null) {
-            keyToRegionIdCache.remove(makeRange(oldRegion.getStartKey(), oldRegion.getEndKey()));
-          }
-          regionCache.put(region.getId(), region);
-          keyToRegionIdCache.put(
-              makeRange(region.getStartKey(), region.getEndKey()), region.getId());
-          return true;
-        }
-      } catch (Exception ignore) {
-        return false;
-      }
-    }
-
-    public synchronized boolean updateStore(TiStore oldStore, TiStore newStore) {
-      TiStore originStore = storeCache.get(oldStore.getId());
-      if (originStore == oldStore) {
-        storeCache.put(newStore.getId(), newStore);
-        if (oldStore != null && oldStore.isUnreachable()) {
-          oldStore.markReachable();
-        }
-        if (newStore.getProxyStore() != null) {
-          newStore.markUnreachable();
-        }
-        return true;
-      }
-      return false;
-    }
-
-    public synchronized void invalidateAllRegionForStore(TiStore store) {
-      TiStore oldStore = storeCache.get(store.getId());
-      if (oldStore != store) {
-        return;
-      }
-      List<TiRegion> regionToRemove = new ArrayList<>();
-      for (TiRegion r : regionCache.values()) {
-        if (r.getLeader().getStoreId() == store.getId()) {
-          if (logger.isDebugEnabled()) {
-            logger.debug(String.format("invalidateAllRegionForStore Region[%s]", r));
-          }
-          regionToRemove.add(r);
-        }
-      }
-
-      logger.warn(String.format("invalid store [%d]", store.getId()));
-      // remove region
-      for (TiRegion r : regionToRemove) {
-        keyToRegionIdCache.remove(makeRange(r.getStartKey(), r.getEndKey()));
-        regionCache.remove(r.getId());
-      }
-    }
-
-    public synchronized void invalidateStore(long storeId) {
-      TiStore store = storeCache.remove(storeId);
-      if (store != null) {
-        store.markReachable();
-      }
-    }
-
-    public synchronized TiStore getStoreById(long id) {
-      return storeCache.get(id);
-    }
-
-    public synchronized TiStore putStore(long id, TiStore store) {
-      TiStore oldStore = storeCache.get(id);
-      if (oldStore != null && oldStore.getStore().equals(store.getStore())) {
-        return oldStore;
-      }
-      storeCache.put(id, store);
-      return store;
-    }
-
-    public synchronized void clearAll() {
-      keyToRegionIdCache.clear();
-      regionCache.clear();
-    }
   }
 }

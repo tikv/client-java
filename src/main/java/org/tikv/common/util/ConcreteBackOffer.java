@@ -102,7 +102,7 @@ public class ConcreteBackOffer implements BackOffer {
         backOffFunction = BackOffFunction.create(200, 3000, BackOffStrategy.EqualJitter);
         break;
       case BoPDRPC:
-        backOffFunction = BackOffFunction.create(500, 3000, BackOffStrategy.EqualJitter);
+        backOffFunction = BackOffFunction.create(100, 600, BackOffStrategy.EqualJitter);
         break;
       case BoTiKVRPC:
         backOffFunction = BackOffFunction.create(100, 400, BackOffStrategy.EqualJitter);
