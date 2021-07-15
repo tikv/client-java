@@ -90,12 +90,24 @@ The following includes JVM related parameters.
 - pd addresses, separated by comma
 - default: 127.0.0.1:2379
 
+#### tikv.enable_grpc_forward
+- When network isolation occurs between a tikv node and the client, it is allowed to forward the request to him through other nodes. 
+- default: true
+
 #### tikv.grpc.timeout_in_ms
 - timeout of grpc request  
+- default: 150ms
+
+#### tikv.grpc.forward_timeout_in_ms
+- timeout of grpc request when forward request by follower
 - default: 600ms
 
+#### tikv.grpc.health_check_timeout
+- timeout of grpc request to check health status of TiKV node. unit: ms
+- default: 40
+
 #### tikv.grpc.scan_timeout_in_ms
-- timeout of scan/delete range grpc request
+- timeout of scan/delete_range/batch_put grpc request
 - default: 20s
 
 ### Metrics Parameter
