@@ -174,6 +174,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
     if (recv.onStoreUnreachable()) {
+      backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoTiKVRPC, e);
       return true;
     }
 

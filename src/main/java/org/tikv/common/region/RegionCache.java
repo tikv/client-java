@@ -6,9 +6,7 @@ import static org.tikv.common.util.KeyRangeUtils.makeRange;
 import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
 import com.google.protobuf.ByteString;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,10 +77,6 @@ public class RegionCache {
     return region;
   }
 
-  private synchronized TiRegion getRegionFromCache(long regionId) {
-    return regionCache.get(regionId);
-  }
-
   /** Removes region associated with regionId from regionCache. */
   public synchronized void invalidateRegion(TiRegion region) {
     try {
@@ -130,29 +124,6 @@ public class RegionCache {
       return true;
     }
     return false;
-  }
-
-  public synchronized void invalidateAllRegionForStore(TiStore store) {
-    TiStore oldStore = storeCache.get(store.getId());
-    if (oldStore != store) {
-      return;
-    }
-    List<TiRegion> regionToRemove = new ArrayList<>();
-    for (TiRegion r : regionCache.values()) {
-      if (r.getLeader().getStoreId() == store.getId()) {
-        if (logger.isDebugEnabled()) {
-          logger.debug(String.format("invalidateAllRegionForStore Region[%s]", r));
-        }
-        regionToRemove.add(r);
-      }
-    }
-
-    logger.warn(String.format("invalid store [%d]", store.getId()));
-    // remove region
-    for (TiRegion r : regionToRemove) {
-      keyToRegionIdCache.remove(makeRange(r.getStartKey(), r.getEndKey()));
-      regionCache.remove(r.getId());
-    }
   }
 
   public synchronized void invalidateStore(long storeId) {

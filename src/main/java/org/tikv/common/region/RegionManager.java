@@ -85,17 +85,11 @@ public class RegionManager {
     this.cacheInvalidateCallback = cacheInvalidateCallback;
     this.pdClient = pdClient;
     this.conf = conf;
-
-    if (enableGrpcForward) {
-      StoreHealthyChecker storeChecker =
-          new StoreHealthyChecker(channelFactory, pdClient, this.cache);
-      this.storeChecker = storeChecker;
-      this.executor = Executors.newScheduledThreadPool(1);
-      this.executor.scheduleAtFixedRate(storeChecker, 1, 1, TimeUnit.SECONDS);
-    } else {
-      this.storeChecker = null;
-      this.executor = null;
-    }
+    StoreHealthyChecker storeChecker =
+        new StoreHealthyChecker(channelFactory, pdClient, this.cache);
+    this.storeChecker = storeChecker;
+    this.executor = Executors.newScheduledThreadPool(1);
+    this.executor.scheduleAtFixedRate(storeChecker, 1, 1, TimeUnit.SECONDS);
   }
 
   public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
@@ -135,8 +129,6 @@ public class RegionManager {
         region =
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
       }
-    } catch (Exception e) {
-      return null;
     } finally {
       requestTimer.observeDuration();
     }
@@ -234,7 +226,7 @@ public class RegionManager {
       if (store.getStore().getState().equals(StoreState.Tombstone)) {
         return null;
       }
-      if (cache.putStore(id, store)) {
+      if (cache.putStore(id, store) && storeChecker != null) {
         storeChecker.scheduleStoreHealthCheck(store);
       }
       return store;
@@ -266,7 +258,7 @@ public class RegionManager {
   }
 
   public synchronized void updateStore(TiStore oldStore, TiStore newStore) {
-    if (cache.updateStore(oldStore, newStore)) {
+    if (cache.updateStore(oldStore, newStore) && storeChecker != null) {
       storeChecker.scheduleStoreHealthCheck(newStore);
     }
   }
@@ -283,24 +275,6 @@ public class RegionManager {
    */
   public synchronized void onRequestFail(TiRegion region) {
     cache.invalidateRegion(region);
-  }
-
-  /** If region has changed, return the new one and update cache. */
-  public TiRegion getRegionSkipCache(TiRegion region) {
-    BackOffer backOffer = ConcreteBackOffer.newGetBackOff();
-    try {
-      Pair<Metapb.Region, Metapb.Peer> regionAndLeader =
-          pdClient.getRegionByID(backOffer, region.getId());
-      if (!regionAndLeader.first.equals(region.getMeta())) {
-        region = createRegion(regionAndLeader.first, regionAndLeader.second, backOffer);
-        return cache.putRegion(region);
-      } else {
-        logger.warn("Cannot get region from PD for region id: " + region.getId());
-        return null;
-      }
-    } catch (Exception e) {
-      return null;
-    }
   }
 
   public void invalidateStore(long storeId) {
