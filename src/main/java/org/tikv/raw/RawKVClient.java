@@ -27,8 +27,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.RawCASConflictException;
 import org.tikv.common.exception.TiKVException;
+import org.tikv.common.importer.ImporterClient;
+import org.tikv.common.importer.SwitchTiKVModeClient;
 import org.tikv.common.key.Key;
 import org.tikv.common.operation.iterator.RawScanIterator;
 import org.tikv.common.region.RegionStoreClient;
@@ -38,6 +41,7 @@ import org.tikv.common.util.*;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClient implements AutoCloseable {
+  private final TiSession tiSession;
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
   private final boolean atomicForCAS;
@@ -85,6 +89,7 @@ public class RawKVClient implements AutoCloseable {
     Objects.requireNonNull(session, "session is null");
     Objects.requireNonNull(clientBuilder, "clientBuilder is null");
     this.conf = session.getConf();
+    this.tiSession = session;
     this.clientBuilder = clientBuilder;
     this.batchGetThreadPool = session.getThreadPoolForBatchGet();
     this.batchPutThreadPool = session.getThreadPoolForBatchPut();
@@ -637,6 +642,94 @@ public class RawKVClient implements AutoCloseable {
   public synchronized void deletePrefix(ByteString key) {
     ByteString endKey = Key.toRawKey(key).nextPrefix().toByteString();
     deleteRange(key, endKey);
+  }
+
+  /**
+   * Ingest KV pairs to RawKV using StreamKV API.
+   *
+   * @param list
+   */
+  public synchronized void ingest(List<Pair<ByteString, ByteString>> list) {
+    ingest(list, null);
+  }
+
+  /**
+   * Ingest KV pairs to RawKV using StreamKV API.
+   *
+   * @param list
+   * @param ttl the ttl of the key (in seconds), 0 means the key will never be outdated
+   */
+  public synchronized void ingest(List<Pair<ByteString, ByteString>> list, Long ttl)
+      throws GrpcException {
+    if (list.isEmpty()) {
+      return;
+    }
+
+    Key min = Key.MAX;
+    Key max = Key.MIN;
+    Map<ByteString, ByteString> map = new HashMap<>(list.size());
+
+    for (Pair<ByteString, ByteString> pair : list) {
+      map.put(pair.first, pair.second);
+      Key key = Key.toRawKey(pair.first.toByteArray());
+      if (key.compareTo(min) < 0) {
+        min = key;
+      }
+      if (key.compareTo(max) > 0) {
+        max = key;
+      }
+    }
+
+    SwitchTiKVModeClient switchTiKVModeClient = tiSession.getSwitchTiKVModeClient();
+
+    try {
+      // switch to normal mode
+      switchTiKVModeClient.switchTiKVToNormalMode();
+
+      // region split
+      List<byte[]> splitKeys = new ArrayList<>(2);
+      splitKeys.add(min.getBytes());
+      splitKeys.add(max.next().getBytes());
+      tiSession.splitRegionAndScatter(splitKeys);
+      tiSession.getRegionManager().invalidateAll();
+
+      // switch to import mode
+      switchTiKVModeClient.keepTiKVToImportMode();
+
+      // group keys by region
+      List<ByteString> sortedKeyList =
+          list.stream().map(pair -> pair.first).collect(Collectors.toList());
+      Map<TiRegion, List<ByteString>> groupKeys =
+          groupKeysByRegion(
+              clientBuilder.getRegionManager(), sortedKeyList, ConcreteBackOffer.newRawKVBackOff());
+
+      // ingest for each region
+      for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
+        TiRegion region = entry.getKey();
+        List<ByteString> keys = entry.getValue();
+        List<Pair<ByteString, ByteString>> kvs =
+            keys.stream().map(k -> Pair.create(k, map.get(k))).collect(Collectors.toList());
+        doIngest(region, kvs, ttl);
+      }
+    } finally {
+      // swith tikv to normal mode
+      switchTiKVModeClient.stopKeepTiKVToImportMode();
+      switchTiKVModeClient.switchTiKVToNormalMode();
+    }
+  }
+
+  private void doIngest(TiRegion region, List<Pair<ByteString, ByteString>> sortedList, Long ttl)
+      throws GrpcException {
+    if (sortedList.isEmpty()) {
+      return;
+    }
+
+    ByteString uuid = ByteString.copyFrom(genUUID());
+    Key minKey = Key.toRawKey(sortedList.get(0).first);
+    Key maxKey = Key.toRawKey(sortedList.get(sortedList.size() - 1).first);
+    ImporterClient importerClient =
+        new ImporterClient(tiSession, uuid, minKey, maxKey, region, ttl);
+    importerClient.rawWrite(sortedList.iterator());
   }
 
   private void doSendBatchPut(BackOffer backOffer, Map<ByteString, ByteString> kvPairs, long ttl) {

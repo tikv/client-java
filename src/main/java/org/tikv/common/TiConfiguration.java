@@ -82,6 +82,9 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
     setIfMissing(TIKV_HEALTH_CHECK_PERIOD_DURATION, DEF_HEALTH_CHECK_PERIOD_DURATION);
     setIfMissing(TIKV_ENABLE_ATOMIC_FOR_CAS, DEF_TIKV_ENABLE_ATOMIC_FOR_CAS);
+    setIfMissing(TIKV_IMPORTER_MAX_KV_BATCH_BYTES, DEF_TIKV_IMPORTER_MAX_KV_BATCH_BYTES);
+    setIfMissing(TIKV_IMPORTER_MAX_KV_BATCH_SIZE, DEF_TIKV_IMPORTER_MAX_KV_BATCH_SIZE);
+    setIfMissing(TIKV_SCATTER_WAIT_SECONDS, DEF_TIKV_SCATTER_WAIT_SECONDS);
   }
 
   public static void listAll() {
@@ -272,6 +275,12 @@ public class TiConfiguration implements Serializable {
   private HostMapping hostMapping = null;
 
   private boolean enableAtomicForCAS = getBoolean(TIKV_ENABLE_ATOMIC_FOR_CAS);
+
+  private int importerMaxKVBatchBytes = getInt(TIKV_IMPORTER_MAX_KV_BATCH_BYTES);
+
+  private int importerMaxKVBatchSize = getInt(TIKV_IMPORTER_MAX_KV_BATCH_SIZE);
+
+  private int scatterWaitSeconds = getInt(TIKV_SCATTER_WAIT_SECONDS);
 
   public enum KVMode {
     TXN,
@@ -489,6 +498,14 @@ public class TiConfiguration implements Serializable {
     return kvMode;
   }
 
+  public boolean isRawKVMode() {
+    return getKvMode() == TiConfiguration.KVMode.RAW;
+  }
+
+  public boolean isTxnKVMode() {
+    return getKvMode() == KVMode.TXN;
+  }
+
   public TiConfiguration setKvMode(String kvMode) {
     this.kvMode = KVMode.valueOf(kvMode);
     return this;
@@ -585,5 +602,29 @@ public class TiConfiguration implements Serializable {
 
   public void setEnableAtomicForCAS(boolean enableAtomicForCAS) {
     this.enableAtomicForCAS = enableAtomicForCAS;
+  }
+
+  public int getImporterMaxKVBatchBytes() {
+    return importerMaxKVBatchBytes;
+  }
+
+  public void setImporterMaxKVBatchBytes(int importerMaxKVBatchBytes) {
+    this.importerMaxKVBatchBytes = importerMaxKVBatchBytes;
+  }
+
+  public int getImporterMaxKVBatchSize() {
+    return importerMaxKVBatchSize;
+  }
+
+  public void setImporterMaxKVBatchSize(int importerMaxKVBatchSize) {
+    this.importerMaxKVBatchSize = importerMaxKVBatchSize;
+  }
+
+  public int getScatterWaitSeconds() {
+    return scatterWaitSeconds;
+  }
+
+  public void setScatterWaitSeconds(int scatterWaitSeconds) {
+    this.scatterWaitSeconds = scatterWaitSeconds;
   }
 }
