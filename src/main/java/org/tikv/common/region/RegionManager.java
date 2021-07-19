@@ -117,6 +117,10 @@ public class RegionManager {
     return cacheInvalidateCallback;
   }
 
+  public void invalidateAll() {
+    cache.invalidateAll();
+  }
+
   public ReadOnlyPDClient getPDClient() {
     return this.pdClient;
   }
