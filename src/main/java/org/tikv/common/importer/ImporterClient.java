@@ -40,7 +40,7 @@ public class ImporterClient {
   private TiRegion region;
   private Long ttl;
 
-  private boolean openStream = false;
+  private boolean streamOpened = false;
   private ImportSstpb.SSTMeta sstMeta;
   private List<ImporterStoreClient> clientList;
   private ImporterStoreClient clientLeader;
@@ -66,7 +66,7 @@ public class ImporterClient {
       throw new IllegalArgumentException("KVMode is not RAW in TiConfiguration!");
     }
 
-    openStream = false;
+    streamOpened = false;
 
     int maxKVBatchSize = tiConf.getImporterMaxKVBatchSize();
     int maxKVBatchBytes = tiConf.getImporterMaxKVBatchBytes();
@@ -83,16 +83,16 @@ public class ImporterClient {
           break;
         }
       }
-      if (!openStream) {
+      if (!streamOpened) {
         init();
         startRawWrite();
         rawWriteMeta();
-        openStream = true;
+        streamOpened = true;
       }
       rawWriteBatch(pairs);
     }
 
-    if (openStream) {
+    if (streamOpened) {
       finishRawWrite();
       ingest();
     }
