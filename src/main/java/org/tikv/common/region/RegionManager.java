@@ -69,7 +69,8 @@ public class RegionManager {
 
     if (enableGrpcForward) {
       StoreHealthyChecker storeChecker =
-          new StoreHealthyChecker(channelFactory, pdClient, this.cache, conf.getGrpcHealthCheckTimeout());
+          new StoreHealthyChecker(
+              channelFactory, pdClient, this.cache, conf.getGrpcHealthCheckTimeout());
       this.storeChecker = storeChecker;
       this.executor = Executors.newScheduledThreadPool(1);
       this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);

@@ -51,7 +51,8 @@ public class ConfigUtils {
   public static final String TIKV_NETWORK_MAPPING_NAME = "tikv.network.mapping";
   public static final String TIKV_ENABLE_GRPC_FORWARD = "tikv.enable_grpc_forward";
   public static final String TIKV_GRPC_HEALTH_CHECK_TIMEOUT = "tikv.grpc.health_check_timeout";
-  public static final String TIKV_HEALTH_CHECK_PERIOD_DURATION = "tikv.health_check_period_duration";
+  public static final String TIKV_HEALTH_CHECK_PERIOD_DURATION =
+      "tikv.health_check_period_duration";
 
   public static final String TIKV_ENABLE_ATOMIC_FOR_CAS = "tikv.enable_atomic_for_cas";
 
