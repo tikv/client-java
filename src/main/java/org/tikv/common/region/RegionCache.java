@@ -29,6 +29,12 @@ public class RegionCache {
     keyToRegionIdCache = TreeRangeMap.create();
   }
 
+  public synchronized void invalidateAll() {
+    regionCache.clear();
+    storeCache.clear();
+    keyToRegionIdCache.clear();
+  }
+
   public synchronized TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
     Long regionId;
     if (key.isEmpty()) {

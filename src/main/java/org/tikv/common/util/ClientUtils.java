@@ -213,4 +213,19 @@ public class ClientUtils {
       throw new TiKVException("Execution exception met.", e);
     }
   }
+
+  public static byte[] genUUID() {
+    UUID uuid = UUID.randomUUID();
+
+    byte[] out = new byte[16];
+    long msb = uuid.getMostSignificantBits();
+    long lsb = uuid.getLeastSignificantBits();
+    for (int i = 0; i < 8; i++) {
+      out[i] = (byte) ((msb >> ((7 - i) * 8)) & 0xff);
+    }
+    for (int i = 8; i < 16; i++) {
+      out[i] = (byte) ((lsb >> ((15 - i) * 8)) & 0xff);
+    }
+    return out;
+  }
 }

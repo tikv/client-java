@@ -108,6 +108,10 @@ public class TiRegion implements Serializable {
     return peers;
   }
 
+  public List<Peer> getPeersList() {
+    return getMeta().getPeersList();
+  }
+
   public Peer getCurrentReplica() {
     return replicaList.get(replicaIdx);
   }
@@ -135,10 +139,6 @@ public class TiRegion implements Serializable {
 
   public ByteString getEndKey() {
     return meta.getEndKey();
-  }
-
-  public Key getRowEndKey() {
-    return Key.toRawKey(getEndKey());
   }
 
   public Kvrpcpb.Context getLeaderContext() {
