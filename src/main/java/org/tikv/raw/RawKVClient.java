@@ -697,11 +697,10 @@ public class RawKVClient implements AutoCloseable {
       switchTiKVModeClient.keepTiKVToImportMode();
 
       // group keys by region
-      List<ByteString> sortedKeyList =
-          list.stream().map(pair -> pair.first).collect(Collectors.toList());
+      List<ByteString> keyList = list.stream().map(pair -> pair.first).collect(Collectors.toList());
       Map<TiRegion, List<ByteString>> groupKeys =
           groupKeysByRegion(
-              clientBuilder.getRegionManager(), sortedKeyList, ConcreteBackOffer.newRawKVBackOff());
+              clientBuilder.getRegionManager(), keyList, ConcreteBackOffer.newRawKVBackOff());
 
       // ingest for each region
       for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {

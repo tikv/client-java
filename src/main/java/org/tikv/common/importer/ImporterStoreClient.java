@@ -122,7 +122,7 @@ public class ImporterStoreClient
   }
 
   /**
-   * This API should be called after `finishRawWrite`. This API should be called onn leader only.
+   * This API should be called after `finishRawWrite`. This API should be called on leader only.
    *
    * @param ctx
    */
