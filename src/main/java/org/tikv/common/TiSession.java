@@ -56,7 +56,6 @@ public class TiSession implements AutoCloseable {
   private static final Map<String, TiSession> sessionCachedMap = new HashMap<>();
   private final TiConfiguration conf;
   private final ChannelFactory channelFactory;
-  private Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
   // below object creation is either heavy or making connection (pd), pending for lazy loading
   private volatile PDClient client;
   private volatile Catalog catalog;
@@ -184,11 +183,7 @@ public class TiSession implements AutoCloseable {
         if (regionManager == null) {
           regionManager =
               new RegionManager(
-                  getConf(),
-                  getPDClient(),
-                  this.cacheInvalidateCallback,
-                  this.channelFactory,
-                  this.enableGrpcForward);
+                  getConf(), getPDClient(), this.channelFactory, this.enableGrpcForward);
         }
         res = regionManager;
       }
@@ -329,15 +324,6 @@ public class TiSession implements AutoCloseable {
   @VisibleForTesting
   public ChannelFactory getChannelFactory() {
     return channelFactory;
-  }
-
-  /**
-   * This is used for setting call back function to invalidate cache information
-   *
-   * @param callBackFunc callback function
-   */
-  public void injectCallBackFunc(Function<CacheInvalidateEvent, Void> callBackFunc) {
-    this.cacheInvalidateCallback = callBackFunc;
   }
 
   /**

@@ -80,6 +80,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_NETWORK_MAPPING_NAME, DEF_TIKV_NETWORK_MAPPING_NAME);
     setIfMissing(TIKV_ENABLE_GRPC_FORWARD, DEF_GRPC_FORWARD_ENABLE);
     setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
+    setIfMissing(TIKV_HEALTH_CHECK_PERIOD_DURATION, DEF_HEALTH_CHECK_PERIOD_DURATION);
     setIfMissing(TIKV_ENABLE_ATOMIC_FOR_CAS, DEF_TIKV_ENABLE_ATOMIC_FOR_CAS);
   }
 
@@ -265,6 +266,7 @@ public class TiConfiguration implements Serializable {
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
   private int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
+  private int healthCheckPeriodDuration = getInt(TIKV_HEALTH_CHECK_PERIOD_DURATION);
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
   private HostMapping hostMapping = null;
@@ -571,6 +573,10 @@ public class TiConfiguration implements Serializable {
 
   public long getGrpcHealthCheckTimeout() {
     return this.grpcHealthCheckTimeout;
+  }
+
+  public long getHealthCheckPeriodDuration() {
+    return this.healthCheckPeriodDuration;
   }
 
   public boolean isEnableAtomicForCAS() {

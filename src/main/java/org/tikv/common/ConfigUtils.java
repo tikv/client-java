@@ -51,14 +51,16 @@ public class ConfigUtils {
   public static final String TIKV_NETWORK_MAPPING_NAME = "tikv.network.mapping";
   public static final String TIKV_ENABLE_GRPC_FORWARD = "tikv.enable_grpc_forward";
   public static final String TIKV_GRPC_HEALTH_CHECK_TIMEOUT = "tikv.grpc.health_check_timeout";
+  public static final String TIKV_HEALTH_CHECK_PERIOD_DURATION = "tikv.health_check_period_duration";
 
   public static final String TIKV_ENABLE_ATOMIC_FOR_CAS = "tikv.enable_atomic_for_cas";
 
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
-  public static final String DEF_TIMEOUT = "300ms";
-  public static final String DEF_FORWARD_TIMEOUT = "600ms";
+  public static final String DEF_TIMEOUT = "200ms";
+  public static final String DEF_FORWARD_TIMEOUT = "300ms";
   public static final String DEF_SCAN_TIMEOUT = "20s";
   public static final int DEF_CHECK_HEALTH_TIMEOUT = 100;
+  public static final int DEF_HEALTH_CHECK_PERIOD_DURATION = 300;
   public static final int DEF_SCAN_BATCH_SIZE = 10240;
   public static final int DEF_MAX_FRAME_SIZE = 268435456 * 2; // 256 * 2 MB
   public static final int DEF_INDEX_SCAN_BATCH_SIZE = 20000;
