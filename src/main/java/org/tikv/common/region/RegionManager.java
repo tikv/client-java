@@ -58,26 +58,17 @@ public class RegionManager {
   private final StoreHealthyChecker storeChecker;
 
   public RegionManager(
-      TiConfiguration conf,
-      ReadOnlyPDClient pdClient,
-      ChannelFactory channelFactory,
-      boolean enableGrpcForward) {
+      TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
     this.cache = new RegionCache();
     this.pdClient = pdClient;
     this.conf = conf;
     long period = conf.getHealthCheckPeriodDuration();
-
-    if (enableGrpcForward) {
-      StoreHealthyChecker storeChecker =
-          new StoreHealthyChecker(
-              channelFactory, pdClient, this.cache, conf.getGrpcHealthCheckTimeout());
-      this.storeChecker = storeChecker;
-      this.executor = Executors.newScheduledThreadPool(1);
-      this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
-    } else {
-      this.storeChecker = null;
-      this.executor = null;
-    }
+    StoreHealthyChecker storeChecker =
+        new StoreHealthyChecker(
+            channelFactory, pdClient, this.cache, conf.getGrpcHealthCheckTimeout());
+    this.storeChecker = storeChecker;
+    this.executor = Executors.newScheduledThreadPool(1);
+    this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
   }
 
   public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {

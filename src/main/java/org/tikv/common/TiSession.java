@@ -179,9 +179,7 @@ public class TiSession implements AutoCloseable {
     if (res == null) {
       synchronized (this) {
         if (regionManager == null) {
-          regionManager =
-              new RegionManager(
-                  getConf(), getPDClient(), this.channelFactory, this.enableGrpcForward);
+          regionManager = new RegionManager(getConf(), getPDClient(), this.channelFactory);
         }
         res = regionManager;
       }
