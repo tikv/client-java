@@ -125,6 +125,14 @@ public abstract class AbstractRegionStoreClient
 
   @Override
   public boolean onStoreUnreachable() {
+    if (!targetStore.isValid()) {
+      logger.warn(
+          String.format("store [%d] has been invalid", region.getId(), targetStore.getId()));
+      targetStore = regionManager.getStoreById(targetStore.getId());
+      updateClientStub();
+      return true;
+    }
+
     if (targetStore.getProxyStore() == null) {
       if (targetStore.isReachable()) {
         return true;
@@ -238,20 +246,22 @@ public abstract class AbstractRegionStoreClient
 
   private void updateClientStub() {
     String addressStr = targetStore.getStore().getAddress();
+    if (targetStore.getProxyStore() != null) {
+      addressStr = targetStore.getProxyStore().getAddress();
+    }
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
     blockingStub = TikvGrpc.newBlockingStub(channel);
     asyncStub = TikvGrpc.newStub(channel);
+    if (targetStore.getProxyStore() != null) {
+      Metadata header = new Metadata();
+      header.put(TiConfiguration.FORWARD_META_DATA_KEY, targetStore.getStore().getAddress());
+      blockingStub = MetadataUtils.attachHeaders(blockingStub, header);
+      asyncStub = MetadataUtils.attachHeaders(asyncStub, header);
+    }
   }
 
   private boolean retryOtherStoreByProxyForward() {
-    if (!targetStore.isValid()) {
-      targetStore = regionManager.getStoreById(targetStore.getId());
-      logger.warn(
-          String.format("store [%d] has been invalid", region.getId(), targetStore.getId()));
-      return true;
-    }
-
     TiStore proxyStore = switchProxyStore();
     if (proxyStore == null) {
       logger.warn(
@@ -268,19 +278,13 @@ public abstract class AbstractRegionStoreClient
     }
     targetStore = proxyStore;
     retryForwardTimes += 1;
+    updateClientStub();
     logger.warn(
         String.format(
             "forward request to store [%s] by store [%s] for region[%d]",
             targetStore.getStore().getAddress(),
             targetStore.getProxyStore().getAddress(),
             region.getId()));
-    String addressStr = targetStore.getProxyStore().getAddress();
-    ManagedChannel channel =
-        channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
-    Metadata header = new Metadata();
-    header.put(TiConfiguration.FORWARD_META_DATA_KEY, targetStore.getStore().getAddress());
-    blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel), header);
-    asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newStub(channel), header);
     return true;
   }
 
