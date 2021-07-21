@@ -61,7 +61,7 @@ public class RegionManagerTest extends PDMockServerTest {
     int confVer = 1026;
     int ver = 1027;
     long regionId = 233;
-    String testAddress = "testAddress";
+    String testAddress = "127.0.0.1";
     pdServer.addGetRegionResp(
         GrpcUtils.makeGetRegionResponse(
             pdServer.getClusterId(),
