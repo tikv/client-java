@@ -449,6 +449,8 @@ public class TiSession implements AutoCloseable {
         List<Metapb.Region> newRegions;
         try {
           newRegions = getRegionStoreClientBuilder().build(region, store).splitRegion(splits);
+          // invalidate old region
+          getRegionManager().invalidateRegion(region);
         } catch (final TiKVException e) {
           // retry
           logger.warn("ReSplitting ranges for splitRegion", e);
