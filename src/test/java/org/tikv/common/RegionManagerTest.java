@@ -96,6 +96,7 @@ public class RegionManagerTest extends PDMockServerTest {
       mgr.getRegionByKey(searchKeyNotExists);
       fail();
     } catch (Exception ignored) {
+      ignored.printStackTrace();
     }
   }
 
