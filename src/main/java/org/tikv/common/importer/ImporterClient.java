@@ -166,18 +166,19 @@ public class ImporterClient {
   }
 
   private void ingest() throws GrpcException {
-    int returnNumber = 0;
-    while (returnNumber < clientList.size()) {
-      returnNumber = 0;
-      for (ImporterStoreClient client : clientList) {
+    List<ImporterStoreClient> workingClients = new ArrayList<>(clientList);
+    while (!workingClients.isEmpty()) {
+      Iterator<ImporterStoreClient> itor = workingClients.iterator();
+      while (itor.hasNext()) {
+        ImporterStoreClient client = itor.next();
         if (client.isRawWriteResponseReceived()) {
-          returnNumber++;
+          itor.remove();
         } else if (client.hasRawWriteResponseError()) {
           throw new GrpcException(client.getRawWriteError());
         }
       }
 
-      if (returnNumber < clientList.size()) {
+      if (!workingClients.isEmpty()) {
         try {
           Thread.sleep(1000);
         } catch (InterruptedException e) {
