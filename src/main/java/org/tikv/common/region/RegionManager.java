@@ -104,7 +104,7 @@ public class RegionManager {
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
       }
     } catch (Exception e) {
-        return null;
+      return null;
     } finally {
       requestTimer.observeDuration();
     }
