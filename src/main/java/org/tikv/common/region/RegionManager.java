@@ -25,13 +25,11 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.TiConfiguration;
-import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.util.BackOffer;
@@ -59,44 +57,24 @@ public class RegionManager {
   private final ScheduledExecutorService executor;
   private final StoreHealthyChecker storeChecker;
 
-  private final Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
-
-  // To avoid double retrieval, we used the async version of grpc
-  // When rpc not returned, instead of call again, it wait for previous one done
   public RegionManager(
-      TiConfiguration conf,
-      ReadOnlyPDClient pdClient,
-      Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
+      TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
     this.cache = new RegionCache();
     this.pdClient = pdClient;
     this.conf = conf;
-    this.cacheInvalidateCallback = cacheInvalidateCallback;
-    this.executor = null;
-    this.storeChecker = null;
-  }
-
-  public RegionManager(
-      TiConfiguration conf,
-      ReadOnlyPDClient pdClient,
-      Function<CacheInvalidateEvent, Void> cacheInvalidateCallback,
-      ChannelFactory channelFactory,
-      boolean enableGrpcForward) {
-    this.cache = new RegionCache();
-    this.cacheInvalidateCallback = cacheInvalidateCallback;
-    this.pdClient = pdClient;
-    this.conf = conf;
+    long period = conf.getHealthCheckPeriodDuration();
     StoreHealthyChecker storeChecker =
-        new StoreHealthyChecker(channelFactory, pdClient, this.cache);
+        new StoreHealthyChecker(
+            channelFactory, pdClient, this.cache, conf.getGrpcHealthCheckTimeout());
     this.storeChecker = storeChecker;
     this.executor = Executors.newScheduledThreadPool(1);
-    this.executor.scheduleAtFixedRate(storeChecker, 1, 1, TimeUnit.SECONDS);
+    this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
   }
 
   public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
     this.cache = new RegionCache();
     this.pdClient = pdClient;
     this.conf = conf;
-    this.cacheInvalidateCallback = null;
     this.storeChecker = null;
     this.executor = null;
   }
@@ -105,10 +83,6 @@ public class RegionManager {
     if (this.executor != null) {
       this.executor.shutdownNow();
     }
-  }
-
-  public Function<CacheInvalidateEvent, Void> getCacheInvalidateCallback() {
-    return cacheInvalidateCallback;
   }
 
   public ReadOnlyPDClient getPDClient() {
