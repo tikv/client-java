@@ -92,11 +92,7 @@ public class RegionManagerTest extends PDMockServerTest {
 
     // This will in turn invoke rpc and results in an error
     // since we set just one rpc response
-    try {
-      mgr.getRegionByKey(searchKeyNotExists);
-      fail();
-    } catch (Exception ignored) {
-    }
+    assertNull(mgr.getRegionByKey(searchKeyNotExists));
   }
 
   @Test
