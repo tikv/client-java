@@ -61,7 +61,7 @@ public class RegionManagerTest extends PDMockServerTest {
     int confVer = 1026;
     int ver = 1027;
     long regionId = 233;
-    String testAddress = "127.0.0.1";
+    String testAddress = "testAddress";
     pdServer.addGetRegionResp(
         GrpcUtils.makeGetRegionResponse(
             pdServer.getClusterId(),
@@ -92,7 +92,11 @@ public class RegionManagerTest extends PDMockServerTest {
 
     // This will in turn invoke rpc and results in an error
     // since we set just one rpc response
-    assertNull(mgr.getRegionByKey(searchKeyNotExists));
+    try {
+      mgr.getRegionByKey(searchKeyNotExists);
+      fail();
+    } catch (Exception ignored) {
+    }
   }
 
   @Test
