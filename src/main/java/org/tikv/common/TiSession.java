@@ -31,6 +31,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.catalog.Catalog;
 import org.tikv.common.exception.TiKVException;
+import org.tikv.common.importer.ImporterStoreClient;
+import org.tikv.common.importer.SwitchTiKVModeClient;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.RegionManager;
@@ -67,8 +69,10 @@ public class TiSession implements AutoCloseable {
   private volatile RegionManager regionManager;
   private volatile boolean enableGrpcForward;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
+  private volatile ImporterStoreClient.ImporterStoreClientBuilder importerClientBuilder;
   private boolean isClosed = false;
   private MetricsServer metricsServer;
+  private static final int MAX_SPLIT_REGION_STACK_DEPTH = 6;
 
   public TiSession(TiConfiguration conf) {
     this.conf = conf;
@@ -127,6 +131,21 @@ public class TiSession implements AutoCloseable {
                   conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
         }
         res = clientBuilder;
+      }
+    }
+    return res;
+  }
+
+  public ImporterStoreClient.ImporterStoreClientBuilder getImporterRegionStoreClientBuilder() {
+    ImporterStoreClient.ImporterStoreClientBuilder res = importerClientBuilder;
+    if (res == null) {
+      synchronized (this) {
+        if (importerClientBuilder == null) {
+          importerClientBuilder =
+              new ImporterStoreClient.ImporterStoreClientBuilder(
+                  conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
+        }
+        res = importerClientBuilder;
       }
     }
     return res;
@@ -323,9 +342,21 @@ public class TiSession implements AutoCloseable {
   }
 
   /**
+   * SwitchTiKVModeClient is used for SST Ingest.
+   *
+   * @return a SwitchTiKVModeClient
+   */
+  public SwitchTiKVModeClient getSwitchTiKVModeClient() {
+    return new SwitchTiKVModeClient(getPDClient(), getImporterRegionStoreClientBuilder());
+  }
+
+  /**
    * split region and scatter
    *
    * @param splitKeys
+   * @param splitRegionBackoffMS
+   * @param scatterRegionBackoffMS
+   * @param scatterWaitMS
    */
   public void splitRegionAndScatter(
       List<byte[]> splitKeys,
@@ -340,7 +371,7 @@ public class TiSession implements AutoCloseable {
         splitRegion(
             splitKeys
                 .stream()
-                .map(k -> Key.toRawKey(k).next().toByteString())
+                .map(k -> Key.toRawKey(k).toByteString())
                 .collect(Collectors.toList()),
             ConcreteBackOffer.newCustomBackOff(splitRegionBackoffMS));
 
@@ -375,11 +406,28 @@ public class TiSession implements AutoCloseable {
     logger.info("splitRegionAndScatter cost {} seconds", (endMS - startMS) / 1000);
   }
 
+  /**
+   * split region and scatter
+   *
+   * @param splitKeys
+   */
+  public void splitRegionAndScatter(List<byte[]> splitKeys) {
+    int splitRegionBackoffMS = BackOffer.SPLIT_REGION_BACKOFF;
+    int scatterRegionBackoffMS = BackOffer.SCATTER_REGION_BACKOFF;
+    int scatterWaitMS = conf.getScatterWaitSeconds() * 1000;
+    splitRegionAndScatter(splitKeys, splitRegionBackoffMS, scatterRegionBackoffMS, scatterWaitMS);
+  }
+
   private List<Metapb.Region> splitRegion(List<ByteString> splitKeys, BackOffer backOffer) {
+    return splitRegion(splitKeys, backOffer, 1);
+  }
+
+  private List<Metapb.Region> splitRegion(
+      List<ByteString> splitKeys, BackOffer backOffer, int depth) {
     List<Metapb.Region> regions = new ArrayList<>();
 
     Map<TiRegion, List<ByteString>> groupKeys =
-        groupKeysByRegion(regionManager, splitKeys, backOffer);
+        groupKeysByRegion(getRegionManager(), splitKeys, backOffer);
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
 
       Pair<TiRegion, TiStore> pair =
@@ -401,12 +449,22 @@ public class TiSession implements AutoCloseable {
         List<Metapb.Region> newRegions;
         try {
           newRegions = getRegionStoreClientBuilder().build(region, store).splitRegion(splits);
+          // invalidate old region
+          getRegionManager().invalidateRegion(region);
         } catch (final TiKVException e) {
           // retry
           logger.warn("ReSplitting ranges for splitRegion", e);
-          clientBuilder.getRegionManager().invalidateRegion(region);
+          getRegionManager().invalidateRegion(region);
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-          newRegions = splitRegion(splits, backOffer);
+          if (depth >= MAX_SPLIT_REGION_STACK_DEPTH) {
+            logger.warn(
+                String.format(
+                    "Skip split region because MAX_SPLIT_REGION_STACK_DEPTH(%d) reached!",
+                    MAX_SPLIT_REGION_STACK_DEPTH));
+            newRegions = new ArrayList<>();
+          } else {
+            newRegions = splitRegion(splits, backOffer, depth + 1);
+          }
         }
         logger.info("region id={}, new region size={}", region.getId(), newRegions.size());
         regions.addAll(newRegions);

@@ -89,6 +89,10 @@ public class RegionManager {
     return this.pdClient;
   }
 
+  public void invalidateAll() {
+    cache.invalidateAll();
+  }
+
   public TiRegion getRegionByKey(ByteString key) {
     return getRegionByKey(key, ConcreteBackOffer.newGetBackOff());
   }

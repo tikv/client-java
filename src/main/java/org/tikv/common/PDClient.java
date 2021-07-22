@@ -48,7 +48,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.CodecDataOutput;
@@ -230,7 +229,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   public Pair<Metapb.Region, Metapb.Peer> getRegionByKey(BackOffer backOffer, ByteString key) {
     Histogram.Timer requestTimer = PD_GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
     try {
-      if (conf.getKvMode() == KVMode.TXN) {
+      if (conf.isTxnKVMode()) {
         CodecDataOutput cdo = new CodecDataOutput();
         BytesCodec.writeBytes(cdo, key.toByteArray());
         key = cdo.toByteString();
@@ -679,7 +678,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   private Metapb.Region decodeRegion(Metapb.Region region) {
-    final boolean isRawRegion = conf.getKvMode() == KVMode.RAW;
+    final boolean isRawRegion = conf.isRawKVMode();
     Metapb.Region.Builder builder =
         Metapb.Region.newBuilder()
             .setId(region.getId())

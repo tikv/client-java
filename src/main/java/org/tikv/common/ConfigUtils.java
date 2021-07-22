@@ -56,6 +56,11 @@ public class ConfigUtils {
 
   public static final String TIKV_ENABLE_ATOMIC_FOR_CAS = "tikv.enable_atomic_for_cas";
 
+  public static final String TIKV_IMPORTER_MAX_KV_BATCH_BYTES = "tikv.importer.max_kv_batch_bytes";
+  public static final String TIKV_IMPORTER_MAX_KV_BATCH_SIZE = "tikv.importer.max_kv_batch_size";
+
+  public static final String TIKV_SCATTER_WAIT_SECONDS = "tikv.scatter_wait_seconds";
+
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
   public static final String DEF_FORWARD_TIMEOUT = "300ms";
@@ -88,6 +93,10 @@ public class ConfigUtils {
   public static final String DEF_TIKV_NETWORK_MAPPING_NAME = "";
   public static final boolean DEF_GRPC_FORWARD_ENABLE = true;
   public static final boolean DEF_TIKV_ENABLE_ATOMIC_FOR_CAS = false;
+
+  public static final int DEF_TIKV_IMPORTER_MAX_KV_BATCH_BYTES = 1024 * 1024;
+  public static final int DEF_TIKV_IMPORTER_MAX_KV_BATCH_SIZE = 1024 * 32;
+  public static final int DEF_TIKV_SCATTER_WAIT_SECONDS = 300;
 
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";

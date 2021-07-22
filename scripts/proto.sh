@@ -14,7 +14,7 @@
 #   limitations under the License.
 #
 
-kvproto_hash=6ed99a08e262d8a32d6355dcba91cf99cb92074a
+kvproto_hash=2ac2a7984b2d01b96ed56fd8474f4bf80fa33c51
 raft_rs_hash=b9891b673573fad77ebcf9bbe0969cf945841926
 tipb_hash=c4d518eb1d60c21f05b028b36729e64610346dac
 
