@@ -26,12 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.catalog.Catalog;
-import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
@@ -56,7 +54,6 @@ public class TiSession implements AutoCloseable {
   private static final Map<String, TiSession> sessionCachedMap = new HashMap<>();
   private final TiConfiguration conf;
   private final ChannelFactory channelFactory;
-  private Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
   // below object creation is either heavy or making connection (pd), pending for lazy loading
   private volatile PDClient client;
   private volatile Catalog catalog;
@@ -182,13 +179,7 @@ public class TiSession implements AutoCloseable {
     if (res == null) {
       synchronized (this) {
         if (regionManager == null) {
-          regionManager =
-              new RegionManager(
-                  getConf(),
-                  getPDClient(),
-                  this.cacheInvalidateCallback,
-                  this.channelFactory,
-                  this.enableGrpcForward);
+          regionManager = new RegionManager(getConf(), getPDClient(), this.channelFactory);
         }
         res = regionManager;
       }
@@ -329,15 +320,6 @@ public class TiSession implements AutoCloseable {
   @VisibleForTesting
   public ChannelFactory getChannelFactory() {
     return channelFactory;
-  }
-
-  /**
-   * This is used for setting call back function to invalidate cache information
-   *
-   * @param callBackFunc callback function
-   */
-  public void injectCallBackFunc(Function<CacheInvalidateEvent, Void> callBackFunc) {
-    this.cacheInvalidateCallback = callBackFunc;
   }
 
   /**

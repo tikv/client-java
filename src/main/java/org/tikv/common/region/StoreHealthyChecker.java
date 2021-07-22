@@ -19,20 +19,21 @@ import org.tikv.kvproto.Metapb;
 public class StoreHealthyChecker implements Runnable {
   private static final Logger logger = LoggerFactory.getLogger(StoreHealthyChecker.class);
   private static final long MAX_CHECK_STORE_TOMBSTONE_TICK = 60;
-  private static final long SLEEP_MILLI_SECONDS_AFTER_DOUBLE_CHECK = 500;
   private BlockingQueue<TiStore> taskQueue;
   private final ChannelFactory channelFactory;
   private final ReadOnlyPDClient pdClient;
   private final RegionCache cache;
   private long checkTombstoneTick;
+  private long timeout;
 
   public StoreHealthyChecker(
-      ChannelFactory channelFactory, ReadOnlyPDClient pdClient, RegionCache cache) {
+      ChannelFactory channelFactory, ReadOnlyPDClient pdClient, RegionCache cache, long timeout) {
     this.taskQueue = new LinkedBlockingQueue<>();
     this.channelFactory = channelFactory;
     this.pdClient = pdClient;
     this.cache = cache;
     this.checkTombstoneTick = 0;
+    this.timeout = timeout;
   }
 
   public boolean scheduleStoreHealthCheck(TiStore store) {
@@ -64,7 +65,7 @@ public class StoreHealthyChecker implements Runnable {
     try {
       ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
       HealthGrpc.HealthBlockingStub stub =
-          HealthGrpc.newBlockingStub(channel).withDeadlineAfter(200, TimeUnit.MILLISECONDS);
+          HealthGrpc.newBlockingStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
       HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
       HealthCheckResponse resp = stub.check(req);
       if (resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING) {
@@ -133,7 +134,7 @@ public class StoreHealthyChecker implements Runnable {
     }
     if (!unreachableStore.isEmpty()) {
       try {
-        Thread.sleep(SLEEP_MILLI_SECONDS_AFTER_DOUBLE_CHECK);
+        Thread.sleep(timeout);
       } catch (Exception e) {
         this.taskQueue.addAll(unreachableStore);
         return;
