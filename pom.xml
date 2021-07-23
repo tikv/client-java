@@ -445,6 +445,10 @@
                                     <pattern>io.prometheus</pattern>
                                     <shadedPattern>org.tikv.shade.io.prometheus</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>com.fasterxml.jackson</pattern>
+                                    <shadedPattern>org.tikv.shade.com.fasterxml.jackson</shadedPattern>
+                                </relocation>
                             </relocations>
                         </configuration>
                     </execution>
