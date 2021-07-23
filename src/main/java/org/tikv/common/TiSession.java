@@ -71,6 +71,7 @@ public class TiSession implements AutoCloseable {
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private volatile ImporterStoreClient.ImporterStoreClientBuilder importerClientBuilder;
   private volatile boolean isClosed = false;
+  private volatile SwitchTiKVModeClient switchTiKVModeClient;
   private MetricsServer metricsServer;
   private static final int MAX_SPLIT_REGION_STACK_DEPTH = 6;
 
@@ -387,7 +388,16 @@ public class TiSession implements AutoCloseable {
   public SwitchTiKVModeClient getSwitchTiKVModeClient() {
     checkIsClosed();
 
-    return new SwitchTiKVModeClient(getPDClient(), getImporterRegionStoreClientBuilder());
+    SwitchTiKVModeClient res = switchTiKVModeClient;
+    if (res == null) {
+      synchronized (this) {
+        if (switchTiKVModeClient == null) {
+          switchTiKVModeClient = new SwitchTiKVModeClient(getPDClient(), getImporterRegionStoreClientBuilder());
+        }
+        res = switchTiKVModeClient;
+      }
+    }
+    return res;
   }
 
   /**
@@ -577,6 +587,10 @@ public class TiSession implements AutoCloseable {
     }
     if (catalog != null) {
       catalog.close();
+    }
+
+    if(switchTiKVModeClient != null) {
+      switchTiKVModeClient.stopKeepTiKVToImportMode();
     }
   }
 
