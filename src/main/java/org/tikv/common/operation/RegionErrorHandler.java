@@ -135,6 +135,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
       backOffer.doBackOff(
           BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.getMessage()));
       this.regionManager.onRegionStale(recv.getRegion());
+      return false;
     } else if (error.hasStaleCommand()) {
       // this error is reported from raftstore:
       // command outdated, please try later
