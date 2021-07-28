@@ -165,6 +165,7 @@ public class RegionStoreClientTest extends MockServerTest {
       client.scan(defaultBackOff(), ByteString.copyFromUtf8("error1"), 1);
       fail();
     } catch (Exception e) {
+      e.printStackTrace();
       assertTrue(true);
     }
     server.clearAllMap();
@@ -172,6 +173,6 @@ public class RegionStoreClientTest extends MockServerTest {
   }
 
   private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newCustomBackOff(1000);
+    return ConcreteBackOffer.newCustomBackOff(50);
   }
 }

@@ -96,7 +96,7 @@ public class ConcreteBackOffer implements BackOffer {
         backOffFunction = BackOffFunction.create(2, 500, BackOffStrategy.NoJitter);
         break;
       case BoServerBusy:
-        backOffFunction = BackOffFunction.create(40, 5120, BackOffStrategy.EqualJitter);
+        backOffFunction = BackOffFunction.create(100, 5120, BackOffStrategy.EqualJitter);
         break;
       case BoUpdateLeader:
         backOffFunction = BackOffFunction.create(1, 10, BackOffStrategy.NoJitter);

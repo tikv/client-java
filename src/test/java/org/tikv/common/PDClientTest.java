@@ -160,7 +160,7 @@ public class PDClientTest extends PDMockServerTest {
   }
 
   private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newCustomBackOff(1000);
+    return ConcreteBackOffer.newCustomBackOff(100);
   }
 
   @Test
