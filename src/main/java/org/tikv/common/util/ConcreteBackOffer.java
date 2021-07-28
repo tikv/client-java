@@ -86,29 +86,29 @@ public class ConcreteBackOffer implements BackOffer {
   private BackOffFunction createBackOffFunc(BackOffFunction.BackOffFuncType funcType) {
     BackOffFunction backOffFunction = null;
     switch (funcType) {
-      case BoUpdateLeader:
-        backOffFunction = BackOffFunction.create(1, 10, BackOffStrategy.NoJitter);
-        break;
       case BoTxnLockFast:
         backOffFunction = BackOffFunction.create(100, 3000, BackOffStrategy.EqualJitter);
-        break;
-      case BoServerBusy:
-        backOffFunction = BackOffFunction.create(2000, 10000, BackOffStrategy.EqualJitter);
-        break;
-      case BoRegionMiss:
-        backOffFunction = BackOffFunction.create(100, 500, BackOffStrategy.NoJitter);
         break;
       case BoTxnLock:
         backOffFunction = BackOffFunction.create(200, 3000, BackOffStrategy.EqualJitter);
         break;
-      case BoPDRPC:
-        backOffFunction = BackOffFunction.create(100, 600, BackOffStrategy.EqualJitter);
-        break;
-      case BoTiKVRPC:
-        backOffFunction = BackOffFunction.create(100, 400, BackOffStrategy.EqualJitter);
-        break;
       case BoTxnNotFound:
         backOffFunction = BackOffFunction.create(2, 500, BackOffStrategy.NoJitter);
+        break;
+      case BoServerBusy:
+        backOffFunction = BackOffFunction.create(40, 5120, BackOffStrategy.EqualJitter);
+        break;
+      case BoUpdateLeader:
+        backOffFunction = BackOffFunction.create(1, 10, BackOffStrategy.NoJitter);
+        break;
+      case BoRegionMiss:
+        backOffFunction = BackOffFunction.create(10, 640, BackOffStrategy.NoJitter);
+        break;
+      case BoPDRPC:
+        backOffFunction = BackOffFunction.create(10, 640, BackOffStrategy.EqualJitter);
+        break;
+      case BoTiKVRPC:
+        backOffFunction = BackOffFunction.create(10, 640, BackOffStrategy.EqualJitter);
         break;
     }
     return backOffFunction;
