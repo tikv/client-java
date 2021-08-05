@@ -110,6 +110,10 @@ The following includes JVM related parameters.
 - time to wait for scattering regions
 - default: 300 (5min)
 
+#### tikv.rawkv.default_backoff_in_ms
+- RawKV default backoff in milliseconds
+- default: 20000 (20 seconds)
+
 ### Metrics Parameter
 
 #### tikv.metrics.enable

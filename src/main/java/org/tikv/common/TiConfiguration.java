@@ -85,6 +85,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_IMPORTER_MAX_KV_BATCH_BYTES, DEF_TIKV_IMPORTER_MAX_KV_BATCH_BYTES);
     setIfMissing(TIKV_IMPORTER_MAX_KV_BATCH_SIZE, DEF_TIKV_IMPORTER_MAX_KV_BATCH_SIZE);
     setIfMissing(TIKV_SCATTER_WAIT_SECONDS, DEF_TIKV_SCATTER_WAIT_SECONDS);
+    setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
   }
 
   public static void listAll() {
@@ -281,6 +282,8 @@ public class TiConfiguration implements Serializable {
   private int importerMaxKVBatchSize = getInt(TIKV_IMPORTER_MAX_KV_BATCH_SIZE);
 
   private int scatterWaitSeconds = getInt(TIKV_SCATTER_WAIT_SECONDS);
+
+  private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
 
   public enum KVMode {
     TXN,
@@ -626,5 +629,13 @@ public class TiConfiguration implements Serializable {
 
   public void setScatterWaitSeconds(int scatterWaitSeconds) {
     this.scatterWaitSeconds = scatterWaitSeconds;
+  }
+
+  public int getRawKVDefaultBackoffInMS() {
+    return rawKVDefaultBackoffInMS;
+  }
+
+  public void setRawKVDefaultBackoffInMS(int rawKVDefaultBackoffInMS) {
+    this.rawKVDefaultBackoffInMS = rawKVDefaultBackoffInMS;
   }
 }

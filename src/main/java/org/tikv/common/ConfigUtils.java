@@ -15,6 +15,7 @@
 
 package org.tikv.common;
 
+import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class ConfigUtils {
@@ -61,6 +62,8 @@ public class ConfigUtils {
 
   public static final String TIKV_SCATTER_WAIT_SECONDS = "tikv.scatter_wait_seconds";
 
+  public static final String TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS = "tikv.rawkv.default_backoff_in_ms";
+
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
   public static final String DEF_FORWARD_TIMEOUT = "300ms";
@@ -97,6 +100,7 @@ public class ConfigUtils {
   public static final int DEF_TIKV_IMPORTER_MAX_KV_BATCH_BYTES = 1024 * 1024;
   public static final int DEF_TIKV_IMPORTER_MAX_KV_BATCH_SIZE = 1024 * 32;
   public static final int DEF_TIKV_SCATTER_WAIT_SECONDS = 300;
+  public static final int DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS = BackOffer.RAWKV_MAX_BACKOFF;
 
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";

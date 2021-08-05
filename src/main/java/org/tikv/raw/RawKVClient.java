@@ -247,7 +247,7 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      doSendBatchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs, ttl);
+      doSendBatchPut(defaultBackOff(), kvPairs, ttl);
       RAW_REQUEST_SUCCESS.labels(label).inc();
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
@@ -699,8 +699,7 @@ public class RawKVClient implements AutoCloseable {
       // group keys by region
       List<ByteString> keyList = list.stream().map(pair -> pair.first).collect(Collectors.toList());
       Map<TiRegion, List<ByteString>> groupKeys =
-          groupKeysByRegion(
-              clientBuilder.getRegionManager(), keyList, ConcreteBackOffer.newRawKVBackOff());
+          groupKeysByRegion(clientBuilder.getRegionManager(), keyList, defaultBackOff());
 
       // ingest for each region
       for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
@@ -979,7 +978,7 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newRawKVBackOff();
+    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
   }
 
   /**
