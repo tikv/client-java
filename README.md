@@ -98,6 +98,25 @@ The following includes JVM related parameters.
 - timeout of scan/delete range grpc request
 - default: 20s
 
+<<<<<<< HEAD
+=======
+#### tikv.importer.max_kv_batch_bytes
+- Maximal package size transporting from clients to TiKV Server (ingest API)
+- default: 1048576 (1M)
+
+#### tikv.importer.max_kv_batch_size
+- Maximal batch size transporting from clients to TiKV Server (ingest API)
+- default: 32768 (32K)
+
+#### tikv.scatter_wait_seconds
+- time to wait for scattering regions
+- default: 300 (5min)
+
+#### tikv.rawkv.default_backoff_in_ms
+- RawKV default backoff in milliseconds
+- default: 20000 (20 seconds)
+
+>>>>>>> 5aebd12... add configration parameter for RawKV timeout (#246)
 ### Metrics Parameter
 
 #### tikv.metrics.enable

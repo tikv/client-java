@@ -235,7 +235,11 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
+<<<<<<< HEAD
       doSendBatchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs, ttl, atomic);
+=======
+      doSendBatchPut(defaultBackOff(), kvPairs, ttl);
+>>>>>>> 5aebd12... add configration parameter for RawKV timeout (#246)
       RAW_REQUEST_SUCCESS.labels(label).inc();
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
@@ -615,8 +619,98 @@ public class RawKVClient implements AutoCloseable {
     deleteRange(key, endKey);
   }
 
+<<<<<<< HEAD
   private void doSendBatchPut(
       BackOffer backOffer, Map<ByteString, ByteString> kvPairs, long ttl, boolean atomic) {
+=======
+  /**
+   * Ingest KV pairs to RawKV using StreamKV API.
+   *
+   * @param list
+   */
+  public synchronized void ingest(List<Pair<ByteString, ByteString>> list) {
+    ingest(list, null);
+  }
+
+  /**
+   * Ingest KV pairs to RawKV using StreamKV API.
+   *
+   * @param list
+   * @param ttl the ttl of the key (in seconds), 0 means the key will never be outdated
+   */
+  public synchronized void ingest(List<Pair<ByteString, ByteString>> list, Long ttl)
+      throws GrpcException {
+    if (list.isEmpty()) {
+      return;
+    }
+
+    Key min = Key.MAX;
+    Key max = Key.MIN;
+    Map<ByteString, ByteString> map = new HashMap<>(list.size());
+
+    for (Pair<ByteString, ByteString> pair : list) {
+      map.put(pair.first, pair.second);
+      Key key = Key.toRawKey(pair.first.toByteArray());
+      if (key.compareTo(min) < 0) {
+        min = key;
+      }
+      if (key.compareTo(max) > 0) {
+        max = key;
+      }
+    }
+
+    SwitchTiKVModeClient switchTiKVModeClient = tiSession.getSwitchTiKVModeClient();
+
+    try {
+      // switch to normal mode
+      switchTiKVModeClient.switchTiKVToNormalMode();
+
+      // region split
+      List<byte[]> splitKeys = new ArrayList<>(2);
+      splitKeys.add(min.getBytes());
+      splitKeys.add(max.next().getBytes());
+      tiSession.splitRegionAndScatter(splitKeys);
+      tiSession.getRegionManager().invalidateAll();
+
+      // switch to import mode
+      switchTiKVModeClient.keepTiKVToImportMode();
+
+      // group keys by region
+      List<ByteString> keyList = list.stream().map(pair -> pair.first).collect(Collectors.toList());
+      Map<TiRegion, List<ByteString>> groupKeys =
+          groupKeysByRegion(clientBuilder.getRegionManager(), keyList, defaultBackOff());
+
+      // ingest for each region
+      for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
+        TiRegion region = entry.getKey();
+        List<ByteString> keys = entry.getValue();
+        List<Pair<ByteString, ByteString>> kvs =
+            keys.stream().map(k -> Pair.create(k, map.get(k))).collect(Collectors.toList());
+        doIngest(region, kvs, ttl);
+      }
+    } finally {
+      // swith tikv to normal mode
+      switchTiKVModeClient.stopKeepTiKVToImportMode();
+      switchTiKVModeClient.switchTiKVToNormalMode();
+    }
+  }
+
+  private void doIngest(TiRegion region, List<Pair<ByteString, ByteString>> sortedList, Long ttl)
+      throws GrpcException {
+    if (sortedList.isEmpty()) {
+      return;
+    }
+
+    ByteString uuid = ByteString.copyFrom(genUUID());
+    Key minKey = Key.toRawKey(sortedList.get(0).first);
+    Key maxKey = Key.toRawKey(sortedList.get(sortedList.size() - 1).first);
+    ImporterClient importerClient =
+        new ImporterClient(tiSession, uuid, minKey, maxKey, region, ttl);
+    importerClient.rawWrite(sortedList.iterator());
+  }
+
+  private void doSendBatchPut(BackOffer backOffer, Map<ByteString, ByteString> kvPairs, long ttl) {
+>>>>>>> 5aebd12... add configration parameter for RawKV timeout (#246)
     ExecutorCompletionService<List<Batch>> completionService =
         new ExecutorCompletionService<>(batchPutThreadPool);
 
@@ -866,6 +960,6 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newRawKVBackOff();
+    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
   }
 }

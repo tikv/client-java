@@ -81,6 +81,14 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_ENABLE_GRPC_FORWARD, DEF_GRPC_FORWARD_ENABLE);
     setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
     setIfMissing(TIKV_HEALTH_CHECK_PERIOD_DURATION, DEF_HEALTH_CHECK_PERIOD_DURATION);
+<<<<<<< HEAD
+=======
+    setIfMissing(TIKV_ENABLE_ATOMIC_FOR_CAS, DEF_TIKV_ENABLE_ATOMIC_FOR_CAS);
+    setIfMissing(TIKV_IMPORTER_MAX_KV_BATCH_BYTES, DEF_TIKV_IMPORTER_MAX_KV_BATCH_BYTES);
+    setIfMissing(TIKV_IMPORTER_MAX_KV_BATCH_SIZE, DEF_TIKV_IMPORTER_MAX_KV_BATCH_SIZE);
+    setIfMissing(TIKV_SCATTER_WAIT_SECONDS, DEF_TIKV_SCATTER_WAIT_SECONDS);
+    setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+>>>>>>> 5aebd12... add configration parameter for RawKV timeout (#246)
   }
 
   public static void listAll() {
@@ -270,6 +278,19 @@ public class TiConfiguration implements Serializable {
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
   private HostMapping hostMapping = null;
 
+<<<<<<< HEAD
+=======
+  private boolean enableAtomicForCAS = getBoolean(TIKV_ENABLE_ATOMIC_FOR_CAS);
+
+  private int importerMaxKVBatchBytes = getInt(TIKV_IMPORTER_MAX_KV_BATCH_BYTES);
+
+  private int importerMaxKVBatchSize = getInt(TIKV_IMPORTER_MAX_KV_BATCH_SIZE);
+
+  private int scatterWaitSeconds = getInt(TIKV_SCATTER_WAIT_SECONDS);
+
+  private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+
+>>>>>>> 5aebd12... add configration parameter for RawKV timeout (#246)
   public enum KVMode {
     TXN,
     RAW
@@ -575,4 +596,47 @@ public class TiConfiguration implements Serializable {
   public long getHealthCheckPeriodDuration() {
     return this.healthCheckPeriodDuration;
   }
+<<<<<<< HEAD
+=======
+
+  public boolean isEnableAtomicForCAS() {
+    return enableAtomicForCAS;
+  }
+
+  public void setEnableAtomicForCAS(boolean enableAtomicForCAS) {
+    this.enableAtomicForCAS = enableAtomicForCAS;
+  }
+
+  public int getImporterMaxKVBatchBytes() {
+    return importerMaxKVBatchBytes;
+  }
+
+  public void setImporterMaxKVBatchBytes(int importerMaxKVBatchBytes) {
+    this.importerMaxKVBatchBytes = importerMaxKVBatchBytes;
+  }
+
+  public int getImporterMaxKVBatchSize() {
+    return importerMaxKVBatchSize;
+  }
+
+  public void setImporterMaxKVBatchSize(int importerMaxKVBatchSize) {
+    this.importerMaxKVBatchSize = importerMaxKVBatchSize;
+  }
+
+  public int getScatterWaitSeconds() {
+    return scatterWaitSeconds;
+  }
+
+  public void setScatterWaitSeconds(int scatterWaitSeconds) {
+    this.scatterWaitSeconds = scatterWaitSeconds;
+  }
+
+  public int getRawKVDefaultBackoffInMS() {
+    return rawKVDefaultBackoffInMS;
+  }
+
+  public void setRawKVDefaultBackoffInMS(int rawKVDefaultBackoffInMS) {
+    this.rawKVDefaultBackoffInMS = rawKVDefaultBackoffInMS;
+  }
+>>>>>>> 5aebd12... add configration parameter for RawKV timeout (#246)
 }
