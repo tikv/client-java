@@ -272,7 +272,7 @@ public abstract class AbstractRegionStoreClient
     }
     if (originStore == null) {
       originStore = targetStore;
-      if (this.targetStore.getProxyStore() != null && this.timeout < conf.getForwardTimeout()) {
+      if (this.targetStore.getProxyStore() != null) {
         this.timeout = conf.getForwardTimeout();
       }
     }

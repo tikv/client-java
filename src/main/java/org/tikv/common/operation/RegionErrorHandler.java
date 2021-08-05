@@ -130,12 +130,9 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
           BackOffFunction.BackOffFuncType.BoServerBusy,
           new StatusRuntimeException(
               Status.fromCode(Status.Code.UNAVAILABLE).withDescription(error.toString())));
-      return true;
-    } else if (error.hasRegionNotFound()) {
       backOffer.doBackOff(
           BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.getMessage()));
-      this.regionManager.onRegionStale(recv.getRegion());
-      return false;
+      return true;
     } else if (error.hasStaleCommand()) {
       // this error is reported from raftstore:
       // command outdated, please try later
