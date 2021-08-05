@@ -235,7 +235,7 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      doSendBatchPut(ConcreteBackOffer.newRawKVBackOff(), kvPairs, ttl, atomic);
+      doSendBatchPut(defaultBackOff(), kvPairs, ttl, atomic);
       RAW_REQUEST_SUCCESS.labels(label).inc();
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
@@ -866,6 +866,6 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newRawKVBackOff();
+    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
   }
 }

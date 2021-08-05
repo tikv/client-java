@@ -412,7 +412,7 @@ public class TiSession implements AutoCloseable {
     long endMS = System.currentTimeMillis();
     logger.info("splitRegionAndScatter cost {} seconds", (endMS - startMS) / 1000);
   }
-  
+
   private List<Metapb.Region> splitRegion(List<ByteString> splitKeys, BackOffer backOffer) {
     List<Metapb.Region> regions = new ArrayList<>();
 
