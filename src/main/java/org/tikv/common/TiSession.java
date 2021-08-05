@@ -392,7 +392,8 @@ public class TiSession implements AutoCloseable {
     if (res == null) {
       synchronized (this) {
         if (switchTiKVModeClient == null) {
-          switchTiKVModeClient = new SwitchTiKVModeClient(getPDClient(), getImporterRegionStoreClientBuilder());
+          switchTiKVModeClient =
+              new SwitchTiKVModeClient(getPDClient(), getImporterRegionStoreClientBuilder());
         }
         res = switchTiKVModeClient;
       }
@@ -589,7 +590,7 @@ public class TiSession implements AutoCloseable {
       catalog.close();
     }
 
-    if(switchTiKVModeClient != null) {
+    if (switchTiKVModeClient != null) {
       switchTiKVModeClient.stopKeepTiKVToImportMode();
     }
   }
