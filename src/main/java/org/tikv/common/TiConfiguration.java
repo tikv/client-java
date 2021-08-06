@@ -81,6 +81,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_ENABLE_GRPC_FORWARD, DEF_GRPC_FORWARD_ENABLE);
     setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
     setIfMissing(TIKV_HEALTH_CHECK_PERIOD_DURATION, DEF_HEALTH_CHECK_PERIOD_DURATION);
+    setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
   }
 
   public static void listAll() {
@@ -269,6 +270,8 @@ public class TiConfiguration implements Serializable {
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
   private HostMapping hostMapping = null;
+
+  private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
 
   public enum KVMode {
     TXN,
@@ -574,5 +577,13 @@ public class TiConfiguration implements Serializable {
 
   public long getHealthCheckPeriodDuration() {
     return this.healthCheckPeriodDuration;
+  }
+
+  public int getRawKVDefaultBackoffInMS() {
+    return rawKVDefaultBackoffInMS;
+  }
+
+  public void setRawKVDefaultBackoffInMS(int rawKVDefaultBackoffInMS) {
+    this.rawKVDefaultBackoffInMS = rawKVDefaultBackoffInMS;
   }
 }

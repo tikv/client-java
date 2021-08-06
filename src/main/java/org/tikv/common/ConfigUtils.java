@@ -15,6 +15,7 @@
 
 package org.tikv.common;
 
+import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class ConfigUtils {
@@ -54,6 +55,8 @@ public class ConfigUtils {
   public static final String TIKV_HEALTH_CHECK_PERIOD_DURATION =
       "tikv.health_check_period_duration";
 
+  public static final String TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS = "tikv.rawkv.default_backoff_in_ms";
+
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
   public static final String DEF_FORWARD_TIMEOUT = "300ms";
@@ -85,6 +88,8 @@ public class ConfigUtils {
   public static final int DEF_METRICS_PORT = 3140;
   public static final String DEF_TIKV_NETWORK_MAPPING_NAME = "";
   public static final boolean DEF_GRPC_FORWARD_ENABLE = true;
+
+  public static final int DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS = BackOffer.RAWKV_MAX_BACKOFF;
 
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";

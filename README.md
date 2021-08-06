@@ -132,6 +132,9 @@ The following includes ThreadPool related parameters, which can be passed in thr
 - the thread pool size of deleteRange on client side
 - default: 20
 
+#### tikv.rawkv.default_backoff_in_ms
+- RawKV default backoff in milliseconds
+- default: 20000 (20 seconds)
 
 ## Metrics
 
