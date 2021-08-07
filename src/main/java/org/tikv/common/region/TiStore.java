@@ -1,10 +1,11 @@
 package org.tikv.common.region;
 
+import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.tikv.kvproto.Metapb;
 
-public class TiStore {
+public class TiStore implements Serializable {
   private static long MAX_FAIL_FORWARD_TIMES = 4;
   private final Metapb.Store store;
   private final Metapb.Store proxyStore;
