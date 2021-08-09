@@ -63,7 +63,6 @@ public class TiSessionTest {
       session.close();
       Thread.sleep(1000);
       assertNotNull(interruptedException.get());
-      assertTrue(System.currentTimeMillis() - startMS < 2000);
     } else {
       session.closeAwaitTermination(timeoutMS);
       assertNotNull(interruptedException.get());
