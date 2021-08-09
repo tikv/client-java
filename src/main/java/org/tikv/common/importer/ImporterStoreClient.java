@@ -152,12 +152,12 @@ public class ImporterStoreClient
 
   @Override
   protected ImportSSTGrpc.ImportSSTBlockingStub getBlockingStub() {
-    return blockingStub.withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+    return blockingStub.withDeadlineAfter(conf.getTimeout(), TimeUnit.MILLISECONDS);
   }
 
   @Override
   protected ImportSSTGrpc.ImportSSTStub getAsyncStub() {
-    return asyncStub.withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+    return asyncStub.withDeadlineAfter(conf.getIngestTimeout(), TimeUnit.MILLISECONDS);
   }
 
   @Override
