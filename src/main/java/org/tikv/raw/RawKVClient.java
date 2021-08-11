@@ -286,6 +286,29 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
+  public Optional<ByteString> get(ByteString key, String cf) {
+    String label = "client_raw_get";
+    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+    try {
+      BackOffer backOffer = defaultBackOff();
+      while (true) {
+        RegionStoreClient client = clientBuilder.build(key);
+        try {
+          Optional<ByteString> result = client.rawGet(defaultBackOff(), key);
+          RAW_REQUEST_SUCCESS.labels(label).inc();
+          return result;
+        } catch (final TiKVException e) {
+          backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+        }
+      }
+    } catch (Exception e) {
+      RAW_REQUEST_FAILURE.labels(label).inc();
+      throw e;
+    } finally {
+      requestTimer.observeDuration();
+    }
+  }
+
   /**
    * Get a list of raw key-value pair from TiKV if key exists
    *
