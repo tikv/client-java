@@ -13,6 +13,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.codec.Codec;
+import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.Pair;
 import org.tikv.raw.RawKVClient;
@@ -41,7 +43,7 @@ public class TxnKVIngestTest {
   }
 
   @Test
-  public void txnIngestTest() {
+  public void txnIngestTest() throws InterruptedException {
     KVClient client = session.createKVClient();
 
     // gen test data
@@ -62,8 +64,15 @@ public class TxnKVIngestTest {
     client.ingest(sortedList);
 
     // assert
+    Thread.sleep(10000);
+    long version = session.getTimestamp().getVersion();
     for (Pair<ByteString, ByteString> pair : sortedList) {
-      ByteString v = client.get(pair.first, 1L);
+      ByteString key = pair.first;
+      //CodecDataOutput cdo = new CodecDataOutput();
+      //Codec.BytesCodec.writeBytes(cdo, key.toByteArray());
+      //ByteString key2 = cdo.toByteString();
+      ByteString v = client.get(key, version);
+      System.out.println("get " + key.toStringUtf8() + "\t" + v.toStringUtf8());
       assertEquals(v, pair.second);
     }
   }

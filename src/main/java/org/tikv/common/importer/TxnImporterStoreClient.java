@@ -162,6 +162,6 @@ public class TxnImporterStoreClient
 
   @Override
   protected ImportSSTGrpc.ImportSSTStub getAsyncStub() {
-    return asyncStub.withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+    return asyncStub.withDeadlineAfter(200, TimeUnit.SECONDS);
   }
 }

@@ -28,6 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.codec.Codec;
+import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.importer.ImporterClient;
@@ -183,8 +185,18 @@ public class KVClient implements AutoCloseable {
       for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
         TiRegion region = entry.getKey();
         List<ByteString> keys = entry.getValue();
+
+
         List<Pair<ByteString, ByteString>> kvs =
             keys.stream().map(k -> Pair.create(k, map.get(k))).collect(Collectors.toList());
+            /*keys.stream().map(k -> {
+              CodecDataOutput cdo = new CodecDataOutput();
+              Codec.BytesCodec.writeBytes(cdo, k.toByteArray());
+              ByteString k2 = cdo.toByteString();
+              System.out.println("put " + k2.toStringUtf8() + "\t" + map.get(k).toStringUtf8());
+
+              return Pair.create(k2, map.get(k));
+            }).collect(Collectors.toList());*/
         doIngest(region, kvs);
       }
     } finally {
@@ -277,6 +289,7 @@ public class KVClient implements AutoCloseable {
     Key maxKey = Key.toRawKey(sortedList.get(sortedList.size() - 1).first);
     TxnImporterClient txnImporterClient =
             new TxnImporterClient(tiSession, uuid, minKey, maxKey, region);
+
     txnImporterClient.txnWrite(sortedList.iterator());
   }
 }
