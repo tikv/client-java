@@ -23,6 +23,8 @@ import java.util.Iterator;
 import java.util.List;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.codec.Codec;
+import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.TiRegion;
@@ -88,13 +90,21 @@ public class TxnImporterClient {
     }
   }
 
+  // TODO
+  private ByteString encode(ByteString key) {
+    CodecDataOutput cdo = new CodecDataOutput();
+    Codec.BytesCodec.writeBytes(cdo, key.toByteArray());
+    ByteString key2 = cdo.toByteString();
+    return key2;
+  }
+
   private void init() {
     long regionId = region.getId();
     Metapb.RegionEpoch regionEpoch = region.getRegionEpoch();
     ImportSstpb.Range range =
         ImportSstpb.Range.newBuilder()
-            .setStart(minKey.toByteString())
-            .setEnd(maxKey.toByteString())
+            .setStart(encode(minKey.toByteString()))
+            .setEnd(encode(maxKey.toByteString()))
             .build();
 
     sstMeta =
