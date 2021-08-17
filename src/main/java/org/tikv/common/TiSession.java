@@ -33,6 +33,7 @@ import org.tikv.common.catalog.Catalog;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.importer.ImporterStoreClient;
 import org.tikv.common.importer.SwitchTiKVModeClient;
+import org.tikv.common.importer.TxnImporterStoreClient;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.RegionManager;
@@ -70,6 +71,8 @@ public class TiSession implements AutoCloseable {
   private volatile boolean enableGrpcForward;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private volatile ImporterStoreClient.ImporterStoreClientBuilder importerClientBuilder;
+  private volatile TxnImporterStoreClient.TxnImporterStoreClientBuilder
+      txnImporterStoreClientBuilder;
   private volatile boolean isClosed = false;
   private volatile SwitchTiKVModeClient switchTiKVModeClient;
   private MetricsServer metricsServer;
@@ -119,7 +122,7 @@ public class TiSession implements AutoCloseable {
 
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
-    return new KVClient(conf, builder);
+    return new KVClient(conf, builder, this);
   }
 
   public TxnKVClient createTxnClient() {
@@ -157,6 +160,24 @@ public class TiSession implements AutoCloseable {
                   conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
         }
         res = importerClientBuilder;
+      }
+    }
+    return res;
+  }
+
+  public TxnImporterStoreClient.TxnImporterStoreClientBuilder
+      getTxnImporterRegionStoreClientBuilder() {
+    checkIsClosed();
+
+    TxnImporterStoreClient.TxnImporterStoreClientBuilder res = txnImporterStoreClientBuilder;
+    if (res == null) {
+      synchronized (this) {
+        if (txnImporterStoreClientBuilder == null) {
+          txnImporterStoreClientBuilder =
+              new TxnImporterStoreClient.TxnImporterStoreClientBuilder(
+                  conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
+        }
+        res = txnImporterStoreClientBuilder;
       }
     }
     return res;
