@@ -23,6 +23,8 @@ import java.util.Iterator;
 import java.util.List;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
+import org.tikv.common.codec.Codec;
+import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.TiRegion;
@@ -57,14 +59,11 @@ public class ImporterClient {
   }
 
   /**
-   * write KV pairs to RawKV using KVStream interface
+   * write KV pairs to RawKV/Txn using KVStream interface
    *
    * @param iterator
    */
-  public void rawWrite(Iterator<Pair<ByteString, ByteString>> iterator) throws GrpcException {
-    if (!tiConf.isRawKVMode()) {
-      throw new IllegalArgumentException("KVMode is not RAW in TiConfiguration!");
-    }
+  public void write(Iterator<Pair<ByteString, ByteString>> iterator) throws GrpcException {
 
     streamOpened = false;
 
@@ -85,15 +84,15 @@ public class ImporterClient {
       }
       if (!streamOpened) {
         init();
-        startRawWrite();
-        rawWriteMeta();
+        startWrite();
+        writeMeta();
         streamOpened = true;
       }
-      rawWriteBatch(pairs);
+      writeBatch(pairs);
     }
 
     if (streamOpened) {
-      finishRawWrite();
+      finishWrite();
       ingest();
     }
   }
@@ -102,10 +101,15 @@ public class ImporterClient {
     long regionId = region.getId();
     Metapb.RegionEpoch regionEpoch = region.getRegionEpoch();
     ImportSstpb.Range range =
-        ImportSstpb.Range.newBuilder()
-            .setStart(minKey.toByteString())
-            .setEnd(maxKey.toByteString())
-            .build();
+        tiConf.isTxnKVMode()
+            ? ImportSstpb.Range.newBuilder()
+                .setStart(encode(minKey.toByteString()))
+                .setEnd(encode(maxKey.toByteString()))
+                .build()
+            : ImportSstpb.Range.newBuilder()
+                .setStart(minKey.toByteString())
+                .setEnd(maxKey.toByteString())
+                .build();
 
     sstMeta =
         ImportSstpb.SSTMeta.newBuilder()
@@ -129,39 +133,69 @@ public class ImporterClient {
     }
   }
 
-  private void startRawWrite() {
+  private ByteString encode(ByteString key) {
+    CodecDataOutput cdo = new CodecDataOutput();
+    Codec.BytesCodec.writeBytes(cdo, key.toByteArray());
+    return cdo.toByteString();
+  }
+
+  private void startWrite() {
     for (ImporterStoreClient client : clientList) {
-      client.startRawWrite();
+      client.startWrite();
     }
   }
 
-  private void rawWriteMeta() {
-    ImportSstpb.RawWriteRequest request =
-        ImportSstpb.RawWriteRequest.newBuilder().setMeta(sstMeta).build();
-    for (ImporterStoreClient client : clientList) {
-      client.rawWriteBatch(request);
-    }
-  }
-
-  private void rawWriteBatch(List<ImportSstpb.Pair> pairs) {
-    ImportSstpb.RawWriteBatch batch;
-
-    if (ttl == null || ttl <= 0) {
-      batch = ImportSstpb.RawWriteBatch.newBuilder().addAllPairs(pairs).build();
+  private void writeMeta() {
+    if (tiConf.isTxnKVMode()) {
+      ImportSstpb.WriteRequest request =
+          ImportSstpb.WriteRequest.newBuilder().setMeta(sstMeta).build();
+      for (ImporterStoreClient client : clientList) {
+        client.writeBatch(request);
+      }
     } else {
-      batch = ImportSstpb.RawWriteBatch.newBuilder().addAllPairs(pairs).setTtl(ttl).build();
-    }
-
-    ImportSstpb.RawWriteRequest request =
-        ImportSstpb.RawWriteRequest.newBuilder().setBatch(batch).build();
-    for (ImporterStoreClient client : clientList) {
-      client.rawWriteBatch(request);
+      ImportSstpb.RawWriteRequest request =
+          ImportSstpb.RawWriteRequest.newBuilder().setMeta(sstMeta).build();
+      for (ImporterStoreClient client : clientList) {
+        client.writeBatch(request);
+      }
     }
   }
 
-  private void finishRawWrite() {
+  private void writeBatch(List<ImportSstpb.Pair> pairs) {
+    if (tiConf.isTxnKVMode()) {
+      ImportSstpb.WriteBatch batch;
+
+      batch =
+          ImportSstpb.WriteBatch.newBuilder()
+              .addAllPairs(pairs)
+              .setCommitTs(tiSession.getTimestamp().getVersion())
+              .build();
+
+      ImportSstpb.WriteRequest request =
+          ImportSstpb.WriteRequest.newBuilder().setBatch(batch).build();
+      for (ImporterStoreClient client : clientList) {
+        client.writeBatch(request);
+      }
+    } else {
+      ImportSstpb.RawWriteBatch batch;
+
+      if (ttl == null || ttl <= 0) {
+        batch = ImportSstpb.RawWriteBatch.newBuilder().addAllPairs(pairs).build();
+      } else {
+        batch = ImportSstpb.RawWriteBatch.newBuilder().addAllPairs(pairs).setTtl(ttl).build();
+      }
+
+      ImportSstpb.RawWriteRequest request =
+          ImportSstpb.RawWriteRequest.newBuilder().setBatch(batch).build();
+      for (ImporterStoreClient client : clientList) {
+        client.writeBatch(request);
+      }
+    }
+  }
+
+  private void finishWrite() {
     for (ImporterStoreClient client : clientList) {
-      client.finishRawWrite();
+      client.finishWrite();
     }
   }
 
@@ -171,10 +205,10 @@ public class ImporterClient {
       Iterator<ImporterStoreClient> itor = workingClients.iterator();
       while (itor.hasNext()) {
         ImporterStoreClient client = itor.next();
-        if (client.isRawWriteResponseReceived()) {
+        if (client.isWriteResponseReceived()) {
           itor.remove();
-        } else if (client.hasRawWriteResponseError()) {
-          throw new GrpcException(client.getRawWriteError());
+        } else if (client.hasWriteResponseError()) {
+          throw new GrpcException(client.getWriteError());
         }
       }
 

@@ -62,7 +62,6 @@ public class TxnKVIngestTest {
     for (Pair<ByteString, ByteString> pair : sortedList) {
       ByteString key = pair.first;
       ByteString v = client.get(key, version);
-      System.out.println("get " + key.toStringUtf8() + "\t" + v.toStringUtf8());
       assertEquals(v, pair.second);
     }
   }

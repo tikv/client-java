@@ -33,7 +33,6 @@ import org.tikv.common.catalog.Catalog;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.importer.ImporterStoreClient;
 import org.tikv.common.importer.SwitchTiKVModeClient;
-import org.tikv.common.importer.TxnImporterStoreClient;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.RegionManager;
@@ -42,6 +41,7 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
+import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.txn.KVClient;
@@ -71,8 +71,6 @@ public class TiSession implements AutoCloseable {
   private volatile boolean enableGrpcForward;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private volatile ImporterStoreClient.ImporterStoreClientBuilder importerClientBuilder;
-  private volatile TxnImporterStoreClient.TxnImporterStoreClientBuilder
-      txnImporterStoreClientBuilder;
   private volatile boolean isClosed = false;
   private volatile SwitchTiKVModeClient switchTiKVModeClient;
   private MetricsServer metricsServer;
@@ -155,29 +153,19 @@ public class TiSession implements AutoCloseable {
     if (res == null) {
       synchronized (this) {
         if (importerClientBuilder == null) {
-          importerClientBuilder =
-              new ImporterStoreClient.ImporterStoreClientBuilder(
-                  conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
+          if (conf.isTxnKVMode()) {
+            importerClientBuilder =
+                new ImporterStoreClient.ImporterStoreClientBuilder<
+                    ImportSstpb.WriteRequest, ImportSstpb.WriteRequest>(
+                    conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
+          } else {
+            importerClientBuilder =
+                new ImporterStoreClient.ImporterStoreClientBuilder<
+                    ImportSstpb.RawWriteRequest, ImportSstpb.RawWriteResponse>(
+                    conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
+          }
         }
         res = importerClientBuilder;
-      }
-    }
-    return res;
-  }
-
-  public TxnImporterStoreClient.TxnImporterStoreClientBuilder
-      getTxnImporterRegionStoreClientBuilder() {
-    checkIsClosed();
-
-    TxnImporterStoreClient.TxnImporterStoreClientBuilder res = txnImporterStoreClientBuilder;
-    if (res == null) {
-      synchronized (this) {
-        if (txnImporterStoreClientBuilder == null) {
-          txnImporterStoreClientBuilder =
-              new TxnImporterStoreClient.TxnImporterStoreClientBuilder(
-                  conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
-        }
-        res = txnImporterStoreClientBuilder;
       }
     }
     return res;

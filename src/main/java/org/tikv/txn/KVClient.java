@@ -30,8 +30,8 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
+import org.tikv.common.importer.ImporterClient;
 import org.tikv.common.importer.SwitchTiKVModeClient;
-import org.tikv.common.importer.TxnImporterClient;
 import org.tikv.common.key.Key;
 import org.tikv.common.operation.iterator.ConcreteScanIterator;
 import org.tikv.common.region.RegionStoreClient;
@@ -274,8 +274,7 @@ public class KVClient implements AutoCloseable {
     ByteString uuid = ByteString.copyFrom(genUUID());
     Key minKey = Key.toRawKey(sortedList.get(0).first);
     Key maxKey = Key.toRawKey(sortedList.get(sortedList.size() - 1).first);
-    TxnImporterClient txnImporterClient =
-        new TxnImporterClient(tiSession, uuid, minKey, maxKey, region);
-    txnImporterClient.txnWrite(sortedList.iterator());
+    ImporterClient importerClient = new ImporterClient(tiSession, uuid, minKey, maxKey, region, 0L);
+    importerClient.write(sortedList.iterator());
   }
 }
