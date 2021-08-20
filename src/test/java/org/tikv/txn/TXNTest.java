@@ -29,6 +29,7 @@ public class TXNTest {
   @Before
   public void setUp() {
     TiConfiguration conf = TiConfiguration.createDefault();
+    conf.setTest(true);
     try {
       session = TiSession.create(conf);
       this.builder = session.getRegionStoreClientBuilder();

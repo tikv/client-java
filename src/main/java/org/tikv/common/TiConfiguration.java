@@ -287,6 +287,8 @@ public class TiConfiguration implements Serializable {
 
   private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
 
+  private boolean isTest = false;
+
   public enum KVMode {
     TXN,
     RAW
@@ -647,5 +649,13 @@ public class TiConfiguration implements Serializable {
 
   public void setRawKVDefaultBackoffInMS(int rawKVDefaultBackoffInMS) {
     this.rawKVDefaultBackoffInMS = rawKVDefaultBackoffInMS;
+  }
+
+  public boolean isTest() {
+    return isTest;
+  }
+
+  public void setTest(boolean test) {
+    isTest = test;
   }
 }

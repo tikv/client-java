@@ -12,6 +12,7 @@ public class SwitchTiKVModeTest {
   @Before
   public void setup() {
     TiConfiguration conf = TiConfiguration.createRawDefault();
+    conf.setTest(true);
     session = TiSession.create(conf);
   }
 
