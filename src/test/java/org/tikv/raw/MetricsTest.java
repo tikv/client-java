@@ -27,6 +27,7 @@ public class MetricsTest {
   @Test
   public void oneTiSession() throws Exception {
     TiConfiguration conf = TiConfiguration.createRawDefault();
+    conf.setTest(true);
     conf.setMetricsEnable(true);
     TiSession session = TiSession.create(conf);
     sessionList.add(session);
@@ -42,6 +43,7 @@ public class MetricsTest {
   @Test
   public void twoTiSession() throws Exception {
     TiConfiguration conf = TiConfiguration.createRawDefault();
+    conf.setTest(true);
     conf.setMetricsEnable(true);
 
     TiSession session1 = TiSession.create(conf);
@@ -68,12 +70,14 @@ public class MetricsTest {
   @Test
   public void twoTiSessionWithDifferentPort() {
     TiConfiguration conf1 = TiConfiguration.createRawDefault();
+    conf1.setTest(true);
     conf1.setMetricsEnable(true);
     conf1.setMetricsPort(12345);
     TiSession session1 = TiSession.create(conf1);
     sessionList.add(session1);
 
     TiConfiguration conf2 = TiConfiguration.createRawDefault();
+    conf2.setTest(true);
     conf2.setMetricsEnable(true);
     conf2.setMetricsPort(54321);
     try {

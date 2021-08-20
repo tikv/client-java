@@ -25,6 +25,7 @@ public class CASTest {
   public void setup() {
     try {
       TiConfiguration conf = TiConfiguration.createRawDefault();
+      conf.setTest(true);
       conf.setEnableAtomicForCAS(true);
       session = TiSession.create(conf);
       initialized = false;

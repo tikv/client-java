@@ -12,6 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.tikv.common.region.TiRegion;
 import org.tikv.raw.RawKVClient;
@@ -31,13 +32,14 @@ public class TiSessionTest {
     doCloseWithRunningTaskTest(true, 0);
   }
 
-  @Test
+  @Ignore
   public void closeAwaitTerminationWithRunningTaskTest() throws Exception {
     doCloseWithRunningTaskTest(false, 10000);
   }
 
   private void doCloseWithRunningTaskTest(boolean now, long timeoutMS) throws Exception {
     TiConfiguration conf = TiConfiguration.createRawDefault();
+    conf.setTest(true);
     session = TiSession.create(conf);
 
     ExecutorService executorService = session.getThreadPoolForBatchGet();
@@ -82,6 +84,7 @@ public class TiSessionTest {
 
   private void doCloseTest(boolean now, long timeoutMS) throws Exception {
     TiConfiguration conf = TiConfiguration.createRawDefault();
+    conf.setTest(true);
     session = TiSession.create(conf);
     RawKVClient client = session.createRawClient();
 

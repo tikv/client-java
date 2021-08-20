@@ -73,6 +73,7 @@ public class RawKVClientTest {
   public void setup() {
     try {
       TiConfiguration conf = TiConfiguration.createRawDefault();
+      conf.setTest(true);
       session = TiSession.create(conf);
       initialized = false;
       if (client == null) {
