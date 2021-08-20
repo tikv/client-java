@@ -688,15 +688,23 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     if (region.getStartKey().isEmpty() || isRawRegion) {
       builder.setStartKey(region.getStartKey());
     } else {
-      byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
-      builder.setStartKey(ByteString.copyFrom(decodedStartKey));
+      try {
+        byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
+        builder.setStartKey(ByteString.copyFrom(decodedStartKey));
+      } catch (Exception e) {
+        builder.setStartKey(region.getStartKey());
+      }
     }
 
     if (region.getEndKey().isEmpty() || isRawRegion) {
       builder.setEndKey(region.getEndKey());
     } else {
-      byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
-      builder.setEndKey(ByteString.copyFrom(decodedEndKey));
+      try {
+        byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
+        builder.setEndKey(ByteString.copyFrom(decodedEndKey));
+      } catch (Exception e) {
+        builder.setEndKey(region.getEndKey());
+      }
     }
 
     return builder.build();
