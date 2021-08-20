@@ -23,22 +23,25 @@ import java.util.*;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
+import org.tikv.common.importer.ImporterClient;
+import org.tikv.common.importer.SwitchTiKVModeClient;
+import org.tikv.common.key.Key;
 import org.tikv.common.operation.iterator.ConcreteScanIterator;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
-import org.tikv.common.util.BackOffFunction;
-import org.tikv.common.util.BackOffer;
-import org.tikv.common.util.Batch;
-import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.*;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class KVClient implements AutoCloseable {
+  private final TiSession tiSession;
   private static final Logger logger = LoggerFactory.getLogger(KVClient.class);
   private static final int MAX_BATCH_LIMIT = 1024;
   private static final int BATCH_GET_SIZE = 16 * 1024;
@@ -46,9 +49,10 @@ public class KVClient implements AutoCloseable {
   private final TiConfiguration conf;
   private final ExecutorService executorService;
 
-  public KVClient(TiConfiguration conf, RegionStoreClientBuilder clientBuilder) {
+  public KVClient(TiConfiguration conf, RegionStoreClientBuilder clientBuilder, TiSession session) {
     Objects.requireNonNull(conf, "conf is null");
     Objects.requireNonNull(clientBuilder, "clientBuilder is null");
+    this.tiSession = session;
     this.conf = conf;
     this.clientBuilder = clientBuilder;
     executorService =
@@ -131,6 +135,64 @@ public class KVClient implements AutoCloseable {
     return scan(startKey, version, Integer.MAX_VALUE);
   }
 
+  public synchronized void ingest(List<Pair<ByteString, ByteString>> list) throws GrpcException {
+    if (list.isEmpty()) {
+      return;
+    }
+
+    Key min = Key.MAX;
+    Key max = Key.MIN;
+    Map<ByteString, ByteString> map = new HashMap<>(list.size());
+
+    for (Pair<ByteString, ByteString> pair : list) {
+      map.put(pair.first, pair.second);
+      Key key = Key.toRawKey(pair.first.toByteArray());
+      if (key.compareTo(min) < 0) {
+        min = key;
+      }
+      if (key.compareTo(max) > 0) {
+        max = key;
+      }
+    }
+
+    SwitchTiKVModeClient switchTiKVModeClient = tiSession.getSwitchTiKVModeClient();
+
+    try {
+      // switch to normal mode
+      switchTiKVModeClient.switchTiKVToNormalMode();
+
+      // region split
+      List<byte[]> splitKeys = new ArrayList<>(2);
+      splitKeys.add(min.getBytes());
+      splitKeys.add(max.next().getBytes());
+
+      tiSession.splitRegionAndScatter(splitKeys);
+      tiSession.getRegionManager().invalidateAll();
+
+      // switch to import mode
+      switchTiKVModeClient.keepTiKVToImportMode();
+
+      // group keys by region
+      List<ByteString> keyList = list.stream().map(pair -> pair.first).collect(Collectors.toList());
+      Map<TiRegion, List<ByteString>> groupKeys =
+          groupKeysByRegion(
+              clientBuilder.getRegionManager(), keyList, ConcreteBackOffer.newRawKVBackOff());
+
+      // ingest for each region
+      for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
+        TiRegion region = entry.getKey();
+        List<ByteString> keys = entry.getValue();
+        List<Pair<ByteString, ByteString>> kvs =
+            keys.stream().map(k -> Pair.create(k, map.get(k))).collect(Collectors.toList());
+        doIngest(region, kvs);
+      }
+    } finally {
+      // swith tikv to normal mode
+      switchTiKVModeClient.stopKeepTiKVToImportMode();
+      switchTiKVModeClient.switchTiKVToNormalMode();
+    }
+  }
+
   private List<Kvrpcpb.KvPair> doSendBatchGet(
       BackOffer backOffer, List<ByteString> keys, long version) {
     ExecutorCompletionService<List<Kvrpcpb.KvPair>> completionService =
@@ -201,5 +263,18 @@ public class KVClient implements AutoCloseable {
       long version,
       int limit) {
     return new ConcreteScanIterator(conf, builder, startKey, version, limit);
+  }
+
+  private void doIngest(TiRegion region, List<Pair<ByteString, ByteString>> sortedList)
+      throws GrpcException {
+    if (sortedList.isEmpty()) {
+      return;
+    }
+
+    ByteString uuid = ByteString.copyFrom(genUUID());
+    Key minKey = Key.toRawKey(sortedList.get(0).first);
+    Key maxKey = Key.toRawKey(sortedList.get(sortedList.size() - 1).first);
+    ImporterClient importerClient = new ImporterClient(tiSession, uuid, minKey, maxKey, region, 0L);
+    importerClient.write(sortedList.iterator());
   }
 }

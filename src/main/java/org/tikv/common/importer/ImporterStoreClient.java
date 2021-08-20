@@ -39,9 +39,9 @@ import org.tikv.kvproto.ImportSSTGrpc;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Kvrpcpb;
 
-public class ImporterStoreClient
+public class ImporterStoreClient<RequestClass, ResponseClass>
     extends AbstractGRPCClient<ImportSSTGrpc.ImportSSTBlockingStub, ImportSSTGrpc.ImportSSTStub>
-    implements StreamObserver<ImportSstpb.RawWriteResponse> {
+    implements StreamObserver<ResponseClass> {
 
   private static final Logger logger = LoggerFactory.getLogger(ImporterStoreClient.class);
 
@@ -53,43 +53,43 @@ public class ImporterStoreClient
     super(conf, channelFactory, blockingStub, asyncStub);
   }
 
-  private StreamObserver<ImportSstpb.RawWriteRequest> streamObserverRequest;
-  private ImportSstpb.RawWriteResponse rawWriteResponse;
-  private Throwable rawWriteError;
+  private StreamObserver<RequestClass> streamObserverRequest;
+  private ResponseClass writeResponse;
+  private Throwable writeError;
 
-  public synchronized boolean isRawWriteResponseReceived() {
-    return rawWriteResponse != null;
+  public synchronized boolean isWriteResponseReceived() {
+    return writeResponse != null;
   }
 
-  private synchronized ImportSstpb.RawWriteResponse getRawWriteResponse() {
-    return rawWriteResponse;
+  private synchronized ResponseClass getWriteResponse() {
+    return writeResponse;
   }
 
-  private synchronized void setRawWriteResponse(ImportSstpb.RawWriteResponse rawWriteResponse) {
-    this.rawWriteResponse = rawWriteResponse;
+  private synchronized void setWriteResponse(ResponseClass writeResponse) {
+    this.writeResponse = writeResponse;
   }
 
-  public synchronized boolean hasRawWriteResponseError() {
-    return this.rawWriteError != null;
+  public synchronized boolean hasWriteResponseError() {
+    return this.writeError != null;
   }
 
-  public synchronized Throwable getRawWriteError() {
-    return this.rawWriteError;
+  public synchronized Throwable getWriteError() {
+    return this.writeError;
   }
 
-  private synchronized void setRawWriteError(Throwable t) {
-    this.rawWriteError = t;
+  private synchronized void setWriteError(Throwable t) {
+    this.writeError = t;
   }
 
   @Override
-  public void onNext(ImportSstpb.RawWriteResponse value) {
-    setRawWriteResponse(value);
+  public void onNext(ResponseClass response) {
+    setWriteResponse(response);
   }
 
   @Override
   public void onError(Throwable t) {
-    setRawWriteError(t);
-    logger.error("Error during raw write!", t);
+    setWriteError(t);
+    logger.error("Error during write!", t);
   }
 
   @Override
@@ -98,36 +98,51 @@ public class ImporterStoreClient
   }
 
   /**
-   * Ingest KV pairs to RawKV using gRPC streaming mode. This API should be called on both leader
-   * and followers.
+   * Ingest KV pairs to RawKV/Txn using gRPC streaming mode. This API should be called on both
+   * leader and followers.
    *
    * @return
    */
-  public void startRawWrite() {
-    streamObserverRequest = getAsyncStub().rawWrite(this);
+  public void startWrite() {
+    if (conf.isRawKVMode()) {
+      streamObserverRequest =
+          (StreamObserver<RequestClass>)
+              getAsyncStub().rawWrite((StreamObserver<ImportSstpb.RawWriteResponse>) this);
+    } else {
+      streamObserverRequest =
+          (StreamObserver<RequestClass>)
+              getAsyncStub().write((StreamObserver<ImportSstpb.WriteResponse>) this);
+    }
   }
 
   /**
-   * This API should be called after `startRawWrite`.
+   * This API should be called after `startWrite`.
    *
    * @param request
    */
-  public void rawWriteBatch(ImportSstpb.RawWriteRequest request) {
+  public void writeBatch(RequestClass request) {
     streamObserverRequest.onNext(request);
   }
 
-  /** This API should be called after `rawWriteBatch`. */
-  public void finishRawWrite() {
+  /** This API should be called after `writeBatch`. */
+  public void finishWrite() {
     streamObserverRequest.onCompleted();
   }
 
   /**
-   * This API should be called after `finishRawWrite`. This API should be called on leader only.
+   * This API should be called after `finishWrite`. This API should be called on leader only.
    *
    * @param ctx
    */
   public void multiIngest(Kvrpcpb.Context ctx) {
-    List<ImportSstpb.SSTMeta> metasList = getRawWriteResponse().getMetasList();
+    List<ImportSstpb.SSTMeta> metasList;
+    if (writeResponse instanceof ImportSstpb.RawWriteResponse) {
+      metasList = ((ImportSstpb.RawWriteResponse) getWriteResponse()).getMetasList();
+    } else if (writeResponse instanceof ImportSstpb.WriteResponse) {
+      metasList = ((ImportSstpb.WriteResponse) getWriteResponse()).getMetasList();
+    } else {
+      throw new IllegalArgumentException("Wrong response type");
+    }
 
     ImportSstpb.MultiIngestRequest request =
         ImportSstpb.MultiIngestRequest.newBuilder().setContext(ctx).addAllSsts(metasList).build();
@@ -163,7 +178,7 @@ public class ImporterStoreClient
   @Override
   public void close() throws Exception {}
 
-  public static class ImporterStoreClientBuilder {
+  public static class ImporterStoreClientBuilder<RequestClass, ResponseClass> {
     private final TiConfiguration conf;
     private final ChannelFactory channelFactory;
     private final RegionManager regionManager;
@@ -193,7 +208,8 @@ public class ImporterStoreClient
       ImportSSTGrpc.ImportSSTBlockingStub blockingStub = ImportSSTGrpc.newBlockingStub(channel);
       ImportSSTGrpc.ImportSSTStub asyncStub = ImportSSTGrpc.newStub(channel);
 
-      return new ImporterStoreClient(conf, channelFactory, blockingStub, asyncStub);
+      return new ImporterStoreClient<RequestClass, ResponseClass>(
+          conf, channelFactory, blockingStub, asyncStub);
     }
   }
 }

@@ -41,6 +41,7 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
+import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.txn.KVClient;
@@ -119,7 +120,7 @@ public class TiSession implements AutoCloseable {
 
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
-    return new KVClient(conf, builder);
+    return new KVClient(conf, builder, this);
   }
 
   public TxnKVClient createTxnClient() {
@@ -152,9 +153,17 @@ public class TiSession implements AutoCloseable {
     if (res == null) {
       synchronized (this) {
         if (importerClientBuilder == null) {
-          importerClientBuilder =
-              new ImporterStoreClient.ImporterStoreClientBuilder(
-                  conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
+          if (conf.isTxnKVMode()) {
+            importerClientBuilder =
+                new ImporterStoreClient.ImporterStoreClientBuilder<
+                    ImportSstpb.WriteRequest, ImportSstpb.WriteRequest>(
+                    conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
+          } else {
+            importerClientBuilder =
+                new ImporterStoreClient.ImporterStoreClientBuilder<
+                    ImportSstpb.RawWriteRequest, ImportSstpb.RawWriteResponse>(
+                    conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
+          }
         }
         res = importerClientBuilder;
       }

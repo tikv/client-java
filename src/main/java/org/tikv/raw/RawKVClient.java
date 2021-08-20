@@ -727,7 +727,7 @@ public class RawKVClient implements AutoCloseable {
     Key maxKey = Key.toRawKey(sortedList.get(sortedList.size() - 1).first);
     ImporterClient importerClient =
         new ImporterClient(tiSession, uuid, minKey, maxKey, region, ttl);
-    importerClient.rawWrite(sortedList.iterator());
+    importerClient.write(sortedList.iterator());
   }
 
   private void doSendBatchPut(BackOffer backOffer, Map<ByteString, ByteString> kvPairs, long ttl) {
