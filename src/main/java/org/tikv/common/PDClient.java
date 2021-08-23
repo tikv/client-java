@@ -575,7 +575,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
             .orElseGet(() -> new DefaultHostMapping(this.etcdClient, conf.getNetworkMappingName()));
     // The first request may cost too much latency
     long originTimeout = this.timeout;
-    this.timeout = conf.getPdGetMemberTimeout();
+    this.timeout = conf.getPdFirstGetMemberTimeout();
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
