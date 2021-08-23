@@ -187,3 +187,4 @@ Add the following config to `conf/prometheus.yml` and restart Prometheus.
 Import the [Client-Java-Summary dashboard config](/metrics/grafana/client_java_summary.json) to Grafana.
 
 ## License
+Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.
