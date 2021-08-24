@@ -27,7 +27,7 @@ The jar can be found in `./target/`
 
 ## Usage
 
-This project is designed to hook with `[pd](https://github.com/tikv/pd)` and `[tikv](https://github.com/tikv/tikv)`.
+This project is designed to hook with [pd](https://github.com/tikv/pd) and [tikv](https://github.com/tikv/tikv).
 
 When you work with this project, you have to communicate with `pd` and `tikv`. Please run TiKV and PD in advance.
 
