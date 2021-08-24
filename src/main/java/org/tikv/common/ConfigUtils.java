@@ -23,6 +23,8 @@ public class ConfigUtils {
   public static final String TIKV_GRPC_TIMEOUT = "tikv.grpc.timeout_in_ms";
   public static final String TIKV_GRPC_INGEST_TIMEOUT = "tikv.grpc.ingest_timeout_in_ms";
   public static final String TIKV_GRPC_FORWARD_TIMEOUT = "tikv.grpc.forward_timeout_in_ms";
+  public static final String TIKV_PD_FIRST_GET_MEMBER_TIMEOUT =
+      "tikv.grpc.pd_first_get_member_timeout_in_ms";
   public static final String TIKV_GRPC_SCAN_TIMEOUT = "tikv.grpc.scan_timeout_in_ms";
   public static final String TIKV_GRPC_SCAN_BATCH_SIZE = "tikv.grpc.scan_batch_size";
   public static final String TIKV_GRPC_MAX_FRAME_SIZE = "tikv.grpc.max_frame_size";
@@ -69,6 +71,7 @@ public class ConfigUtils {
   public static final String DEF_TIMEOUT = "200ms";
   public static final String DEF_TIKV_GRPC_INGEST_TIMEOUT = "200s";
   public static final String DEF_FORWARD_TIMEOUT = "300ms";
+  public static final String DEF_TIKV_PD_FIRST_GET_MEMBER_TIMEOUT = "10000ms";
   public static final String DEF_SCAN_TIMEOUT = "20s";
   public static final int DEF_CHECK_HEALTH_TIMEOUT = 100;
   public static final int DEF_HEALTH_CHECK_PERIOD_DURATION = 300;

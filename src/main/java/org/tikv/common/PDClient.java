@@ -337,7 +337,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
       return resp;
     } catch (Exception e) {
-      logger.debug("failed to get member from pd server.", e);
+      logger.warn("failed to get member from pd server.", e);
     }
     return null;
   }
@@ -575,7 +575,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
             .orElseGet(() -> new DefaultHostMapping(this.etcdClient, conf.getNetworkMappingName()));
     // The first request may cost too much latency
     long originTimeout = this.timeout;
-    this.timeout = 2000;
+    this.timeout = conf.getPdFirstGetMemberTimeout();
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
