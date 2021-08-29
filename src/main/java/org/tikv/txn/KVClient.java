@@ -19,13 +19,17 @@ import static org.tikv.common.util.ClientUtils.*;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
+import io.grpc.ManagedChannel;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.PDClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.GrpcException;
@@ -39,6 +43,10 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Kvrpcpb;
+import org.tikv.kvproto.Kvrpcpb.UnsafeDestroyRangeRequest;
+import org.tikv.kvproto.Kvrpcpb.UnsafeDestroyRangeResponse;
+import org.tikv.kvproto.Metapb;
+import org.tikv.kvproto.TikvGrpc;
 
 public class KVClient implements AutoCloseable {
   private final TiSession tiSession;
@@ -191,6 +199,63 @@ public class KVClient implements AutoCloseable {
       switchTiKVModeClient.stopKeepTiKVToImportMode();
       switchTiKVModeClient.switchTiKVToNormalMode();
     }
+  }
+
+  public void unsafeDestoryRange(ByteString startKey, ByteString endKey) throws GrpcException {
+    List<Metapb.Store> allStores = getStores();
+    ExecutorCompletionService<Object> completionService =
+        new ExecutorCompletionService<>(executorService);
+
+    for (Metapb.Store store : allStores) {
+      completionService.submit(() -> doUnsafeDestoryRange(store, startKey, endKey));
+    }
+
+    try {
+      for (int i = 0; i < allStores.size(); i++) {
+        completionService.take().get();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new TiKVException("Current thread interrupted.", e);
+    } catch (ExecutionException e) {
+      throw new TiKVException("Execution exception met.", e);
+    }
+  }
+
+  private Object doUnsafeDestoryRange(Metapb.Store store, ByteString startKey, ByteString endKey) {
+    ChannelFactory channelFactory = tiSession.getChannelFactory();
+    PDClient client = tiSession.getPDClient();
+
+    ManagedChannel channel = channelFactory.getChannel(store.getAddress(), client.getHostMapping());
+    TikvGrpc.TikvBlockingStub stub =
+        TikvGrpc.newBlockingStub(channel).withDeadlineAfter(5, TimeUnit.MINUTES);
+
+    UnsafeDestroyRangeRequest request =
+        UnsafeDestroyRangeRequest.newBuilder().setStartKey(startKey).setEndKey(endKey).build();
+
+    try {
+      UnsafeDestroyRangeResponse response = stub.unsafeDestroyRange(request);
+      if (response.getError() != null) {
+        String errMsg =
+            String.format(
+                "unsafe destroy range failed on store %d: %s", store.getId(), response.getError());
+        throw new TiKVException(errMsg);
+      }
+    } catch (Exception e) {
+      throw new TiKVException("unsafe destory range failed", e);
+    }
+    return null;
+  }
+
+  private List<Metapb.Store> getStores() {
+    BackOffer bo = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
+    List<Metapb.Store> allStores = tiSession.getPDClient().getAllStores(bo);
+    List<Metapb.Store> stores =
+        allStores
+            .stream()
+            .filter(s -> s.getState() != Metapb.StoreState.Tombstone)
+            .collect(Collectors.toList());
+    return stores;
   }
 
   private List<Kvrpcpb.KvPair> doSendBatchGet(
