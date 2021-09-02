@@ -7,7 +7,6 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
-import org.junit.Test;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.replica.Region;
@@ -19,7 +18,7 @@ public class ReplicaReadTest extends TXNTest {
   private String key;
   private String value;
 
-  @Test
+  @Ignore
   public void leaderReadTest() {
     doTest(TiConfiguration.ReplicaRead.LEADER);
   }
@@ -30,12 +29,12 @@ public class ReplicaReadTest extends TXNTest {
     doTest(TiConfiguration.ReplicaRead.FOLLOWER);
   }
 
-  @Test
+  @Ignore
   public void leadAndFollowerReadTest() {
     doTest(TiConfiguration.ReplicaRead.LEADER_AND_FOLLOWER);
   }
 
-  @Test
+  @Ignore
   public void replicaSelectorTest() {
     TiConfiguration conf = TiConfiguration.createDefault();
     conf.setTest(true);
