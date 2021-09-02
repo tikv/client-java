@@ -21,19 +21,25 @@ import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.codec.Codec;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.RegionException;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
 import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Errorpb.Error;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 
 public class ImporterClient {
+  private static final Logger logger = LoggerFactory.getLogger(ImporterClient.class);
+
   private TiConfiguration tiConf;
   private TiSession tiSession;
   private ByteString uuid;
@@ -64,7 +70,6 @@ public class ImporterClient {
    * @param iterator
    */
   public void write(Iterator<Pair<ByteString, ByteString>> iterator) throws GrpcException {
-
     streamOpened = false;
 
     int maxKVBatchSize = tiConf.getImporterMaxKVBatchSize();
@@ -221,6 +226,24 @@ public class ImporterClient {
       }
     }
 
-    clientLeader.multiIngest(region.getLeaderContext());
+    Object writeResponse = clientLeader.getWriteResponse();
+    try {
+      clientLeader.multiIngest(region.getLeaderContext());
+    } catch (RegionException e) {
+      if (retry(e.getRegionErr())) {
+        logger.warn("ingest error, do retry.", e);
+        tiSession.getRegionManager().invalidateRegion(this.region);
+        this.region = tiSession.getRegionManager().getRegionByKey(this.minKey.toByteString());
+        init();
+        clientLeader.setWriteResponse(writeResponse);
+        clientLeader.multiIngest(region.getLeaderContext());
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  private boolean retry(Error e) {
+    return true; // e.hasNotLeader() || e.hasServerIsBusy() || e.hasEpochNotMatch();
   }
 }

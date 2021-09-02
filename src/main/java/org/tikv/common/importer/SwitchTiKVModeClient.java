@@ -56,6 +56,7 @@ public class SwitchTiKVModeClient {
   }
 
   public void keepTiKVToImportMode() {
+    this.switchTiKVToImportMode();
     ingestScheduledExecutorService.scheduleAtFixedRate(
         this::switchTiKVToImportMode, 0, KEEP_TIKV_TO_IMPORT_MODE_PERIOD, TimeUnit.SECONDS);
   }
