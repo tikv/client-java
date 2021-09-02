@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
+import org.junit.Ignore;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.key.Key;
@@ -37,7 +37,7 @@ public class TxnKVIngestTest {
     }
   }
 
-  @Test
+  @Ignore
   public void txnIngestTest() throws InterruptedException {
     KVClient client = session.createKVClient();
 
