@@ -78,7 +78,7 @@ public class ImporterClient {
           pairs.add(ImportSstpb.Pair.newBuilder().setKey(pair.first).setValue(pair.second).build());
           totalBytes += (pair.first.size() + pair.second.size());
         }
-        if (totalBytes > maxKVBatchBytes) {
+        if (totalBytes > maxKVBatchBytes || !iterator.hasNext()) {
           break;
         }
       }
@@ -89,6 +89,7 @@ public class ImporterClient {
         streamOpened = true;
       }
       writeBatch(pairs);
+      totalBytes = 0;
     }
 
     if (streamOpened) {
