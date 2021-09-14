@@ -264,7 +264,7 @@ public class TiConfiguration implements Serializable {
   private boolean showRowId = getBoolean(TIKV_SHOW_ROWID);
   private String dbPrefix = get(TIKV_DB_PREFIX);
   private KVMode kvMode = getKvMode(TIKV_KV_MODE);
-  private boolean enableGrpcForward = getBoolean(TIKV_ENABLE_GRPC_FORWARD);
+  private final boolean enableGrpcForward = getBoolean(TIKV_ENABLE_GRPC_FORWARD);
 
   private int kvClientConcurrency = getInt(TIKV_KV_CLIENT_CONCURRENCY);
   private ReplicaRead replicaRead = getReplicaRead(TIKV_REPLICA_READ);
@@ -273,8 +273,8 @@ public class TiConfiguration implements Serializable {
 
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
-  private int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
-  private int healthCheckPeriodDuration = getInt(TIKV_HEALTH_CHECK_PERIOD_DURATION);
+  private final int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
+  private final int healthCheckPeriodDuration = getInt(TIKV_HEALTH_CHECK_PERIOD_DURATION);
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
   private HostMapping hostMapping = null;

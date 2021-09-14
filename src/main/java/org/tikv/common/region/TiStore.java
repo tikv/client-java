@@ -6,13 +6,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.tikv.kvproto.Metapb;
 
 public class TiStore implements Serializable {
-  private static long MAX_FAIL_FORWARD_TIMES = 4;
+  private static final long MAX_FAIL_FORWARD_TIMES = 4;
   private final Metapb.Store store;
   private final Metapb.Store proxyStore;
-  private AtomicBoolean reachable;
-  private AtomicBoolean valid;
-  private AtomicLong failForwardCount;
-  private AtomicBoolean canForward;
+  private final AtomicBoolean reachable;
+  private final AtomicBoolean valid;
+  private final AtomicLong failForwardCount;
+  private final AtomicBoolean canForward;
 
   public TiStore(Metapb.Store store) {
     this.store = store;

@@ -73,7 +73,7 @@ public class TiSession implements AutoCloseable {
   private volatile ImporterStoreClient.ImporterStoreClientBuilder importerClientBuilder;
   private volatile boolean isClosed = false;
   private volatile SwitchTiKVModeClient switchTiKVModeClient;
-  private MetricsServer metricsServer;
+  private final MetricsServer metricsServer;
   private static final int MAX_SPLIT_REGION_STACK_DEPTH = 6;
 
   public TiSession(TiConfiguration conf) {

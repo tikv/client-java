@@ -30,9 +30,8 @@ public class MetricsServer {
   private static MetricsServer METRICS_SERVER_INSTANCE = null;
   private static int metricsServerRefCount = 0;
 
-  private int port;
-  private HTTPServer server;
-  private CollectorRegistry collectorRegistry;
+  private final int port;
+  private final HTTPServer server;
 
   public static MetricsServer getInstance(TiConfiguration conf) {
     if (!conf.isMetricsEnable()) {
@@ -58,16 +57,16 @@ public class MetricsServer {
 
   private MetricsServer(int port) {
     try {
-      this.collectorRegistry = new CollectorRegistry();
-      this.collectorRegistry.register(RawKVClient.RAW_REQUEST_LATENCY);
-      this.collectorRegistry.register(RawKVClient.RAW_REQUEST_FAILURE);
-      this.collectorRegistry.register(RawKVClient.RAW_REQUEST_SUCCESS);
-      this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_REQUEST_LATENCY);
-      this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
-      this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
-      this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
+      CollectorRegistry collectorRegistry = new CollectorRegistry();
+      collectorRegistry.register(RawKVClient.RAW_REQUEST_LATENCY);
+      collectorRegistry.register(RawKVClient.RAW_REQUEST_FAILURE);
+      collectorRegistry.register(RawKVClient.RAW_REQUEST_SUCCESS);
+      collectorRegistry.register(RegionStoreClient.GRPC_RAW_REQUEST_LATENCY);
+      collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
+      collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
+      collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
       this.port = port;
-      this.server = new HTTPServer(new InetSocketAddress(port), this.collectorRegistry, true);
+      this.server = new HTTPServer(new InetSocketAddress(port), collectorRegistry, true);
       logger.info("http server is up " + this.server.getPort());
     } catch (Exception e) {
       logger.error("http server not up");

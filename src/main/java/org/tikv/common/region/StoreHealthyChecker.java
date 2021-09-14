@@ -19,12 +19,12 @@ import org.tikv.kvproto.Metapb;
 public class StoreHealthyChecker implements Runnable {
   private static final Logger logger = LoggerFactory.getLogger(StoreHealthyChecker.class);
   private static final long MAX_CHECK_STORE_TOMBSTONE_TICK = 60;
-  private BlockingQueue<TiStore> taskQueue;
+  private final BlockingQueue<TiStore> taskQueue;
   private final ChannelFactory channelFactory;
   private final ReadOnlyPDClient pdClient;
   private final RegionCache cache;
   private long checkTombstoneTick;
-  private long timeout;
+  private final long timeout;
 
   public StoreHealthyChecker(
       ChannelFactory channelFactory, ReadOnlyPDClient pdClient, RegionCache cache, long timeout) {
@@ -37,11 +37,8 @@ public class StoreHealthyChecker implements Runnable {
   }
 
   public boolean scheduleStoreHealthCheck(TiStore store) {
-    if (!this.taskQueue.add(store)) {
-      // add queue false, mark it reachable so that it can be put again.
-      return false;
-    }
-    return true;
+    // add queue false, mark it reachable so that it can be put again.
+    return this.taskQueue.add(store);
   }
 
   private List<TiStore> getValidStores() {
@@ -68,11 +65,7 @@ public class StoreHealthyChecker implements Runnable {
           HealthGrpc.newBlockingStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
       HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
       HealthCheckResponse resp = stub.check(req);
-      if (resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING) {
-        return true;
-      } else {
-        return false;
-      }
+      return resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING;
     } catch (Exception e) {
       return false;
     }
