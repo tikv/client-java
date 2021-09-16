@@ -69,6 +69,15 @@ public class PDClientTest extends PDMockServerTest {
   }
 
   @Test
+  public void testPauseCheck() throws Exception {
+    try (PDClient client = session.getPDClient()) {
+      client.keepPauseChecker(PDChecker.Merge);
+      Thread.sleep(6000);
+      client.stopKeepPauseChecker(PDChecker.Merge);
+    }
+  }
+
+  @Test
   public void testGetRegionByKey() throws Exception {
     byte[] startKey = new byte[] {1, 0, 2, 4};
     byte[] endKey = new byte[] {1, 0, 2, 5};

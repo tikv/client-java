@@ -21,6 +21,7 @@ import static org.tikv.common.pd.PDError.buildFromPdpbError;
 import static org.tikv.common.pd.PDUtils.addrToUri;
 import static org.tikv.common.pd.PDUtils.uriToAddr;
 
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
@@ -35,6 +36,7 @@ import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -46,6 +48,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.codec.Codec.BytesCodec;
@@ -93,12 +100,15 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     implements ReadOnlyPDClient {
   private static final String TIFLASH_TABLE_SYNC_PROGRESS_PATH = "/tiflash/table/sync";
   private static final long MIN_TRY_UPDATE_DURATION = 50;
+  private static final int PAUSE_CHECKER_TIMEOUT = 600;
+  private static final int KEEP_CHECKER_PAUSE_PERIOD = PAUSE_CHECKER_TIMEOUT / 5;
   private final Logger logger = LoggerFactory.getLogger(PDClient.class);
   private RequestHeader header;
   private TsoRequest tsoReq;
   private volatile PDClientWrapper pdClientWrapper;
   private ScheduledExecutorService service;
   private ScheduledExecutorService tiflashReplicaService;
+  private HashMap<PDChecker, ScheduledExecutorService> pauseCheckerService;
   private List<URI> pdAddrs;
   private Client etcdClient;
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
@@ -142,6 +152,49 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     TsoResponse resp = callWithRetry(backOffer, PDGrpc.getTsoMethod(), request, handler);
     Timestamp timestamp = resp.getTimestamp();
     return new TiTimestamp(timestamp.getPhysical(), timestamp.getLogical());
+  }
+
+  public void keepPauseChecker(PDChecker checker) {
+    if (!this.pauseCheckerService.containsKey(checker)) {
+      ScheduledExecutorService newService =
+          Executors.newSingleThreadScheduledExecutor(
+              new ThreadFactoryBuilder()
+                  .setNameFormat(String.format("PDClient-pause-%s-pool-%%d", checker.name()))
+                  .setDaemon(true)
+                  .build());
+      this.pauseCheckerService.put(checker, newService);
+    }
+    this.pauseCheckerService
+        .get(checker)
+        .scheduleAtFixedRate(
+            () -> pauseChecker(checker), 0, KEEP_CHECKER_PAUSE_PERIOD, TimeUnit.SECONDS);
+  }
+
+  public void stopKeepPauseChecker(PDChecker checker) {
+    if (this.pauseCheckerService.containsKey(checker)) {
+      this.pauseCheckerService.get(checker).shutdown();
+    }
+  }
+
+  private void pauseChecker(PDChecker checker) {
+    URI url = pdAddrs.get(0);
+    String api = url.toString() + "/pd/api/v1/checker/" + checker.apiName();
+    JsonMapper jsonMapper = new JsonMapper();
+    HashMap<String, Integer> arguments = new HashMap<>();
+    arguments.put("delay", PAUSE_CHECKER_TIMEOUT);
+    try (CloseableHttpClient client = HttpClients.createDefault()) {
+      byte[] body = jsonMapper.writeValueAsBytes(arguments);
+      HttpPost post = new HttpPost(api);
+      post.setEntity(new ByteArrayEntity(body));
+      try (CloseableHttpResponse resp = client.execute(post)) {
+        if (resp.getStatusLine().getStatusCode() != 200) {
+          logger.error("failed to pause checker.");
+        }
+        logger.info("checker {} paused", checker.apiName());
+      }
+    } catch (Exception e) {
+      logger.error("failed to pause checker.", e);
+    }
   }
 
   /**
