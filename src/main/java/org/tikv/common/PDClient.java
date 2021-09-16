@@ -100,15 +100,15 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     implements ReadOnlyPDClient {
   private static final String TIFLASH_TABLE_SYNC_PROGRESS_PATH = "/tiflash/table/sync";
   private static final long MIN_TRY_UPDATE_DURATION = 50;
-  private static final int PAUSE_CHECKER_TIMEOUT = 600;
-  private static final int KEEP_CHECKER_PAUSE_PERIOD = PAUSE_CHECKER_TIMEOUT / 5;
+  private static final int PAUSE_CHECKER_TIMEOUT = 300; // in seconds
+  private static final int KEEP_CHECKER_PAUSE_PERIOD = PAUSE_CHECKER_TIMEOUT / 5; // in seconds
   private final Logger logger = LoggerFactory.getLogger(PDClient.class);
   private RequestHeader header;
   private TsoRequest tsoReq;
   private volatile PDClientWrapper pdClientWrapper;
   private ScheduledExecutorService service;
   private ScheduledExecutorService tiflashReplicaService;
-  private HashMap<PDChecker, ScheduledExecutorService> pauseCheckerService;
+  private final HashMap<PDChecker, ScheduledExecutorService> pauseCheckerService = new HashMap<>();
   private List<URI> pdAddrs;
   private Client etcdClient;
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
