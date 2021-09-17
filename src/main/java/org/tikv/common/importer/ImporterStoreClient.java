@@ -29,6 +29,7 @@ import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.PDClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.RegionException;
 import org.tikv.common.operation.NoopHandler;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiStore;
@@ -61,7 +62,7 @@ public class ImporterStoreClient<RequestClass, ResponseClass>
     return writeResponse != null;
   }
 
-  private synchronized ResponseClass getWriteResponse() {
+  public synchronized ResponseClass getWriteResponse() {
     return writeResponse;
   }
 
@@ -133,15 +134,17 @@ public class ImporterStoreClient<RequestClass, ResponseClass>
    * This API should be called after `finishWrite`. This API should be called on leader only.
    *
    * @param ctx
+   * @param writeResponse
+   * @throws RegionException
    */
-  public void multiIngest(Kvrpcpb.Context ctx) {
+  public void multiIngest(Kvrpcpb.Context ctx, Object writeResponse) throws RegionException {
     List<ImportSstpb.SSTMeta> metasList;
     if (writeResponse instanceof ImportSstpb.RawWriteResponse) {
-      metasList = ((ImportSstpb.RawWriteResponse) getWriteResponse()).getMetasList();
+      metasList = ((ImportSstpb.RawWriteResponse) writeResponse).getMetasList();
     } else if (writeResponse instanceof ImportSstpb.WriteResponse) {
-      metasList = ((ImportSstpb.WriteResponse) getWriteResponse()).getMetasList();
+      metasList = ((ImportSstpb.WriteResponse) writeResponse).getMetasList();
     } else {
-      throw new IllegalArgumentException("Wrong response type");
+      throw new IllegalArgumentException("Wrong response type: " + writeResponse);
     }
 
     ImportSstpb.MultiIngestRequest request =
@@ -149,7 +152,7 @@ public class ImporterStoreClient<RequestClass, ResponseClass>
 
     ImportSstpb.IngestResponse response = getBlockingStub().multiIngest(request);
     if (response.hasError()) {
-      throw new GrpcException("" + response.getError());
+      throw new RegionException(response.getError());
     }
   }
 
