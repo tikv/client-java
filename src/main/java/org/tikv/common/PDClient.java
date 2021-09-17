@@ -21,6 +21,8 @@ import static org.tikv.common.pd.PDError.buildFromPdpbError;
 import static org.tikv.common.pd.PDUtils.addrToUri;
 import static org.tikv.common.pd.PDUtils.uriToAddr;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -35,6 +37,7 @@ import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
 import java.net.URI;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
@@ -187,10 +190,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     String verb = timeout == 0 ? "resume" : "pause";
     URI url = pdAddrs.get(0);
     String api = url.toString() + "/pd/api/v1/checker/" + checker.apiName();
-    JsonMapper jsonMapper = new JsonMapper();
     HashMap<String, Integer> arguments = new HashMap<>();
     arguments.put("delay", timeout);
     try (CloseableHttpClient client = HttpClients.createDefault()) {
+      JsonMapper jsonMapper = new JsonMapper();
       byte[] body = jsonMapper.writeValueAsBytes(arguments);
       HttpPost post = new HttpPost(api);
       post.setEntity(new ByteArrayEntity(body));
@@ -202,6 +205,20 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
     } catch (Exception e) {
       logger.error(String.format("failed to %s checker.", verb), e);
+    }
+  }
+
+  public Boolean isCheckerPaused(PDChecker checker) {
+    URI url = pdAddrs.get(0);
+    String api = url.toString() + "/pd/api/v1/checker/" + checker.apiName();
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      HashMap<String, Boolean> status =
+          mapper.readValue(new URL(api), new TypeReference<HashMap<String, Boolean>>() {});
+      return status.get("paused");
+    } catch (Exception e) {
+      logger.error(String.format("failed to get %s checker status.", checker.apiName()), e);
+      return null;
     }
   }
 
