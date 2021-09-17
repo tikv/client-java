@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.PDClient;
@@ -41,6 +42,7 @@ import org.tikv.common.operation.iterator.ConcreteScanIterator;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.UnsafeDestroyRangeRequest;
@@ -206,7 +208,8 @@ public class KVClient implements AutoCloseable {
     ExecutorCompletionService<Object> completionService =
         new ExecutorCompletionService<>(executorService);
 
-    for (Metapb.Store store : allStores) {
+    for (Metapb.Store s : allStores) {
+      TiStore store = new TiStore(s);
       completionService.submit(() -> doUnsafeDestoryRange(store, startKey, endKey));
     }
 
@@ -222,7 +225,7 @@ public class KVClient implements AutoCloseable {
     }
   }
 
-  private Object doUnsafeDestoryRange(Metapb.Store store, ByteString startKey, ByteString endKey) {
+  private Object doUnsafeDestoryRange(TiStore store, ByteString startKey, ByteString endKey) {
     ChannelFactory channelFactory = tiSession.getChannelFactory();
     PDClient client = tiSession.getPDClient();
 
@@ -235,7 +238,7 @@ public class KVClient implements AutoCloseable {
 
     try {
       UnsafeDestroyRangeResponse response = stub.unsafeDestroyRange(request);
-      if (response.getError() != null) {
+      if (!StringUtils.isEmpty(response.getError())) {
         String errMsg =
             String.format(
                 "unsafe destroy range failed on store %d: %s", store.getId(), response.getError());
