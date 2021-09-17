@@ -295,7 +295,7 @@ public class ImporterClient {
                 String.format(
                     "Received zero store id, from region %d try next time", region.getId()));
             tiSession.getRegionManager().invalidateRegion(region);
-            region = tiSession.getRegionManager().getRegionByKey(minKey.toByteString());
+            region = tiSession.getRegionManager().getRegionById(region.getId());
             backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
           }
 
