@@ -72,15 +72,17 @@ public class PDClientTest extends PDMockServerTest {
   public void testPauseCheck() throws Exception {
     try (PDClient client = session.getPDClient()) {
       PDChecker checker = PDChecker.Merge;
-      client.keepPauseChecker(checker);
-      Thread.sleep(1000);
-      assertTrue(client.isCheckerPaused(checker));
-
-      client.stopKeepPauseChecker(checker);
-      Thread.sleep(1000);
-
-      client.resumeChecker(checker);
-      assertFalse(client.isCheckerPaused(checker));
+      for(int i = 0; i < 2; i ++) {
+        client.keepPauseChecker(checker);
+        Thread.sleep(1000);
+        assertTrue(client.isCheckerPaused(checker));
+  
+        client.stopKeepPauseChecker(checker);
+        Thread.sleep(1000);
+  
+        client.resumeChecker(checker);
+        assertFalse(client.isCheckerPaused(checker));
+      }
     }
   }
 
