@@ -167,7 +167,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     this.pauseCheckerService
         .get(checker)
         .scheduleAtFixedRate(
-            () -> pauseChecker(checker), 0, KEEP_CHECKER_PAUSE_PERIOD, TimeUnit.SECONDS);
+            () -> pauseChecker(checker, PAUSE_CHECKER_TIMEOUT),
+            0,
+            KEEP_CHECKER_PAUSE_PERIOD,
+            TimeUnit.SECONDS);
   }
 
   public void stopKeepPauseChecker(PDChecker checker) {
@@ -176,24 +179,29 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
   }
 
-  private void pauseChecker(PDChecker checker) {
+  public void resumeChecker(PDChecker checker) {
+    pauseChecker(checker, 0);
+  }
+
+  private void pauseChecker(PDChecker checker, int timeout) {
+    String verb = timeout == 0 ? "resume" : "pause";
     URI url = pdAddrs.get(0);
     String api = url.toString() + "/pd/api/v1/checker/" + checker.apiName();
     JsonMapper jsonMapper = new JsonMapper();
     HashMap<String, Integer> arguments = new HashMap<>();
-    arguments.put("delay", PAUSE_CHECKER_TIMEOUT);
+    arguments.put("delay", timeout);
     try (CloseableHttpClient client = HttpClients.createDefault()) {
       byte[] body = jsonMapper.writeValueAsBytes(arguments);
       HttpPost post = new HttpPost(api);
       post.setEntity(new ByteArrayEntity(body));
       try (CloseableHttpResponse resp = client.execute(post)) {
         if (resp.getStatusLine().getStatusCode() != 200) {
-          logger.error("failed to pause checker.");
+          logger.error("failed to {} checker.", verb);
         }
-        logger.info("checker {} paused", checker.apiName());
+        logger.info("checker {} {}d", checker.apiName(), verb);
       }
     } catch (Exception e) {
-      logger.error("failed to pause checker.", e);
+      logger.error(String.format("failed to %s checker.", verb), e);
     }
   }
 
