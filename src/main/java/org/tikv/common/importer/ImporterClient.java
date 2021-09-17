@@ -17,7 +17,11 @@
 
 package org.tikv.common.importer;
 
+import static org.tikv.common.operation.RegionErrorHandler.NO_LEADER_STORE_ID;
+
 import com.google.protobuf.ByteString;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -28,11 +32,16 @@ import org.tikv.common.TiSession;
 import org.tikv.common.codec.Codec;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
+import org.tikv.common.util.BackOffFunction;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Errorpb.Error;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 
@@ -249,6 +258,71 @@ public class ImporterClient {
       }
     }
 
-    clientLeader.multiIngest(region.getLeaderContext());
+    Object writeResponse = clientLeader.getWriteResponse();
+    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.INGEST_BACKOFF);
+    ingestWithRetry(writeResponse, backOffer);
+  }
+
+  private void ingestWithRetry(Object writeResponse, BackOffer backOffer) {
+    try {
+      clientLeader.multiIngest(region.getLeaderContext(), writeResponse);
+    } catch (RegionException e) {
+      logger.warn("ingest failed.", e);
+      boolean retry = false;
+      Error error = e.getRegionErr();
+      if (error != null) {
+        if (error.hasNotLeader()) {
+          retry = true;
+          long newStoreId = error.getNotLeader().getLeader().getStoreId();
+
+          // update Leader here
+          logger.warn(
+              String.format(
+                  "NotLeader Error with region id %d and store id %d, new store id %d",
+                  region.getId(), region.getLeader().getStoreId(), newStoreId));
+
+          BackOffFunction.BackOffFuncType backOffFuncType;
+          if (newStoreId != NO_LEADER_STORE_ID) {
+            long regionId = region.getId();
+            region = tiSession.getRegionManager().updateLeader(region, newStoreId);
+            if (region == null) {
+              // epoch is not changed, getRegionById is faster than getRegionByKey
+              region = tiSession.getRegionManager().getRegionById(regionId);
+            }
+            backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
+          } else {
+            logger.info(
+                String.format(
+                    "Received zero store id, from region %d try next time", region.getId()));
+            tiSession.getRegionManager().invalidateRegion(region);
+            region = tiSession.getRegionManager().getRegionById(region.getId());
+            backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
+          }
+
+          backOffer.doBackOff(backOffFuncType, e);
+          init();
+        } else if (error.hasServerIsBusy()) {
+          retry = true;
+          // this error is reported from kv:
+          // will occur when write pressure is high. Please try later.
+          logger.warn(
+              String.format(
+                  "Server is busy for region [%s], reason: %s",
+                  region, error.getServerIsBusy().getReason()));
+          backOffer.doBackOff(
+              BackOffFunction.BackOffFuncType.BoServerBusy,
+              new StatusRuntimeException(
+                  Status.fromCode(Status.Code.UNAVAILABLE).withDescription(error.toString())));
+        } else {
+          tiSession.getRegionManager().invalidateRegion(region);
+        }
+      }
+
+      if (retry) {
+        ingestWithRetry(writeResponse, backOffer);
+      } else {
+        throw e;
+      }
+    }
   }
 }

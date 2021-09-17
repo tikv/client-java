@@ -31,6 +31,7 @@ public interface BackOffer {
   int TIKV_SWITCH_MODE_BACKOFF = seconds;
   int SPLIT_REGION_BACKOFF = 12000;
   int SCATTER_REGION_BACKOFF = 30000;
+  int INGEST_BACKOFF = 30000;
 
   /**
    * doBackOff sleeps a while base on the BackOffType and records the error message. Will stop until
