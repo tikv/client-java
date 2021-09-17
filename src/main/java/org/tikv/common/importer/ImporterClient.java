@@ -283,9 +283,11 @@ public class ImporterClient {
 
           BackOffFunction.BackOffFuncType backOffFuncType;
           if (newStoreId != NO_LEADER_STORE_ID) {
+            long regionId = region.getId();
             region = tiSession.getRegionManager().updateLeader(region, newStoreId);
             if (region == null) {
-              region = tiSession.getRegionManager().getRegionByKey(minKey.toByteString());
+              // epoch is not changed, getRegionById is faster than getRegionByKey
+              region = tiSession.getRegionManager().getRegionById(regionId);
             }
             backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
           } else {
@@ -311,11 +313,8 @@ public class ImporterClient {
               BackOffFunction.BackOffFuncType.BoServerBusy,
               new StatusRuntimeException(
                   Status.fromCode(Status.Code.UNAVAILABLE).withDescription(error.toString())));
-          backOffer.doBackOff(
-              BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.getMessage()));
         } else {
           tiSession.getRegionManager().invalidateRegion(region);
-          tiSession.getRegionManager().invalidateStore(region.getLeader().getStoreId());
         }
       }
 
