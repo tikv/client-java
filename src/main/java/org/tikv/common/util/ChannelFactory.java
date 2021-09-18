@@ -25,10 +25,14 @@ import org.tikv.common.pd.PDUtils;
 
 public class ChannelFactory implements AutoCloseable {
   private final int maxFrameSize;
+  private final int keepaliveTime;
+  private final int keepaliveTimeout;
   private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
 
-  public ChannelFactory(int maxFrameSize) {
+  public ChannelFactory(int maxFrameSize, int keepaliveTime, int keepaliveTimeout) {
     this.maxFrameSize = maxFrameSize;
+    this.keepaliveTime = keepaliveTime;
+    this.keepaliveTimeout = keepaliveTimeout;
   }
 
   public ManagedChannel getChannel(String addressStr, HostMapping hostMapping) {
@@ -51,6 +55,9 @@ public class ChannelFactory implements AutoCloseable {
           // So a coarse grain lock is ok here
           return ManagedChannelBuilder.forAddress(mappedAddr.getHost(), mappedAddr.getPort())
               .maxInboundMessageSize(maxFrameSize)
+              .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
+              .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
+              .keepAliveWithoutCalls(true)
               .usePlaintext(true)
               .idleTimeout(60, TimeUnit.SECONDS)
               .build();

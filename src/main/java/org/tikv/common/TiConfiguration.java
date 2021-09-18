@@ -88,6 +88,8 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_IMPORTER_MAX_KV_BATCH_SIZE, DEF_TIKV_IMPORTER_MAX_KV_BATCH_SIZE);
     setIfMissing(TIKV_SCATTER_WAIT_SECONDS, DEF_TIKV_SCATTER_WAIT_SECONDS);
     setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+    setIfMissing(TIKV_GRPC_KEEPALIVE_TIME, DEF_TIKV_GRPC_KEEPALIVE_TIME);
+    setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
   }
 
   public static void listAll() {
@@ -290,6 +292,9 @@ public class TiConfiguration implements Serializable {
   private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
 
   private boolean isTest = false;
+
+  private int keepaliveTime = getInt(TIKV_GRPC_KEEPALIVE_TIME);
+  private int keepaliveTimeout = getInt(TIKV_GRPC_KEEPALIVE_TIMEOUT);
 
   public enum KVMode {
     TXN,
@@ -667,5 +672,21 @@ public class TiConfiguration implements Serializable {
 
   public void setTest(boolean test) {
     isTest = test;
+  }
+
+  public int getKeepaliveTime() {
+    return keepaliveTime;
+  }
+
+  public void setKeepaliveTime(int keepaliveTime) {
+    this.keepaliveTime = keepaliveTime;
+  }
+
+  public int getKeepaliveTimeout() {
+    return keepaliveTimeout;
+  }
+
+  public void setKeepaliveTimeout(int timeout) {
+    this.keepaliveTimeout = timeout;
   }
 }
