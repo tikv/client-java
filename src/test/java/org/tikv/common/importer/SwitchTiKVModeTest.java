@@ -24,7 +24,7 @@ public class SwitchTiKVModeTest {
   }
 
   @Test
-  public void swithTiKVModeTest() throws InterruptedException {
+  public void switchTiKVModeTest() throws InterruptedException {
     SwitchTiKVModeClient switchTiKVModeClient = session.getSwitchTiKVModeClient();
     switchTiKVModeClient.keepTiKVToImportMode();
     Thread.sleep(6000);

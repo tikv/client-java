@@ -57,17 +57,17 @@ public class MyDecimalTest {
 
   @Test
   public void readWordTest() {
-    assertEquals(MyDecimal.readWord(new int[] {250}, 1, 0), -6);
-    assertEquals(MyDecimal.readWord(new int[] {50}, 1, 0), 50);
+    assertEquals(-6, MyDecimal.readWord(new int[] {250}, 1, 0));
+    assertEquals(50, MyDecimal.readWord(new int[] {50}, 1, 0));
 
-    assertEquals(MyDecimal.readWord(new int[] {250, 250}, 2, 0), -1286);
-    assertEquals(MyDecimal.readWord(new int[] {50, 50}, 2, 0), 12850);
+    assertEquals(-1286, MyDecimal.readWord(new int[] {250, 250}, 2, 0));
+    assertEquals(12850, MyDecimal.readWord(new int[] {50, 50}, 2, 0));
 
-    assertEquals(MyDecimal.readWord(new int[] {250, 250, 250}, 3, 0), -328966);
-    assertEquals(MyDecimal.readWord(new int[] {50, 50, 50}, 3, 0), 3289650);
+    assertEquals(-328966, MyDecimal.readWord(new int[] {250, 250, 250}, 3, 0));
+    assertEquals(3289650, MyDecimal.readWord(new int[] {50, 50, 50}, 3, 0));
 
-    assertEquals(MyDecimal.readWord(new int[] {250, 250, 250, 250}, 4, 0), -84215046);
-    assertEquals(MyDecimal.readWord(new int[] {50, 50, 50, 50}, 4, 0), 842150450);
+    assertEquals(-84215046, MyDecimal.readWord(new int[] {250, 250, 250, 250}, 4, 0));
+    assertEquals(842150450, MyDecimal.readWord(new int[] {50, 50, 50, 50}, 4, 0));
   }
 
   @Test
@@ -112,11 +112,6 @@ public class MyDecimalTest {
     String out;
     int precision;
     int frac;
-
-    MyDecimalTestStruct(String in, String out) {
-      this.in = in;
-      this.out = out;
-    }
 
     MyDecimalTestStruct(String in, String out, int precision, int frac) {
       this.in = in;

@@ -1,14 +1,13 @@
 package org.tikv.cdc;
 
-import java.util.Objects;
 import org.tikv.kvproto.Cdcpb.Event.Row;
 
 class CDCEvent {
   enum CDCEventType {
     ROW,
     RESOLVED_TS,
-    ERROR;
-  };
+    ERROR
+  }
 
   public final long regionId;
 
@@ -57,7 +56,7 @@ class CDCEvent {
         builder.append("resolvedTs=").append(resolvedTs);
         break;
       case ROW:
-        builder.append("row=").append(Objects.toString(row));
+        builder.append("row=").append(row);
         break;
     }
     return builder.append("}").toString();

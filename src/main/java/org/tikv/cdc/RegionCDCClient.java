@@ -42,7 +42,7 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
 
   private final AtomicBoolean running = new AtomicBoolean(false);
 
-  private boolean started = false;
+  private final boolean started = false;
 
   public RegionCDCClient(
       final TiRegion region,

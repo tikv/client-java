@@ -38,7 +38,7 @@ public class TxnKVIngestTest {
   }
 
   @Ignore
-  public void txnIngestTest() throws InterruptedException {
+  public void txnIngestTest() {
     KVClient client = session.createKVClient();
 
     // gen test data
