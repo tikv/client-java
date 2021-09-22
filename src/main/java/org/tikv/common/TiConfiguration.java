@@ -90,6 +90,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
     setIfMissing(TIKV_GRPC_KEEPALIVE_TIME, DEF_TIKV_GRPC_KEEPALIVE_TIME);
     setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
+    setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
   }
 
   public static void listAll() {
@@ -290,6 +291,11 @@ public class TiConfiguration implements Serializable {
   private int scatterWaitSeconds = getInt(TIKV_SCATTER_WAIT_SECONDS);
 
   private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+
+  private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
+  private Optional<String> trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION);
+  private Optional<String> keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN);
+  private Optional<String> keyFile = getOption(TIKV_KEY_FILE);
 
   private boolean isTest = false;
 
@@ -688,5 +694,37 @@ public class TiConfiguration implements Serializable {
 
   public void setKeepaliveTimeout(int timeout) {
     this.keepaliveTimeout = timeout;
+  }
+
+  public boolean isTlsEnable() {
+    return tlsEnable;
+  }
+
+  public void setTlsEnable(boolean tlsEnable) {
+    this.tlsEnable = tlsEnable;
+  }
+
+  public Optional<String> getTrustCertCollectionFile() {
+    return trustCertCollectionFile;
+  }
+
+  public void setTrustCertCollectionFile(Optional<String> trustCertCollectionFile) {
+    this.trustCertCollectionFile = trustCertCollectionFile;
+  }
+
+  public Optional<String> getKeyCertChainFile() {
+    return keyCertChainFile;
+  }
+
+  public void setKeyCertChainFile(Optional<String> keyCertChainFile) {
+    this.keyCertChainFile = keyCertChainFile;
+  }
+
+  public Optional<String> getKeyFile() {
+    return keyFile;
+  }
+
+  public void setKeyFile(Optional<String> keyFile) {
+    this.keyFile = keyFile;
   }
 }

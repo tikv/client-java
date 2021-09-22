@@ -79,8 +79,17 @@ public class TiSession implements AutoCloseable {
   public TiSession(TiConfiguration conf) {
     this.conf = conf;
     this.channelFactory =
-        new ChannelFactory(
-            conf.getMaxFrameSize(), conf.getKeepaliveTime(), conf.getKeepaliveTimeout());
+        conf.isTlsEnable()
+            ? new ChannelFactory(
+                conf.getMaxFrameSize(),
+                conf.getKeepaliveTime(),
+                conf.getKeepaliveTimeout(),
+                conf.getTrustCertCollectionFile(),
+                conf.getKeyCertChainFile(),
+                conf.getKeyFile())
+            : new ChannelFactory(
+                conf.getMaxFrameSize(), conf.getKeepaliveTime(), conf.getKeepaliveTimeout());
+
     this.client = PDClient.createRaw(conf, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
     this.metricsServer = MetricsServer.getInstance(conf);
