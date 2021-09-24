@@ -17,7 +17,6 @@ package org.tikv.common;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
 
 import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
@@ -59,7 +58,6 @@ public class RegionManagerTest extends PDMockServerTest {
     ByteString startKey = ByteString.copyFrom(new byte[] {1});
     ByteString endKey = ByteString.copyFrom(new byte[] {10});
     ByteString searchKey = ByteString.copyFrom(new byte[] {5});
-    ByteString searchKeyNotExists = ByteString.copyFrom(new byte[] {11});
     int confVer = 1026;
     int ver = 1027;
     long regionId = 233;
@@ -91,10 +89,6 @@ public class RegionManagerTest extends PDMockServerTest {
 
     TiRegion regionToSearch = mgr.getRegionByKey(searchKey);
     assertEquals(region, regionToSearch);
-
-    // This will in turn invoke rpc and results in an error
-    // since we set just one rpc response
-    assertNull(mgr.getRegionByKey(searchKeyNotExists));
   }
 
   @Test
@@ -160,12 +154,5 @@ public class RegionManagerTest extends PDMockServerTest {
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
     assertNull(mgr.getStoreById(storeId + 1));
-
-    mgr.invalidateStore(storeId);
-    try {
-      mgr.getStoreById(storeId);
-      fail();
-    } catch (Exception ignored) {
-    }
   }
 }

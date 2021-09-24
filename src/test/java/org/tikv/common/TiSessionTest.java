@@ -14,10 +14,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.tikv.BaseRawKVTest;
 import org.tikv.common.region.TiRegion;
 import org.tikv.raw.RawKVClient;
 
-public class TiSessionTest {
+public class TiSessionTest extends BaseRawKVTest {
   private TiSession session;
 
   @After
@@ -38,8 +39,7 @@ public class TiSessionTest {
   }
 
   private void doCloseWithRunningTaskTest(boolean now, long timeoutMS) throws Exception {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
-    conf.setTest(true);
+    TiConfiguration conf = createTiConfiguration();
     session = TiSession.create(conf);
 
     ExecutorService executorService = session.getThreadPoolForBatchGet();
@@ -83,8 +83,7 @@ public class TiSessionTest {
   }
 
   private void doCloseTest(boolean now, long timeoutMS) throws Exception {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
-    conf.setTest(true);
+    TiConfiguration conf = createTiConfiguration();
     session = TiSession.create(conf);
     RawKVClient client = session.createRawClient();
 

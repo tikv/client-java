@@ -11,6 +11,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.Before;
+import org.tikv.BaseTxnKVTest;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.RegionException;
@@ -21,15 +22,14 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
-public class TXNTest {
+public class TXNTest extends BaseTxnKVTest {
   static final int DEFAULT_TTL = 10;
   private TiSession session;
   RegionStoreClient.RegionStoreClientBuilder builder;
 
   @Before
   public void setUp() {
-    TiConfiguration conf = TiConfiguration.createDefault();
-    conf.setTest(true);
+    TiConfiguration conf = createTiConfiguration();
     try {
       session = TiSession.create(conf);
       this.builder = session.getRegionStoreClientBuilder();

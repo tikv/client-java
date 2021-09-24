@@ -11,11 +11,12 @@ import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.BaseRawKVTest;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.RawCASConflictException;
 
-public class CASTest {
+public class CASTest extends BaseRawKVTest {
   private RawKVClient client;
   private boolean initialized;
   private static final Logger logger = LoggerFactory.getLogger(RawKVClientTest.class);
@@ -24,8 +25,7 @@ public class CASTest {
   @Before
   public void setup() {
     try {
-      TiConfiguration conf = TiConfiguration.createRawDefault();
-      conf.setTest(true);
+      TiConfiguration conf = createTiConfiguration();
       conf.setEnableAtomicForCAS(true);
       session = TiSession.create(conf);
       initialized = false;
@@ -48,7 +48,6 @@ public class CASTest {
 
   @Test
   public void rawCASTest() {
-    if (!initialized) return;
     ByteString key = ByteString.copyFromUtf8("key_atomic");
     ByteString value = ByteString.copyFromUtf8("value");
     ByteString value2 = ByteString.copyFromUtf8("value2");
@@ -65,7 +64,6 @@ public class CASTest {
 
   @Test
   public void rawPutIfAbsentTest() {
-    if (!initialized) return;
     long ttl = 10;
     ByteString key = ByteString.copyFromUtf8("key_atomic");
     ByteString value = ByteString.copyFromUtf8("value");

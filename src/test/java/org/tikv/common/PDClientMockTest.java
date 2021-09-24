@@ -18,7 +18,6 @@ package org.tikv.common;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.tikv.common.GrpcUtils.encodeKey;
 
 import com.google.protobuf.ByteString;
 import java.util.concurrent.Callable;
@@ -37,7 +36,7 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
 
-public class PDClientTest extends PDMockServerTest {
+public class PDClientMockTest extends PDMockServerTest {
 
   private static final String LOCAL_ADDR_IPV6 = "[::]";
   public static final String HTTP = "http://";
@@ -88,8 +87,8 @@ public class PDClientTest extends PDMockServerTest {
             pdServer.getClusterId(),
             GrpcUtils.makeRegion(
                 1,
-                encodeKey(startKey),
-                encodeKey(endKey),
+                ByteString.copyFrom(startKey),
+                ByteString.copyFrom(endKey),
                 GrpcUtils.makeRegionEpoch(confVer, ver),
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
@@ -119,8 +118,8 @@ public class PDClientTest extends PDMockServerTest {
             pdServer.getClusterId(),
             GrpcUtils.makeRegion(
                 1,
-                encodeKey(startKey),
-                encodeKey(endKey),
+                ByteString.copyFrom(startKey),
+                ByteString.copyFrom(endKey),
                 GrpcUtils.makeRegionEpoch(confVer, ver),
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));

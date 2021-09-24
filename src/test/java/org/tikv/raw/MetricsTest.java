@@ -9,10 +9,11 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.After;
 import org.junit.Test;
+import org.tikv.BaseRawKVTest;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 
-public class MetricsTest {
+public class MetricsTest extends BaseRawKVTest {
   private final List<TiSession> sessionList = new ArrayList<>();
 
   @After
@@ -26,8 +27,7 @@ public class MetricsTest {
 
   @Test
   public void oneTiSession() throws Exception {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
-    conf.setTest(true);
+    TiConfiguration conf = createTiConfiguration();
     conf.setMetricsEnable(true);
     TiSession session = TiSession.create(conf);
     sessionList.add(session);
@@ -42,8 +42,7 @@ public class MetricsTest {
 
   @Test
   public void twoTiSession() throws Exception {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
-    conf.setTest(true);
+    TiConfiguration conf = createTiConfiguration();
     conf.setMetricsEnable(true);
 
     TiSession session1 = TiSession.create(conf);
@@ -69,15 +68,13 @@ public class MetricsTest {
 
   @Test
   public void twoTiSessionWithDifferentPort() {
-    TiConfiguration conf1 = TiConfiguration.createRawDefault();
-    conf1.setTest(true);
+    TiConfiguration conf1 = createTiConfiguration();
     conf1.setMetricsEnable(true);
     conf1.setMetricsPort(12345);
     TiSession session1 = TiSession.create(conf1);
     sessionList.add(session1);
 
-    TiConfiguration conf2 = TiConfiguration.createRawDefault();
-    conf2.setTest(true);
+    TiConfiguration conf2 = createTiConfiguration();
     conf2.setMetricsEnable(true);
     conf2.setMetricsPort(54321);
     try {
