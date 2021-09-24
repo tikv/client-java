@@ -165,12 +165,11 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                   .setNameFormat(String.format("PDClient-pause-%s-pool-%%d", checker.name()))
                   .setDaemon(true)
                   .build());
-      newService
-          .scheduleAtFixedRate(
-              () -> pauseChecker(checker, PAUSE_CHECKER_TIMEOUT),
-              0,
-              KEEP_CHECKER_PAUSE_PERIOD,
-              TimeUnit.SECONDS);
+      newService.scheduleAtFixedRate(
+          () -> pauseChecker(checker, PAUSE_CHECKER_TIMEOUT),
+          0,
+          KEEP_CHECKER_PAUSE_PERIOD,
+          TimeUnit.SECONDS);
       this.pauseCheckerService.put(checker, newService);
     }
   }
