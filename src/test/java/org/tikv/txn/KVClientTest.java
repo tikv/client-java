@@ -5,7 +5,7 @@ import static org.junit.Assert.fail;
 import com.google.protobuf.ByteString;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
+import org.junit.Ignore;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 
@@ -30,7 +30,7 @@ public class KVClientTest {
     }
   }
 
-  @Test
+  @Ignore
   public void unsafeDestroyRangeTest() {
     try (KVClient client = session.createKVClient()) {
       client.unsafeDestoryRange(ByteString.EMPTY, ByteString.EMPTY);
