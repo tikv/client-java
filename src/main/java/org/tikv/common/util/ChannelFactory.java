@@ -16,7 +16,6 @@
 package org.tikv.common.util;
 
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
 import io.netty.handler.ssl.SslContext;
@@ -92,17 +91,19 @@ public class ChannelFactory implements AutoCloseable {
           } catch (Exception e) {
             throw new IllegalArgumentException("failed to get mapped address " + address, e);
           }
+
           // Channel should be lazy without actual connection until first call
           // So a coarse grain lock is ok here
+          NettyChannelBuilder builder =
+              NettyChannelBuilder.forAddress(mappedAddr.getHost(), mappedAddr.getPort())
+                  .maxInboundMessageSize(maxFrameSize)
+                  .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
+                  .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
+                  .keepAliveWithoutCalls(true)
+                  .idleTimeout(60, TimeUnit.SECONDS);
+
           if (sslContextBuilder == null) {
-            return ManagedChannelBuilder.forAddress(mappedAddr.getHost(), mappedAddr.getPort())
-                .maxInboundMessageSize(maxFrameSize)
-                .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
-                .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
-                .keepAliveWithoutCalls(true)
-                .usePlaintext(true)
-                .idleTimeout(60, TimeUnit.SECONDS)
-                .build();
+            return builder.usePlaintext(true).build();
           } else {
             SslContext sslContext = null;
             try {
@@ -111,14 +112,7 @@ public class ChannelFactory implements AutoCloseable {
               logger.error("create ssl context failed!", e);
               return null;
             }
-            return NettyChannelBuilder.forAddress(mappedAddr.getHost(), mappedAddr.getPort())
-                .maxInboundMessageSize(maxFrameSize)
-                .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
-                .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
-                .keepAliveWithoutCalls(true)
-                .sslContext(sslContext)
-                .idleTimeout(60, TimeUnit.SECONDS)
-                .build();
+            return builder.sslContext(sslContext).build();
           }
         });
   }
