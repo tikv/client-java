@@ -36,19 +36,12 @@ public class SwitchTiKVModeClient {
   private final PDClient pdClient;
   private final ImporterStoreClient.ImporterStoreClientBuilder builder;
 
-  private final ScheduledExecutorService ingestScheduledExecutorService;
+  private ScheduledExecutorService ingestScheduledExecutorService;
 
   public SwitchTiKVModeClient(
       PDClient pdClient, ImporterStoreClient.ImporterStoreClientBuilder builder) {
     this.pdClient = pdClient;
     this.builder = builder;
-
-    this.ingestScheduledExecutorService =
-        Executors.newSingleThreadScheduledExecutor(
-            new ThreadFactoryBuilder()
-                .setNameFormat("switch-tikv-mode-pool-%d")
-                .setDaemon(true)
-                .build());
   }
 
   public void switchTiKVToNormalMode() {
@@ -56,12 +49,21 @@ public class SwitchTiKVModeClient {
   }
 
   public void keepTiKVToImportMode() {
-    ingestScheduledExecutorService.scheduleAtFixedRate(
-        this::switchTiKVToImportMode, 0, KEEP_TIKV_TO_IMPORT_MODE_PERIOD, TimeUnit.SECONDS);
+    if (ingestScheduledExecutorService == null) {
+      ingestScheduledExecutorService =
+          Executors.newSingleThreadScheduledExecutor(
+              new ThreadFactoryBuilder()
+                  .setNameFormat("switch-tikv-mode-pool-%d")
+                  .setDaemon(true)
+                  .build());
+      ingestScheduledExecutorService.scheduleAtFixedRate(
+          this::switchTiKVToImportMode, 0, KEEP_TIKV_TO_IMPORT_MODE_PERIOD, TimeUnit.SECONDS);
+    }
   }
 
   public void stopKeepTiKVToImportMode() {
     ingestScheduledExecutorService.shutdown();
+    ingestScheduledExecutorService = null;
   }
 
   private void switchTiKVToImportMode() {
