@@ -293,9 +293,9 @@ public class TiConfiguration implements Serializable {
   private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
 
   private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
-  private Optional<String> trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION);
-  private Optional<String> keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN);
-  private Optional<String> keyFile = getOption(TIKV_KEY_FILE);
+  private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
+  private String keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN).orElse(null);
+  private String keyFile = getOption(TIKV_KEY_FILE).orElse(null);
 
   private boolean isTest = false;
 
@@ -704,27 +704,27 @@ public class TiConfiguration implements Serializable {
     this.tlsEnable = tlsEnable;
   }
 
-  public Optional<String> getTrustCertCollectionFile() {
+  public String getTrustCertCollectionFile() {
     return trustCertCollectionFile;
   }
 
-  public void setTrustCertCollectionFile(Optional<String> trustCertCollectionFile) {
+  public void setTrustCertCollectionFile(String trustCertCollectionFile) {
     this.trustCertCollectionFile = trustCertCollectionFile;
   }
 
-  public Optional<String> getKeyCertChainFile() {
+  public String getKeyCertChainFile() {
     return keyCertChainFile;
   }
 
-  public void setKeyCertChainFile(Optional<String> keyCertChainFile) {
+  public void setKeyCertChainFile(String keyCertChainFile) {
     this.keyCertChainFile = keyCertChainFile;
   }
 
-  public Optional<String> getKeyFile() {
+  public String getKeyFile() {
     return keyFile;
   }
 
-  public void setKeyFile(Optional<String> keyFile) {
+  public void setKeyFile(String keyFile) {
     this.keyFile = keyFile;
   }
 }

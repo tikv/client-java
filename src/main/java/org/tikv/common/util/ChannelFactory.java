@@ -22,7 +22,6 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import java.io.File;
 import java.net.URI;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLException;
@@ -51,9 +50,9 @@ public class ChannelFactory implements AutoCloseable {
       int maxFrameSize,
       int keepaliveTime,
       int keepaliveTimeout,
-      Optional<String> trustCertCollectionFilePath,
-      Optional<String> keyCertChainFilePath,
-      Optional<String> keyFilePath) {
+      String trustCertCollectionFilePath,
+      String keyCertChainFilePath,
+      String keyFilePath) {
     this.maxFrameSize = maxFrameSize;
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
@@ -62,15 +61,13 @@ public class ChannelFactory implements AutoCloseable {
   }
 
   private SslContextBuilder getSslContextBuilder(
-      Optional<String> trustCertCollectionFilePath,
-      Optional<String> keyCertChainFilePath,
-      Optional<String> keyFilePath) {
+      String trustCertCollectionFilePath, String keyCertChainFilePath, String keyFilePath) {
     SslContextBuilder builder = GrpcSslContexts.forClient();
-    if (trustCertCollectionFilePath.isPresent()) {
-      builder.trustManager(new File(trustCertCollectionFilePath.get()));
+    if (trustCertCollectionFilePath != null) {
+      builder.trustManager(new File(trustCertCollectionFilePath));
     }
-    if (keyCertChainFilePath.isPresent() && keyFilePath.isPresent()) {
-      builder.keyManager(new File(keyCertChainFilePath.get()), new File(keyFilePath.get()));
+    if (keyCertChainFilePath != null && keyFilePath != null) {
+      builder.keyManager(new File(keyCertChainFilePath), new File(keyFilePath));
     }
     return builder;
   }
