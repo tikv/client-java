@@ -155,7 +155,7 @@ The following includes ThreadPool related parameters, which can be passed in thr
 ### TLS
 
 #### tikv.tls_enable
-- whether to enable tls
+- whether to enable TLS
 - default: false
 
 #### tikv.trust_cert_collection
