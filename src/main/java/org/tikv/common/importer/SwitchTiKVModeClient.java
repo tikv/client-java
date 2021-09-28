@@ -48,7 +48,7 @@ public class SwitchTiKVModeClient {
     doSwitchTiKVMode(ImportSstpb.SwitchMode.Normal);
   }
 
-  public void keepTiKVToImportMode() {
+  public synchronized void keepTiKVToImportMode() {
     if (ingestScheduledExecutorService == null) {
       ingestScheduledExecutorService =
           Executors.newSingleThreadScheduledExecutor(
@@ -61,7 +61,7 @@ public class SwitchTiKVModeClient {
     }
   }
 
-  public void stopKeepTiKVToImportMode() {
+  public synchronized void stopKeepTiKVToImportMode() {
     ingestScheduledExecutorService.shutdown();
     ingestScheduledExecutorService = null;
   }
