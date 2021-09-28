@@ -265,7 +265,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                   "wait scatter region %d at key %s is %s",
                   region.getId(),
                   KeyUtils.formatBytes(resp.getDesc().toByteArray()),
-                  resp.getStatus().toString()));
+                  resp.getStatus()));
         }
       }
     }
@@ -499,11 +499,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       logger.info(String.format("can not switch to new leader, try follower forward"));
       List<Pdpb.Member> members = resp.getMembersList();
 
-      boolean hasReachNextMember = false;
       // If we have not used follower forward, try the first follower.
-      if (pdClientWrapper != null && pdClientWrapper.getStoreAddress().equals(leaderUrlStr)) {
-        hasReachNextMember = true;
-      }
+      boolean hasReachNextMember =
+          pdClientWrapper != null && pdClientWrapper.getStoreAddress().equals(leaderUrlStr);
 
       for (int i = 0; i < members.size() * 2; i++) {
         Pdpb.Member member = members.get(i % members.size());

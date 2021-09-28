@@ -18,7 +18,7 @@ import org.tikv.kvproto.Errorpb;
 public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private static final Logger logger = LoggerFactory.getLogger(RegionErrorHandler.class);
   // if a store does not have leader currently, store id is set to 0
-  private static final int NO_LEADER_STORE_ID = 0;
+  public static final int NO_LEADER_STORE_ID = 0;
   private final Function<RespT, Errorpb.Error> getRegionError;
   private final RegionManager regionManager;
   private final RegionErrorReceiver recv;

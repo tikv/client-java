@@ -15,7 +15,9 @@
 
 package org.tikv.common;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
 import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
@@ -53,7 +55,7 @@ public class RegionManagerTest extends PDMockServerTest {
   }
 
   @Test
-  public void getRegionByKey() throws Exception {
+  public void getRegionByKey() {
     ByteString startKey = ByteString.copyFrom(new byte[] {1});
     ByteString endKey = ByteString.copyFrom(new byte[] {10});
     ByteString searchKey = ByteString.copyFrom(new byte[] {5});
@@ -96,7 +98,7 @@ public class RegionManagerTest extends PDMockServerTest {
   }
 
   @Test
-  public void getStoreByKey() throws Exception {
+  public void getStoreByKey() {
     ByteString startKey = ByteString.copyFrom(new byte[] {1});
     ByteString endKey = ByteString.copyFrom(new byte[] {10});
     ByteString searchKey = ByteString.copyFrom(new byte[] {5});
@@ -133,7 +135,7 @@ public class RegionManagerTest extends PDMockServerTest {
   }
 
   @Test
-  public void getStoreById() throws Exception {
+  public void getStoreById() {
     long storeId = 234;
     String testAddress = "testAddress";
     pdServer.addGetStoreResp(

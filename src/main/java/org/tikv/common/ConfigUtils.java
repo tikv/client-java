@@ -28,6 +28,8 @@ public class ConfigUtils {
   public static final String TIKV_GRPC_SCAN_TIMEOUT = "tikv.grpc.scan_timeout_in_ms";
   public static final String TIKV_GRPC_SCAN_BATCH_SIZE = "tikv.grpc.scan_batch_size";
   public static final String TIKV_GRPC_MAX_FRAME_SIZE = "tikv.grpc.max_frame_size";
+  public static final String TIKV_GRPC_KEEPALIVE_TIME = "tikv.grpc.keepalive_time";
+  public static final String TIKV_GRPC_KEEPALIVE_TIMEOUT = "tikv.grpc.keepalive_timeout";
 
   public static final String TIKV_INDEX_SCAN_BATCH_SIZE = "tikv.index.scan_batch_size";
   public static final String TIKV_INDEX_SCAN_CONCURRENCY = "tikv.index.scan_concurrency";
@@ -120,4 +122,7 @@ public class ConfigUtils {
   public static final String LEADER = "LEADER";
   public static final String FOLLOWER = "FOLLOWER";
   public static final String LEADER_AND_FOLLOWER = "LEADER_AND_FOLLOWER";
+
+  public static final int DEF_TIKV_GRPC_KEEPALIVE_TIME = 10;
+  public static final int DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT = 3;
 }

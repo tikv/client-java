@@ -15,7 +15,9 @@
 
 package org.tikv.common;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
@@ -62,11 +64,11 @@ public class RegionStoreClientTest extends MockServerTest {
   }
 
   @Test
-  public void rawGetTest() throws Exception {
+  public void rawGetTest() {
     doRawGetTest(createClientV3());
   }
 
-  public void doRawGetTest(RegionStoreClient client) throws Exception {
+  public void doRawGetTest(RegionStoreClient client) {
     server.put("key1", "value1");
     Optional<ByteString> value = client.rawGet(defaultBackOff(), ByteString.copyFromUtf8("key1"));
     assertEquals(ByteString.copyFromUtf8("value1"), value.get());
@@ -93,7 +95,7 @@ public class RegionStoreClientTest extends MockServerTest {
     doGetTest(createClientV3());
   }
 
-  public void doGetTest(RegionStoreClient client) throws Exception {
+  public void doGetTest(RegionStoreClient client) {
     server.put("key1", "value1");
     ByteString value = client.get(defaultBackOff(), ByteString.copyFromUtf8("key1"), 1);
     assertEquals(ByteString.copyFromUtf8("value1"), value);
@@ -110,11 +112,11 @@ public class RegionStoreClientTest extends MockServerTest {
   }
 
   @Test
-  public void batchGetTest() throws Exception {
+  public void batchGetTest() {
     doBatchGetTest(createClientV3());
   }
 
-  public void doBatchGetTest(RegionStoreClient client) throws Exception {
+  public void doBatchGetTest(RegionStoreClient client) {
     server.put("key1", "value1");
     server.put("key2", "value2");
     server.put("key4", "value4");
@@ -145,11 +147,11 @@ public class RegionStoreClientTest extends MockServerTest {
   }
 
   @Test
-  public void scanTest() throws Exception {
+  public void scanTest() {
     doScanTest(createClientV3());
   }
 
-  public void doScanTest(RegionStoreClient client) throws Exception {
+  public void doScanTest(RegionStoreClient client) {
     server.put("key1", "value1");
     server.put("key2", "value2");
     server.put("key4", "value4");

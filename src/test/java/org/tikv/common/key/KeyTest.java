@@ -24,7 +24,7 @@ import org.junit.Test;
 public class KeyTest {
 
   @Test
-  public void nextPrefixTest() throws Exception {
+  public void nextPrefixTest() {
     Key k1 = toRawKey(new byte[] {1, 2, 3});
     assertEquals(toRawKey(new byte[] {1, 2, 4}), k1.nextPrefix());
 

@@ -22,7 +22,7 @@ public class ReflectionWrapper {
     this.obj = obj;
   }
 
-  private Object obj;
+  private final Object obj;
 
   public Object call(String methodName, Object... args) {
     try {

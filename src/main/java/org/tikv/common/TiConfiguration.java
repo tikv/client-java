@@ -88,6 +88,8 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_IMPORTER_MAX_KV_BATCH_SIZE, DEF_TIKV_IMPORTER_MAX_KV_BATCH_SIZE);
     setIfMissing(TIKV_SCATTER_WAIT_SECONDS, DEF_TIKV_SCATTER_WAIT_SECONDS);
     setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+    setIfMissing(TIKV_GRPC_KEEPALIVE_TIME, DEF_TIKV_GRPC_KEEPALIVE_TIME);
+    setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
   }
 
   public static void listAll() {
@@ -264,7 +266,7 @@ public class TiConfiguration implements Serializable {
   private boolean showRowId = getBoolean(TIKV_SHOW_ROWID);
   private String dbPrefix = get(TIKV_DB_PREFIX);
   private KVMode kvMode = getKvMode(TIKV_KV_MODE);
-  private boolean enableGrpcForward = getBoolean(TIKV_ENABLE_GRPC_FORWARD);
+  private final boolean enableGrpcForward = getBoolean(TIKV_ENABLE_GRPC_FORWARD);
 
   private int kvClientConcurrency = getInt(TIKV_KV_CLIENT_CONCURRENCY);
   private ReplicaRead replicaRead = getReplicaRead(TIKV_REPLICA_READ);
@@ -273,8 +275,8 @@ public class TiConfiguration implements Serializable {
 
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
-  private int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
-  private int healthCheckPeriodDuration = getInt(TIKV_HEALTH_CHECK_PERIOD_DURATION);
+  private final int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
+  private final int healthCheckPeriodDuration = getInt(TIKV_HEALTH_CHECK_PERIOD_DURATION);
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
   private HostMapping hostMapping = null;
@@ -290,6 +292,9 @@ public class TiConfiguration implements Serializable {
   private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
 
   private boolean isTest = false;
+
+  private int keepaliveTime = getInt(TIKV_GRPC_KEEPALIVE_TIME);
+  private int keepaliveTimeout = getInt(TIKV_GRPC_KEEPALIVE_TIMEOUT);
 
   public enum KVMode {
     TXN,
@@ -667,5 +672,21 @@ public class TiConfiguration implements Serializable {
 
   public void setTest(boolean test) {
     isTest = test;
+  }
+
+  public int getKeepaliveTime() {
+    return keepaliveTime;
+  }
+
+  public void setKeepaliveTime(int keepaliveTime) {
+    this.keepaliveTime = keepaliveTime;
+  }
+
+  public int getKeepaliveTimeout() {
+    return keepaliveTimeout;
+  }
+
+  public void setKeepaliveTimeout(int timeout) {
+    this.keepaliveTimeout = timeout;
   }
 }

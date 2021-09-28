@@ -13,7 +13,7 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 
 public class MetricsTest {
-  private List<TiSession> sessionList = new ArrayList<>();
+  private final List<TiSession> sessionList = new ArrayList<>();
 
   @After
   public void tearDown() throws Exception {
@@ -35,7 +35,7 @@ public class MetricsTest {
     client.put(ByteString.copyFromUtf8("k"), ByteString.copyFromUtf8("v"));
     Optional<ByteString> result = client.get(ByteString.copyFromUtf8("k"));
     assertTrue(result.isPresent());
-    assertEquals(result.get().toStringUtf8(), "v");
+    assertEquals("v", result.get().toStringUtf8());
     client.close();
     session.close();
   }
@@ -61,7 +61,7 @@ public class MetricsTest {
 
     Optional<ByteString> result = client2.get(ByteString.copyFromUtf8("k2"));
     assertTrue(result.isPresent());
-    assertEquals(result.get().toStringUtf8(), "v2");
+    assertEquals("v2", result.get().toStringUtf8());
 
     client2.close();
     session2.close();
@@ -82,7 +82,6 @@ public class MetricsTest {
     conf2.setMetricsPort(54321);
     try {
       TiSession.create(conf2);
-      assertEquals(1, 2);
     } catch (IllegalArgumentException e) {
       assertEquals(
           "Do dot support multiple tikv.metrics.port, which are 54321 and 12345", e.getMessage());

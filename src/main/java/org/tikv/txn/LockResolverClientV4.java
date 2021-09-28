@@ -244,7 +244,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
         logger.warn(
             String.format(
                 "lock txn not found, lock has expired, CallerStartTs=%d lock str=%s",
-                callerStartTS, lock.toString()));
+                callerStartTS, lock));
         if (lock.getLockType() == Kvrpcpb.Op.PessimisticLock) {
           return new TxnStatus();
         }

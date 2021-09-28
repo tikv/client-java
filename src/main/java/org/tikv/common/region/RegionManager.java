@@ -151,7 +151,7 @@ public class RegionManager {
       ByteString key, TiStoreType storeType, BackOffer backOffer) {
     TiRegion region = getRegionByKey(key, backOffer);
     if (!region.isValid()) {
-      throw new TiClientInternalException("Region invalid: " + region.toString());
+      throw new TiClientInternalException("Region invalid: " + region);
     }
 
     TiStore store = null;
@@ -181,7 +181,7 @@ public class RegionManager {
 
     if (store == null) {
       throw new TiClientInternalException(
-          "Cannot find valid store on " + storeType + " for region " + region.toString());
+          "Cannot find valid store on " + storeType + " for region " + region);
     }
 
     return Pair.create(region, store);

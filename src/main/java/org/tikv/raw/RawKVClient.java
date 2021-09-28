@@ -1097,9 +1097,9 @@ public class RawKVClient implements AutoCloseable {
 
     private Iterator<KvPair> iterator;
 
-    private ByteString startKey;
-    private ByteString endKey;
-    private boolean keyOnly;
+    private final ByteString startKey;
+    private final ByteString endKey;
+    private final boolean keyOnly;
 
     private KvPair last;
 
