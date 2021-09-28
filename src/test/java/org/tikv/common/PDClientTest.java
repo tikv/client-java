@@ -16,7 +16,6 @@
 package org.tikv.common;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.tikv.common.GrpcUtils.encodeKey;
@@ -75,24 +74,6 @@ public class PDClientTest extends PDMockServerTest {
       TiTimestamp ts = client.getTimestamp(defaultBackOff());
       // Test pdServer is set to generate physical == logical + 1
       assertEquals(ts.getPhysical(), ts.getLogical() + 1);
-    }
-  }
-
-  @Test
-  public void testPauseCheck() throws Exception {
-    try (PDClient client = session.getPDClient()) {
-      PDChecker checker = PDChecker.Merge;
-      for (int i = 0; i < 2; i++) {
-        client.keepPauseChecker(checker);
-        Thread.sleep(1000);
-        assertTrue(client.isCheckerPaused(checker));
-
-        client.stopKeepPauseChecker(checker);
-        Thread.sleep(1000);
-
-        client.resumeChecker(checker);
-        assertFalse(client.isCheckerPaused(checker));
-      }
     }
   }
 
