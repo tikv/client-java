@@ -157,7 +157,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     return new TiTimestamp(timestamp.getPhysical(), timestamp.getLogical());
   }
 
-  public void keepPauseChecker(PDChecker checker) {
+  public synchronized void keepPauseChecker(PDChecker checker) {
     if (!this.pauseCheckerService.containsKey(checker)) {
       ScheduledExecutorService newService =
           Executors.newSingleThreadScheduledExecutor(
@@ -174,7 +174,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     }
   }
 
-  public void stopKeepPauseChecker(PDChecker checker) {
+  public synchronized void stopKeepPauseChecker(PDChecker checker) {
     if (this.pauseCheckerService.containsKey(checker)) {
       this.pauseCheckerService.get(checker).shutdown();
       this.pauseCheckerService.remove(checker);
