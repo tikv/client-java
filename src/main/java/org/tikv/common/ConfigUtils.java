@@ -69,6 +69,11 @@ public class ConfigUtils {
 
   public static final String TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS = "tikv.rawkv.default_backoff_in_ms";
 
+  public static final String TIKV_TLS_ENABLE = "tikv.tls_enable";
+  public static final String TIKV_TRUST_CERT_COLLECTION = "tikv.trust_cert_collection";
+  public static final String TIKV_KEY_CERT_CHAIN = "tikv.key_cert_chain";
+  public static final String TIKV_KEY_FILE = "tikv.key_file";
+
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
   public static final String DEF_TIKV_GRPC_INGEST_TIMEOUT = "200s";
@@ -125,4 +130,5 @@ public class ConfigUtils {
 
   public static final int DEF_TIKV_GRPC_KEEPALIVE_TIME = 10;
   public static final int DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT = 3;
+  public static final boolean DEF_TIKV_TLS_ENABLE = false;
 }

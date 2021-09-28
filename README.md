@@ -152,6 +152,24 @@ The following includes ThreadPool related parameters, which can be passed in thr
 - whether to enable `Compare And Set`, set true if using `RawKVClient.compareAndSet` or `RawKVClient.putIfAbsent`
 - default: false
 
+### TLS
+
+#### tikv.tls_enable
+- whether to enable TLS
+- default: false
+
+#### tikv.trust_cert_collection
+- Trusted certificates for verifying the remote endpoint's certificate, e.g. /home/tidb/ca.pem. The file should contain an X.509 certificate collection in PEM format.
+- default: null
+
+#### tikv.key_cert_chain
+- an X.509 certificate chain file in PEM format, e.g. /home/tidb/client.pem.
+- default: null
+
+#### tikv.key_file
+- a PKCS#8 private key file in PEM format. e.g. /home/tidb/client-key.pem.
+- default: null
+
 ## Metrics
 
 Client Java supports exporting metrics to Prometheus using poll mode and viewing on Grafana. The following steps shows how to enable this function.
