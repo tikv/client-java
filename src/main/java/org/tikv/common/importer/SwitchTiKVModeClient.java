@@ -62,8 +62,10 @@ public class SwitchTiKVModeClient {
   }
 
   public synchronized void stopKeepTiKVToImportMode() {
-    ingestScheduledExecutorService.shutdown();
-    ingestScheduledExecutorService = null;
+    if (ingestScheduledExecutorService != null) {
+      ingestScheduledExecutorService.shutdown();
+      ingestScheduledExecutorService = null;
+    }
   }
 
   private void switchTiKVToImportMode() {
