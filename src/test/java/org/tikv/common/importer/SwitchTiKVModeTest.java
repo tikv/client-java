@@ -26,9 +26,11 @@ public class SwitchTiKVModeTest {
   @Test
   public void switchTiKVModeTest() throws InterruptedException {
     SwitchTiKVModeClient switchTiKVModeClient = session.getSwitchTiKVModeClient();
-    switchTiKVModeClient.keepTiKVToImportMode();
-    Thread.sleep(6000);
-    switchTiKVModeClient.stopKeepTiKVToImportMode();
-    switchTiKVModeClient.switchTiKVToNormalMode();
+    for (int i = 0; i < 2; i++) {
+      switchTiKVModeClient.keepTiKVToImportMode();
+      Thread.sleep(6000);
+      switchTiKVModeClient.stopKeepTiKVToImportMode();
+      switchTiKVModeClient.switchTiKVToNormalMode();
+    }
   }
 }
