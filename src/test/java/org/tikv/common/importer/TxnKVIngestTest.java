@@ -7,7 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
+import org.junit.Test;
+import org.tikv.BaseTxnKVTest;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.key.Key;
@@ -15,7 +16,7 @@ import org.tikv.common.util.Pair;
 import org.tikv.txn.KVClient;
 import org.tikv.util.TestUtils;
 
-public class TxnKVIngestTest {
+public class TxnKVIngestTest extends BaseTxnKVTest {
   private TiSession session;
 
   private static final int KEY_NUMBER = 16;
@@ -25,8 +26,7 @@ public class TxnKVIngestTest {
 
   @Before
   public void setup() {
-    TiConfiguration conf = TiConfiguration.createDefault();
-    conf.setTest(true);
+    TiConfiguration conf = createTiConfiguration();
     session = TiSession.create(conf);
   }
 
@@ -37,7 +37,7 @@ public class TxnKVIngestTest {
     }
   }
 
-  @Ignore
+  @Test
   public void txnIngestTest() {
     KVClient client = session.createKVClient();
 

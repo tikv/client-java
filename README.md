@@ -9,21 +9,17 @@ It is supposed to:
 
 ## How to build
 
-### Maven
-
-The alternative way to build a usable jar for testing will be
-
 ```
-mvn clean install -Dmaven.test.skip=true
+mvn clean package -Dmaven.test.skip=true
 ```
 
-The following command can install dependencies for you.
+## How to run test
 
 ```
-mvn package
+export RAWKV_PD_ADDRESSES=127.0.0.1:2379
+export TXNKV_PD_ADDRESSES=127.0.0.1:2379
+mvn clean test
 ```
-
-The jar can be found in `./target/`
 
 ## Usage
 

@@ -6,13 +6,14 @@ import static org.junit.Assert.assertTrue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.tikv.BaseRawKVTest;
 
-public class PDClientIntegrationTest {
+public class PDClientIntegrationTest extends BaseRawKVTest {
   private TiSession session;
 
   @Before
   public void setup() {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
+    TiConfiguration conf = createTiConfiguration();
     conf.setTest(true);
     session = TiSession.create(conf);
   }
@@ -30,11 +31,11 @@ public class PDClientIntegrationTest {
       PDChecker checker = PDChecker.Merge;
       for (int i = 0; i < 2; i++) {
         client.keepPauseChecker(checker);
-        Thread.sleep(1000);
+        Thread.sleep(2000);
         assertTrue(client.isCheckerPaused(checker));
 
         client.stopKeepPauseChecker(checker);
-        Thread.sleep(1000);
+        Thread.sleep(2000);
 
         client.resumeChecker(checker);
         assertFalse(client.isCheckerPaused(checker));

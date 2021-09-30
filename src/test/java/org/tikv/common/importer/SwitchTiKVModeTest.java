@@ -3,16 +3,16 @@ package org.tikv.common.importer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.tikv.BaseRawKVTest;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 
-public class SwitchTiKVModeTest {
+public class SwitchTiKVModeTest extends BaseRawKVTest {
   private TiSession session;
 
   @Before
   public void setup() {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
-    conf.setTest(true);
+    TiConfiguration conf = createTiConfiguration();
     session = TiSession.create(conf);
   }
 

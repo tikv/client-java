@@ -4,6 +4,20 @@ import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class TestUtils {
+  public static String getEnv(String key) {
+    String tmp = System.getenv(key);
+    if (tmp != null && !tmp.equals("")) {
+      return tmp;
+    }
+
+    tmp = System.getProperty(key);
+    if (tmp != null && !tmp.equals("")) {
+      return tmp;
+    }
+
+    return null;
+  }
+
   public static byte[] genRandomKey(String keyPrefix, int keyLength) {
     int length = keyLength - keyPrefix.length();
     if (length <= 0) {

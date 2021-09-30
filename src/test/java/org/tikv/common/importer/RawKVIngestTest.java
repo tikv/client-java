@@ -11,6 +11,7 @@ import java.util.Optional;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.tikv.BaseRawKVTest;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.key.Key;
@@ -18,7 +19,7 @@ import org.tikv.common.util.Pair;
 import org.tikv.raw.RawKVClient;
 import org.tikv.util.TestUtils;
 
-public class RawKVIngestTest {
+public class RawKVIngestTest extends BaseRawKVTest {
   private TiSession session;
 
   private static final int KEY_NUMBER = 16;
@@ -28,8 +29,7 @@ public class RawKVIngestTest {
 
   @Before
   public void setup() {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
-    conf.setTest(true);
+    TiConfiguration conf = createTiConfiguration();
     session = TiSession.create(conf);
   }
 

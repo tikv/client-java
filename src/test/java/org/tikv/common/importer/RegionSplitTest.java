@@ -9,11 +9,12 @@ import java.util.List;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.tikv.BaseRawKVTest;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.region.TiRegion;
 
-public class RegionSplitTest {
+public class RegionSplitTest extends BaseRawKVTest {
   private TiSession session;
 
   private static final int KEY_NUMBER = 10;
@@ -22,8 +23,7 @@ public class RegionSplitTest {
 
   @Before
   public void setup() {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
-    conf.setTest(true);
+    TiConfiguration conf = createTiConfiguration();
     session = TiSession.create(conf);
   }
 
