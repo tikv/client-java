@@ -15,25 +15,22 @@
  *
  */
 
-package org.tikv.sst;
+package org.tikv.br;
 
 import com.google.protobuf.ByteString;
-import java.util.Arrays;
 import java.util.Iterator;
 import org.rocksdb.SstFileReaderIterator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.tikv.common.util.Pair;
 
 public class SSTIterator implements Iterator<Pair<ByteString, ByteString>> {
-  private static final Logger logger = LoggerFactory.getLogger(SSTIterator.class);
-
   private final SstFileReaderIterator iterator;
+  private final KVDecoder kvDecoder;
 
   private Pair<ByteString, ByteString> nextPair;
 
-  public SSTIterator(SstFileReaderIterator iterator) {
+  public SSTIterator(SstFileReaderIterator iterator, KVDecoder kvDecoder) {
     this.iterator = iterator;
+    this.kvDecoder = kvDecoder;
     this.iterator.seekToFirst();
     this.nextPair = processNext();
   }
@@ -52,8 +49,8 @@ public class SSTIterator implements Iterator<Pair<ByteString, ByteString>> {
 
   private Pair<ByteString, ByteString> processNext() {
     if (iterator.isValid()) {
-      ByteString key = decodeKey(iterator.key());
-      ByteString value = decodeValue(iterator.value());
+      ByteString key = kvDecoder.decodeKey(iterator.key());
+      ByteString value = kvDecoder.decodeValue(iterator.value());
       iterator.next();
       if (key != null) {
         return Pair.create(key, value);
@@ -63,22 +60,5 @@ public class SSTIterator implements Iterator<Pair<ByteString, ByteString>> {
     } else {
       return null;
     }
-  }
-
-  private ByteString decodeKey(byte[] key) {
-    if (key == null || key.length == 0) {
-      logger.warn(
-          "skip Key-Value pair because key == null || key.length == 0, key = "
-              + Arrays.toString(key));
-      return null;
-    } else if (key[0] != 'z') {
-      logger.warn("skip Key-Value pair because key[0] != 'z', key = " + Arrays.toString(key));
-      return null;
-    }
-    return ByteString.copyFrom(key, 1, key.length - 1);
-  }
-
-  private ByteString decodeValue(byte[] value) {
-    return ByteString.copyFrom(value);
   }
 }

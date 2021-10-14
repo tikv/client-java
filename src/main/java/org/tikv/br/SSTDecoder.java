@@ -15,7 +15,7 @@
  *
  */
 
-package org.tikv.sst;
+package org.tikv.br;
 
 import com.google.protobuf.ByteString;
 import java.util.Iterator;
@@ -28,20 +28,24 @@ import org.tikv.common.util.Pair;
 
 public class SSTDecoder {
   private final String filePath;
+  private final KVDecoder kvDecoder;
   private final Options options;
   private final ReadOptions readOptions;
 
   private SstFileReader sstFileReader;
   private SstFileReaderIterator iterator;
 
-  public SSTDecoder(String filePath) {
-    this.filePath = filePath;
+  public SSTDecoder(String sstFilePath, KVDecoder kvDecoder) {
+    this.filePath = sstFilePath;
+    this.kvDecoder = kvDecoder;
     this.options = new Options();
     this.readOptions = new ReadOptions();
   }
 
-  public SSTDecoder(String filePath, Options options, ReadOptions readOptions) {
+  public SSTDecoder(
+      String filePath, KVDecoder kvDecoder, Options options, ReadOptions readOptions) {
     this.filePath = filePath;
+    this.kvDecoder = kvDecoder;
     this.options = options;
     this.readOptions = readOptions;
   }
@@ -54,7 +58,7 @@ public class SSTDecoder {
     sstFileReader = new SstFileReader(new Options());
     sstFileReader.open(filePath);
     iterator = sstFileReader.newIterator(new ReadOptions());
-    return new SSTIterator(iterator);
+    return new SSTIterator(iterator, kvDecoder);
   }
 
   public synchronized void close() {
