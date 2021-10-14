@@ -1042,7 +1042,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               RawBatchPutRequest.newBuilder()
                   .setContext(makeContext(storeType))
                   .addAllPairs(kvPairs)
-                  .setTtl(ttl)
+                  .addTtls(ttl)
                   .setForCas(atomicForCAS)
                   .build();
       RegionErrorHandler<RawBatchPutResponse> handler =
