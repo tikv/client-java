@@ -18,8 +18,9 @@
 package org.tikv.br;
 
 import com.google.protobuf.ByteString;
+import java.io.Serializable;
 
-public interface KVDecoder {
+public interface KVDecoder extends Serializable {
   ByteString decodeKey(byte[] key);
 
   ByteString decodeValue(byte[] value);

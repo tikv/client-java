@@ -17,12 +17,13 @@
 
 package org.tikv.br;
 
+import java.io.Serializable;
 import org.rocksdb.Options;
 import org.rocksdb.ReadOptions;
 import org.tikv.common.exception.SSTDecodeException;
 import org.tikv.kvproto.Brpb;
 
-public class BackupDecoder {
+public class BackupDecoder implements Serializable {
   private final Brpb.BackupMeta backupMeta;
   private final boolean ttlEnabled;
   private final KVDecoder kvDecoder;
