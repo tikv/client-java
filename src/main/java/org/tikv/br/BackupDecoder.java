@@ -41,11 +41,13 @@ public class BackupDecoder implements Serializable {
   }
 
   private KVDecoder initKVDecoder() throws SSTDecodeException {
-    // Currently only v1 is supported.
-    // V2 will be added after https://github.com/tikv/tikv/issues/10938.
     if (backupMeta.getIsRawKv()) {
-      // TODO: ttl_enable should be witten to BackupMeta
-      return new RawKVDecoderV1(ttlEnabled);
+      if ("V1".equals(backupMeta.getApiVersion().name())) {
+        return new RawKVDecoderV1(ttlEnabled);
+      } else {
+        throw new SSTDecodeException(
+            "does not support decode APIVersion " + backupMeta.getApiVersion().name());
+      }
     } else {
       throw new SSTDecodeException("TxnKV is not supported yet!");
     }
