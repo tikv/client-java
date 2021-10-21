@@ -50,7 +50,8 @@ public class RawScanIterator extends ScanIterator {
           currentCache = null;
         } else {
           try {
-            currentCache = client.rawScan(backOffer, startKey, limit, keyOnly);
+            currentCache =
+                client.rawScan(backOffer, startKey, endKey.toByteString(), limit, keyOnly);
           } catch (final TiKVException e) {
             backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
             continue;
