@@ -1130,18 +1130,24 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param keyOnly true if value of KvPair is not needed
    * @return KvPair list
    */
-  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
+  public List<KvPair> rawScan(
+      BackOffer backOffer, ByteString startKey, ByteString endKey, int limit, boolean keyOnly) {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_scan").startTimer();
     try {
       Supplier<RawScanRequest> factory =
-          () ->
-              RawScanRequest.newBuilder()
-                  .setContext(makeContext(storeType))
-                  .setStartKey(key)
-                  .setKeyOnly(keyOnly)
-                  .setLimit(limit)
-                  .build();
+          () -> {
+            RawScanRequest.Builder builder =
+                RawScanRequest.newBuilder()
+                    .setContext(makeContext(storeType))
+                    .setStartKey(startKey)
+                    .setKeyOnly(keyOnly)
+                    .setLimit(limit);
+            if (endKey != null) {
+              builder.setEndKey(endKey);
+            }
+            return builder.build();
+          };
 
       RegionErrorHandler<RawScanResponse> handler =
           new RegionErrorHandler<RawScanResponse>(
@@ -1155,7 +1161,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public List<KvPair> rawScan(BackOffer backOffer, ByteString key, boolean keyOnly) {
-    return rawScan(backOffer, key, getConf().getScanBatchSize(), keyOnly);
+    return rawScan(backOffer, key, null, getConf().getScanBatchSize(), keyOnly);
   }
 
   private List<KvPair> rawScanHelper(RawScanResponse resp) {
