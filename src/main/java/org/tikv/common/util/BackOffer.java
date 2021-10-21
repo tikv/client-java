@@ -20,22 +20,12 @@ package org.tikv.common.util;
 public interface BackOffer {
   // Back off types.
   int seconds = 1000;
-  int COP_BUILD_TASK_MAX_BACKOFF = 5 * seconds;
   int TSO_MAX_BACKOFF = 5 * seconds;
   int SCANNER_NEXT_MAX_BACKOFF = 40 * seconds;
   int BATCH_GET_MAX_BACKOFF = 40 * seconds;
   int COP_NEXT_MAX_BACKOFF = 40 * seconds;
   int GET_MAX_BACKOFF = 40 * seconds;
-  int PREWRITE_MAX_BACKOFF = 20 * seconds;
-  int CLEANUP_MAX_BACKOFF = 20 * seconds;
-  int GC_ONE_REGION_MAX_BACKOFF = 20 * seconds;
-  int GC_RESOLVE_LOCK_MAX_BACKOFF = 100 * seconds;
-  int GC_DELETE_RANGE_MAX_BACKOFF = 100 * seconds;
-
   int RAWKV_MAX_BACKOFF = 20 * seconds;
-
-  int SPLIT_REGION_BACKOFF = 20 * seconds;
-  int BATCH_COMMIT_BACKOFF = 10 * seconds;
   int PD_INFO_BACKOFF = 5 * seconds;
 
   /**
