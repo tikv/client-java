@@ -125,7 +125,7 @@ public class RawKVClient implements AutoCloseable {
     try {
       BackOffer backOffer = defaultBackOff();
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key);
+        RegionStoreClient client = clientBuilder.build(key, backOffer);
         try {
           client.rawPut(backOffer, key, value, ttl, atomicForCAS);
           RAW_REQUEST_SUCCESS.labels(label).inc();
@@ -211,7 +211,7 @@ public class RawKVClient implements AutoCloseable {
     try {
       BackOffer backOffer = defaultBackOff();
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key);
+        RegionStoreClient client = clientBuilder.build(key, backOffer);
         try {
           client.rawCompareAndSet(backOffer, key, prevValue, value, ttl);
           RAW_REQUEST_SUCCESS.labels(label).inc();
@@ -269,7 +269,7 @@ public class RawKVClient implements AutoCloseable {
     try {
       BackOffer backOffer = defaultBackOff();
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key);
+        RegionStoreClient client = clientBuilder.build(key, backOffer);
         try {
           Optional<ByteString> result = client.rawGet(defaultBackOff(), key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
@@ -342,7 +342,7 @@ public class RawKVClient implements AutoCloseable {
     try {
       BackOffer backOffer = defaultBackOff();
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key);
+        RegionStoreClient client = clientBuilder.build(key, backOffer);
         try {
           Optional<Long> result = client.rawGetKeyTTL(defaultBackOff(), key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
@@ -590,7 +590,7 @@ public class RawKVClient implements AutoCloseable {
     try {
       BackOffer backOffer = defaultBackOff();
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key);
+        RegionStoreClient client = clientBuilder.build(key, backOffer);
         try {
           client.rawDelete(defaultBackOff(), key, atomicForCAS);
           RAW_REQUEST_SUCCESS.labels(label).inc();
@@ -820,7 +820,7 @@ public class RawKVClient implements AutoCloseable {
 
   private Pair<List<Batch>, List<KvPair>> doSendBatchGetInBatchesWithRetry(
       BackOffer backOffer, Batch batch) {
-    RegionStoreClient client = clientBuilder.build(batch.getRegion());
+    RegionStoreClient client = clientBuilder.build(batch.getRegion(), backOffer);
     try {
       List<KvPair> partialResult = client.rawBatchGet(backOffer, batch.getKeys());
       return Pair.create(new ArrayList<>(), partialResult);
@@ -860,7 +860,7 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private List<Batch> doSendBatchDeleteInBatchesWithRetry(BackOffer backOffer, Batch batch) {
-    RegionStoreClient client = clientBuilder.build(batch.getRegion());
+    RegionStoreClient client = clientBuilder.build(batch.getRegion(), backOffer);
     try {
       client.rawBatchDelete(backOffer, batch.getKeys(), atomicForCAS);
       return new ArrayList<>();
@@ -910,7 +910,7 @@ public class RawKVClient implements AutoCloseable {
   }
 
   private List<DeleteRange> doSendDeleteRangeWithRetry(BackOffer backOffer, DeleteRange range) {
-    try (RegionStoreClient client = clientBuilder.build(range.getRegion())) {
+    try (RegionStoreClient client = clientBuilder.build(range.getRegion(), backOffer)) {
       client.setTimeout(conf.getScanTimeout());
       client.rawDeleteRange(backOffer, range.getStartKey(), range.getEndKey());
       return new ArrayList<>();

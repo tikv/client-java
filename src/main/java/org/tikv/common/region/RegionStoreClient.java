@@ -1302,19 +1302,39 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       return build(key, TiStoreType.TiKV);
     }
 
+    public synchronized RegionStoreClient build(ByteString key, BackOffer backOffer)
+        throws GrpcException {
+      return build(key, TiStoreType.TiKV, backOffer);
+    }
+
     public synchronized RegionStoreClient build(ByteString key, TiStoreType storeType)
         throws GrpcException {
-      Pair<TiRegion, TiStore> pair = regionManager.getRegionStorePairByKey(key, storeType);
+      return build(key, storeType, defaultBackOff());
+    }
+
+    public synchronized RegionStoreClient build(
+        ByteString key, TiStoreType storeType, BackOffer backOffer) throws GrpcException {
+      Pair<TiRegion, TiStore> pair =
+          regionManager.getRegionStorePairByKey(key, storeType, backOffer);
       return build(pair.first, pair.second, storeType);
     }
 
     public synchronized RegionStoreClient build(TiRegion region) throws GrpcException {
-      TiStore store = regionManager.getStoreById(region.getLeader().getStoreId());
+      return build(region, defaultBackOff());
+    }
+
+    public synchronized RegionStoreClient build(TiRegion region, BackOffer backOffer)
+        throws GrpcException {
+      TiStore store = regionManager.getStoreById(region.getLeader().getStoreId(), backOffer);
       return build(region, store, TiStoreType.TiKV);
     }
 
     public RegionManager getRegionManager() {
       return regionManager;
+    }
+
+    private BackOffer defaultBackOff() {
+      return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
     }
   }
 }
