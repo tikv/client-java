@@ -130,7 +130,7 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      BackOffer backOffer = defaultBackOff();
+      BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS());
       while (true) {
         RegionStoreClient client = clientBuilder.build(key, backOffer);
         try {
@@ -139,6 +139,7 @@ public class RawKVClient implements AutoCloseable {
           return;
         } catch (final TiKVException e) {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+          logger.warn("Retry for put error", e);
         }
       }
     } catch (Exception e) {
@@ -174,7 +175,7 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_put_if_absent";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      BackOffer backOffer = defaultBackOff();
+      BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS());
       while (true) {
         RegionStoreClient client = clientBuilder.build(key, backOffer);
         try {
@@ -183,6 +184,7 @@ public class RawKVClient implements AutoCloseable {
           return result;
         } catch (final TiKVException e) {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+          logger.warn("Retry for putIfAbsent error", e);
         }
       }
     } catch (Exception e) {
@@ -235,7 +237,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      doSendBatchPut(defaultBackOff(), kvPairs, ttl, atomic);
+      BackOffer backOffer =
+          ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchWriteTimeoutInMS());
+      doSendBatchPut(backOffer, kvPairs, ttl, atomic);
       RAW_REQUEST_SUCCESS.labels(label).inc();
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
@@ -255,15 +259,16 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      BackOffer backOffer = defaultBackOff();
+      BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS());
       while (true) {
         RegionStoreClient client = clientBuilder.build(key, backOffer);
         try {
-          ByteString result = client.rawGet(defaultBackOff(), key);
+          ByteString result = client.rawGet(backOffer, key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return result;
         } catch (final TiKVException e) {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+          logger.warn("Retry for get error", e);
         }
       }
     } catch (Exception e) {
@@ -284,7 +289,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      BackOffer backOffer = defaultBackOff();
+      BackOffer backOffer =
+          ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchReadTimeoutInMS());
       List<KvPair> result = doSendBatchGet(backOffer, keys);
       RAW_REQUEST_SUCCESS.labels(label).inc();
       return result;
@@ -318,7 +324,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      BackOffer backOffer = defaultBackOff();
+      BackOffer backOffer =
+          ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchWriteTimeoutInMS());
       doSendBatchDelete(backOffer, keys, atomic);
       RAW_REQUEST_SUCCESS.labels(label).inc();
       return;
@@ -341,15 +348,16 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_get_key_ttl";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      BackOffer backOffer = defaultBackOff();
+      BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS());
       while (true) {
         RegionStoreClient client = clientBuilder.build(key, backOffer);
         try {
-          Long result = client.rawGetKeyTTL(defaultBackOff(), key);
+          Long result = client.rawGetKeyTTL(backOffer, key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return result;
         } catch (final TiKVException e) {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+          logger.warn("Retry for getKeyTTL error", e);
         }
       }
     } catch (Exception e) {
@@ -382,7 +390,7 @@ public class RawKVClient implements AutoCloseable {
       for (int i = 0; i < num; i++) {
         try {
           Pair<Integer, List<KvPair>> scanResult =
-              completionService.take().get(BackOffer.RAWKV_MAX_BACKOFF, TimeUnit.SECONDS);
+              completionService.take().get(conf.getRawKVScanTimeoutInMS(), TimeUnit.MILLISECONDS);
           scanResults.set(scanResult.first, scanResult.second);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -428,8 +436,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_scan";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
+      BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVScanTimeoutInMS());
       Iterator<KvPair> iterator =
-          rawScanIterator(conf, clientBuilder, startKey, endKey, limit, keyOnly);
+          rawScanIterator(conf, clientBuilder, startKey, endKey, limit, keyOnly, backOffer);
       List<KvPair> result = new ArrayList<>();
       iterator.forEachRemaining(result::add);
       RAW_REQUEST_SUCCESS.labels(label).inc();
@@ -488,11 +497,12 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_scan_without_limit";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
+      BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVScanTimeoutInMS());
       List<KvPair> result = new ArrayList<>();
       while (true) {
         Iterator<KvPair> iterator =
             rawScanIterator(
-                conf, clientBuilder, startKey, endKey, conf.getScanBatchSize(), keyOnly);
+                conf, clientBuilder, startKey, endKey, conf.getScanBatchSize(), keyOnly, backOffer);
         if (!iterator.hasNext()) {
           break;
         }
@@ -559,15 +569,16 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      BackOffer backOffer = defaultBackOff();
+      BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS());
       while (true) {
         RegionStoreClient client = clientBuilder.build(key, backOffer);
         try {
-          client.rawDelete(defaultBackOff(), key, atomic);
+          client.rawDelete(backOffer, key, atomic);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return;
         } catch (final TiKVException e) {
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
+          logger.warn("Retry for delete error", e);
         }
       }
     } catch (Exception e) {
@@ -591,7 +602,7 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_delete_range";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     try {
-      BackOffer backOffer = defaultBackOff();
+      BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVCleanTimeoutInMS());
       doSendDeleteRange(backOffer, startKey, endKey);
       RAW_REQUEST_SUCCESS.labels(label).inc();
     } catch (Exception e) {
@@ -643,20 +654,20 @@ public class RawKVClient implements AutoCloseable {
         completionService.submit(
             () -> doSendBatchPutInBatchesWithRetry(batch.getBackOffer(), batch, ttl, atomic));
       }
-      getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
+      getTasks(completionService, taskQueue, task, conf.getRawKVBatchWriteTimeoutInMS());
     }
   }
 
   private List<Batch> doSendBatchPutInBatchesWithRetry(
       BackOffer backOffer, Batch batch, long ttl, boolean atomic) {
-    try (RegionStoreClient client = clientBuilder.build(batch.getRegion())) {
-      client.setTimeout(conf.getScanTimeout());
+    try (RegionStoreClient client = clientBuilder.build(batch.getRegion(), backOffer)) {
+      client.setTimeout(conf.getRawKVBatchWriteTimeoutInMS());
       client.rawBatchPut(backOffer, batch, ttl, atomic);
       return new ArrayList<>();
     } catch (final TiKVException e) {
       // TODO: any elegant way to re-split the ranges if fails?
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-      logger.debug("ReSplitting ranges for BatchPutRequest");
+      logger.warn("ReSplitting ranges for BatchPutRequest", e);
       // retry
       return doSendBatchPutWithRefetchRegion(backOffer, batch);
     }
@@ -699,7 +710,8 @@ public class RawKVClient implements AutoCloseable {
             () -> doSendBatchGetInBatchesWithRetry(batch.getBackOffer(), batch));
       }
       result.addAll(
-          getTasksWithOutput(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF));
+          getTasksWithOutput(
+              completionService, taskQueue, task, conf.getRawKVBatchReadTimeoutInMS()));
     }
 
     return result;
@@ -714,7 +726,7 @@ public class RawKVClient implements AutoCloseable {
     } catch (final TiKVException e) {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       clientBuilder.getRegionManager().invalidateRegion(batch.getRegion());
-      logger.debug("ReSplitting ranges for BatchGetRequest", e);
+      logger.warn("ReSplitting ranges for BatchGetRequest", e);
 
       // retry
       return Pair.create(doSendBatchGetWithRefetchRegion(backOffer, batch), new ArrayList<>());
@@ -742,7 +754,7 @@ public class RawKVClient implements AutoCloseable {
         completionService.submit(
             () -> doSendBatchDeleteInBatchesWithRetry(batch.getBackOffer(), batch, atomic));
       }
-      getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
+      getTasks(completionService, taskQueue, task, conf.getRawKVBatchWriteTimeoutInMS());
     }
   }
 
@@ -755,7 +767,7 @@ public class RawKVClient implements AutoCloseable {
     } catch (final TiKVException e) {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       clientBuilder.getRegionManager().invalidateRegion(batch.getRegion());
-      logger.debug("ReSplitting ranges for BatchGetRequest", e);
+      logger.warn("ReSplitting ranges for BatchGetRequest", e);
 
       // retry
       return doSendBatchDeleteWithRefetchRegion(backOffer, batch);
@@ -793,7 +805,7 @@ public class RawKVClient implements AutoCloseable {
       for (DeleteRange range : task) {
         completionService.submit(() -> doSendDeleteRangeWithRetry(range.getBackOffer(), range));
       }
-      getTasks(completionService, taskQueue, task, BackOffer.RAWKV_MAX_BACKOFF);
+      getTasks(completionService, taskQueue, task, conf.getRawKVCleanTimeoutInMS());
     }
   }
 
@@ -805,7 +817,7 @@ public class RawKVClient implements AutoCloseable {
     } catch (final TiKVException e) {
       backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
       clientBuilder.getRegionManager().invalidateRegion(range.getRegion());
-      logger.debug("ReSplitting ranges for BatchDeleteRangeRequest", e);
+      logger.warn("ReSplitting ranges for BatchDeleteRangeRequest", e);
 
       // retry
       return doSendDeleteRangeWithRefetchRegion(backOffer, range);
@@ -858,14 +870,11 @@ public class RawKVClient implements AutoCloseable {
       ByteString startKey,
       ByteString endKey,
       int limit,
-      boolean keyOnly) {
+      boolean keyOnly,
+      BackOffer backOffer) {
     if (limit > MAX_RAW_SCAN_LIMIT) {
       throw ERR_MAX_SCAN_LIMIT_EXCEEDED;
     }
-    return new RawScanIterator(conf, builder, startKey, endKey, limit, keyOnly);
-  }
-
-  private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
+    return new RawScanIterator(conf, builder, startKey, endKey, limit, keyOnly, backOffer);
   }
 }
