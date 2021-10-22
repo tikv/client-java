@@ -90,7 +90,7 @@ public class RegionManager {
   }
 
   public TiRegion getRegionByKey(ByteString key) {
-    return getRegionByKey(key, ConcreteBackOffer.newGetBackOff());
+    return getRegionByKey(key, defaultBackOff());
   }
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
@@ -118,7 +118,7 @@ public class RegionManager {
   // Consider region A, B. After merge of (A, B) -> A, region ID B does not exist.
   // This request is unrecoverable.
   public TiRegion getRegionById(long regionId) {
-    BackOffer backOffer = ConcreteBackOffer.newGetBackOff();
+    BackOffer backOffer = defaultBackOff();
     TiRegion region = cache.getRegionById(regionId);
     if (region == null) {
       Pair<Metapb.Region, Metapb.Peer> regionAndLeader =
@@ -138,7 +138,7 @@ public class RegionManager {
   }
 
   public Pair<TiRegion, TiStore> getRegionStorePairByKey(ByteString key, TiStoreType storeType) {
-    return getRegionStorePairByKey(key, storeType, ConcreteBackOffer.newGetBackOff());
+    return getRegionStorePairByKey(key, storeType, defaultBackOff());
   }
 
   public Pair<TiRegion, TiStore> getRegionStorePairByKey(
@@ -210,7 +210,7 @@ public class RegionManager {
   }
 
   public TiStore getStoreById(long id) {
-    return getStoreById(id, ConcreteBackOffer.newGetBackOff());
+    return getStoreById(id, defaultBackOff());
   }
 
   public void onRegionStale(TiRegion region) {
@@ -257,5 +257,9 @@ public class RegionManager {
 
   public void invalidateRegion(TiRegion region) {
     cache.invalidateRegion(region);
+  }
+
+  private BackOffer defaultBackOff() {
+    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
   }
 }
