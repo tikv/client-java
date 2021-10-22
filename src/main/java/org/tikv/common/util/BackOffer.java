@@ -20,7 +20,6 @@ package org.tikv.common.util;
 public interface BackOffer {
   // Back off types.
   int seconds = 1000;
-  int COP_BUILD_TASK_MAX_BACKOFF = 5 * seconds;
   int TSO_MAX_BACKOFF = 5 * seconds;
   int SCANNER_NEXT_MAX_BACKOFF = 40 * seconds;
   int BATCH_GET_MAX_BACKOFF = 40 * seconds;
