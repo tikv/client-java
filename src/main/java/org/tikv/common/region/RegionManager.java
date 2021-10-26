@@ -188,7 +188,7 @@ public class RegionManager {
   }
 
   private List<TiStore> getRegionStore(List<Metapb.Peer> peers, BackOffer backOffer) {
-    return peers.stream().map(p -> getStoreById(p.getStoreId())).collect(Collectors.toList());
+    return peers.stream().map(p -> getStoreById(p.getStoreId(), backOffer)).collect(Collectors.toList());
   }
 
   public TiStore getStoreById(long id, BackOffer backOffer) {
