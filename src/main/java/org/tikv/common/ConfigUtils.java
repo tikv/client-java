@@ -103,8 +103,8 @@ public class ConfigUtils {
   public static final int DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS = 2000;
   public static final int DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS = 2000;
   public static final int DEF_TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS = 2000;
-  public static final int DEF_TIKV_RAWKV_SCAN_TIMEOUT_IN_MS = 10000;
-  public static final int DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS = 600000;
+  public static final int DEF_TIKV_RAWKV_SCAN_TIMEOUT_IN_MS = 2000; // 10000;
+  public static final int DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS = 2000; // 600000;
 
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";

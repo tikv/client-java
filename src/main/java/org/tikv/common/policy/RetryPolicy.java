@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableSet;
 import io.grpc.Status;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
+import java.util.Random;
 import java.util.concurrent.Callable;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.operation.ErrorHandler;
@@ -26,6 +27,10 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 
 public abstract class RetryPolicy<RespT> {
+  public static int pdErrorRate = 0; // 0-100, 0 means do not inest error
+  public static int tikvErrorRate = 0; // 0-100, 0 means do not inest error
+  public static Random random = new Random(pdErrorRate + tikvErrorRate);
+
   BackOffer backOffer = ConcreteBackOffer.newCopNextMaxBackOff();
   public static final Histogram GRPC_SINGLE_REQUEST_LATENCY =
       Histogram.build()
@@ -62,13 +67,36 @@ public abstract class RetryPolicy<RespT> {
   }
 
   public RespT callWithRetry(Callable<RespT> proc, String methodName) {
+    int r = random.nextInt(100);
     while (true) {
       RespT result = null;
       try {
         // add single request duration histogram
         Histogram.Timer requestTimer = GRPC_SINGLE_REQUEST_LATENCY.labels(methodName).startTimer();
         try {
-          result = proc.call();
+          if (methodName.contains("pdpb.PD")) {
+            if (pdErrorRate == 0) {
+              result = proc.call();
+            } else {
+              if (r < pdErrorRate) {
+                Thread.sleep(150);
+                throw new Exception("ingest error");
+              } else {
+                result = proc.call();
+              }
+            }
+          } else {
+            if (tikvErrorRate == 0) {
+              result = proc.call();
+            } else {
+              if (r < tikvErrorRate) {
+                Thread.sleep(150);
+                throw new Exception("ingest error");
+              } else {
+                result = proc.call();
+              }
+            }
+          }
         } finally {
           requestTimer.observeDuration();
         }
