@@ -17,6 +17,8 @@
 
 package org.tikv.common.util;
 
+import static org.tikv.common.ConfigUtils.TIKV_BO_REGION_MISS_BASE_IN_MS;
+
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
 
 public class ConcreteBackOffer implements BackOffer {
@@ -107,7 +110,11 @@ public class ConcreteBackOffer implements BackOffer {
         backOffFunction = BackOffFunction.create(2000, 10000, BackOffStrategy.EqualJitter);
         break;
       case BoRegionMiss:
-        backOffFunction = BackOffFunction.create(100, 500, BackOffStrategy.NoJitter);
+        backOffFunction =
+            BackOffFunction.create(
+                TiConfiguration.getInt(TIKV_BO_REGION_MISS_BASE_IN_MS),
+                500,
+                BackOffStrategy.NoJitter);
         break;
       case BoTxnLock:
         backOffFunction = BackOffFunction.create(200, 3000, BackOffStrategy.EqualJitter);
