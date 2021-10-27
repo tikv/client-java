@@ -18,6 +18,8 @@ package org.tikv.common;
 import static org.tikv.common.ConfigUtils.*;
 
 import io.grpc.Metadata;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
 import java.util.*;
@@ -39,14 +41,35 @@ public class TiConfiguration implements Serializable {
       Metadata.Key.of("pd-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
 
   static {
+    // priority: system environment > config file > default
     loadFromSystemProperties();
+    loadFromConfigurationFile();
     loadFromDefaultProperties();
+    listAll();
   }
 
   private static void loadFromSystemProperties() {
     for (Map.Entry<String, String> prop : Utils.getSystemProperties().entrySet()) {
       if (prop.getKey().startsWith("tikv.")) {
         set(prop.getKey(), prop.getValue());
+      }
+    }
+  }
+
+  private static void loadFromConfigurationFile() {
+    Optional<String> file = getOption(TIKV_CONFIGURATION_FILE);
+    if (file.isPresent()) {
+      Properties properties = new Properties();
+      try {
+        properties.load(new FileInputStream(file.get()));
+      } catch (IOException e) {
+        logger.error("load config file error, path = " + file.get(), e);
+      }
+      for (String key : properties.stringPropertyNames()) {
+        if (key.startsWith("tikv.")) {
+          String value = properties.getProperty(key);
+          setIfMissing(key, value);
+        }
       }
     }
   }
@@ -91,7 +114,7 @@ public class TiConfiguration implements Serializable {
   }
 
   public static void listAll() {
-    logger.info(new ArrayList<>(settings.entrySet()).toString());
+    logger.warn("static configurations are:" + new ArrayList<>(settings.entrySet()).toString());
   }
 
   private static void set(String key, String value) {
