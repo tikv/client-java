@@ -32,12 +32,17 @@ public class ConcreteBackOffer implements BackOffer {
   private final Map<BackOffFunction.BackOffFuncType, BackOffFunction> backOffFunctionMap;
   private final List<Exception> errors;
   private int totalSleep;
+  private long deadline;
 
-  private ConcreteBackOffer(int maxSleep) {
+  private ConcreteBackOffer(int maxSleep, long deadline) {
+    Preconditions.checkArgument(
+        maxSleep == 0 || deadline == 0, "Max sleep time should be 0 or Deadline should be 0.");
     Preconditions.checkArgument(maxSleep >= 0, "Max sleep time cannot be less than 0.");
+    Preconditions.checkArgument(deadline >= 0, "Deadline cannot be less than 0.");
     this.maxSleep = maxSleep;
     this.errors = new ArrayList<>();
     this.backOffFunctionMap = new HashMap<>();
+    this.deadline = deadline;
   }
 
   private ConcreteBackOffer(ConcreteBackOffer source) {
@@ -45,34 +50,40 @@ public class ConcreteBackOffer implements BackOffer {
     this.totalSleep = source.totalSleep;
     this.errors = source.errors;
     this.backOffFunctionMap = source.backOffFunctionMap;
+    this.deadline = source.deadline;
+  }
+
+  public static ConcreteBackOffer newDeadlineBackOff(int timeoutInMs) {
+    long deadline = System.currentTimeMillis() + timeoutInMs;
+    return new ConcreteBackOffer(0, deadline);
   }
 
   public static ConcreteBackOffer newCustomBackOff(int maxSleep) {
-    return new ConcreteBackOffer(maxSleep);
+    return new ConcreteBackOffer(maxSleep, 0);
   }
 
   public static ConcreteBackOffer newScannerNextMaxBackOff() {
-    return new ConcreteBackOffer(SCANNER_NEXT_MAX_BACKOFF);
+    return new ConcreteBackOffer(SCANNER_NEXT_MAX_BACKOFF, 0);
   }
 
   public static ConcreteBackOffer newBatchGetMaxBackOff() {
-    return new ConcreteBackOffer(BATCH_GET_MAX_BACKOFF);
+    return new ConcreteBackOffer(BATCH_GET_MAX_BACKOFF, 0);
   }
 
   public static ConcreteBackOffer newCopNextMaxBackOff() {
-    return new ConcreteBackOffer(COP_NEXT_MAX_BACKOFF);
+    return new ConcreteBackOffer(COP_NEXT_MAX_BACKOFF, 0);
   }
 
   public static ConcreteBackOffer newGetBackOff() {
-    return new ConcreteBackOffer(GET_MAX_BACKOFF);
+    return new ConcreteBackOffer(GET_MAX_BACKOFF, 0);
   }
 
   public static ConcreteBackOffer newRawKVBackOff() {
-    return new ConcreteBackOffer(RAWKV_MAX_BACKOFF);
+    return new ConcreteBackOffer(RAWKV_MAX_BACKOFF, 0);
   }
 
   public static ConcreteBackOffer newTsoBackOff() {
-    return new ConcreteBackOffer(TSO_MAX_BACKOFF);
+    return new ConcreteBackOffer(TSO_MAX_BACKOFF, 0);
   }
 
   public static ConcreteBackOffer create(BackOffer source) {
@@ -125,27 +136,46 @@ public class ConcreteBackOffer implements BackOffer {
     BackOffFunction backOffFunction =
         backOffFunctionMap.computeIfAbsent(funcType, this::createBackOffFunc);
 
-    // Back off will be done here
-    totalSleep += backOffFunction.doBackOff(maxSleepMs);
+    // Back off will not be done here
+    long sleep = backOffFunction.getSleepMs(maxSleepMs);
+    totalSleep += sleep;
+
     logger.debug(
         String.format(
             "%s, retry later(totalSleep %dms, maxSleep %dms)",
             err.getMessage(), totalSleep, maxSleep));
     errors.add(err);
-    if (maxSleep > 0 && totalSleep >= maxSleep) {
-      StringBuilder errMsg =
-          new StringBuilder(
-              String.format("BackOffer.maxSleep %dms is exceeded, errors:", maxSleep));
-      for (int i = 0; i < errors.size(); i++) {
-        Exception curErr = errors.get(i);
-        // Print only last 3 errors for non-DEBUG log levels.
-        if (logger.isDebugEnabled() || i >= errors.size() - 3) {
-          errMsg.append("\n").append(i).append(".").append(curErr.toString());
-        }
+
+    // Check deadline
+    if (deadline > 0) {
+      long currentMs = System.currentTimeMillis();
+      if (currentMs + sleep >= deadline) {
+        logThrowError(String.format("Deadline %d is exceeded, errors:", deadline), err);
       }
-      logger.warn(errMsg.toString());
-      // Use the last backoff type to generate an exception
-      throw new GrpcException("retry is exhausted.", err);
     }
+
+    try {
+      Thread.sleep(sleep);
+    } catch (InterruptedException e) {
+      throw new GrpcException(e);
+    }
+
+    if (maxSleep > 0 && totalSleep >= maxSleep) {
+      logThrowError(String.format("BackOffer.maxSleep %dms is exceeded, errors:", maxSleep), err);
+    }
+  }
+
+  private void logThrowError(String msg, Exception err) {
+    StringBuilder errMsg = new StringBuilder(msg);
+    for (int i = 0; i < errors.size(); i++) {
+      Exception curErr = errors.get(i);
+      // Print only last 3 errors for non-DEBUG log levels.
+      if (logger.isDebugEnabled() || i >= errors.size() - 3) {
+        errMsg.append("\n").append(i).append(".").append(curErr.toString());
+      }
+    }
+    logger.warn(errMsg.toString());
+    // Use the last backoff type to generate an exception
+    throw new GrpcException("retry is exhausted.", err);
   }
 }
