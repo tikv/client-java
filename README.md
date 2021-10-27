@@ -86,21 +86,6 @@ public class Main {
 
 The following includes JVM related parameters.
 
-#### tikv.configuration_file
-- tikv java client configuration file
-- default: null
-
-This parameter can be passed by `-Dtikv.configuration_file=/path/to/tikv_client_config.properties`.
-
-Here is an example of `tikv_client_config.properties`.
-
-```
-tikv.grpc.timeout_in_ms=150ms 
-tikv.grpc.forward_timeout_in_ms=200ms
-tikv.metrics.enable=true
-tikv.metrics.port=3140
-```
-
 #### tikv.pd.addresses
 - pd addresses, separated by comma
 - default: 127.0.0.1:2379
