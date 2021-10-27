@@ -19,7 +19,7 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class ConfigUtils {
-  public static final String TIKV_CONFIGURATION_FILE = "tikv.configuration_file";
+  public static final String TIKV_CONFIGURATION_FILENAME = "tikv.properties";
 
   public static final String TIKV_PD_ADDRESSES = "tikv.pd.addresses";
   public static final String TIKV_GRPC_TIMEOUT = "tikv.grpc.timeout_in_ms";

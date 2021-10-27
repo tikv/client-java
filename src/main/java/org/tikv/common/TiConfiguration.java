@@ -18,8 +18,8 @@ package org.tikv.common;
 import static org.tikv.common.ConfigUtils.*;
 
 import io.grpc.Metadata;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
 import java.util.*;
@@ -57,20 +57,27 @@ public class TiConfiguration implements Serializable {
   }
 
   private static void loadFromConfigurationFile() {
-    Optional<String> file = getOption(TIKV_CONFIGURATION_FILE);
-    if (file.isPresent()) {
+    try (InputStream input =
+        TiConfiguration.class
+            .getClassLoader()
+            .getResourceAsStream(ConfigUtils.TIKV_CONFIGURATION_FILENAME)) {
       Properties properties = new Properties();
-      try {
-        properties.load(new FileInputStream(file.get()));
-      } catch (IOException e) {
-        logger.error("load config file error, path = " + file.get(), e);
+
+      if (input == null) {
+        logger.warn("Unable to find " + ConfigUtils.TIKV_CONFIGURATION_FILENAME);
+        return;
       }
+
+      logger.info("loading " + ConfigUtils.TIKV_CONFIGURATION_FILENAME);
+      properties.load(input);
       for (String key : properties.stringPropertyNames()) {
         if (key.startsWith("tikv.")) {
           String value = properties.getProperty(key);
           setIfMissing(key, value);
         }
       }
+    } catch (IOException e) {
+      logger.error("load config file error", e);
     }
   }
 
@@ -117,7 +124,7 @@ public class TiConfiguration implements Serializable {
   }
 
   public static void listAll() {
-    logger.warn("static configurations are:" + new ArrayList<>(settings.entrySet()).toString());
+    logger.info("static configurations are:" + new ArrayList<>(settings.entrySet()).toString());
   }
 
   private static void set(String key, String value) {
