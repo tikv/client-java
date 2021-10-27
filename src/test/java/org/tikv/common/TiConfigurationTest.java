@@ -17,12 +17,11 @@ package org.tikv.common;
 
 import static org.junit.Assert.assertEquals;
 
-import org.junit.Ignore;
+import org.junit.Test;
 
 public class TiConfigurationTest {
 
-  // Set `-Dtikv.configuration_file=src/test/resources/tikv_client_config.properties` to test
-  @Ignore
+  @Test
   public void configFileTest() {
     TiConfiguration conf = TiConfiguration.createRawDefault();
     assertEquals("configFileTest", conf.getDBPrefix());
