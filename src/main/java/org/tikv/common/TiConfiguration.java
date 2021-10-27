@@ -122,6 +122,12 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
     setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
     setIfMissing(TIFLASH_ENABLE, DEF_TIFLASH_ENABLE);
+    setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_RAWKV_SCAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_SCAN_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
   }
 
   public static void listAll() {
@@ -322,6 +328,12 @@ public class TiConfiguration implements Serializable {
   private int scatterWaitSeconds = getInt(TIKV_SCATTER_WAIT_SECONDS);
 
   private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+  private int rawKVReadTimeoutInMS = getInt(TIKV_RAWKV_READ_TIMEOUT_IN_MS);
+  private int rawKVWriteTimeoutInMS = getInt(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
+  private int rawKVBatchReadTimeoutInMS = getInt(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
+  private int rawKVBatchWriteTimeoutInMS = getInt(TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS);
+  private int rawKVScanTimeoutInMS = getInt(TIKV_RAWKV_SCAN_TIMEOUT_IN_MS);
+  private int rawKVCleanTimeoutInMS = getInt(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
 
   private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
   private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
@@ -767,5 +779,53 @@ public class TiConfiguration implements Serializable {
 
   public void setKeyFile(String keyFile) {
     this.keyFile = keyFile;
+  }
+
+  public int getRawKVReadTimeoutInMS() {
+    return rawKVReadTimeoutInMS;
+  }
+
+  public void setRawKVReadTimeoutInMS(int rawKVReadTimeoutInMS) {
+    this.rawKVReadTimeoutInMS = rawKVReadTimeoutInMS;
+  }
+
+  public int getRawKVWriteTimeoutInMS() {
+    return rawKVWriteTimeoutInMS;
+  }
+
+  public void setRawKVWriteTimeoutInMS(int rawKVWriteTimeoutInMS) {
+    this.rawKVWriteTimeoutInMS = rawKVWriteTimeoutInMS;
+  }
+
+  public int getRawKVBatchReadTimeoutInMS() {
+    return rawKVBatchReadTimeoutInMS;
+  }
+
+  public void setRawKVBatchReadTimeoutInMS(int rawKVBatchReadTimeoutInMS) {
+    this.rawKVBatchReadTimeoutInMS = rawKVBatchReadTimeoutInMS;
+  }
+
+  public int getRawKVBatchWriteTimeoutInMS() {
+    return rawKVBatchWriteTimeoutInMS;
+  }
+
+  public void setRawKVBatchWriteTimeoutInMS(int rawKVBatchWriteTimeoutInMS) {
+    this.rawKVBatchWriteTimeoutInMS = rawKVBatchWriteTimeoutInMS;
+  }
+
+  public int getRawKVScanTimeoutInMS() {
+    return rawKVScanTimeoutInMS;
+  }
+
+  public void setRawKVScanTimeoutInMS(int rawKVScanTimeoutInMS) {
+    this.rawKVScanTimeoutInMS = rawKVScanTimeoutInMS;
+  }
+
+  public int getRawKVCleanTimeoutInMS() {
+    return rawKVCleanTimeoutInMS;
+  }
+
+  public void setRawKVCleanTimeoutInMS(int rawKVCleanTimeoutInMS) {
+    this.rawKVCleanTimeoutInMS = rawKVCleanTimeoutInMS;
   }
 }
