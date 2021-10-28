@@ -128,6 +128,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_SCAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_SCAN_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_BO_REGION_MISS_BASE_IN_MS, DEF_TIKV_BO_REGION_MISS_BASE_IN_MS);
   }
 
   public static void listAll() {
@@ -174,7 +175,7 @@ public class TiConfiguration implements Serializable {
     return option.get();
   }
 
-  private static int getInt(String key) {
+  public static int getInt(String key) {
     return Integer.parseInt(get(key));
   }
 

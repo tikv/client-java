@@ -78,6 +78,7 @@ public class ConfigUtils {
       "tikv.rawkv.batch_write_timeout_in_ms";
   public static final String TIKV_RAWKV_SCAN_TIMEOUT_IN_MS = "tikv.rawkv.scan_timeout_in_ms";
   public static final String TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS = "tikv.rawkv.clean_timeout_in_ms";
+  public static final String TIKV_BO_REGION_MISS_BASE_IN_MS = "tikv.bo_region_miss_base_in_ms";
 
   public static final String TIKV_TLS_ENABLE = "tikv.tls_enable";
   public static final String TIKV_TRUST_CERT_COLLECTION = "tikv.trust_cert_collection";
@@ -131,6 +132,8 @@ public class ConfigUtils {
   public static final int DEF_TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS = 2000;
   public static final int DEF_TIKV_RAWKV_SCAN_TIMEOUT_IN_MS = 10000;
   public static final int DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS = 600000;
+
+  public static final int DEF_TIKV_BO_REGION_MISS_BASE_IN_MS = 100;
 
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";
