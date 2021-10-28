@@ -71,11 +71,14 @@ public class TiSession implements AutoCloseable {
   private MetricsServer metricsServer;
 
   public TiSession(TiConfiguration conf) {
+    // may throw org.tikv.common.MetricsServer  - http server not up
+    // put it at the beginning of this function to avoid unclosed Thread
+    this.metricsServer = MetricsServer.getInstance(conf);
+
     this.conf = conf;
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
     this.client = PDClient.createRaw(conf, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
-    this.metricsServer = MetricsServer.getInstance(conf);
     if (this.enableGrpcForward) {
       logger.info("enable grpc forward for high available");
     }
