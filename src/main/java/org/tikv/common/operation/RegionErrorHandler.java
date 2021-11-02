@@ -3,17 +3,21 @@ package org.tikv.common.operation;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.region.RegionErrorReceiver;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Errorpb;
+import org.tikv.kvproto.Metapb;
 
 public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private static final Logger logger = LoggerFactory.getLogger(RegionErrorHandler.class);
@@ -115,11 +119,11 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
       // throwing it out.
       return false;
     } else if (error.hasEpochNotMatch()) {
-      // this error is reported from raftstore:
-      // region has outdated version，please try later.
-      logger.warn(String.format("Stale Epoch encountered for region [%s]", recv.getRegion()));
-      this.regionManager.onRegionStale(recv.getRegion());
-      return false;
+      logger.warn(
+          String.format(
+              "tikv reports `EpochNotMatch` retry later, EpochNotMatch: %s",
+              error.getEpochNotMatch()));
+      return onRegionEpochNotMatch(backOffer, error.getEpochNotMatch().getCurrentRegionsList());
     } else if (error.hasServerIsBusy()) {
       // this error is reported from kv:
       // will occur when write pressure is high. Please try later.
@@ -168,6 +172,53 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
           BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.getMessage()));
       return true;
     }
+    return false;
+  }
+
+  // OnRegionEpochNotMatch removes the old region and inserts new regions into the cache.
+  // It returns whether retries the request because it's possible the region epoch is ahead of
+  // TiKV's due to slow appling.
+  private boolean onRegionEpochNotMatch(BackOffer backOffer, List<Metapb.Region> currentRegions) {
+    if (currentRegions.size() == 0) {
+      this.regionManager.onRegionStale(recv.getRegion());
+      return false;
+    }
+
+    // Find whether the region epoch in `ctx` is ahead of TiKV's. If so, backoff.
+    for (Metapb.Region meta : currentRegions) {
+      if (meta.getId() == recv.getRegion().getId()
+          && (meta.getRegionEpoch().getConfVer() < recv.getRegion().getVerID().getConfVer()
+              || meta.getRegionEpoch().getVersion() < recv.getRegion().getVerID().getVer())) {
+        String errorMsg =
+            String.format(
+                "region epoch is ahead of tikv, region: %s, currentRegions: %s",
+                recv.getRegion(), currentRegions);
+        logger.info(errorMsg);
+        backOffer.doBackOff(
+            BackOffFunction.BackOffFuncType.BoRegionMiss, new TiKVException(errorMsg));
+        return true;
+      }
+    }
+
+    boolean needInvalidateOld = true;
+    List<TiRegion> newRegions = new ArrayList<>(currentRegions.size());
+    // If the region epoch is not ahead of TiKV's, replace region meta in region cache.
+    for (Metapb.Region meta : currentRegions) {
+      TiRegion region = regionManager.createRegion(meta, backOffer);
+      newRegions.add(region);
+      if (recv.getRegion().getVerID() == region.getVerID()) {
+        needInvalidateOld = false;
+      }
+    }
+
+    for (TiRegion region : newRegions) {
+      regionManager.insertRegionToCache(region);
+    }
+
+    if (needInvalidateOld) {
+      this.regionManager.onRegionStale(recv.getRegion());
+    }
+
     return false;
   }
 

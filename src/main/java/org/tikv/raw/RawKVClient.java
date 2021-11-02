@@ -133,6 +133,7 @@ public class RawKVClient implements AutoCloseable {
       BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS());
       while (true) {
         RegionStoreClient client = clientBuilder.build(key, backOffer);
+        logger.warn("put region: " + client.getRegion().toString());
         try {
           client.rawPut(backOffer, key, value, ttl, atomic);
           RAW_REQUEST_SUCCESS.labels(label).inc();
@@ -178,6 +179,7 @@ public class RawKVClient implements AutoCloseable {
       BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS());
       while (true) {
         RegionStoreClient client = clientBuilder.build(key, backOffer);
+        logger.warn("putIfAbsent region: " + client.getRegion().toString());
         try {
           ByteString result = client.rawPutIfAbsent(backOffer, key, value, ttl);
           RAW_REQUEST_SUCCESS.labels(label).inc();
@@ -263,6 +265,7 @@ public class RawKVClient implements AutoCloseable {
       BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS());
       while (true) {
         RegionStoreClient client = clientBuilder.build(key, backOffer);
+        logger.warn("get region: " + client.getRegion().toString());
         try {
           ByteString result = client.rawGet(backOffer, key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
