@@ -175,12 +175,12 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     return false;
   }
 
+  // ref: https://github.com/tikv/client-go/blob/tidb-5.2/internal/locate/region_request.go#L985
   // OnRegionEpochNotMatch removes the old region and inserts new regions into the cache.
   // It returns whether retries the request because it's possible the region epoch is ahead of
   // TiKV's due to slow appling.
   private boolean onRegionEpochNotMatch(BackOffer backOffer, List<Metapb.Region> currentRegions) {
     if (currentRegions.size() == 0) {
-      logger.warn("currentRegions.size() == 0");
       this.regionManager.onRegionStale(recv.getRegion());
       return false;
     }
@@ -213,12 +213,10 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     }
 
     if (needInvalidateOld) {
-      logger.warn("needInvalidateOld, region=" + recv.getRegion());
       this.regionManager.onRegionStale(recv.getRegion());
     }
 
     for (TiRegion region : newRegions) {
-      logger.warn("insertRegionToCache, region=" + region);
       regionManager.insertRegionToCache(region);
     }
 

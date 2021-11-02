@@ -99,6 +99,7 @@ public class RegionCache {
         keyToRegionIdCache.remove(makeRange(oldRegion.getStartKey(), oldRegion.getEndKey()));
       }
       regionCache.put(region.getId(), region);
+      keyToRegionIdCache.put(makeRange(region.getStartKey(), region.getEndKey()), region.getId());
     } catch (Exception ignore) {
     }
   }
