@@ -121,8 +121,8 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     } else if (error.hasEpochNotMatch()) {
       logger.warn(
           String.format(
-              "tikv reports `EpochNotMatch` retry later, EpochNotMatch: %s",
-              error.getEpochNotMatch()));
+              "tikv reports `EpochNotMatch` retry later, region: %s, EpochNotMatch: %s",
+              recv.getRegion(), error.getEpochNotMatch()));
       return onRegionEpochNotMatch(backOffer, error.getEpochNotMatch().getCurrentRegionsList());
     } else if (error.hasServerIsBusy()) {
       // this error is reported from kv:
@@ -180,6 +180,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   // TiKV's due to slow appling.
   private boolean onRegionEpochNotMatch(BackOffer backOffer, List<Metapb.Region> currentRegions) {
     if (currentRegions.size() == 0) {
+      logger.warn("currentRegions.size() == 0");
       this.regionManager.onRegionStale(recv.getRegion());
       return false;
     }
@@ -211,12 +212,14 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
       }
     }
 
-    for (TiRegion region : newRegions) {
-      regionManager.insertRegionToCache(region);
+    if (needInvalidateOld) {
+      logger.warn("needInvalidateOld, region=" + recv.getRegion());
+      this.regionManager.onRegionStale(recv.getRegion());
     }
 
-    if (needInvalidateOld) {
-      this.regionManager.onRegionStale(recv.getRegion());
+    for (TiRegion region : newRegions) {
+      logger.warn("insertRegionToCache, region=" + region);
+      regionManager.insertRegionToCache(region);
     }
 
     return false;

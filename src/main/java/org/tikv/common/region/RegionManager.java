@@ -100,6 +100,7 @@ public class RegionManager {
       if (region == null) {
         logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
         Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
+        logger.warn("getRegionByKey: regionAndLeader=" + regionAndLeader);
         region =
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
       }
