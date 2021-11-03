@@ -338,7 +338,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
       return resp;
     } catch (Exception e) {
-      logger.debug("failed to get member from pd server.", e);
+      logger.error("failed to get member from pd server.", e);
     }
     return null;
   }
@@ -582,7 +582,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       if (resp != null) {
         break;
       }
-      logger.info("Could not get leader member with pd: " + u);
+      logger.error("Could not get leader member with pd: " + u);
     }
     this.timeout = originTimeout;
     checkNotNull(resp, "Failed to init client for PD cluster.");
