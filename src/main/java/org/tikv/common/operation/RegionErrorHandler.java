@@ -120,9 +120,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
       return false;
     } else if (error.hasEpochNotMatch()) {
       logger.warn(
-          String.format(
-              "tikv reports `EpochNotMatch` retry later, region: %s, EpochNotMatch: %s",
-              recv.getRegion(), error.getEpochNotMatch()));
+          String.format("tikv reports `EpochNotMatch` retry later, region: %s", recv.getRegion()));
       return onRegionEpochNotMatch(backOffer, error.getEpochNotMatch().getCurrentRegionsList());
     } else if (error.hasServerIsBusy()) {
       // this error is reported from kv:
