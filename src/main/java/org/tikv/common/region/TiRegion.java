@@ -82,6 +82,10 @@ public class TiRegion implements Serializable {
     replicaIdx = 0;
   }
 
+  public TiConfiguration getConf() {
+    return conf;
+  }
+
   public Peer getLeader() {
     return leader;
   }
@@ -269,6 +273,18 @@ public class TiRegion implements Serializable {
       this.id = id;
       this.confVer = confVer;
       this.ver = ver;
+    }
+
+    public long getId() {
+      return id;
+    }
+
+    public long getConfVer() {
+      return confVer;
+    }
+
+    public long getVer() {
+      return ver;
     }
 
     @Override
