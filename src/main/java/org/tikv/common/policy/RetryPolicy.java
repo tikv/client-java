@@ -33,6 +33,12 @@ public abstract class RetryPolicy<RespT> {
           .help("grpc request latency.")
           .labelNames("type")
           .register();
+  public static final Histogram CALL_WITH_RETRY_DURATION =
+      Histogram.build()
+          .name("client_java_call_with_retry_duration")
+          .help("callWithRetry duration.")
+          .labelNames("type")
+          .register();
   public static final Counter GRPC_REQUEST_RETRY_NUM =
       Counter.build()
           .name("client_java_grpc_requests_retry_num")
@@ -62,37 +68,43 @@ public abstract class RetryPolicy<RespT> {
   }
 
   public RespT callWithRetry(Callable<RespT> proc, String methodName) {
-    while (true) {
-      RespT result = null;
-      try {
-        // add single request duration histogram
-        Histogram.Timer requestTimer = GRPC_SINGLE_REQUEST_LATENCY.labels(methodName).startTimer();
+    Histogram.Timer callWithRetryTimer = CALL_WITH_RETRY_DURATION.labels(methodName).startTimer();
+    try {
+      while (true) {
+        RespT result = null;
         try {
-          result = proc.call();
-        } finally {
-          requestTimer.observeDuration();
+          // add single request duration histogram
+          Histogram.Timer requestTimer =
+              GRPC_SINGLE_REQUEST_LATENCY.labels(methodName).startTimer();
+          try {
+            result = proc.call();
+          } finally {
+            requestTimer.observeDuration();
+          }
+        } catch (Exception e) {
+          rethrowNotRecoverableException(e);
+          // Handle request call error
+          boolean retry = handler.handleRequestError(backOffer, e);
+          if (retry) {
+            GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
+            continue;
+          } else {
+            return result;
+          }
         }
-      } catch (Exception e) {
-        rethrowNotRecoverableException(e);
-        // Handle request call error
-        boolean retry = handler.handleRequestError(backOffer, e);
-        if (retry) {
-          GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
-          continue;
-        } else {
-          return result;
-        }
-      }
 
-      // Handle response error
-      if (handler != null) {
-        boolean retry = handler.handleResponseError(backOffer, result);
-        if (retry) {
-          GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
-          continue;
+        // Handle response error
+        if (handler != null) {
+          boolean retry = handler.handleResponseError(backOffer, result);
+          if (retry) {
+            GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
+            continue;
+          }
         }
+        return result;
       }
-      return result;
+    } finally {
+      callWithRetryTimer.observeDuration();
     }
   }
 

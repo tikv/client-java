@@ -20,6 +20,7 @@ package org.tikv.common.util;
 import static org.tikv.common.ConfigUtils.TIKV_BO_REGION_MISS_BASE_IN_MS;
 
 import com.google.common.base.Preconditions;
+import io.prometheus.client.Histogram;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +36,14 @@ public class ConcreteBackOffer implements BackOffer {
   private final Map<BackOffFunction.BackOffFuncType, BackOffFunction> backOffFunctionMap;
   private final List<Exception> errors;
   private int totalSleep;
-  private long deadline;
+  private final long deadline;
+
+  public static final Histogram BACKOFF_DURATION =
+      Histogram.build()
+          .name("client_java_backoff_duration")
+          .help("backoff duration.")
+          .labelNames("type")
+          .register();
 
   private ConcreteBackOffer(int maxSleep, long deadline) {
     Preconditions.checkArgument(
@@ -140,35 +148,40 @@ public class ConcreteBackOffer implements BackOffer {
   @Override
   public void doBackOffWithMaxSleep(
       BackOffFunction.BackOffFuncType funcType, long maxSleepMs, Exception err) {
-    BackOffFunction backOffFunction =
-        backOffFunctionMap.computeIfAbsent(funcType, this::createBackOffFunc);
-
-    // Back off will not be done here
-    long sleep = backOffFunction.getSleepMs(maxSleepMs);
-    totalSleep += sleep;
-
-    logger.debug(
-        String.format(
-            "%s, retry later(totalSleep %dms, maxSleep %dms)",
-            err.getMessage(), totalSleep, maxSleep));
-    errors.add(err);
-
-    // Check deadline
-    if (deadline > 0) {
-      long currentMs = System.currentTimeMillis();
-      if (currentMs + sleep >= deadline) {
-        logThrowError(String.format("Deadline %d is exceeded, errors:", deadline), err);
-      }
-    }
-
+    Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(funcType.name()).startTimer();
     try {
-      Thread.sleep(sleep);
-    } catch (InterruptedException e) {
-      throw new GrpcException(e);
-    }
+      BackOffFunction backOffFunction =
+          backOffFunctionMap.computeIfAbsent(funcType, this::createBackOffFunc);
 
-    if (maxSleep > 0 && totalSleep >= maxSleep) {
-      logThrowError(String.format("BackOffer.maxSleep %dms is exceeded, errors:", maxSleep), err);
+      // Back off will not be done here
+      long sleep = backOffFunction.getSleepMs(maxSleepMs);
+      totalSleep += sleep;
+
+      logger.debug(
+          String.format(
+              "%s, retry later(totalSleep %dms, maxSleep %dms)",
+              err.getMessage(), totalSleep, maxSleep));
+      errors.add(err);
+
+      // Check deadline
+      if (deadline > 0) {
+        long currentMs = System.currentTimeMillis();
+        if (currentMs + sleep >= deadline) {
+          logThrowError(String.format("Deadline %d is exceeded, errors:", deadline), err);
+        }
+      }
+
+      try {
+        Thread.sleep(sleep);
+      } catch (InterruptedException e) {
+        throw new GrpcException(e);
+      }
+
+      if (maxSleep > 0 && totalSleep >= maxSleep) {
+        logThrowError(String.format("BackOffer.maxSleep %dms is exceeded, errors:", maxSleep), err);
+      }
+    } finally {
+      backOffTimer.observeDuration();
     }
   }
 
