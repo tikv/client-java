@@ -162,7 +162,8 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     // Upper level may split this task.
     invalidateRegionStoreCache(recv.getRegion());
     // retry if raft proposal is dropped, it indicates the store is in the middle of transition
-    if (error.getMessage().contains("Raft ProposalDropped")) {
+    if (error.getMessage().contains("Raft ProposalDropped")
+        || error.getMessage().contains("is missing")) {
       backOffer.doBackOff(
           BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.getMessage()));
       return true;
