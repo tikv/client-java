@@ -181,6 +181,12 @@ public class RegionManager {
     return Pair.create(region, store);
   }
 
+  public TiRegion createRegion(Metapb.Region region, BackOffer backOffer) {
+    List<Metapb.Peer> peers = region.getPeersList();
+    List<TiStore> stores = getRegionStore(peers, backOffer);
+    return new TiRegion(conf, region, null, peers, stores);
+  }
+
   private TiRegion createRegion(Metapb.Region region, Metapb.Peer leader, BackOffer backOffer) {
     List<Metapb.Peer> peers = region.getPeersList();
     List<TiStore> stores = getRegionStore(peers, backOffer);
@@ -260,6 +266,10 @@ public class RegionManager {
 
   public void invalidateRegion(TiRegion region) {
     cache.invalidateRegion(region);
+  }
+
+  public void insertRegionToCache(TiRegion region) {
+    cache.insertRegionToCache(region);
   }
 
   private BackOffer defaultBackOff() {

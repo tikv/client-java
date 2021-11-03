@@ -92,6 +92,18 @@ public class RegionCache {
     }
   }
 
+  public synchronized void insertRegionToCache(TiRegion region) {
+    try {
+      TiRegion oldRegion = regionCache.get(region.getId());
+      if (oldRegion != null) {
+        keyToRegionIdCache.remove(makeRange(oldRegion.getStartKey(), oldRegion.getEndKey()));
+      }
+      regionCache.put(region.getId(), region);
+      keyToRegionIdCache.put(makeRange(region.getStartKey(), region.getEndKey()), region.getId());
+    } catch (Exception ignore) {
+    }
+  }
+
   public synchronized boolean updateRegion(TiRegion expected, TiRegion region) {
     try {
       if (logger.isDebugEnabled()) {
