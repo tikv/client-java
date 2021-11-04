@@ -151,6 +151,7 @@ public class ConcreteBackOffer implements BackOffer {
   }
 
   public boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType, long maxSleepMs) {
+    Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(funcType.name()).startTimer();
     BackOffFunction backOffFunction =
         backOffFunctionMap.computeIfAbsent(funcType, this::createBackOffFunc);
 
@@ -171,6 +172,7 @@ public class ConcreteBackOffer implements BackOffer {
     } catch (InterruptedException e) {
       throw new GrpcException(e);
     }
+    backOffTimer.observeDuration();
     if (maxSleep > 0 && totalSleep >= maxSleep) {
       logger.warn(String.format("BackOffer.maxSleep %dms is exceeded, errors:", maxSleep));
       return false;
