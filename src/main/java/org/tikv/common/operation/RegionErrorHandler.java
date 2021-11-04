@@ -235,7 +235,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     if (!backOffer.canRetryAfterSleep(BackOffFunction.BackOffFuncType.BoTiKVRPC)) {
       regionManager.onRequestFail(recv.getRegion());
       throw new GrpcException(
-              "send tikv request error: " + e.getMessage() + ", try next peer later", e);
+          "send tikv request error: " + e.getMessage() + ", try next peer later", e);
     }
     // TiKV maybe down, so do not retry in `callWithRetry`
     // should re-fetch the new leader from PD and send request to it
