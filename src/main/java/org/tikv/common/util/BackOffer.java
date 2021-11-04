@@ -34,6 +34,8 @@ public interface BackOffer {
    */
   void doBackOff(BackOffFunction.BackOffFuncType funcType, Exception err);
 
+  boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType);
+
   /**
    * BackoffWithMaxSleep sleeps a while base on the backoffType and records the error message and
    * never sleep more than maxSleepMs for each sleep.

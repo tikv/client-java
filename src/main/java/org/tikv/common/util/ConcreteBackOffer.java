@@ -138,26 +138,23 @@ public class ConcreteBackOffer implements BackOffer {
   }
 
   @Override
-  public void doBackOffWithMaxSleep(
-      BackOffFunction.BackOffFuncType funcType, long maxSleepMs, Exception err) {
+  public boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType) {
+    return canRetryAfterSleep(funcType, -1);
+  }
+
+  public boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType, long maxSleepMs) {
     BackOffFunction backOffFunction =
         backOffFunctionMap.computeIfAbsent(funcType, this::createBackOffFunc);
 
     // Back off will not be done here
     long sleep = backOffFunction.getSleepMs(maxSleepMs);
     totalSleep += sleep;
-
-    logger.debug(
-        String.format(
-            "%s, retry later(totalSleep %dms, maxSleep %dms)",
-            err.getMessage(), totalSleep, maxSleep));
-    errors.add(err);
-
     // Check deadline
     if (deadline > 0) {
       long currentMs = System.currentTimeMillis();
       if (currentMs + sleep >= deadline) {
-        logThrowError(String.format("Deadline %d is exceeded, errors:", deadline), err);
+        logger.warn(String.format("Deadline %d is exceeded, errors:", deadline));
+        return false;
       }
     }
 
@@ -166,14 +163,28 @@ public class ConcreteBackOffer implements BackOffer {
     } catch (InterruptedException e) {
       throw new GrpcException(e);
     }
-
     if (maxSleep > 0 && totalSleep >= maxSleep) {
-      logThrowError(String.format("BackOffer.maxSleep %dms is exceeded, errors:", maxSleep), err);
+      logger.warn(String.format("BackOffer.maxSleep %dms is exceeded, errors:", maxSleep));
+      return false;
+    }
+    return true;
+  }
+
+  @Override
+  public void doBackOffWithMaxSleep(
+      BackOffFunction.BackOffFuncType funcType, long maxSleepMs, Exception err) {
+    logger.debug(
+        String.format(
+            "%s, retry later(totalSleep %dms, maxSleep %dms)",
+            err.getMessage(), totalSleep, maxSleep));
+    errors.add(err);
+    if (!canRetryAfterSleep(funcType, maxSleepMs)) {
+      logThrowError(err);
     }
   }
 
-  private void logThrowError(String msg, Exception err) {
-    StringBuilder errMsg = new StringBuilder(msg);
+  private void logThrowError(Exception err) {
+    StringBuilder errMsg = new StringBuilder();
     for (int i = 0; i < errors.size(); i++) {
       Exception curErr = errors.get(i);
       // Print only last 3 errors for non-DEBUG log levels.

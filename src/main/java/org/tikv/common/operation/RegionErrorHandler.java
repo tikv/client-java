@@ -224,15 +224,19 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
     if (recv.onStoreUnreachable()) {
-      backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoTiKVRPC, e);
+      if (!backOffer.canRetryAfterSleep(BackOffFunction.BackOffFuncType.BoTiKVRPC)) {
+        regionManager.onRequestFail(recv.getRegion());
+        throw new GrpcException("retry is exhausted.", e);
+      }
       return true;
     }
 
     logger.warn("request failed because of: " + e.getMessage());
-    backOffer.doBackOff(
-        BackOffFunction.BackOffFuncType.BoTiKVRPC,
-        new GrpcException(
-            "send tikv request error: " + e.getMessage() + ", try next peer later", e));
+    if (!backOffer.canRetryAfterSleep(BackOffFunction.BackOffFuncType.BoTiKVRPC)) {
+      regionManager.onRequestFail(recv.getRegion());
+      throw new GrpcException(
+              "send tikv request error: " + e.getMessage() + ", try next peer later", e);
+    }
     // TiKV maybe down, so do not retry in `callWithRetry`
     // should re-fetch the new leader from PD and send request to it
     return false;
