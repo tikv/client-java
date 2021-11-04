@@ -33,7 +33,11 @@ public interface BackOffer {
    * max back off time exceeded and throw an exception to the caller.
    */
   void doBackOff(BackOffFunction.BackOffFuncType funcType, Exception err);
-
+  /**
+   * doBackOff sleeps a while base on the BackOffType and records the error message. Will stop until
+   * max back off time exceeded and throw an exception to the caller. It will return false if the
+   * total sleep time has exceed some limit condition.
+   */
   boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType);
 
   /**
