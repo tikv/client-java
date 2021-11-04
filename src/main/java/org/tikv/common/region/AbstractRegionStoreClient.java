@@ -143,8 +143,8 @@ public abstract class AbstractRegionStoreClient
     // so that we can
     // reduce the latency cost by fail requests.
     if (targetStore.canForwardFirst()) {
-      if (conf.getEnableGrpcForward() && retryForwardTimes <= region.getFollowerList().size()) {
-        return retryOtherStoreByProxyForward();
+      if (retryOtherStoreByProxyForward()) {
+        return true;
       }
       if (retryOtherStoreLeader()) {
         return true;
@@ -153,12 +153,10 @@ public abstract class AbstractRegionStoreClient
       if (retryOtherStoreLeader()) {
         return true;
       }
-      if (conf.getEnableGrpcForward() && retryForwardTimes <= region.getFollowerList().size()) {
-        return retryOtherStoreByProxyForward();
+      if (retryOtherStoreByProxyForward()) {
+        return true;
       }
-      return true;
     }
-
     logger.warn(
         String.format(
             "retry time exceed for region[%d], invalid this region[%d]",
@@ -262,6 +260,9 @@ public abstract class AbstractRegionStoreClient
   }
 
   private boolean retryOtherStoreByProxyForward() {
+    if (!conf.getEnableGrpcForward() || retryForwardTimes > region.getFollowerList().size()) {
+      return false;
+    }
     TiStore proxyStore = switchProxyStore();
     if (proxyStore == null) {
       logger.warn(
