@@ -260,7 +260,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   private boolean retryOtherStoreByProxyForward() {
-    if (!conf.getEnableGrpcForward() && retryForwardTimes > region.getFollowerList().size()) {
+    if (!conf.getEnableGrpcForward() || retryForwardTimes > region.getFollowerList().size()) {
       return false;
     }
     TiStore proxyStore = switchProxyStore();
