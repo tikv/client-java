@@ -144,7 +144,9 @@ public abstract class AbstractRegionStoreClient
     // reduce the latency cost by fail requests.
     if (targetStore.canForwardFirst()) {
       if (conf.getEnableGrpcForward() && retryForwardTimes <= region.getFollowerList().size()) {
-        return retryOtherStoreByProxyForward();
+        if (retryOtherStoreByProxyForward()) {
+          return true;
+        }
       }
       if (retryOtherStoreLeader()) {
         return true;
@@ -154,7 +156,9 @@ public abstract class AbstractRegionStoreClient
         return true;
       }
       if (conf.getEnableGrpcForward() && retryForwardTimes <= region.getFollowerList().size()) {
-        return retryOtherStoreByProxyForward();
+        if (retryOtherStoreByProxyForward()) {
+          return true;
+        }
       }
       return true;
     }

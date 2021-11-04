@@ -224,7 +224,14 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
     if (recv.onStoreUnreachable()) {
-      backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoTiKVRPC, e);
+      try {
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoTiKVRPC, e);
+      } catch (Exception boErr) {
+        logger.warn(
+            String.format("backoff time exceed, invalidate region[%d]", recv.getRegion().getId()));
+        regionManager.onRequestFail(recv.getRegion());
+        throw boErr;
+      }
       return true;
     }
 
