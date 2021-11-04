@@ -20,6 +20,7 @@ package org.tikv.common.util;
 import static org.tikv.common.ConfigUtils.TIKV_BO_REGION_MISS_BASE_IN_MS;
 
 import com.google.common.base.Preconditions;
+import io.prometheus.client.Histogram;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +36,14 @@ public class ConcreteBackOffer implements BackOffer {
   private final Map<BackOffFunction.BackOffFuncType, BackOffFunction> backOffFunctionMap;
   private final List<Exception> errors;
   private int totalSleep;
-  private long deadline;
+  private final long deadline;
+
+  public static final Histogram BACKOFF_DURATION =
+      Histogram.build()
+          .name("client_java_backoff_duration")
+          .help("backoff duration.")
+          .labelNames("type")
+          .register();
 
   private ConcreteBackOffer(int maxSleep, long deadline) {
     Preconditions.checkArgument(
