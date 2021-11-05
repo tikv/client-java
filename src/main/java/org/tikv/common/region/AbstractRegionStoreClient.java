@@ -194,11 +194,6 @@ public abstract class AbstractRegionStoreClient
         // create a new store object, which is can-forward.
         regionManager.updateStore(originStore, targetStore);
       } else {
-        // If we try to forward request to leader by follower failed, it means that the store of old
-        // leader may be
-        // unavailable but the new leader has not been report to PD. So we can ban this store for a
-        // short time to
-        // avoid too many request try forward rather than try other peer.
         originStore.forwardFail();
       }
     }
@@ -260,7 +255,18 @@ public abstract class AbstractRegionStoreClient
   }
 
   private boolean retryOtherStoreByProxyForward() {
-    if (!conf.getEnableGrpcForward() || retryForwardTimes > region.getFollowerList().size()) {
+    if (!conf.getEnableGrpcForward()) {
+      return false;
+    }
+    if (retryForwardTimes >= region.getFollowerList().size()) {
+      // If we try to forward request to leader by follower failed, it means that the store of old
+      // leader may be
+      // unavailable but the new leader has not been report to PD. So we can ban this store for a
+      // short time to
+      // avoid too many request try forward rather than try other peer.
+      if (originStore != null) {
+        originStore.forwardFail();
+      }
       return false;
     }
     TiStore proxyStore = switchProxyStore();
@@ -269,6 +275,11 @@ public abstract class AbstractRegionStoreClient
           String.format(
               "no forward store can be selected for store [%s] and region[%d]",
               targetStore.getStore().getAddress(), region.getId()));
+      if (originStore != null) {
+        originStore.forwardFail();
+      } else {
+        targetStore.forwardFail();
+      }
       return false;
     }
     if (originStore == null) {
