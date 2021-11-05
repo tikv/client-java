@@ -127,7 +127,7 @@ public abstract class AbstractRegionStoreClient
   public boolean onStoreUnreachable() {
     if (!targetStore.isValid()) {
       logger.warn(
-          String.format("store [%d] has been invalid", region.getId(), targetStore.getId()));
+          String.format("store [%d] has been invalid", targetStore.getId()));
       targetStore = regionManager.getStoreById(targetStore.getId());
       updateClientStub();
       return true;
@@ -159,7 +159,7 @@ public abstract class AbstractRegionStoreClient
     }
     logger.warn(
         String.format(
-            "retry time exceed for region[%d], invalid this region[%d]",
+            "retry time exceed for region[%d], invalid store[%d]",
             region.getId(), targetStore.getId()));
     regionManager.onRequestFail(region);
     return false;
