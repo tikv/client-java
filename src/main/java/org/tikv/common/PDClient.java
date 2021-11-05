@@ -39,6 +39,8 @@ import io.prometheus.client.Histogram;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -633,7 +635,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   private void initCluster() {
     GetMembersResponse resp = null;
-    List<URI> pdAddrs = getConf().getPdAddrs();
+    List<URI> pdAddrs = new ArrayList<>(getConf().getPdAddrs());
+    // shuffle PD addresses so that clients call getMembers from different PD
+    Collections.shuffle(pdAddrs);
     this.pdAddrs = pdAddrs;
     this.etcdClient =
         Client.builder()
