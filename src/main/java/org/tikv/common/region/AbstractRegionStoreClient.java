@@ -126,8 +126,7 @@ public abstract class AbstractRegionStoreClient
   @Override
   public boolean onStoreUnreachable() {
     if (!targetStore.isValid()) {
-      logger.warn(
-          String.format("store [%d] has been invalid", targetStore.getId()));
+      logger.warn(String.format("store [%d] has been invalid", targetStore.getId()));
       targetStore = regionManager.getStoreById(targetStore.getId());
       updateClientStub();
       return true;
