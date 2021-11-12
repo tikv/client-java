@@ -25,7 +25,7 @@
     {
       "type": "datasource",
       "id": "prometheus",
-      "name": "Prometheus",
+      "name": "${DS_TEST-CLUSTER}",
       "version": "1.0.0"
     }
   ],
@@ -54,7 +54,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "Prometheus",
+      "datasource": "${DS_TEST-CLUSTER}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -153,7 +153,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "Prometheus",
+      "datasource": "${DS_TEST-CLUSTER}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -250,7 +250,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "Prometheus",
+      "datasource": "${DS_TEST-CLUSTER}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -349,7 +349,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "Prometheus",
+      "datasource": "${DS_TEST-CLUSTER}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -448,7 +448,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "Prometheus",
+      "datasource": "${DS_TEST-CLUSTER}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -547,7 +547,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "Prometheus",
+      "datasource": "${DS_TEST-CLUSTER}",
       "description": "",
       "fieldConfig": {
         "defaults": {
@@ -651,7 +651,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "Prometheus",
+      "datasource": "${DS_TEST-CLUSTER}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -748,7 +748,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "Prometheus",
+      "datasource": "${DS_TEST-CLUSTER}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -845,7 +845,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "Prometheus",
+      "datasource": "${DS_TEST-CLUSTER}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -959,7 +959,7 @@
           "text": "All",
           "value": "$__all"
         },
-        "datasource": "Prometheus",
+        "datasource": "${DS_TEST-CLUSTER}",
         "definition": "label_values(client_java_raw_requests_latency_count, instance)",
         "description": null,
         "error": null,
