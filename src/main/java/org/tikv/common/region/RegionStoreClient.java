@@ -30,6 +30,7 @@ import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
 import java.util.*;
+import java.util.concurrent.Future;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

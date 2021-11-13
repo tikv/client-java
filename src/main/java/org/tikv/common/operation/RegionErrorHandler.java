@@ -47,13 +47,13 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     if (error != null) {
       return handleRegionError(backOffer, error);
     } else {
-      tryUpdateRegionStore();
+      switchLeaderOrForwardRequest();
     }
     return false;
   }
 
-  public void tryUpdateRegionStore() {
-    recv.tryUpdateRegionStore();
+  public void switchLeaderOrForwardRequest() {
+    recv.switchLeaderOrForwardRequest();
   }
 
   public boolean handleRegionError(BackOffer backOffer, Errorpb.Error error) {

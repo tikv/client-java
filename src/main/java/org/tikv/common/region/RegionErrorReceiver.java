@@ -17,13 +17,15 @@
 
 package org.tikv.common.region;
 
+import org.tikv.common.TiSession;
+
 public interface RegionErrorReceiver {
   boolean onNotLeader(TiRegion region);
 
   /// return whether we need to retry this request.
-  boolean onStoreUnreachable();
+  boolean onStoreUnreachable(TiSession session);
 
-  void tryUpdateRegionStore();
+  void switchLeaderOrForwardRequest();
 
   TiRegion getRegion();
 }

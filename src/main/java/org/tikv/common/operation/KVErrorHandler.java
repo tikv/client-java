@@ -95,7 +95,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
     if (error != null) {
       return regionHandler.handleRegionError(backOffer, error);
     } else {
-      regionHandler.tryUpdateRegionStore();
+      regionHandler.switchLeaderOrForwardRequest();
     }
 
     // Key error handling logic
