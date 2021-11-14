@@ -207,7 +207,7 @@ public abstract class AbstractRegionStoreClient
           TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
       Kvrpcpb.RawGetRequest rawGetRequest =
           Kvrpcpb.RawGetRequest.newBuilder()
-              .setContext(makeContext(TiStoreType.TiKV))
+              .setContext(region.getReplicaContext(peer))
               .setKey(key)
               .build();
       ListenableFuture<Kvrpcpb.RawGetResponse> task = stub.rawGet(rawGetRequest);
