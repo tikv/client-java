@@ -1,7 +1,6 @@
 package org.tikv.common.region;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import org.tikv.kvproto.Metapb;
 
 public class TiStore {

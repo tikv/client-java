@@ -29,31 +29,23 @@ import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.health.v1.HealthGrpc;
 import io.grpc.stub.ClientCalls;
 import io.grpc.stub.MetadataUtils;
-
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.*;
-import java.util.function.Supplier;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
-import org.tikv.common.TiSession;
 import org.tikv.common.exception.GrpcException;
-import org.tikv.common.operation.RegionErrorHandler;
 import org.tikv.common.util.ChannelFactory;
-import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
-import org.tikv.raw.RawKVClient;
 
 public abstract class AbstractRegionStoreClient
-    extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvStub>
+    extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvFutureStub>
     implements RegionErrorReceiver {
   private static final Logger logger = LoggerFactory.getLogger(AbstractRegionStoreClient.class);
 
@@ -67,7 +59,7 @@ public abstract class AbstractRegionStoreClient
       TiStore store,
       ChannelFactory channelFactory,
       TikvGrpc.TikvBlockingStub blockingStub,
-      TikvGrpc.TikvStub asyncStub,
+      TikvGrpc.TikvFutureStub asyncStub,
       RegionManager regionManager) {
     super(conf, channelFactory, blockingStub, asyncStub);
     checkNotNull(region, "Region is empty");
@@ -94,7 +86,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   @Override
-  protected TikvGrpc.TikvStub getAsyncStub() {
+  protected TikvGrpc.TikvFutureStub getAsyncStub() {
     return asyncStub.withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
   }
 
@@ -143,47 +135,49 @@ public abstract class AbstractRegionStoreClient
       }
     }
 
-    CompletableFuture<Pair<Metapb.Peer, Metapb.Peer>>[] futureArray = new CompletableFuture[region.getFollowerList().size()];
-    int num = 0;
-    for (Metapb.Peer peer: region.getFollowerList()) {
-      futureArray[num++] = CompletableFuture.supplyAsync(() -> {
-        ByteString key = region.getStartKey();
-        TiStore store = regionManager.getStoreById(peer.getStoreId());
-        ManagedChannel channel = channelFactory.getChannel(store.getAddress(), regionManager.getPDClient().getHostMapping());
-        TikvGrpc.TikvBlockingStub stub = getBlockingStub();
-        Supplier<Kvrpcpb.RawGetRequest> factory =
-            () -> Kvrpcpb.RawGetRequest.newBuilder().setContext(makeContext(TiStoreType.TiKV)).setKey(key).build();
-        Callable<Kvrpcpb.RawGetResponse> callable = () -> ClientCalls.blockingUnaryCall(channel, TikvGrpc.getRawGetMethod(), stub.getCallOptions(), factory.get());
-
-        try {
-          Kvrpcpb.RawGetResponse resp = callable.call();
-          if (resp.hasRegionError()) {
-            Errorpb.Error error = resp.getRegionError();
-            if (error.hasNotLeader()) {
-              return Pair.create(peer, error.getNotLeader().getLeader());
-            }
-          }
-        } catch (Exception e) {
-          // ignore exception
-          try {
-            Thread.sleep(50);
-          } catch (InterruptedException ex) {
-            ex.printStackTrace();
-          }
-        }
-        return null;
-      }, Executors.newFixedThreadPool(region.getFollowerList().size()));
+    List<Metapb.Peer> peers = region.getFollowerList();
+    if (peers.isEmpty()) {
+      // no followers available, retry
+      regionManager.onRequestFail(region);
+      return false;
     }
-    CompletableFuture.anyOf(futureArray).thenAccept((pair) ->{
-      switchProxyStore(pair.first, pair.second);
-    });
 
-    // If this store has failed to forward request too many times, we shall try other peer at first
+    Metapb.Peer peer = switchLeader();
+    if (peer == null) {
+      // leader is not elected, just wait until it is ready.
+      return true;
+    }
+    TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
+    if (currentLeaderStore.isReachable()) {
+      // switch to leader store
+      store = currentLeaderStore;
+      updateClientStub();
+      return true;
+    }
+    if (conf.getEnableGrpcForward()) {
+      // when current leader cannot be reached
+      TiStore storeWithProxy = switchProxyStore();
+      if (storeWithProxy == null) {
+        // no store available, retry
+        regionManager.onRequestFail(region);
+        return false;
+      }
+      if (storeWithProxy.getStore().getId() == store.getStore().getId()) {
+        // the store is back online
+        return true;
+      }
+      // use proxy store to forward requests
+      regionManager.updateStore(store, storeWithProxy);
+      store = storeWithProxy;
+      updateClientStub();
+      return true;
+    }
+
+    // If this store has failed to forward request, we shall try other peer at first
     // so that we can reduce the latency cost by fail requests.
     logger.warn(
         String.format(
-            "retry time exceed for region[%d], invalid store[%d]",
-            region.getId(), store.getId()));
+            "retry time exceed for region[%d], invalid store[%d]", region.getId(), store.getId()));
     regionManager.onRequestFail(region);
     return false;
   }
@@ -196,17 +190,6 @@ public abstract class AbstractRegionStoreClient
     return region.getReplicaContext(resolvedLocks, storeType);
   }
 
-  @Override
-  public void switchLeaderOrForwardRequest() {
-    if (leader != null) {
-      logger.warn(
-          String.format(
-              "update leader to store [%d] for region[%d]",
-              region.getLeader().getStoreId(), region.getId()));
-      this.regionManager.updateLeader(region, leader.getStoreId());
-    }
-  }
-
   private void updateClientStub() {
     String addressStr = store.getStore().getAddress();
     if (store.getProxyStore() != null) {
@@ -215,7 +198,7 @@ public abstract class AbstractRegionStoreClient
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
     blockingStub = TikvGrpc.newBlockingStub(channel);
-    asyncStub = TikvGrpc.newStub(channel);
+    asyncStub = TikvGrpc.newFutureStub(channel);
     if (store.getProxyStore() != null) {
       Metadata header = new Metadata();
       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
@@ -224,19 +207,125 @@ public abstract class AbstractRegionStoreClient
     }
   }
 
-  private TiStore switchProxyStore(Metapb.Peer answered, Metapb.Peer leader) {
-    List<Metapb.Peer>  peers = region.getFollowerList();
-    if (peers.isEmpty()) {
-      return null;
-    }
-    for(Metapb.Peer peer: peers) {
+  private Metapb.Peer switchLeader() {
+    List<SwitchLeaderTask> responses = new LinkedList<>();
+    for (Metapb.Peer peer : region.getFollowerList()) {
+      ByteString key = region.getStartKey();
       TiStore store = regionManager.getStoreById(peer.getStoreId());
-      ManagedChannel channel = channelFactory.getChannel(store.getAddress(), regionManager.getPDClient().getHostMapping());
-      HealthGrpc.HealthFutureStub stub = HealthGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+      ManagedChannel channel =
+          channelFactory.getChannel(
+              store.getAddress(), regionManager.getPDClient().getHostMapping());
+      TikvGrpc.TikvFutureStub stub = getAsyncStub();
+      Kvrpcpb.RawGetRequest rawGetRequest =
+          Kvrpcpb.RawGetRequest.newBuilder()
+              .setContext(makeContext(TiStoreType.TiKV))
+              .setKey(key)
+              .build();
+      ListenableFuture<Kvrpcpb.RawGetResponse> task =
+          ClientCalls.futureUnaryCall(
+              channel.newCall(TikvGrpc.getRawGetMethod(), stub.getCallOptions()), rawGetRequest);
+      responses.add(new SwitchLeaderTask(task, peer));
+    }
+    while (true) {
+      try {
+        Thread.sleep(20);
+      } catch (InterruptedException e) {
+        throw new GrpcException(e);
+      }
+      List<SwitchLeaderTask> unfinished = new LinkedList<>();
+      for (SwitchLeaderTask task : responses) {
+        if (task.task.isDone()) {
+          try {
+            Kvrpcpb.RawGetResponse resp = task.task.get();
+            if (resp != null) {
+              // the peer has answered, it should be reachable.
+              TiStore peerStore = regionManager.getStoreById(task.peer.getStoreId());
+              if (!peerStore.isReachable()) {
+                peerStore.markReachable();
+              }
+              if (!resp.hasRegionError()) {
+                // the peer is leader
+                return task.peer;
+              } else {
+                Errorpb.Error error = resp.getRegionError();
+                if (error.hasNotLeader()) {
+                  // real leader in not_leader error
+                  return error.getNotLeader().getLeader();
+                }
+              }
+            }
+          } catch (Exception ignored) {
+          }
+        } else {
+          unfinished.add(task);
+        }
+      }
+      if (unfinished.isEmpty()) {
+        return null;
+      }
+      responses = unfinished;
+    }
+  }
+
+  private TiStore switchProxyStore() {
+    List<ForwardCheckTask> responses = new LinkedList<>();
+    for (Metapb.Peer peer : region.getFollowerList()) {
+      TiStore store = regionManager.getStoreById(peer.getStoreId());
+      ManagedChannel channel =
+          channelFactory.getChannel(
+              store.getAddress(), regionManager.getPDClient().getHostMapping());
+      HealthGrpc.HealthFutureStub stub =
+          HealthGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
       Metadata header = new Metadata();
       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
       HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
       ListenableFuture<HealthCheckResponse> task = stub.check(req);
+      responses.add(new ForwardCheckTask(task, store));
+    }
+    while (true) {
+      try {
+        Thread.sleep(20);
+      } catch (InterruptedException e) {
+        throw new GrpcException(e);
+      }
+      List<ForwardCheckTask> unfinished = new LinkedList<>();
+      for (ForwardCheckTask task : responses) {
+        if (task.task.isDone()) {
+          try {
+            HealthCheckResponse resp = task.task.get();
+            if (resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING) {
+              return store.withProxy(task.store.getStore());
+            }
+          } catch (Exception ignored) {
+          }
+        } else {
+          unfinished.add(task);
+        }
+      }
+      if (unfinished.isEmpty()) {
+        return null;
+      }
+      responses = unfinished;
+    }
+  }
+
+  private static class SwitchLeaderTask {
+    private final ListenableFuture<Kvrpcpb.RawGetResponse> task;
+    private final Metapb.Peer peer;
+
+    private SwitchLeaderTask(ListenableFuture<Kvrpcpb.RawGetResponse> task, Metapb.Peer peer) {
+      this.task = task;
+      this.peer = peer;
+    }
+  }
+
+  private static class ForwardCheckTask {
+    private final ListenableFuture<HealthCheckResponse> task;
+    private final TiStore store;
+
+    private ForwardCheckTask(ListenableFuture<HealthCheckResponse> task, TiStore store) {
+      this.task = task;
+      this.store = store;
     }
   }
 }

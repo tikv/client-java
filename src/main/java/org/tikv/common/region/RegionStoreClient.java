@@ -30,7 +30,6 @@ import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
 import java.util.*;
-import java.util.concurrent.Future;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +48,7 @@ import org.tikv.kvproto.Kvrpcpb.*;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
-import org.tikv.kvproto.TikvGrpc.TikvStub;
+import org.tikv.kvproto.TikvGrpc.TikvFutureStub;
 import org.tikv.txn.AbstractLockResolverClient;
 import org.tikv.txn.Lock;
 import org.tikv.txn.ResolveLockResult;
@@ -94,7 +93,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       TiStoreType storeType,
       ChannelFactory channelFactory,
       TikvBlockingStub blockingStub,
-      TikvStub asyncStub,
+      TikvFutureStub asyncStub,
       RegionManager regionManager,
       PDClient pdClient,
       RegionStoreClient.RegionStoreClientBuilder clientBuilder) {
@@ -125,7 +124,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
 
       TikvBlockingStub tikvBlockingStub = TikvGrpc.newBlockingStub(channel);
-      TikvStub tikvAsyncStub = TikvGrpc.newStub(channel);
+      TikvGrpc.TikvFutureStub tikvAsyncStub = TikvGrpc.newFutureStub(channel);
 
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
@@ -1247,7 +1246,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       ManagedChannel channel = null;
 
       TikvBlockingStub blockingStub = null;
-      TikvStub asyncStub = null;
+      TikvFutureStub asyncStub = null;
 
       if (conf.getEnableGrpcForward() && store.getProxyStore() != null && !store.isReachable()) {
         addressStr = store.getProxyStore().getAddress();
@@ -1256,11 +1255,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
         Metadata header = new Metadata();
         header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
         blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel), header);
-        asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newStub(channel), header);
+        asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newFutureStub(channel), header);
       } else {
         channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
         blockingStub = TikvGrpc.newBlockingStub(channel);
-        asyncStub = TikvGrpc.newStub(channel);
+        asyncStub = TikvGrpc.newFutureStub(channel);
       }
 
       return new RegionStoreClient(

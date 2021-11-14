@@ -69,7 +69,7 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.PDGrpc.PDBlockingStub;
-import org.tikv.kvproto.PDGrpc.PDStub;
+import org.tikv.kvproto.PDGrpc.PDFutureStub;
 import org.tikv.kvproto.Pdpb;
 import org.tikv.kvproto.Pdpb.Error;
 import org.tikv.kvproto.Pdpb.ErrorType;
@@ -92,7 +92,7 @@ import org.tikv.kvproto.Pdpb.Timestamp;
 import org.tikv.kvproto.Pdpb.TsoRequest;
 import org.tikv.kvproto.Pdpb.TsoResponse;
 
-public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
+public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     implements ReadOnlyPDClient {
   private static final String TIFLASH_TABLE_SYNC_PROGRESS_PATH = "/tiflash/table/sync";
   private static final long MIN_TRY_UPDATE_DURATION = 50;
@@ -552,7 +552,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   @Override
-  protected PDStub getAsyncStub() {
+  protected PDFutureStub getAsyncStub() {
     if (pdClientWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
@@ -635,7 +635,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   static class PDClientWrapper {
     private final String leaderInfo;
     private final PDBlockingStub blockingStub;
-    private final PDStub asyncStub;
+    private final PDFutureStub asyncStub;
     private final long createTime;
     private final String storeAddress;
 
@@ -646,10 +646,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, addrToUri(leaderInfo).toString());
         this.blockingStub =
             MetadataUtils.attachHeaders(PDGrpc.newBlockingStub(clientChannel), header);
-        this.asyncStub = MetadataUtils.attachHeaders(PDGrpc.newStub(clientChannel), header);
+        this.asyncStub = MetadataUtils.attachHeaders(PDGrpc.newFutureStub(clientChannel), header);
       } else {
         this.blockingStub = PDGrpc.newBlockingStub(clientChannel);
-        this.asyncStub = PDGrpc.newStub(clientChannel);
+        this.asyncStub = PDGrpc.newFutureStub(clientChannel);
       }
       this.leaderInfo = leaderInfo;
       this.storeAddress = storeAddress;
@@ -668,7 +668,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       return blockingStub;
     }
 
-    PDStub getAsyncStub() {
+    PDFutureStub getAsyncStub() {
       return asyncStub;
     }
 
