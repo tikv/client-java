@@ -129,6 +129,9 @@ public abstract class AbstractRegionStoreClient
 
     if (store.getProxyStore() == null) {
       if (store.isReachable()) {
+        logger.warn(
+            String.format(
+                "store[%d] for region[%d] is reachable, retry", store.getId(), region.getId()));
         return true;
       }
     }
@@ -136,17 +139,27 @@ public abstract class AbstractRegionStoreClient
     List<Metapb.Peer> peers = region.getFollowerList();
     if (peers.isEmpty()) {
       // no followers available, retry
+      logger.warn(String.format("no followers of region[%d] available, retry", region.getId()));
       regionManager.onRequestFail(region);
       return false;
     }
 
+    logger.warn(String.format("try switch leader: region[%d]", region.getId()));
+
     Metapb.Peer peer = switchLeader();
     if (peer == null) {
       // leader is not elected, just wait until it is ready.
+      logger.warn(
+          String.format(
+              "leader for region[%d] is not elected, just wait until it is ready", region.getId()));
       return true;
     }
     TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
     if (currentLeaderStore.isReachable()) {
+      logger.warn(
+          String.format(
+              "update leader using switchLeader logic from store[%d] to store[%d]",
+              region.getLeader().getStoreId(), peer.getStoreId()));
       // update region cache
       region = regionManager.updateLeader(region, peer.getStoreId());
       // switch to leader store
@@ -155,10 +168,12 @@ public abstract class AbstractRegionStoreClient
       return true;
     }
     if (conf.getEnableGrpcForward()) {
+      logger.warn(String.format("try grpc forward: region[%d]", region.getId()));
       // when current leader cannot be reached
       TiStore storeWithProxy = switchProxyStore();
       if (storeWithProxy == null) {
         // no store available, retry
+        logger.warn(String.format("No store available, retry: region[%d]", region.getId()));
         return false;
       }
       // use proxy store to forward requests
@@ -225,8 +240,12 @@ public abstract class AbstractRegionStoreClient
           try {
             Kvrpcpb.RawGetResponse resp = task.task.get();
             if (resp != null) {
+              logger.info(String.format("rawGet response received from peer[%s]", task.peer));
               if (!resp.hasRegionError()) {
                 // the peer is leader
+                logger.info(
+                    String.format(
+                        "rawGet response indicates peer[%d] is leader", task.peer.getId()));
                 return task.peer;
               }
             }
@@ -269,7 +288,13 @@ public abstract class AbstractRegionStoreClient
         if (task.task.isDone()) {
           try {
             HealthCheckResponse resp = task.task.get();
+            logger.info(
+                String.format("healthCheck response received from store[%d]", task.store.getId()));
             if (resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING) {
+              logger.info(
+                  String.format(
+                      "healthCheck response indicates forward from remote[%s] to remote[%s]",
+                      task.store.getAddress(), store.getAddress()));
               return store.withProxy(task.store.getStore());
             }
           } catch (Exception ignored) {
