@@ -215,7 +215,7 @@ public abstract class AbstractRegionStoreClient
     }
     while (true) {
       try {
-        Thread.sleep(20);
+        Thread.sleep(2);
       } catch (InterruptedException e) {
         throw new GrpcException(e);
       }
@@ -260,7 +260,7 @@ public abstract class AbstractRegionStoreClient
     }
     while (true) {
       try {
-        Thread.sleep(20);
+        Thread.sleep(2);
       } catch (InterruptedException e) {
         throw new GrpcException(e);
       }
