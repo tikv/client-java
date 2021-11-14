@@ -23,7 +23,7 @@ public interface RegionErrorReceiver {
   boolean onNotLeader(TiRegion region);
 
   /// return whether we need to retry this request.
-  boolean onStoreUnreachable(TiSession session);
+  boolean onStoreUnreachable();
 
   void switchLeaderOrForwardRequest();
 
