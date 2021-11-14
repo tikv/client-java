@@ -38,6 +38,7 @@ import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
@@ -146,26 +147,39 @@ public abstract class AbstractRegionStoreClient
 
     logger.warn(String.format("try switch leader: region[%d]", region.getId()));
 
-    Metapb.Peer peer = switchLeader();
+    Pair<Metapb.Peer, Boolean> pair = switchLeader();
+    Metapb.Peer peer = pair.first;
+    boolean exceptionEncountered = pair.second;
     if (peer == null) {
-      // leader is not elected, just wait until it is ready.
-      logger.warn(
-          String.format(
-              "leader for region[%d] is not elected, just wait until it is ready", region.getId()));
-      return true;
-    }
-    TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
-    if (currentLeaderStore.isReachable()) {
-      logger.warn(
-          String.format(
-              "update leader using switchLeader logic from store[%d] to store[%d]",
-              region.getLeader().getStoreId(), peer.getStoreId()));
-      // update region cache
-      region = regionManager.updateLeader(region, peer.getStoreId());
-      // switch to leader store
-      store = currentLeaderStore;
-      updateClientStub();
-      return true;
+      if (!exceptionEncountered) {
+        // all response returned normally, the leader is not elected, just wait until it is ready.
+        logger.warn(
+            String.format(
+                "leader for region[%d] is not elected, just wait until it is ready",
+                region.getId()));
+        return true;
+      } else {
+        // no leader found, some response does not return normally, there may be network partition.
+        logger.warn(
+            String.format(
+                "leader for region[%d] is not found, it is possible that network partition occurred",
+                region.getId()));
+      }
+    } else {
+      // we found a leader
+      TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
+      if (currentLeaderStore.isReachable()) {
+        logger.warn(
+            String.format(
+                "update leader using switchLeader logic from store[%d] to store[%d]",
+                region.getLeader().getStoreId(), peer.getStoreId()));
+        // update region cache
+        region = regionManager.updateLeader(region, peer.getStoreId());
+        // switch to leader store
+        store = currentLeaderStore;
+        updateClientStub();
+        return true;
+      }
     }
     if (conf.getEnableGrpcForward()) {
       logger.warn(String.format("try grpc forward: region[%d]", region.getId()));
@@ -210,7 +224,8 @@ public abstract class AbstractRegionStoreClient
     }
   }
 
-  private Metapb.Peer switchLeader() {
+  // first: leader peer, second: true if any responses returned with grpc error
+  private Pair<Metapb.Peer, Boolean> switchLeader() {
     List<SwitchLeaderTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
@@ -228,6 +243,7 @@ public abstract class AbstractRegionStoreClient
       ListenableFuture<Kvrpcpb.RawGetResponse> task = stub.rawGet(rawGetRequest);
       responses.add(new SwitchLeaderTask(task, peer));
     }
+    boolean exceptionEncountered = false;
     while (true) {
       try {
         Thread.sleep(2);
@@ -246,17 +262,18 @@ public abstract class AbstractRegionStoreClient
                 logger.info(
                     String.format(
                         "rawGet response indicates peer[%d] is leader", task.peer.getId()));
-                return task.peer;
+                return Pair.create(task.peer, exceptionEncountered);
               }
             }
           } catch (Exception ignored) {
+            exceptionEncountered = true;
           }
         } else {
           unfinished.add(task);
         }
       }
       if (unfinished.isEmpty()) {
-        return null;
+        return Pair.create(null, exceptionEncountered);
       }
       responses = unfinished;
     }
