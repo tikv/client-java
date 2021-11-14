@@ -28,6 +28,7 @@ import io.grpc.health.v1.HealthCheckRequest;
 import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.health.v1.HealthGrpc;
 import io.grpc.stub.MetadataUtils;
+import io.prometheus.client.Histogram;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -47,6 +48,18 @@ public abstract class AbstractRegionStoreClient
     extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvFutureStub>
     implements RegionErrorReceiver {
   private static final Logger logger = LoggerFactory.getLogger(AbstractRegionStoreClient.class);
+
+  public static final Histogram SWITCH_LEADER_DURATION =
+      Histogram.build()
+          .name("client_java_switch_leader_duration")
+          .help("switch leader duration.")
+          .register();
+
+  public static final Histogram GRPC_FORWARD_DURATION =
+      Histogram.build()
+          .name("client_java_grpc_forward_duration")
+          .help("grpc forward duration.")
+          .register();
 
   protected final RegionManager regionManager;
   protected TiRegion region;
@@ -137,64 +150,75 @@ public abstract class AbstractRegionStoreClient
       }
     }
 
-    List<Metapb.Peer> peers = region.getFollowerList();
-    if (peers.isEmpty()) {
-      // no followers available, retry
-      logger.warn(String.format("no followers of region[%d] available, retry", region.getId()));
-      regionManager.onRequestFail(region);
-      return false;
-    }
-
-    logger.warn(String.format("try switch leader: region[%d]", region.getId()));
-
-    Pair<Metapb.Peer, Boolean> pair = switchLeader();
-    Metapb.Peer peer = pair.first;
-    boolean exceptionEncountered = pair.second;
-    if (peer == null) {
-      if (!exceptionEncountered) {
-        // all response returned normally, the leader is not elected, just wait until it is ready.
-        logger.warn(
-            String.format(
-                "leader for region[%d] is not elected, just wait until it is ready",
-                region.getId()));
-        return true;
-      } else {
-        // no leader found, some response does not return normally, there may be network partition.
-        logger.warn(
-            String.format(
-                "leader for region[%d] is not found, it is possible that network partition occurred",
-                region.getId()));
-      }
-    } else {
-      // we found a leader
-      TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
-      if (currentLeaderStore.isReachable()) {
-        logger.warn(
-            String.format(
-                "update leader using switchLeader logic from store[%d] to store[%d]",
-                region.getLeader().getStoreId(), peer.getStoreId()));
-        // update region cache
-        region = regionManager.updateLeader(region, peer.getStoreId());
-        // switch to leader store
-        store = currentLeaderStore;
-        updateClientStub();
-        return true;
-      }
-    }
-    if (conf.getEnableGrpcForward()) {
-      logger.warn(String.format("try grpc forward: region[%d]", region.getId()));
-      // when current leader cannot be reached
-      TiStore storeWithProxy = switchProxyStore();
-      if (storeWithProxy == null) {
-        // no store available, retry
-        logger.warn(String.format("No store available, retry: region[%d]", region.getId()));
+    Histogram.Timer switchLeaderDurationTimer = SWITCH_LEADER_DURATION.startTimer();
+    try {
+      List<Metapb.Peer> peers = region.getFollowerList();
+      if (peers.isEmpty()) {
+        // no followers available, retry
+        logger.warn(String.format("no followers of region[%d] available, retry", region.getId()));
+        regionManager.onRequestFail(region);
         return false;
       }
-      // use proxy store to forward requests
-      regionManager.updateStore(store, storeWithProxy);
-      store = storeWithProxy;
-      updateClientStub();
-      return true;
+
+      logger.warn(String.format("try switch leader: region[%d]", region.getId()));
+
+      Pair<Metapb.Peer, Boolean> pair = switchLeader();
+      Metapb.Peer peer = pair.first;
+      boolean exceptionEncountered = pair.second;
+      if (peer == null) {
+        if (!exceptionEncountered) {
+          // all response returned normally, the leader is not elected, just wait until it is ready.
+          logger.warn(
+              String.format(
+                  "leader for region[%d] is not elected, just wait until it is ready",
+                  region.getId()));
+          return true;
+        } else {
+          // no leader found, some response does not return normally, there may be network
+          // partition.
+          logger.warn(
+              String.format(
+                  "leader for region[%d] is not found, it is possible that network partition occurred",
+                  region.getId()));
+        }
+      } else {
+        // we found a leader
+        TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
+        if (currentLeaderStore.isReachable()) {
+          logger.warn(
+              String.format(
+                  "update leader using switchLeader logic from store[%d] to store[%d]",
+                  region.getLeader().getStoreId(), peer.getStoreId()));
+          // update region cache
+          region = regionManager.updateLeader(region, peer.getStoreId());
+          // switch to leader store
+          store = currentLeaderStore;
+          updateClientStub();
+          return true;
+        }
+      }
+    } finally {
+      switchLeaderDurationTimer.observeDuration();
+    }
+    if (conf.getEnableGrpcForward()) {
+      Histogram.Timer grpcForwardDurationTimer = GRPC_FORWARD_DURATION.startTimer();
+      try {
+        logger.warn(String.format("try grpc forward: region[%d]", region.getId()));
+        // when current leader cannot be reached
+        TiStore storeWithProxy = switchProxyStore();
+        if (storeWithProxy == null) {
+          // no store available, retry
+          logger.warn(String.format("No store available, retry: region[%d]", region.getId()));
+          return false;
+        }
+        // use proxy store to forward requests
+        regionManager.updateStore(store, storeWithProxy);
+        store = storeWithProxy;
+        updateClientStub();
+        return true;
+      } finally {
+        grpcForwardDurationTimer.observeDuration();
+      }
     }
     return false;
   }
@@ -256,7 +280,6 @@ public abstract class AbstractRegionStoreClient
           try {
             Kvrpcpb.RawGetResponse resp = task.task.get();
             if (resp != null) {
-              logger.info(String.format("rawGet response received from peer[%s]", task.peer));
               if (!resp.hasRegionError()) {
                 // the peer is leader
                 logger.info(
@@ -305,8 +328,6 @@ public abstract class AbstractRegionStoreClient
         if (task.task.isDone()) {
           try {
             HealthCheckResponse resp = task.task.get();
-            logger.info(
-                String.format("healthCheck response received from store[%d]", task.store.getId()));
             if (resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING) {
               logger.info(
                   String.format(
