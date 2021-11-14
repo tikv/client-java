@@ -148,7 +148,7 @@ public abstract class AbstractRegionStoreClient
     TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
     if (currentLeaderStore.isReachable()) {
       // update region cache
-      regionManager.updateLeader(region, peer.getStoreId());
+      region = regionManager.updateLeader(region, peer.getStoreId());
       // switch to leader store
       store = currentLeaderStore;
       updateClientStub();
@@ -225,11 +225,6 @@ public abstract class AbstractRegionStoreClient
           try {
             Kvrpcpb.RawGetResponse resp = task.task.get();
             if (resp != null) {
-              // the peer has answered, it should be reachable.
-              TiStore peerStore = regionManager.getStoreById(task.peer.getStoreId());
-              if (!peerStore.isReachable()) {
-                peerStore.markReachable();
-              }
               if (!resp.hasRegionError()) {
                 // the peer is leader
                 return task.peer;
