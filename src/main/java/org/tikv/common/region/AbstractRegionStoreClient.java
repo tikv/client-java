@@ -147,6 +147,8 @@ public abstract class AbstractRegionStoreClient
     }
     TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
     if (currentLeaderStore.isReachable()) {
+      // update region cache
+      regionManager.updateLeader(region, peer.getStoreId());
       // switch to leader store
       store = currentLeaderStore;
       updateClientStub();
@@ -158,10 +160,6 @@ public abstract class AbstractRegionStoreClient
       if (storeWithProxy == null) {
         // no store available, retry
         return false;
-      }
-      if (storeWithProxy.getStore().getId() == store.getStore().getId()) {
-        // the store is back online
-        return true;
       }
       // use proxy store to forward requests
       regionManager.updateStore(store, storeWithProxy);
