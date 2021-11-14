@@ -27,7 +27,6 @@ import io.grpc.Metadata;
 import io.grpc.health.v1.HealthCheckRequest;
 import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.health.v1.HealthGrpc;
-import io.grpc.stub.ClientCalls;
 import io.grpc.stub.MetadataUtils;
 import java.util.LinkedList;
 import java.util.List;
@@ -39,7 +38,6 @@ import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.util.ChannelFactory;
-import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
@@ -70,7 +68,7 @@ public abstract class AbstractRegionStoreClient
     this.store = store;
     if (this.store.getProxyStore() != null) {
       this.timeout = conf.getForwardTimeout();
-    } else if (!this.store.isReachable() && !this.store.canForward()) {
+    } else if (!this.store.isReachable()) {
       onStoreUnreachable();
     }
   }
@@ -159,7 +157,6 @@ public abstract class AbstractRegionStoreClient
       TiStore storeWithProxy = switchProxyStore();
       if (storeWithProxy == null) {
         // no store available, retry
-        regionManager.onRequestFail(region);
         return false;
       }
       if (storeWithProxy.getStore().getId() == store.getStore().getId()) {
@@ -172,13 +169,6 @@ public abstract class AbstractRegionStoreClient
       updateClientStub();
       return true;
     }
-
-    // If this store has failed to forward request, we shall try other peer at first
-    // so that we can reduce the latency cost by fail requests.
-    logger.warn(
-        String.format(
-            "retry time exceed for region[%d], invalid store[%d]", region.getId(), store.getId()));
-    regionManager.onRequestFail(region);
     return false;
   }
 
@@ -215,15 +205,14 @@ public abstract class AbstractRegionStoreClient
       ManagedChannel channel =
           channelFactory.getChannel(
               store.getAddress(), regionManager.getPDClient().getHostMapping());
-      TikvGrpc.TikvFutureStub stub = getAsyncStub();
+      TikvGrpc.TikvFutureStub stub =
+          TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
       Kvrpcpb.RawGetRequest rawGetRequest =
           Kvrpcpb.RawGetRequest.newBuilder()
               .setContext(makeContext(TiStoreType.TiKV))
               .setKey(key)
               .build();
-      ListenableFuture<Kvrpcpb.RawGetResponse> task =
-          ClientCalls.futureUnaryCall(
-              channel.newCall(TikvGrpc.getRawGetMethod(), stub.getCallOptions()), rawGetRequest);
+      ListenableFuture<Kvrpcpb.RawGetResponse> task = stub.rawGet(rawGetRequest);
       responses.add(new SwitchLeaderTask(task, peer));
     }
     while (true) {
@@ -246,12 +235,6 @@ public abstract class AbstractRegionStoreClient
               if (!resp.hasRegionError()) {
                 // the peer is leader
                 return task.peer;
-              } else {
-                Errorpb.Error error = resp.getRegionError();
-                if (error.hasNotLeader()) {
-                  // real leader in not_leader error
-                  return error.getNotLeader().getLeader();
-                }
               }
             }
           } catch (Exception ignored) {

@@ -122,9 +122,6 @@ public class StoreHealthyChecker implements Runnable {
                     "store [%s] recovers to be reachable and canforward", store.getAddress()));
             store.markReachable();
           }
-          if (!store.canForward()) {
-            store.markCanForward();
-          }
         }
       } else if (store.isReachable()) {
         unreachableStore.add(store);

@@ -8,13 +8,11 @@ public class TiStore {
   private final Metapb.Store proxyStore;
   private final AtomicBoolean reachable;
   private final AtomicBoolean valid;
-  private final AtomicBoolean canForward;
 
   public TiStore(Metapb.Store store) {
     this.store = store;
     this.reachable = new AtomicBoolean(true);
     this.valid = new AtomicBoolean(true);
-    this.canForward = new AtomicBoolean(true);
     this.proxyStore = null;
   }
 
@@ -26,7 +24,6 @@ public class TiStore {
       this.reachable = new AtomicBoolean(true);
     }
     this.valid = new AtomicBoolean(true);
-    this.canForward = new AtomicBoolean(true);
     this.proxyStore = proxyStore;
   }
 
@@ -74,14 +71,6 @@ public class TiStore {
 
   public void markInvalid() {
     this.valid.set(false);
-  }
-
-  public void markCanForward() {
-    this.canForward.set(true);
-  }
-
-  public boolean canForward() {
-    return this.canForward.get();
   }
 
   public Metapb.Store getStore() {
