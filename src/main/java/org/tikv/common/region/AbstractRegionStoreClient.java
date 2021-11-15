@@ -233,13 +233,16 @@ public abstract class AbstractRegionStoreClient
 
   private void updateClientStub() {
     String addressStr = store.getStore().getAddress();
+    long deadline = timeout;
     if (store.getProxyStore() != null) {
       addressStr = store.getProxyStore().getAddress();
+      deadline = conf.getForwardTimeout();
     }
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
-    blockingStub = TikvGrpc.newBlockingStub(channel);
-    asyncStub = TikvGrpc.newFutureStub(channel);
+    blockingStub =
+        TikvGrpc.newBlockingStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
+    asyncStub = TikvGrpc.newFutureStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
     if (store.getProxyStore() != null) {
       Metadata header = new Metadata();
       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
@@ -305,17 +308,17 @@ public abstract class AbstractRegionStoreClient
   private TiStore switchProxyStore() {
     List<ForwardCheckTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
-      TiStore store = regionManager.getStoreById(peer.getStoreId());
+      TiStore peerStore = regionManager.getStoreById(peer.getStoreId());
       ManagedChannel channel =
           channelFactory.getChannel(
-              store.getAddress(), regionManager.getPDClient().getHostMapping());
+              peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
       HealthGrpc.HealthFutureStub stub =
           HealthGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
       Metadata header = new Metadata();
       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
       HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
       ListenableFuture<HealthCheckResponse> task = stub.check(req);
-      responses.add(new ForwardCheckTask(task, store));
+      responses.add(new ForwardCheckTask(task, peerStore));
     }
     while (true) {
       try {
