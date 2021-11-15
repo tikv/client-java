@@ -303,6 +303,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   private TiStore switchProxyStore() {
+    long forwardTimeout = conf.getForwardTimeout();
     List<ForwardCheckTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
@@ -311,7 +312,7 @@ public abstract class AbstractRegionStoreClient
           channelFactory.getChannel(
               peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
       TikvGrpc.TikvFutureStub stub =
-          TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+          TikvGrpc.newFutureStub(channel).withDeadlineAfter(forwardTimeout, TimeUnit.MILLISECONDS);
       Metadata header = new Metadata();
       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
       Kvrpcpb.RawGetRequest rawGetRequest =
@@ -321,7 +322,7 @@ public abstract class AbstractRegionStoreClient
               .build();
       ListenableFuture<Kvrpcpb.RawGetResponse> task =
           MetadataUtils.attachHeaders(stub, header).rawGet(rawGetRequest);
-      responses.add(new ForwardCheckTask(task, peerStore));
+      responses.add(new ForwardCheckTask(task, peerStore.getStore()));
     }
     while (true) {
       try {
@@ -335,7 +336,11 @@ public abstract class AbstractRegionStoreClient
           try {
             // any answer will do
             Kvrpcpb.RawGetResponse resp = task.task.get();
-            return task.store;
+            logger.info(
+                String.format(
+                    "rawGetResponse indicates forward from [%s] to [%s]",
+                    task.store.getAddress(), store.getAddress()));
+            return store.withProxy(task.store);
           } catch (Exception ignored) {
           }
         } else {
@@ -361,9 +366,9 @@ public abstract class AbstractRegionStoreClient
 
   private static class ForwardCheckTask {
     private final ListenableFuture<Kvrpcpb.RawGetResponse> task;
-    private final TiStore store;
+    private final Metapb.Store store;
 
-    private ForwardCheckTask(ListenableFuture<Kvrpcpb.RawGetResponse> task, TiStore store) {
+    private ForwardCheckTask(ListenableFuture<Kvrpcpb.RawGetResponse> task, Metapb.Store store) {
       this.task = task;
       this.store = store;
     }
