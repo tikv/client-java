@@ -24,9 +24,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
-import io.grpc.health.v1.HealthCheckRequest;
-import io.grpc.health.v1.HealthCheckResponse;
-import io.grpc.health.v1.HealthGrpc;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
 import java.util.LinkedList;
@@ -256,10 +253,10 @@ public abstract class AbstractRegionStoreClient
     List<SwitchLeaderTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
-      TiStore store = regionManager.getStoreById(peer.getStoreId());
+      TiStore peerStore = regionManager.getStoreById(peer.getStoreId());
       ManagedChannel channel =
           channelFactory.getChannel(
-              store.getAddress(), regionManager.getPDClient().getHostMapping());
+              peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
       TikvGrpc.TikvFutureStub stub =
           TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
       Kvrpcpb.RawGetRequest rawGetRequest =
@@ -308,16 +305,22 @@ public abstract class AbstractRegionStoreClient
   private TiStore switchProxyStore() {
     List<ForwardCheckTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
+      ByteString key = region.getStartKey();
       TiStore peerStore = regionManager.getStoreById(peer.getStoreId());
       ManagedChannel channel =
           channelFactory.getChannel(
               peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
-      HealthGrpc.HealthFutureStub stub =
-          HealthGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+      TikvGrpc.TikvFutureStub stub =
+          TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
       Metadata header = new Metadata();
       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
-      HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
-      ListenableFuture<HealthCheckResponse> task = stub.check(req);
+      Kvrpcpb.RawGetRequest rawGetRequest =
+          Kvrpcpb.RawGetRequest.newBuilder()
+              .setContext(region.getReplicaContext(peer))
+              .setKey(key)
+              .build();
+      ListenableFuture<Kvrpcpb.RawGetResponse> task =
+          MetadataUtils.attachHeaders(stub, header).rawGet(rawGetRequest);
       responses.add(new ForwardCheckTask(task, peerStore));
     }
     while (true) {
@@ -330,14 +333,9 @@ public abstract class AbstractRegionStoreClient
       for (ForwardCheckTask task : responses) {
         if (task.task.isDone()) {
           try {
-            HealthCheckResponse resp = task.task.get();
-            if (resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING) {
-              logger.info(
-                  String.format(
-                      "healthCheck response indicates forward from remote[%s] to remote[%s]",
-                      task.store.getAddress(), store.getAddress()));
-              return store.withProxy(task.store.getStore());
-            }
+            // any answer will do
+            Kvrpcpb.RawGetResponse resp = task.task.get();
+            return task.store;
           } catch (Exception ignored) {
           }
         } else {
@@ -362,10 +360,10 @@ public abstract class AbstractRegionStoreClient
   }
 
   private static class ForwardCheckTask {
-    private final ListenableFuture<HealthCheckResponse> task;
+    private final ListenableFuture<Kvrpcpb.RawGetResponse> task;
     private final TiStore store;
 
-    private ForwardCheckTask(ListenableFuture<HealthCheckResponse> task, TiStore store) {
+    private ForwardCheckTask(ListenableFuture<Kvrpcpb.RawGetResponse> task, TiStore store) {
       this.task = task;
       this.store = store;
     }
