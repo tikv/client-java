@@ -585,9 +585,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     long originTimeout = this.timeout;
     this.timeout = 2000;
     for (URI u : pdAddrs) {
-      logger.info("get members: start");
+      logger.info("get members with pd " + u + ": start");
       resp = getMembers(u);
-      logger.info("get members: end");
+      logger.info("get members with pd " + u + ": end");
       if (resp != null) {
         break;
       }
@@ -608,9 +608,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
     String leaderUrlStr = resp.getLeader().getClientUrls(0);
     leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
-    logger.info("createLeaderClientWrapper: start");
+    logger.info("createLeaderClientWrapper with leader " + leaderUrlStr + ": start");
     createLeaderClientWrapper(leaderUrlStr);
-    logger.info("createLeaderClientWrapper: end");
+    logger.info("createLeaderClientWrapper with leader " + leaderUrlStr + ": end");
     service =
         Executors.newSingleThreadScheduledExecutor(
             new ThreadFactoryBuilder()
