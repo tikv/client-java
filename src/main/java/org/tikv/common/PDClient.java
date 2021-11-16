@@ -340,7 +340,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
       return resp;
     } catch (Exception e) {
-      logger.error("failed to get member from pd server.", e);
+      logger.warn("failed to get member from pd server.", e);
     }
     return null;
   }
@@ -560,6 +560,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   private void initCluster() {
+    logger.info("init cluster: start");
     GetMembersResponse resp = null;
     List<URI> pdAddrs = new ArrayList<>(getConf().getPdAddrs());
     // shuffle PD addresses so that clients call getMembers from different PD
@@ -575,14 +576,18 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                         .setDaemon(true)
                         .build()))
             .build();
+    logger.info("init host mapping: start");
     this.hostMapping =
         Optional.ofNullable(getConf().getHostMapping())
             .orElseGet(() -> new DefaultHostMapping(this.etcdClient, conf.getNetworkMappingName()));
+    logger.info("init host mapping: end");
     // The first request may cost too much latency
     long originTimeout = this.timeout;
     this.timeout = 2000;
     for (URI u : pdAddrs) {
+      logger.info("get members: start");
       resp = getMembers(u);
+      logger.info("get members: end");
       if (resp != null) {
         break;
       }
@@ -603,7 +608,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
     String leaderUrlStr = resp.getLeader().getClientUrls(0);
     leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
+    logger.info("createLeaderClientWrapper: start");
     createLeaderClientWrapper(leaderUrlStr);
+    logger.info("createLeaderClientWrapper: end");
     service =
         Executors.newSingleThreadScheduledExecutor(
             new ThreadFactoryBuilder()
@@ -630,6 +637,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                 .build());
     tiflashReplicaService.scheduleAtFixedRate(
         this::updateTiFlashReplicaStatus, 10, 10, TimeUnit.SECONDS);
+    logger.info("init cluster: finish");
   }
 
   static class PDClientWrapper {
