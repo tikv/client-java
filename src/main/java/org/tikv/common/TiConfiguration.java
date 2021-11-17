@@ -119,6 +119,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_RAWKV_SCAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_SCAN_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
     setIfMissing(TIKV_BO_REGION_MISS_BASE_IN_MS, DEF_TIKV_BO_REGION_MISS_BASE_IN_MS);
+    setIfMissing(TIKV_SLOW_LOG_THRESHOLD, DEF_TIKV_SLOW_LOG_THRESHOLD);
   }
 
   public static void listAll() {
@@ -315,6 +316,7 @@ public class TiConfiguration implements Serializable {
   private int rawKVBatchWriteTimeoutInMS = getInt(TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS);
   private int rawKVScanTimeoutInMS = getInt(TIKV_RAWKV_SCAN_TIMEOUT_IN_MS);
   private int rawKVCleanTimeoutInMS = getInt(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
+  private double slowLogThreshold = getDouble(TIKV_SLOW_LOG_THRESHOLD);
 
   public enum KVMode {
     TXN,
@@ -676,5 +678,13 @@ public class TiConfiguration implements Serializable {
 
   public void setRawKVCleanTimeoutInMS(int rawKVCleanTimeoutInMS) {
     this.rawKVCleanTimeoutInMS = rawKVCleanTimeoutInMS;
+  }
+
+  public double getSlowLogThreshold() {
+    return slowLogThreshold;
+  }
+
+  public void setSlowLogThreshold(double slowLogThreshold) {
+    this.slowLogThreshold = slowLogThreshold;
   }
 }

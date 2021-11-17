@@ -90,7 +90,8 @@ public abstract class AbstractGRPCClient<
                   return ClientCalls.blockingUnaryCall(
                       stub.getChannel(), method, stub.getCallOptions(), requestFactory.get());
                 },
-                method.getFullMethodName());
+                method.getFullMethodName(),
+                backOffer);
 
     if (logger.isTraceEnabled()) {
       logger.trace(String.format("leaving %s...", method.getFullMethodName()));
@@ -118,7 +119,8 @@ public abstract class AbstractGRPCClient<
                   responseObserver);
               return null;
             },
-            method.getFullMethodName());
+            method.getFullMethodName(),
+            backOffer);
     logger.debug(String.format("leaving %s...", method.getFullMethodName()));
   }
 
@@ -139,7 +141,8 @@ public abstract class AbstractGRPCClient<
                   return asyncBidiStreamingCall(
                       stub.getChannel().newCall(method, stub.getCallOptions()), responseObserver);
                 },
-                method.getFullMethodName());
+                method.getFullMethodName(),
+                backOffer);
     logger.debug(String.format("leaving %s...", method.getFullMethodName()));
     return observer;
   }
@@ -162,7 +165,8 @@ public abstract class AbstractGRPCClient<
                       blockingServerStreamingCall(
                           stub.getChannel(), method, stub.getCallOptions(), requestFactory.get()));
                 },
-                method.getFullMethodName());
+                method.getFullMethodName(),
+                backOffer);
     logger.debug(String.format("leaving %s...", method.getFullMethodName()));
     return response;
   }

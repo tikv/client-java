@@ -21,6 +21,7 @@ import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
 import java.util.concurrent.Callable;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.operation.ErrorHandler;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
@@ -67,7 +68,16 @@ public abstract class RetryPolicy<RespT> {
     }
   }
 
-  public RespT callWithRetry(Callable<RespT> proc, String methodName) {
+  public RespT callWithRetry(Callable<RespT> proc, String methodName, BackOffer backOffer) {
+    SlowLogSpan slowLogSpan = backOffer.slowLogStart("callWithRetry " + methodName);
+    try {
+      return callWithRetry(proc, methodName);
+    } finally {
+      slowLogSpan.end();
+    }
+  }
+
+  private RespT callWithRetry(Callable<RespT> proc, String methodName) {
     Histogram.Timer callWithRetryTimer = CALL_WITH_RETRY_DURATION.labels(methodName).startTimer();
     try {
       while (true) {
@@ -76,9 +86,11 @@ public abstract class RetryPolicy<RespT> {
           // add single request duration histogram
           Histogram.Timer requestTimer =
               GRPC_SINGLE_REQUEST_LATENCY.labels(methodName).startTimer();
+          SlowLogSpan slowLogSpan = backOffer.slowLogStart("gRPC " + methodName);
           try {
             result = proc.call();
           } finally {
+            slowLogSpan.end();
             requestTimer.observeDuration();
           }
         } catch (Exception e) {
