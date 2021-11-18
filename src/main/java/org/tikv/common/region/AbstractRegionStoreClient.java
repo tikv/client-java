@@ -140,7 +140,7 @@ public abstract class AbstractRegionStoreClient
 
     if (store.getProxyStore() == null) {
       if (store.isReachable()) {
-        logger.warn(
+        logger.info(
             String.format(
                 "store[%d] for region[%d] is reachable, retry", store.getId(), region.getId()));
         return true;
@@ -157,7 +157,7 @@ public abstract class AbstractRegionStoreClient
         return false;
       }
 
-      logger.warn(String.format("try switch leader: region[%d]", region.getId()));
+      logger.info(String.format("try switch leader: region[%d]", region.getId()));
 
       Pair<Metapb.Peer, Boolean> pair = switchLeader();
       Metapb.Peer peer = pair.first;
@@ -165,7 +165,7 @@ public abstract class AbstractRegionStoreClient
       if (peer == null) {
         if (!exceptionEncountered) {
           // all response returned normally, the leader is not elected, just wait until it is ready.
-          logger.warn(
+          logger.info(
               String.format(
                   "leader for region[%d] is not elected, just wait until it is ready",
                   region.getId()));
@@ -182,7 +182,7 @@ public abstract class AbstractRegionStoreClient
         // we found a leader
         TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
         if (currentLeaderStore.isReachable()) {
-          logger.warn(
+          logger.info(
               String.format(
                   "update leader using switchLeader logic from store[%d] to store[%d]",
                   region.getLeader().getStoreId(), peer.getStoreId()));
@@ -200,7 +200,7 @@ public abstract class AbstractRegionStoreClient
     if (conf.getEnableGrpcForward()) {
       Histogram.Timer grpcForwardDurationTimer = GRPC_FORWARD_DURATION.startTimer();
       try {
-        logger.warn(String.format("try grpc forward: region[%d]", region.getId()));
+        logger.info(String.format("try grpc forward: region[%d]", region.getId()));
         // when current leader cannot be reached
         TiStore storeWithProxy = switchProxyStore();
         if (storeWithProxy == null) {
