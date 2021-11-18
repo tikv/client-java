@@ -368,7 +368,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
           new PDClientWrapper(leaderUrlStr, leaderUrlStr, clientChannel, System.nanoTime());
       timeout = conf.getTimeout();
     } catch (IllegalArgumentException e) {
-      logger.error("Error updating leader. " + leaderUrlStr, e);
       return false;
     }
     logger.info(String.format("Switched to new leader: %s", pdClientWrapper));
@@ -388,7 +387,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       pdClientWrapper = new PDClientWrapper(leaderUrls, followerUrlStr, channel, System.nanoTime());
       timeout = conf.getForwardTimeout();
     } catch (IllegalArgumentException e) {
-      logger.error("Error updating follower. " + followerUrlStr, e);
       return false;
     }
     logger.info(String.format("Switched to new leader by follower forward: %s", pdClientWrapper));
@@ -591,8 +589,11 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       if (resp != null) {
         break;
       }
-      logger.error("Could not get leader member with pd: " + u);
     }
+    if (resp == null) {
+      logger.error("Could not get leader member with: " + pdAddrs);
+    }
+
     this.timeout = originTimeout;
     checkNotNull(resp, "Failed to init client for PD cluster.");
     long clusterId = resp.getHeader().getClusterId();
