@@ -368,7 +368,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
           new PDClientWrapper(leaderUrlStr, leaderUrlStr, clientChannel, System.nanoTime());
       timeout = conf.getTimeout();
     } catch (IllegalArgumentException e) {
-      logger.warn("Error updating leader. " + leaderUrlStr, e);
       return false;
     }
     logger.info(String.format("Switched to new leader: %s", pdClientWrapper));
@@ -388,7 +387,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       pdClientWrapper = new PDClientWrapper(leaderUrls, followerUrlStr, channel, System.nanoTime());
       timeout = conf.getForwardTimeout();
     } catch (IllegalArgumentException e) {
-      logger.warn("Error updating follower. " + followerUrlStr, e);
       return false;
     }
     logger.info(String.format("Switched to new leader by follower forward: %s", pdClientWrapper));
