@@ -138,7 +138,7 @@ public abstract class AbstractRegionStoreClient
       return true;
     }
 
-    if (store.getProxyStore() == null) {
+    if (store.getProxyStore() == null && store.isReachable()) {
       if (store.isReachable()) {
         logger.info(
             String.format(
@@ -292,6 +292,7 @@ public abstract class AbstractRegionStoreClient
       for (SwitchLeaderTask task : responses) {
         if (!task.task.isDone()) {
           unfinished.add(task);
+          continue;
         }
         try {
           Kvrpcpb.RawGetResponse resp = task.task.get();
@@ -347,6 +348,7 @@ public abstract class AbstractRegionStoreClient
       for (ForwardCheckTask task : responses) {
         if (!task.task.isDone()) {
           unfinished.add(task);
+          continue;
         }
         try {
           // any answer will do
