@@ -147,6 +147,45 @@ public abstract class AbstractRegionStoreClient
       }
     }
 
+    Boolean result = trySwitchLeader();
+    if (result != null) {
+      return result;
+    }
+    if (conf.getEnableGrpcForward()) {
+      return tryGrpcForward();
+    }
+    return false;
+  }
+
+  protected Kvrpcpb.Context makeContext(TiStoreType storeType) {
+    return region.getReplicaContext(java.util.Collections.emptySet(), storeType);
+  }
+
+  protected Kvrpcpb.Context makeContext(Set<Long> resolvedLocks, TiStoreType storeType) {
+    return region.getReplicaContext(resolvedLocks, storeType);
+  }
+
+  private void updateClientStub() {
+    String addressStr = store.getStore().getAddress();
+    long deadline = timeout;
+    if (store.getProxyStore() != null) {
+      addressStr = store.getProxyStore().getAddress();
+      deadline = conf.getForwardTimeout();
+    }
+    ManagedChannel channel =
+        channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
+    blockingStub =
+        TikvGrpc.newBlockingStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
+    asyncStub = TikvGrpc.newFutureStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
+    if (store.getProxyStore() != null) {
+      Metadata header = new Metadata();
+      header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
+      blockingStub = MetadataUtils.attachHeaders(blockingStub, header);
+      asyncStub = MetadataUtils.attachHeaders(asyncStub, header);
+    }
+  }
+
+  private Boolean trySwitchLeader() {
     Histogram.Timer switchLeaderDurationTimer = SWITCH_LEADER_DURATION.startTimer();
     try {
       List<Metapb.Peer> peers = region.getFollowerList();
@@ -197,54 +236,27 @@ public abstract class AbstractRegionStoreClient
     } finally {
       switchLeaderDurationTimer.observeDuration();
     }
-    if (conf.getEnableGrpcForward()) {
-      Histogram.Timer grpcForwardDurationTimer = GRPC_FORWARD_DURATION.startTimer();
-      try {
-        logger.info(String.format("try grpc forward: region[%d]", region.getId()));
-        // when current leader cannot be reached
-        TiStore storeWithProxy = switchProxyStore();
-        if (storeWithProxy == null) {
-          // no store available, retry
-          logger.warn(String.format("No store available, retry: region[%d]", region.getId()));
-          return false;
-        }
-        // use proxy store to forward requests
-        regionManager.updateStore(store, storeWithProxy);
-        store = storeWithProxy;
-        updateClientStub();
-        return true;
-      } finally {
-        grpcForwardDurationTimer.observeDuration();
+    return null;
+  }
+
+  private boolean tryGrpcForward() {
+    Histogram.Timer grpcForwardDurationTimer = GRPC_FORWARD_DURATION.startTimer();
+    try {
+      logger.info(String.format("try grpc forward: region[%d]", region.getId()));
+      // when current leader cannot be reached
+      TiStore storeWithProxy = switchProxyStore();
+      if (storeWithProxy == null) {
+        // no store available, retry
+        logger.warn(String.format("No store available, retry: region[%d]", region.getId()));
+        return false;
       }
-    }
-    return false;
-  }
-
-  protected Kvrpcpb.Context makeContext(TiStoreType storeType) {
-    return region.getReplicaContext(java.util.Collections.emptySet(), storeType);
-  }
-
-  protected Kvrpcpb.Context makeContext(Set<Long> resolvedLocks, TiStoreType storeType) {
-    return region.getReplicaContext(resolvedLocks, storeType);
-  }
-
-  private void updateClientStub() {
-    String addressStr = store.getStore().getAddress();
-    long deadline = timeout;
-    if (store.getProxyStore() != null) {
-      addressStr = store.getProxyStore().getAddress();
-      deadline = conf.getForwardTimeout();
-    }
-    ManagedChannel channel =
-        channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
-    blockingStub =
-        TikvGrpc.newBlockingStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
-    asyncStub = TikvGrpc.newFutureStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
-    if (store.getProxyStore() != null) {
-      Metadata header = new Metadata();
-      header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
-      blockingStub = MetadataUtils.attachHeaders(blockingStub, header);
-      asyncStub = MetadataUtils.attachHeaders(asyncStub, header);
+      // use proxy store to forward requests
+      regionManager.updateStore(store, storeWithProxy);
+      store = storeWithProxy;
+      updateClientStub();
+      return true;
+    } finally {
+      grpcForwardDurationTimer.observeDuration();
     }
   }
 
