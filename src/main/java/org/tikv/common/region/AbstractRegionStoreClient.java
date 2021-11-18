@@ -300,8 +300,7 @@ public abstract class AbstractRegionStoreClient
             if (!resp.hasRegionError()) {
               // the peer is leader
               logger.info(
-                  String.format(
-                      "rawGet response indicates peer[%d] is leader", task.peer.getId()));
+                  String.format("rawGet response indicates peer[%d] is leader", task.peer.getId()));
               return Pair.create(task.peer, exceptionEncountered);
             }
           }
