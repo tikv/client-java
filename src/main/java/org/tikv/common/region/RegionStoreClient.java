@@ -975,7 +975,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throws RawCASConflictException {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
-      throw new TiClientInternalException("RawPutResponse failed without a cause");
+      throw new TiClientInternalException("RawCASResponse failed without a cause");
     }
     String error = resp.getError();
     if (!error.isEmpty()) {
