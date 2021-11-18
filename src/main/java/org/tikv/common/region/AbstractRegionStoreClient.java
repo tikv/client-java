@@ -288,23 +288,22 @@ public abstract class AbstractRegionStoreClient
       }
       List<SwitchLeaderTask> unfinished = new LinkedList<>();
       for (SwitchLeaderTask task : responses) {
-        if (task.task.isDone()) {
-          try {
-            Kvrpcpb.RawGetResponse resp = task.task.get();
-            if (resp != null) {
-              if (!resp.hasRegionError()) {
-                // the peer is leader
-                logger.info(
-                    String.format(
-                        "rawGet response indicates peer[%d] is leader", task.peer.getId()));
-                return Pair.create(task.peer, exceptionEncountered);
-              }
-            }
-          } catch (Exception ignored) {
-            exceptionEncountered = true;
-          }
-        } else {
+        if (!task.task.isDone()) {
           unfinished.add(task);
+        }
+        try {
+          Kvrpcpb.RawGetResponse resp = task.task.get();
+          if (resp != null) {
+            if (!resp.hasRegionError()) {
+              // the peer is leader
+              logger.info(
+                  String.format(
+                      "rawGet response indicates peer[%d] is leader", task.peer.getId()));
+              return Pair.create(task.peer, exceptionEncountered);
+            }
+          }
+        } catch (Exception ignored) {
+          exceptionEncountered = true;
         }
       }
       if (unfinished.isEmpty()) {
@@ -344,19 +343,18 @@ public abstract class AbstractRegionStoreClient
       }
       List<ForwardCheckTask> unfinished = new LinkedList<>();
       for (ForwardCheckTask task : responses) {
-        if (task.task.isDone()) {
-          try {
-            // any answer will do
-            Kvrpcpb.RawGetResponse resp = task.task.get();
-            logger.info(
-                String.format(
-                    "rawGetResponse indicates forward from [%s] to [%s]",
-                    task.store.getAddress(), store.getAddress()));
-            return store.withProxy(task.store);
-          } catch (Exception ignored) {
-          }
-        } else {
+        if (!task.task.isDone()) {
           unfinished.add(task);
+        }
+        try {
+          // any answer will do
+          Kvrpcpb.RawGetResponse resp = task.task.get();
+          logger.info(
+              String.format(
+                  "rawGetResponse indicates forward from [%s] to [%s]",
+                  task.store.getAddress(), store.getAddress()));
+          return store.withProxy(task.store);
+        } catch (Exception ignored) {
         }
       }
       if (unfinished.isEmpty()) {
