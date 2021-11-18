@@ -46,16 +46,16 @@ public abstract class AbstractRegionStoreClient
     implements RegionErrorReceiver {
   private static final Logger logger = LoggerFactory.getLogger(AbstractRegionStoreClient.class);
 
-  public static final Histogram SWITCH_LEADER_DURATION =
+  public static final Histogram SEEK_LEADER_STORE_DURATION =
       Histogram.build()
-          .name("client_java_switch_leader_duration")
-          .help("switch leader duration.")
+          .name("client_java_seek_leader_store_duration")
+          .help("seek leader store duration.")
           .register();
 
-  public static final Histogram GRPC_FORWARD_DURATION =
+  public static final Histogram SEEK_PROXY_STORE_DURATION =
       Histogram.build()
-          .name("client_java_grpc_forward_duration")
-          .help("grpc forward duration.")
+          .name("client_java_seek_proxy_store_duration")
+          .help("seek proxy store duration.")
           .register();
 
   protected final RegionManager regionManager;
@@ -147,12 +147,14 @@ public abstract class AbstractRegionStoreClient
       }
     }
 
-    Boolean result = trySwitchLeader();
+    // seek an available leader store to send request
+    Boolean result = seekLeaderStore();
     if (result != null) {
       return result;
     }
     if (conf.getEnableGrpcForward()) {
-      return tryGrpcForward();
+      // seek an available proxy store to forward request
+      return seekProxyStore();
     }
     return false;
   }
@@ -185,8 +187,8 @@ public abstract class AbstractRegionStoreClient
     }
   }
 
-  private Boolean trySwitchLeader() {
-    Histogram.Timer switchLeaderDurationTimer = SWITCH_LEADER_DURATION.startTimer();
+  private Boolean seekLeaderStore() {
+    Histogram.Timer switchLeaderDurationTimer = SEEK_LEADER_STORE_DURATION.startTimer();
     try {
       List<Metapb.Peer> peers = region.getFollowerList();
       if (peers.isEmpty()) {
@@ -198,7 +200,7 @@ public abstract class AbstractRegionStoreClient
 
       logger.info(String.format("try switch leader: region[%d]", region.getId()));
 
-      Pair<Metapb.Peer, Boolean> pair = switchLeader();
+      Pair<Metapb.Peer, Boolean> pair = switchLeaderStore();
       Metapb.Peer peer = pair.first;
       boolean exceptionEncountered = pair.second;
       if (peer == null) {
@@ -239,8 +241,8 @@ public abstract class AbstractRegionStoreClient
     return null;
   }
 
-  private boolean tryGrpcForward() {
-    Histogram.Timer grpcForwardDurationTimer = GRPC_FORWARD_DURATION.startTimer();
+  private boolean seekProxyStore() {
+    Histogram.Timer grpcForwardDurationTimer = SEEK_PROXY_STORE_DURATION.startTimer();
     try {
       logger.info(String.format("try grpc forward: region[%d]", region.getId()));
       // when current leader cannot be reached
@@ -261,7 +263,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   // first: leader peer, second: true if any responses returned with grpc error
-  private Pair<Metapb.Peer, Boolean> switchLeader() {
+  private Pair<Metapb.Peer, Boolean> switchLeaderStore() {
     List<SwitchLeaderTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
