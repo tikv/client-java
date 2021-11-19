@@ -19,12 +19,12 @@ import org.tikv.kvproto.Metapb;
 public class StoreHealthyChecker implements Runnable {
   private static final Logger logger = LoggerFactory.getLogger(StoreHealthyChecker.class);
   private static final long MAX_CHECK_STORE_TOMBSTONE_TICK = 60;
-  private BlockingQueue<TiStore> taskQueue;
+  private final BlockingQueue<TiStore> taskQueue;
   private final ChannelFactory channelFactory;
   private final ReadOnlyPDClient pdClient;
   private final RegionCache cache;
   private long checkTombstoneTick;
-  private long timeout;
+  private final long timeout;
 
   public StoreHealthyChecker(
       ChannelFactory channelFactory, ReadOnlyPDClient pdClient, RegionCache cache, long timeout) {
@@ -117,13 +117,8 @@ public class StoreHealthyChecker implements Runnable {
           }
         } else {
           if (!store.isReachable()) {
-            logger.warn(
-                String.format(
-                    "store [%s] recovers to be reachable and canforward", store.getAddress()));
+            logger.warn(String.format("store [%s] recovers to be reachable", store.getAddress()));
             store.markReachable();
-          }
-          if (!store.canForwardFirst()) {
-            store.makrCanForward();
           }
         }
       } else if (store.isReachable()) {

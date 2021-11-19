@@ -35,9 +35,9 @@ public class TiConfiguration implements Serializable {
 
   private static final Logger logger = LoggerFactory.getLogger(TiConfiguration.class);
   private static final ConcurrentHashMap<String, String> settings = new ConcurrentHashMap<>();
-  public static final Metadata.Key FORWARD_META_DATA_KEY =
+  public static final Metadata.Key<String> FORWARD_META_DATA_KEY =
       Metadata.Key.of("tikv-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
-  public static final Metadata.Key PD_FORWARD_META_DATA_KEY =
+  public static final Metadata.Key<String> PD_FORWARD_META_DATA_KEY =
       Metadata.Key.of("pd-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
 
   static {
