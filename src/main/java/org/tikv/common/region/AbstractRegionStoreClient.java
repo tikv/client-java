@@ -200,26 +200,8 @@ public abstract class AbstractRegionStoreClient
 
       logger.info(String.format("try switch leader: region[%d]", region.getId()));
 
-      Pair<Metapb.Peer, Boolean> pair = switchLeaderStore();
-      Metapb.Peer peer = pair.first;
-      boolean exceptionEncountered = pair.second;
-      if (peer == null) {
-        if (!exceptionEncountered) {
-          // all response returned normally, the leader is not elected, just wait until it is ready.
-          logger.info(
-              String.format(
-                  "leader for region[%d] is not elected, just wait until it is ready",
-                  region.getId()));
-          return true;
-        } else {
-          // no leader found, some response does not return normally, there may be network
-          // partition.
-          logger.warn(
-              String.format(
-                  "leader for region[%d] is not found, it is possible that network partition occurred",
-                  region.getId()));
-        }
-      } else {
+      Metapb.Peer peer = switchLeaderStore();
+      if (peer != null) {
         // we found a leader
         TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
         if (currentLeaderStore.isReachable()) {
@@ -234,6 +216,12 @@ public abstract class AbstractRegionStoreClient
           updateClientStub();
           return true;
         }
+      } else {
+        // no leader found, some response does not return normally, there may be network partition.
+        logger.warn(
+            String.format(
+                "leader for region[%d] is not found, it is possible that network partition occurred",
+                region.getId()));
       }
     } finally {
       switchLeaderDurationTimer.observeDuration();
@@ -263,7 +251,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   // first: leader peer, second: true if any responses returned with grpc error
-  private Pair<Metapb.Peer, Boolean> switchLeaderStore() {
+  private Metapb.Peer switchLeaderStore() {
     List<SwitchLeaderTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
@@ -281,7 +269,6 @@ public abstract class AbstractRegionStoreClient
       ListenableFuture<Kvrpcpb.RawGetResponse> task = stub.rawGet(rawGetRequest);
       responses.add(new SwitchLeaderTask(task, peer));
     }
-    boolean exceptionEncountered = false;
     while (true) {
       try {
         Thread.sleep(2);
@@ -301,15 +288,14 @@ public abstract class AbstractRegionStoreClient
               // the peer is leader
               logger.info(
                   String.format("rawGet response indicates peer[%d] is leader", task.peer.getId()));
-              return Pair.create(task.peer, exceptionEncountered);
+              return task.peer;
             }
           }
         } catch (Exception ignored) {
-          exceptionEncountered = true;
         }
       }
       if (unfinished.isEmpty()) {
-        return Pair.create(null, exceptionEncountered);
+        return null;
       }
       responses = unfinished;
     }
