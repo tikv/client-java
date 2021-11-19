@@ -18,6 +18,7 @@ import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
+import org.tikv.common.log.SlowLogEmptyImpl;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
@@ -163,7 +164,7 @@ public class RawKVClientTest extends BaseRawKVTest {
   public void testDeadlineBackOff() {
     int timeout = 2000;
     int sleep = 150;
-    BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(timeout);
+    BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(timeout, SlowLogEmptyImpl.INSTANCE);
     long s = System.currentTimeMillis();
     try {
       while (true) {

@@ -216,7 +216,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
 
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
-    if (recv.onStoreUnreachable()) {
+    if (recv.onStoreUnreachable(backOffer.getSlowLog())) {
       if (!backOffer.canRetryAfterSleep(BackOffFunction.BackOffFuncType.BoTiKVRPC)) {
         regionManager.onRequestFail(recv.getRegion());
         throw new GrpcException("retry is exhausted.", e);
