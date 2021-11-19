@@ -36,7 +36,6 @@ import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.util.ChannelFactory;
-import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
@@ -136,15 +135,6 @@ public abstract class AbstractRegionStoreClient
       store = regionManager.getStoreById(store.getId());
       updateClientStub();
       return true;
-    }
-
-    if (store.getProxyStore() == null && store.isReachable()) {
-      if (store.isReachable()) {
-        logger.info(
-            String.format(
-                "store[%d] for region[%d] is reachable, retry", store.getId(), region.getId()));
-        return true;
-      }
     }
 
     // seek an available leader store to send request
