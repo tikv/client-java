@@ -35,10 +35,14 @@ public class SlowLogImpl implements SlowLog {
   private final List<SlowLogSpan> slowLogSpans = new ArrayList<>();
 
   private final long startMS;
+  private final long timeoutMS;
+
+  /** Key-Value pairs which will be logged, e.g. function name, key, region, etc. */
   private final Map<String, String> properties;
 
-  public SlowLogImpl(Map<String, String> properties) {
+  public SlowLogImpl(long timeoutMS, Map<String, String> properties) {
     this.startMS = System.currentTimeMillis();
+    this.timeoutMS = timeoutMS;
     this.properties = new HashMap<>(properties);
   }
 
@@ -56,17 +60,20 @@ public class SlowLogImpl implements SlowLog {
   }
 
   @Override
-  public void logSlowLog() {
-    logger.warn(getSlowLogString());
+  public void log() {
+    long currentMS = System.currentTimeMillis();
+    if (currentMS - startMS > timeoutMS) {
+      logger.warn("SlowLog:" + getSlowLogString(currentMS));
+    }
   }
 
-  private String getSlowLogString() {
+  private String getSlowLogString(long currentMS) {
     JsonObject jsonObject = new JsonObject();
-    long currentMS = System.currentTimeMillis();
 
     jsonObject.addProperty("start", DATE_FORMAT.format(startMS));
     jsonObject.addProperty("end", DATE_FORMAT.format(currentMS));
     jsonObject.addProperty("duration", (currentMS - startMS) + "ms");
+    jsonObject.addProperty("timeout", timeoutMS + "ms");
 
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       jsonObject.addProperty(entry.getKey(), entry.getValue());

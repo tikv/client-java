@@ -22,5 +22,5 @@ public interface SlowLog {
 
   SlowLogSpan start(String name);
 
-  void logSlowLog();
+  void log();
 }

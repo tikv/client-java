@@ -19,6 +19,7 @@ import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
+import org.tikv.common.log.SlowLogEmptyImpl;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
@@ -187,7 +188,7 @@ public class RawKVClientTest {
   public void testDeadlineBackOff() {
     int timeout = 2000;
     int sleep = 150;
-    BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(timeout);
+    BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(timeout, SlowLogEmptyImpl.INSTANCE);
     long s = System.currentTimeMillis();
     try {
       while (true) {
@@ -303,15 +304,24 @@ public class RawKVClientTest {
    */
   @Test
   public void getTest() {
-    ByteString key = rawKey("key");
+    ByteString key = rawKey("key49");
+    client.get(key);
     client.get(key);
   }
 
   @Test
   public void batchGetTest() {
     // TODO: mars
-    ByteString key = rawKey("key");
-    client.get(key);
+    List<ByteString> keys = new ArrayList<>();
+    for(int i = 49; i < 50; i ++) {
+      ByteString key = rawKey("key" + i);
+      keys.add(key);
+      client.get(key);
+      client.put(key, key);
+    }
+
+    //client.batchGet(keys);
+    //client.batchGet(keys);
   }
 
   @Test

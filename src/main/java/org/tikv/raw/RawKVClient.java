@@ -31,6 +31,7 @@ import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.log.SlowLog;
+import org.tikv.common.log.SlowLogEmptyImpl;
 import org.tikv.common.log.SlowLogImpl;
 import org.tikv.common.operation.iterator.RawScanIterator;
 import org.tikv.common.region.RegionStoreClient;
@@ -133,8 +134,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
+        newSlowLog(
+            conf.getRawKVWriteTimeoutInMS(),
+            new HashMap<String, String>(2) {
               {
                 put("func", "put");
                 put("key", KeyUtils.formatBytesUTF8(key));
@@ -160,7 +162,7 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
+      slowLog.log();
     }
   }
 
@@ -189,8 +191,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_put_if_absent";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
+        newSlowLog(
+            conf.getRawKVWriteTimeoutInMS(),
+            new HashMap<String, String>(2) {
               {
                 put("func", "putIfAbsent");
                 put("key", KeyUtils.formatBytesUTF8(key));
@@ -216,7 +219,7 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
+      slowLog.log();
     }
   }
 
@@ -262,8 +265,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
+        newSlowLog(
+            conf.getRawKVBatchWriteTimeoutInMS(),
+            new HashMap<String, String>(2) {
               {
                 put("func", "batchPut");
                 put("keySize", String.valueOf(kvPairs.size()));
@@ -280,7 +284,7 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
+      slowLog.log();
     }
   }
 
@@ -294,8 +298,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
+        newSlowLog(
+            conf.getRawKVReadTimeoutInMS(),
+            new HashMap<String, String>(2) {
               {
                 put("func", "get");
                 put("key", KeyUtils.formatBytesUTF8(key));
@@ -322,7 +327,7 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
+      slowLog.log();
     }
   }
 
@@ -336,8 +341,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
+        newSlowLog(
+            conf.getRawKVBatchReadTimeoutInMS(),
+            new HashMap<String, String>(2) {
               {
                 put("func", "batchGet");
                 put("keySize", String.valueOf(keys.size()));
@@ -355,7 +361,7 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
+      slowLog.log();
     }
   }
 
@@ -381,8 +387,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
+        newSlowLog(
+            conf.getRawKVBatchWriteTimeoutInMS(),
+            new HashMap<String, String>(2) {
               {
                 put("func", "batchDelete");
                 put("keySize", String.valueOf(keys.size()));
@@ -400,7 +407,7 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
+      slowLog.log();
     }
   }
 
@@ -415,8 +422,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_get_key_ttl";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
+        newSlowLog(
+            conf.getRawKVReadTimeoutInMS(),
+            new HashMap<String, String>(2) {
               {
                 put("func", "getKeyTTL");
                 put("key", KeyUtils.formatBytesUTF8(key));
@@ -442,7 +450,7 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
+      slowLog.log();
     }
   }
 
@@ -521,8 +529,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_scan";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
+        newSlowLog(
+            conf.getRawKVScanTimeoutInMS(),
+            new HashMap<String, String>(5) {
               {
                 put("func", "scan");
                 put("startKey", KeyUtils.formatBytesUTF8(startKey));
@@ -545,7 +554,7 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
+      slowLog.log();
     }
   }
 
@@ -595,8 +604,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_scan_without_limit";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
+        newSlowLog(
+            conf.getRawKVScanTimeoutInMS(),
+            new HashMap<String, String>(4) {
               {
                 put("func", "scan");
                 put("startKey", KeyUtils.formatBytesUTF8(startKey));
@@ -632,7 +642,7 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
+      slowLog.log();
     }
   }
 
@@ -686,8 +696,9 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
+        newSlowLog(
+            conf.getRawKVWriteTimeoutInMS(),
+            new HashMap<String, String>(3) {
               {
                 put("func", "delete");
                 put("key", KeyUtils.formatBytesUTF8(key));
@@ -714,7 +725,7 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
+      slowLog.log();
     }
   }
 
@@ -730,17 +741,8 @@ public class RawKVClient implements AutoCloseable {
   public synchronized void deleteRange(ByteString startKey, ByteString endKey) {
     String label = "client_raw_delete_range";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            new HashMap<String, String>(8) {
-              {
-                put("func", "deleteRange");
-                put("startKey", KeyUtils.formatBytesUTF8(startKey));
-                put("endKey", KeyUtils.formatBytesUTF8(endKey));
-              }
-            });
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVCleanTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVCleanTimeoutInMS(), SlowLogEmptyImpl.INSTANCE);
     try {
       long deadline = System.currentTimeMillis() + conf.getRawKVCleanTimeoutInMS();
       doSendDeleteRange(backOffer, startKey, endKey, deadline);
@@ -750,7 +752,6 @@ public class RawKVClient implements AutoCloseable {
       throw e;
     } finally {
       requestTimer.observeDuration();
-      logSlowLog(backOffer);
     }
   }
 
@@ -1067,11 +1068,8 @@ public class RawKVClient implements AutoCloseable {
     return new RawScanIterator(conf, builder, startKey, endKey, limit, keyOnly, backOffer);
   }
 
-  private void logSlowLog(ConcreteBackOffer backOffer) {
-    double slowLogThreshold = conf.getSlowLogThreshold();
-    long currentMS = System.currentTimeMillis();
-    if ((currentMS - backOffer.startMS) >= slowLogThreshold * backOffer.timeoutInMs) {
-      backOffer.logSlowLog();
-    }
+  private SlowLog newSlowLog(long timeoutMS, Map<String, String> properties) {
+    long slowLogTimeoutMS = (long) (conf.getSlowLogThreshold() * timeoutMS);
+    return new SlowLogImpl(slowLogTimeoutMS, properties);
   }
 }

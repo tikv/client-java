@@ -31,5 +31,5 @@ public class SlowLogEmptyImpl implements SlowLog {
   }
 
   @Override
-  public void logSlowLog() {}
+  public void log() {}
 }

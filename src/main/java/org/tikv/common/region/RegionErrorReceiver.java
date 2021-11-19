@@ -17,11 +17,13 @@
 
 package org.tikv.common.region;
 
+import org.tikv.common.log.SlowLog;
+
 public interface RegionErrorReceiver {
   boolean onNotLeader(TiRegion region);
 
   /// return whether we need to retry this request.
-  boolean onStoreUnreachable();
+  boolean onStoreUnreachable(SlowLog slowLog);
 
   TiRegion getRegion();
 }

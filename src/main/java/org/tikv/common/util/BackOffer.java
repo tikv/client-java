@@ -17,7 +17,7 @@
 
 package org.tikv.common.util;
 
-import org.tikv.common.log.SlowLogSpan;
+import org.tikv.common.log.SlowLog;
 
 public interface BackOffer {
   // Back off types.
@@ -61,7 +61,5 @@ public interface BackOffer {
     DecorrJitter
   }
 
-  SlowLogSpan slowLogStart(String span);
-
-  void logSlowLog();
+  SlowLog getSlowLog();
 }

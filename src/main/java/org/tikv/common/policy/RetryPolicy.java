@@ -69,16 +69,9 @@ public abstract class RetryPolicy<RespT> {
   }
 
   public RespT callWithRetry(Callable<RespT> proc, String methodName, BackOffer backOffer) {
-    SlowLogSpan slowLogSpan = backOffer.slowLogStart("callWithRetry " + methodName);
-    try {
-      return callWithRetry(proc, methodName);
-    } finally {
-      slowLogSpan.end();
-    }
-  }
-
-  private RespT callWithRetry(Callable<RespT> proc, String methodName) {
     Histogram.Timer callWithRetryTimer = CALL_WITH_RETRY_DURATION.labels(methodName).startTimer();
+    SlowLogSpan callWithRetrySlowLogSpan =
+        backOffer.getSlowLog().start("callWithRetry " + methodName);
     try {
       while (true) {
         RespT result = null;
@@ -86,7 +79,7 @@ public abstract class RetryPolicy<RespT> {
           // add single request duration histogram
           Histogram.Timer requestTimer =
               GRPC_SINGLE_REQUEST_LATENCY.labels(methodName).startTimer();
-          SlowLogSpan slowLogSpan = backOffer.slowLogStart("gRPC " + methodName);
+          SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("gRPC " + methodName);
           try {
             result = proc.call();
           } finally {
@@ -117,6 +110,7 @@ public abstract class RetryPolicy<RespT> {
       }
     } finally {
       callWithRetryTimer.observeDuration();
+      callWithRetrySlowLogSpan.end();
     }
   }
 
