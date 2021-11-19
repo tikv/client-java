@@ -396,7 +396,7 @@ public class TwoPhaseCommitter {
       BatchKeys batchKeys,
       Map<ByteString, Kvrpcpb.Mutation> mutations)
       throws TiBatchWriteException {
-    LOG.info(
+    LOG.debug(
         "start prewrite secondary key, row={}, size={}KB, regionId={}",
         batchKeys.getKeys().size(),
         batchKeys.getSizeInKB(),
@@ -444,7 +444,7 @@ public class TwoPhaseCommitter {
         throw new TiBatchWriteException(errorMsg, e);
       }
     }
-    LOG.info(
+    LOG.debug(
         "prewrite secondary key successfully, row={}, size={}KB, regionId={}",
         batchKeys.getKeys().size(),
         batchKeys.getSizeInKB(),
