@@ -83,6 +83,8 @@ public abstract class AbstractRegionStoreClient
     if (this.store.getProxyStore() != null) {
       this.timeout = conf.getForwardTimeout();
     } else if (!this.store.isReachable()) {
+      // cannot get Deadline or SlowLog instance here
+      // use SlowLogEmptyImpl instead to skip slow log record
       onStoreUnreachable(SlowLogEmptyImpl.INSTANCE);
     }
   }
