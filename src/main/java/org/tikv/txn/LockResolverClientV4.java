@@ -47,7 +47,7 @@ import org.tikv.common.util.TsoUtils;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
-import org.tikv.kvproto.TikvGrpc.TikvStub;
+import org.tikv.kvproto.TikvGrpc.TikvFutureStub;
 import org.tikv.txn.exception.TxnNotFoundException;
 import org.tikv.txn.exception.WriteConflictException;
 
@@ -78,7 +78,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
       TiRegion region,
       TiStore store,
       TikvBlockingStub blockingStub,
-      TikvStub asyncStub,
+      TikvFutureStub asyncStub,
       ChannelFactory channelFactory,
       RegionManager regionManager,
       PDClient pdClient,
