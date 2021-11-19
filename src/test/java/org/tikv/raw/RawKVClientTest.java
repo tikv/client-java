@@ -299,31 +299,6 @@ public class RawKVClientTest {
     client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
   }
 
-  /*
-  iptables -I INPUT -s 192.168.190.70 -p tcp --dport 22366 -j DROP
-   */
-  @Test
-  public void getTest() {
-    ByteString key = rawKey("key49");
-    client.get(key);
-    client.get(key);
-  }
-
-  @Test
-  public void batchGetTest() {
-    // TODO: mars
-    List<ByteString> keys = new ArrayList<>();
-    for(int i = 49; i < 50; i ++) {
-      ByteString key = rawKey("key" + i);
-      keys.add(key);
-      client.get(key);
-      client.put(key, key);
-    }
-
-    //client.batchGet(keys);
-    //client.batchGet(keys);
-  }
-
   @Test
   public void simpleTest() {
     if (!initialized) return;

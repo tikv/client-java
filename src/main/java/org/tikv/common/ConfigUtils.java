@@ -67,7 +67,13 @@ public class ConfigUtils {
   public static final String TIKV_RAWKV_SCAN_TIMEOUT_IN_MS = "tikv.rawkv.scan_timeout_in_ms";
   public static final String TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS = "tikv.rawkv.clean_timeout_in_ms";
   public static final String TIKV_BO_REGION_MISS_BASE_IN_MS = "tikv.bo_region_miss_base_in_ms";
-  public static final String TIKV_SLOW_LOG_THRESHOLD = "tikv.slow_log_threshold";
+  public static final String TIKV_RAWKV_READ_SLOWLOG_IN_MS = "tikv.rawkv.read_slowlog_in_ms";
+  public static final String TIKV_RAWKV_WRITE_SLOWLOG_IN_MS = "tikv.rawkv.write_slowlog_in_ms";
+  public static final String TIKV_RAWKV_BATCH_READ_SLOWLOG_IN_MS =
+      "tikv.rawkv.batch_read_slowlog_in_ms";
+  public static final String TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS =
+      "tikv.rawkv.batch_write_slowlog_in_ms";
+  public static final String TIKV_RAWKV_SCAN_SLOWLOG_IN_MS = "tikv.rawkv.scan_slowlog_in_ms";
 
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
@@ -111,7 +117,7 @@ public class ConfigUtils {
   public static final int DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS = 600000;
 
   public static final int DEF_TIKV_BO_REGION_MISS_BASE_IN_MS = 20;
-  public static final String DEF_TIKV_SLOW_LOG_THRESHOLD = "0.5"; // TODO: default value?
+  public static final String DEF_TIKV_RAWKV_SCAN_SLOWLOG_IN_MS = "5000";
 
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";

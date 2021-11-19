@@ -119,7 +119,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_RAWKV_SCAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_SCAN_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
     setIfMissing(TIKV_BO_REGION_MISS_BASE_IN_MS, DEF_TIKV_BO_REGION_MISS_BASE_IN_MS);
-    setIfMissing(TIKV_SLOW_LOG_THRESHOLD, DEF_TIKV_SLOW_LOG_THRESHOLD);
+    setIfMissing(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS, DEF_TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
   }
 
   public static void listAll() {
@@ -168,6 +168,10 @@ public class TiConfiguration implements Serializable {
 
   public static int getInt(String key) {
     return Integer.parseInt(get(key));
+  }
+
+  public static Optional<Integer> getIntOption(String key) {
+    return getOption(key).map(Integer::parseInt);
   }
 
   private static int getInt(String key, int defaultValue) {
@@ -316,7 +320,13 @@ public class TiConfiguration implements Serializable {
   private int rawKVBatchWriteTimeoutInMS = getInt(TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS);
   private int rawKVScanTimeoutInMS = getInt(TIKV_RAWKV_SCAN_TIMEOUT_IN_MS);
   private int rawKVCleanTimeoutInMS = getInt(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
-  private double slowLogThreshold = getDouble(TIKV_SLOW_LOG_THRESHOLD);
+  private Optional<Integer> rawKVReadSlowLogInMS = getIntOption(TIKV_RAWKV_READ_SLOWLOG_IN_MS);
+  private Optional<Integer> rawKVWriteSlowLogInMS = getIntOption(TIKV_RAWKV_WRITE_SLOWLOG_IN_MS);
+  private Optional<Integer> rawKVBatchReadSlowLogInMS =
+      getIntOption(TIKV_RAWKV_BATCH_READ_SLOWLOG_IN_MS);
+  private Optional<Integer> rawKVBatchWriteSlowLogInMS =
+      getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS);
+  private int rawKVScanSlowLogInMS = getInt(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
 
   public enum KVMode {
     TXN,
@@ -680,11 +690,43 @@ public class TiConfiguration implements Serializable {
     this.rawKVCleanTimeoutInMS = rawKVCleanTimeoutInMS;
   }
 
-  public double getSlowLogThreshold() {
-    return slowLogThreshold;
+  public Integer getRawKVReadSlowLogInMS() {
+    return rawKVReadSlowLogInMS.orElse((int) (getTimeout() * 2));
   }
 
-  public void setSlowLogThreshold(double slowLogThreshold) {
-    this.slowLogThreshold = slowLogThreshold;
+  public void setRawKVReadSlowLogInMS(Integer rawKVReadSlowLogInMS) {
+    this.rawKVReadSlowLogInMS = Optional.of(rawKVReadSlowLogInMS);
+  }
+
+  public Integer getRawKVWriteSlowLogInMS() {
+    return rawKVWriteSlowLogInMS.orElse((int) (getTimeout() * 2));
+  }
+
+  public void setRawKVWriteSlowLogInMS(Integer rawKVWriteSlowLogInMS) {
+    this.rawKVWriteSlowLogInMS = Optional.of(rawKVWriteSlowLogInMS);
+  }
+
+  public Integer getRawKVBatchReadSlowLogInMS() {
+    return rawKVBatchReadSlowLogInMS.orElse((int) (getTimeout() * 2));
+  }
+
+  public void setRawKVBatchReadSlowLogInMS(Integer rawKVBatchReadSlowLogInMS) {
+    this.rawKVBatchReadSlowLogInMS = Optional.of(rawKVBatchReadSlowLogInMS);
+  }
+
+  public Integer getRawKVBatchWriteSlowLogInMS() {
+    return rawKVBatchWriteSlowLogInMS.orElse((int) (getTimeout() * 2));
+  }
+
+  public void setRawKVBatchWriteSlowLogInMS(Integer rawKVBatchWriteSlowLogInMS) {
+    this.rawKVBatchWriteSlowLogInMS = Optional.of(rawKVBatchWriteSlowLogInMS);
+  }
+
+  public int getRawKVScanSlowLogInMS() {
+    return rawKVScanSlowLogInMS;
+  }
+
+  public void setRawKVScanSlowLogInMS(int rawKVScanSlowLogInMS) {
+    this.rawKVScanSlowLogInMS = rawKVScanSlowLogInMS;
   }
 }

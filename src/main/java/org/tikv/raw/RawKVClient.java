@@ -134,8 +134,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        newSlowLog(
-            conf.getRawKVWriteTimeoutInMS(),
+        new SlowLogImpl(
+            conf.getRawKVWriteSlowLogInMS(),
             new HashMap<String, String>(2) {
               {
                 put("func", "put");
@@ -191,8 +191,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_put_if_absent";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        newSlowLog(
-            conf.getRawKVWriteTimeoutInMS(),
+        new SlowLogImpl(
+            conf.getRawKVWriteSlowLogInMS(),
             new HashMap<String, String>(2) {
               {
                 put("func", "putIfAbsent");
@@ -265,8 +265,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        newSlowLog(
-            conf.getRawKVBatchWriteTimeoutInMS(),
+        new SlowLogImpl(
+            conf.getRawKVBatchWriteSlowLogInMS(),
             new HashMap<String, String>(2) {
               {
                 put("func", "batchPut");
@@ -298,8 +298,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        newSlowLog(
-            conf.getRawKVReadTimeoutInMS(),
+        new SlowLogImpl(
+            conf.getRawKVReadSlowLogInMS(),
             new HashMap<String, String>(2) {
               {
                 put("func", "get");
@@ -341,8 +341,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        newSlowLog(
-            conf.getRawKVBatchReadTimeoutInMS(),
+        new SlowLogImpl(
+            conf.getRawKVBatchReadSlowLogInMS(),
             new HashMap<String, String>(2) {
               {
                 put("func", "batchGet");
@@ -387,8 +387,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_batch_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        newSlowLog(
-            conf.getRawKVBatchWriteTimeoutInMS(),
+        new SlowLogImpl(
+            conf.getRawKVBatchWriteSlowLogInMS(),
             new HashMap<String, String>(2) {
               {
                 put("func", "batchDelete");
@@ -422,8 +422,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_get_key_ttl";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        newSlowLog(
-            conf.getRawKVReadTimeoutInMS(),
+        new SlowLogImpl(
+            conf.getRawKVReadSlowLogInMS(),
             new HashMap<String, String>(2) {
               {
                 put("func", "getKeyTTL");
@@ -529,8 +529,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_scan";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        newSlowLog(
-            conf.getRawKVScanTimeoutInMS(),
+        new SlowLogImpl(
+            conf.getRawKVScanSlowLogInMS(),
             new HashMap<String, String>(5) {
               {
                 put("func", "scan");
@@ -604,8 +604,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_scan_without_limit";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        newSlowLog(
-            conf.getRawKVScanTimeoutInMS(),
+        new SlowLogImpl(
+            conf.getRawKVScanSlowLogInMS(),
             new HashMap<String, String>(4) {
               {
                 put("func", "scan");
@@ -696,8 +696,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     SlowLog slowLog =
-        newSlowLog(
-            conf.getRawKVWriteTimeoutInMS(),
+        new SlowLogImpl(
+            conf.getRawKVWriteSlowLogInMS(),
             new HashMap<String, String>(3) {
               {
                 put("func", "delete");
@@ -742,7 +742,8 @@ public class RawKVClient implements AutoCloseable {
     String label = "client_raw_delete_range";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVCleanTimeoutInMS(), SlowLogEmptyImpl.INSTANCE);
+        ConcreteBackOffer.newDeadlineBackOff(
+            conf.getRawKVCleanTimeoutInMS(), SlowLogEmptyImpl.INSTANCE);
     try {
       long deadline = System.currentTimeMillis() + conf.getRawKVCleanTimeoutInMS();
       doSendDeleteRange(backOffer, startKey, endKey, deadline);
@@ -1066,10 +1067,5 @@ public class RawKVClient implements AutoCloseable {
       throw ERR_MAX_SCAN_LIMIT_EXCEEDED;
     }
     return new RawScanIterator(conf, builder, startKey, endKey, limit, keyOnly, backOffer);
-  }
-
-  private SlowLog newSlowLog(long timeoutMS, Map<String, String> properties) {
-    long slowLogTimeoutMS = (long) (conf.getSlowLogThreshold() * timeoutMS);
-    return new SlowLogImpl(slowLogTimeoutMS, properties);
   }
 }

@@ -30,6 +30,8 @@ import org.slf4j.LoggerFactory;
 public class SlowLogImpl implements SlowLog {
   private static final Logger logger = LoggerFactory.getLogger(SlowLogImpl.class);
 
+  private static final int MAX_SPAN_SIZE = 1024;
+
   public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("HH:mm:ss.SSS");
 
   private final List<SlowLogSpan> slowLogSpans = new ArrayList<>();
@@ -54,7 +56,9 @@ public class SlowLogImpl implements SlowLog {
   @Override
   public synchronized SlowLogSpan start(String name) {
     SlowLogSpan slowLogSpan = new SlowLogSpanImpl(name);
-    slowLogSpans.add(slowLogSpan);
+    if (slowLogSpans.size() < MAX_SPAN_SIZE) {
+      slowLogSpans.add(slowLogSpan);
+    }
     slowLogSpan.start();
     return slowLogSpan;
   }
@@ -62,7 +66,7 @@ public class SlowLogImpl implements SlowLog {
   @Override
   public void log() {
     long currentMS = System.currentTimeMillis();
-    if (currentMS - startMS > timeoutMS) {
+    if (timeoutMS >= 0 && currentMS - startMS > timeoutMS) {
       logger.warn("SlowLog:" + getSlowLogString(currentMS));
     }
   }
