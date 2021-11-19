@@ -17,6 +17,8 @@
 
 package org.tikv.common.util;
 
+import org.tikv.common.log.SlowLog;
+
 public interface BackOffer {
   // Back off types.
   int seconds = 1000;
@@ -58,4 +60,6 @@ public interface BackOffer {
     // DecorrJitter increases the maximum jitter based on the last random value.
     DecorrJitter
   }
+
+  SlowLog getSlowLog();
 }
