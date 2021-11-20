@@ -19,9 +19,8 @@ package org.tikv.common.operation;
 
 import static org.tikv.common.pd.PDError.buildFromPdpbError;
 
-import java.util.function.Function;
-
 import io.grpc.StatusRuntimeException;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.PDClient;

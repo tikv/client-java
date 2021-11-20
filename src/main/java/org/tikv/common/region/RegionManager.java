@@ -33,7 +33,6 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.InvalidStoreException;
 import org.tikv.common.exception.TiClientInternalException;
-import org.tikv.common.exception.TiKVException;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
@@ -200,7 +199,8 @@ public class RegionManager {
       if (store == null) {
         store = new TiStore(pdClient.getStore(backOffer, id));
       }
-      // if we did not get store info from pd or the store is already tombstone, remove store from cache
+      // if we did not get store info from pd or the store is already tombstone, remove store from
+      // cache
       if (store.getStore() == null || store.getStore().getState().equals(StoreState.Tombstone)) {
         return null;
       }
@@ -219,7 +219,7 @@ public class RegionManager {
 
   public TiStore getStoreById(long id, BackOffer backOffer) {
     TiStore store = getStoreByIdWithBackOff(id, backOffer);
-    if (store == null || store.getStore() == null) {
+    if (store == null) {
       cache.clearAll();
       throw new InvalidStoreException(id);
     }

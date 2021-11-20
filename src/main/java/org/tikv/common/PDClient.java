@@ -247,7 +247,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
       GetRegionResponse resp =
           callWithRetry(backOffer, PDGrpc.getGetRegionMethod(), request, handler);
-      return Pair.create(decodeRegion(resp.getRegion()), resp.getLeader());
+      return new Pair<Metapb.Region, Metapb.Peer>(decodeRegion(resp.getRegion()), resp.getLeader());
     } finally {
       requestTimer.observeDuration();
     }
@@ -262,7 +262,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
     GetRegionResponse resp =
         callWithRetry(backOffer, PDGrpc.getGetRegionByIDMethod(), request, handler);
-    return Pair.create(decodeRegion(resp.getRegion()), resp.getLeader());
+    return new Pair<Metapb.Region, Metapb.Peer>(decodeRegion(resp.getRegion()), resp.getLeader());
   }
 
   private Supplier<GetStoreRequest> buildGetStoreReq(long storeId) {
