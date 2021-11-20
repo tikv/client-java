@@ -37,7 +37,7 @@ public class ReplicaReadTest extends TXNTest {
 
   @Test
   public void replicaSelectorTest() {
-    TiConfiguration conf = TiConfiguration.createDefault();
+    TiConfiguration conf = createTiConfiguration();
 
     conf.setReplicaSelector(
         new ReplicaSelector() {
@@ -58,7 +58,7 @@ public class ReplicaReadTest extends TXNTest {
   }
 
   private void doTest(TiConfiguration.ReplicaRead replicaRead) {
-    TiConfiguration conf = TiConfiguration.createDefault();
+    TiConfiguration conf = createTiConfiguration();
     conf.setReplicaRead(replicaRead);
     session = TiSession.create(conf);
 

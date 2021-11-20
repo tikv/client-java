@@ -79,7 +79,7 @@ public class RangeColumnPartitionPruner
     NormalizedPredicate predicate = node.normalize();
     if (predicate == null) {
       throw new UnsupportedOperationException(
-          String.format("ComparisonBinaryExpression %s cannot be normalized", node.toString()));
+          String.format("ComparisonBinaryExpression %s cannot be normalized", node));
     }
     String colRefName = predicate.getColumnRef().getName();
     List<Expression> partExprs = partExprsPerColumnRef.get(colRefName);

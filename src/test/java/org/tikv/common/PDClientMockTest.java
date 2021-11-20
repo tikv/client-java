@@ -15,11 +15,17 @@
 
 package org.tikv.common;
 
-import static org.junit.Assert.*;
-import static org.tikv.common.GrpcUtils.encodeKey;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import com.google.protobuf.ByteString;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.Test;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.meta.TiTimestamp;
@@ -30,32 +36,34 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
 
-public class PDClientTest extends PDMockServerTest {
+public class PDClientMockTest extends PDMockServerTest {
+
   private static final String LOCAL_ADDR_IPV6 = "[::]";
+  public static final String HTTP = "http://";
 
   @Test
   public void testCreate() throws Exception {
     try (PDClient client = session.getPDClient()) {
-      assertEquals(client.getPdClientWrapper().getLeaderInfo(), LOCAL_ADDR + ":" + pdServer.port);
-      assertEquals(client.getHeader().getClusterId(), CLUSTER_ID);
+      assertEquals(LOCAL_ADDR + ":" + pdServer.port, client.getPdClientWrapper().getLeaderInfo());
+      assertEquals(CLUSTER_ID, client.getHeader().getClusterId());
     }
   }
 
   @Test
   public void testSwitchLeader() throws Exception {
     try (PDClient client = session.getPDClient()) {
-      client.trySwitchLeader("http://" + LOCAL_ADDR + ":" + (pdServer.port + 1));
+      client.trySwitchLeader(HTTP + LOCAL_ADDR + ":" + (pdServer.port + 1));
       assertEquals(
           client.getPdClientWrapper().getLeaderInfo(),
-          "http://" + LOCAL_ADDR + ":" + (pdServer.port + 1));
+          HTTP + LOCAL_ADDR + ":" + (pdServer.port + 1));
     }
     tearDown();
     setUp(LOCAL_ADDR_IPV6);
     try (PDClient client = session.getPDClient()) {
-      client.trySwitchLeader("http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
+      client.trySwitchLeader(HTTP + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
       assertEquals(
           client.getPdClientWrapper().getLeaderInfo(),
-          "http://" + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
+          HTTP + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
     }
   }
 
@@ -79,8 +87,8 @@ public class PDClientTest extends PDMockServerTest {
             pdServer.getClusterId(),
             GrpcUtils.makeRegion(
                 1,
-                encodeKey(startKey),
-                encodeKey(endKey),
+                ByteString.copyFrom(startKey),
+                ByteString.copyFrom(endKey),
                 GrpcUtils.makeRegionEpoch(confVer, ver),
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
@@ -93,8 +101,8 @@ public class PDClientTest extends PDMockServerTest {
       assertEquals(r.getEndKey(), ByteString.copyFrom(endKey));
       assertEquals(r.getRegionEpoch().getConfVer(), confVer);
       assertEquals(r.getRegionEpoch().getVersion(), ver);
-      assertEquals(l.getId(), 1);
-      assertEquals(l.getStoreId(), 10);
+      assertEquals(1, l.getId());
+      assertEquals(10, l.getStoreId());
     }
   }
 
@@ -110,8 +118,8 @@ public class PDClientTest extends PDMockServerTest {
             pdServer.getClusterId(),
             GrpcUtils.makeRegion(
                 1,
-                encodeKey(startKey),
-                encodeKey(endKey),
+                ByteString.copyFrom(startKey),
+                ByteString.copyFrom(endKey),
                 GrpcUtils.makeRegionEpoch(confVer, ver),
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
@@ -119,12 +127,12 @@ public class PDClientTest extends PDMockServerTest {
       Pair<Metapb.Region, Metapb.Peer> rl = client.getRegionByID(defaultBackOff(), 0);
       Metapb.Region r = rl.first;
       Metapb.Peer l = rl.second;
-      assertEquals(r.getStartKey(), ByteString.copyFrom(startKey));
-      assertEquals(r.getEndKey(), ByteString.copyFrom(endKey));
-      assertEquals(r.getRegionEpoch().getConfVer(), confVer);
-      assertEquals(r.getRegionEpoch().getVersion(), ver);
-      assertEquals(l.getId(), 1);
-      assertEquals(l.getStoreId(), 10);
+      assertEquals(ByteString.copyFrom(startKey), r.getStartKey());
+      assertEquals(ByteString.copyFrom(endKey), r.getEndKey());
+      assertEquals(confVer, r.getRegionEpoch().getConfVer());
+      assertEquals(ver, r.getRegionEpoch().getVersion());
+      assertEquals(1, l.getId());
+      assertEquals(10, l.getStoreId());
     }
   }
 
@@ -142,20 +150,20 @@ public class PDClientTest extends PDMockServerTest {
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
     try (PDClient client = session.getPDClient()) {
-      Store r = client.getStore(defaultBackOff(), 0);
-      assertEquals(r.getId(), storeId);
-      assertEquals(r.getAddress(), testAddress);
-      assertEquals(r.getState(), Metapb.StoreState.Up);
-      assertEquals(r.getLabels(0).getKey(), "k1");
-      assertEquals(r.getLabels(1).getKey(), "k2");
-      assertEquals(r.getLabels(0).getValue(), "v1");
-      assertEquals(r.getLabels(1).getValue(), "v2");
+      Store r = client.getStore(defaultBackOff(), storeId);
+      assertEquals(storeId, r.getId());
+      assertEquals(testAddress, r.getAddress());
+      assertEquals(Metapb.StoreState.Up, r.getState());
+      assertEquals("k1", r.getLabels(0).getKey());
+      assertEquals("k2", r.getLabels(1).getKey());
+      assertEquals("v1", r.getLabels(0).getValue());
+      assertEquals("v2", r.getLabels(1).getValue());
 
       pdServer.addGetStoreResp(
           GrpcUtils.makeGetStoreResponse(
               pdServer.getClusterId(),
               GrpcUtils.makeStore(storeId, testAddress, Metapb.StoreState.Tombstone)));
-      assertEquals(StoreState.Tombstone, client.getStore(defaultBackOff(), 0).getState());
+      assertEquals(StoreState.Tombstone, client.getStore(defaultBackOff(), storeId).getState());
     }
   }
 

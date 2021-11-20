@@ -18,7 +18,7 @@ import org.tikv.kvproto.Errorpb;
 public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private static final Logger logger = LoggerFactory.getLogger(RegionErrorHandler.class);
   // if a store does not have leader currently, store id is set to 0
-  private static final int NO_LEADER_STORE_ID = 0;
+  public static final int NO_LEADER_STORE_ID = 0;
   private final Function<RespT, Errorpb.Error> getRegionError;
   private final RegionManager regionManager;
   private final RegionErrorReceiver recv;
@@ -36,15 +36,20 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   public boolean handleResponseError(BackOffer backOffer, RespT resp) {
     if (resp == null) {
       String msg = String.format("Request Failed with unknown reason for [%s]", recv.getRegion());
-      logger.warn(msg);
       return handleRequestError(backOffer, new GrpcException(msg));
     }
     // Region error handling logic
     Errorpb.Error error = getRegionError(resp);
     if (error != null) {
       return handleRegionError(backOffer, error);
+    } else {
+      tryUpdateRegionStore();
     }
     return false;
+  }
+
+  public void tryUpdateRegionStore() {
+    recv.tryUpdateRegionStore();
   }
 
   public boolean handleRegionError(BackOffer backOffer, Errorpb.Error error) {
@@ -169,10 +174,9 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
     if (recv.onStoreUnreachable()) {
       return true;
-    } else {
-      regionManager.onRequestFail(recv.getRegion());
     }
 
+    logger.warn("request failed because of: " + e.getMessage());
     backOffer.doBackOff(
         BackOffFunction.BackOffFuncType.BoTiKVRPC,
         new GrpcException(

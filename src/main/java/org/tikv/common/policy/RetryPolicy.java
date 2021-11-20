@@ -41,9 +41,9 @@ public abstract class RetryPolicy<RespT> {
           .register();
 
   // handles PD and TiKV's error.
-  private ErrorHandler<RespT> handler;
+  private final ErrorHandler<RespT> handler;
 
-  private ImmutableSet<Status.Code> unrecoverableStatus =
+  private final ImmutableSet<Status.Code> unrecoverableStatus =
       ImmutableSet.of(
           Status.Code.ALREADY_EXISTS, Status.Code.PERMISSION_DENIED,
           Status.Code.INVALID_ARGUMENT, Status.Code.NOT_FOUND,
@@ -79,6 +79,8 @@ public abstract class RetryPolicy<RespT> {
         if (retry) {
           GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
           continue;
+        } else {
+          return result;
         }
       }
 

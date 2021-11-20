@@ -20,13 +20,14 @@ import static org.tikv.common.codec.KeyUtils.formatBytes;
 
 import com.google.common.primitives.Bytes;
 import com.google.protobuf.ByteString;
+import java.io.Serializable;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.types.DataType;
 import org.tikv.common.util.FastByteComparisons;
 
-public class Key implements Comparable<Key> {
+public class Key implements Comparable<Key>, Serializable {
   public static final Key EMPTY = createEmpty();
   public static final Key NULL = createNull();
   public static final Key MIN = createTypelessMin();

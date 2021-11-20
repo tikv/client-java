@@ -9,12 +9,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.util.FastByteComparisons;
+import org.tikv.common.util.KeyRangeUtils;
 import org.tikv.kvproto.Cdcpb.ChangeDataEvent;
 import org.tikv.kvproto.Cdcpb.ChangeDataRequest;
 import org.tikv.kvproto.Cdcpb.Event.LogType;
+import org.tikv.kvproto.Cdcpb.Event.Row;
 import org.tikv.kvproto.Cdcpb.Header;
 import org.tikv.kvproto.Cdcpb.ResolvedTs;
 import org.tikv.kvproto.ChangeDataGrpc;
@@ -34,10 +38,11 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
   private final ChangeDataStub asyncStub;
   private final Consumer<CDCEvent> eventConsumer;
   private final CDCConfig config;
+  private final Predicate<Row> rowFilter;
 
   private final AtomicBoolean running = new AtomicBoolean(false);
 
-  private boolean started = false;
+  private final boolean started = false;
 
   public RegionCDCClient(
       final TiRegion region,
@@ -54,6 +59,24 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
 
     this.regionKeyRange =
         KeyRange.newBuilder().setStart(region.getStartKey()).setEnd(region.getEndKey()).build();
+
+    this.rowFilter =
+        regionEnclosed()
+            ? ((row) -> true)
+            : new Predicate<Row>() {
+              final byte[] buffer = new byte[config.getMaxRowKeySize()];
+
+              final byte[] start = keyRange.getStart().toByteArray();
+              final byte[] end = keyRange.getEnd().toByteArray();
+
+              @Override
+              public boolean test(final Row row) {
+                final int len = row.getKey().size();
+                row.getKey().copyTo(buffer, 0);
+                return (FastByteComparisons.compareTo(buffer, 0, len, start, 0, start.length) >= 0)
+                    && (FastByteComparisons.compareTo(buffer, 0, len, end, 0, end.length) < 0);
+              }
+            };
   }
 
   public synchronized void start(final long startTs) {
@@ -85,6 +108,11 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
 
   public KeyRange getRegionKeyRange() {
     return regionKeyRange;
+  }
+
+  public boolean regionEnclosed() {
+    return KeyRangeUtils.makeRange(keyRange.getStart(), keyRange.getEnd())
+        .encloses(KeyRangeUtils.makeRange(regionKeyRange.getStart(), regionKeyRange.getEnd()));
   }
 
   public boolean isRunning() {
@@ -133,6 +161,7 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
             .stream()
             .flatMap(ev -> ev.getEntries().getEntriesList().stream())
             .filter(row -> ALLOWED_LOGTYPE.contains(row.getType()))
+            .filter(this.rowFilter)
             .map(row -> CDCEvent.rowEvent(region.getId(), row))
             .forEach(this::submitEvent);
 
@@ -149,7 +178,7 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
   }
 
   private void submitEvent(final CDCEvent event) {
-    LOGGER.info("submit event: {}", event);
+    LOGGER.debug("submit event: {}", event);
     eventConsumer.accept(event);
   }
 }

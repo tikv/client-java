@@ -23,7 +23,7 @@ import org.tikv.common.codec.Codec.*;
 
 public class CodecTest {
   @Test
-  public void readNWriteLongTest() throws Exception {
+  public void readNWriteLongTest() {
     CodecDataOutput cdo = new CodecDataOutput();
     IntegerCodec.writeLongFully(cdo, 9999L, true);
     IntegerCodec.writeLongFully(cdo, -2333L, false);
@@ -62,7 +62,7 @@ public class CodecTest {
   }
 
   @Test
-  public void readNWriteUnsignedLongTest() throws Exception {
+  public void readNWriteUnsignedLongTest() {
     CodecDataOutput cdo = new CodecDataOutput();
     IntegerCodec.writeULongFully(cdo, 0xffffffffffffffffL, true);
     IntegerCodec.writeULongFully(cdo, Long.MIN_VALUE, false);
@@ -156,7 +156,7 @@ public class CodecTest {
   }
 
   @Test
-  public void writeBytesTest() throws Exception {
+  public void writeBytesTest() {
     CodecDataOutput cdo = new CodecDataOutput();
     Codec.BytesCodec.writeBytes(cdo, "abcdefghijk".getBytes());
     byte[] result = cdo.toBytes();

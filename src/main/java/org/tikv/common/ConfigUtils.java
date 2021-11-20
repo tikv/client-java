@@ -15,14 +15,23 @@
 
 package org.tikv.common;
 
+import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class ConfigUtils {
+  public static final String TIKV_CONFIGURATION_FILENAME = "tikv.properties";
+
   public static final String TIKV_PD_ADDRESSES = "tikv.pd.addresses";
   public static final String TIKV_GRPC_TIMEOUT = "tikv.grpc.timeout_in_ms";
+  public static final String TIKV_GRPC_INGEST_TIMEOUT = "tikv.grpc.ingest_timeout_in_ms";
+  public static final String TIKV_GRPC_FORWARD_TIMEOUT = "tikv.grpc.forward_timeout_in_ms";
+  public static final String TIKV_PD_FIRST_GET_MEMBER_TIMEOUT =
+      "tikv.grpc.pd_first_get_member_timeout_in_ms";
   public static final String TIKV_GRPC_SCAN_TIMEOUT = "tikv.grpc.scan_timeout_in_ms";
   public static final String TIKV_GRPC_SCAN_BATCH_SIZE = "tikv.grpc.scan_batch_size";
   public static final String TIKV_GRPC_MAX_FRAME_SIZE = "tikv.grpc.max_frame_size";
+  public static final String TIKV_GRPC_KEEPALIVE_TIME = "tikv.grpc.keepalive_time";
+  public static final String TIKV_GRPC_KEEPALIVE_TIMEOUT = "tikv.grpc.keepalive_timeout";
 
   public static final String TIKV_INDEX_SCAN_BATCH_SIZE = "tikv.index.scan_batch_size";
   public static final String TIKV_INDEX_SCAN_CONCURRENCY = "tikv.index.scan_concurrency";
@@ -50,13 +59,31 @@ public class ConfigUtils {
   public static final String TIKV_NETWORK_MAPPING_NAME = "tikv.network.mapping";
   public static final String TIKV_ENABLE_GRPC_FORWARD = "tikv.enable_grpc_forward";
   public static final String TIKV_GRPC_HEALTH_CHECK_TIMEOUT = "tikv.grpc.health_check_timeout";
+  public static final String TIKV_HEALTH_CHECK_PERIOD_DURATION =
+      "tikv.health_check_period_duration";
 
   public static final String TIKV_ENABLE_ATOMIC_FOR_CAS = "tikv.enable_atomic_for_cas";
 
+  public static final String TIKV_IMPORTER_MAX_KV_BATCH_BYTES = "tikv.importer.max_kv_batch_bytes";
+  public static final String TIKV_IMPORTER_MAX_KV_BATCH_SIZE = "tikv.importer.max_kv_batch_size";
+
+  public static final String TIKV_SCATTER_WAIT_SECONDS = "tikv.scatter_wait_seconds";
+
+  public static final String TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS = "tikv.rawkv.default_backoff_in_ms";
+
+  public static final String TIKV_TLS_ENABLE = "tikv.tls_enable";
+  public static final String TIKV_TRUST_CERT_COLLECTION = "tikv.trust_cert_collection";
+  public static final String TIKV_KEY_CERT_CHAIN = "tikv.key_cert_chain";
+  public static final String TIKV_KEY_FILE = "tikv.key_file";
+
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
-  public static final String DEF_TIMEOUT = "600ms";
+  public static final String DEF_TIMEOUT = "200ms";
+  public static final String DEF_TIKV_GRPC_INGEST_TIMEOUT = "200s";
+  public static final String DEF_FORWARD_TIMEOUT = "300ms";
+  public static final String DEF_TIKV_PD_FIRST_GET_MEMBER_TIMEOUT = "10000ms";
   public static final String DEF_SCAN_TIMEOUT = "20s";
-  public static final int DEF_CHECK_HEALTH_TIMEOUT = 40;
+  public static final int DEF_CHECK_HEALTH_TIMEOUT = 100;
+  public static final int DEF_HEALTH_CHECK_PERIOD_DURATION = 300;
   public static final int DEF_SCAN_BATCH_SIZE = 10240;
   public static final int DEF_MAX_FRAME_SIZE = 268435456 * 2; // 256 * 2 MB
   public static final int DEF_INDEX_SCAN_BATCH_SIZE = 20000;
@@ -84,6 +111,11 @@ public class ConfigUtils {
   public static final boolean DEF_GRPC_FORWARD_ENABLE = true;
   public static final boolean DEF_TIKV_ENABLE_ATOMIC_FOR_CAS = false;
 
+  public static final int DEF_TIKV_IMPORTER_MAX_KV_BATCH_BYTES = 1024 * 1024;
+  public static final int DEF_TIKV_IMPORTER_MAX_KV_BATCH_SIZE = 1024 * 32;
+  public static final int DEF_TIKV_SCATTER_WAIT_SECONDS = 300;
+  public static final int DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS = BackOffer.RAWKV_MAX_BACKOFF;
+
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";
   public static final String HIGH_COMMAND_PRIORITY = "HIGH";
@@ -97,4 +129,8 @@ public class ConfigUtils {
   public static final String LEADER = "LEADER";
   public static final String FOLLOWER = "FOLLOWER";
   public static final String LEADER_AND_FOLLOWER = "LEADER_AND_FOLLOWER";
+
+  public static final int DEF_TIKV_GRPC_KEEPALIVE_TIME = 10;
+  public static final int DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT = 3;
+  public static final boolean DEF_TIKV_TLS_ENABLE = false;
 }

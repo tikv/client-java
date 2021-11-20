@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 PingCAP, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,14 @@
  * limitations under the License.
  */
 
-package org.tikv.util;
+package org.tikv.common.exception;
 
-import java.lang.reflect.Method;
-
-public class ReflectionWrapper {
-  public ReflectionWrapper(Object obj) {
-    this.obj = obj;
+public class SSTDecodeException extends RuntimeException {
+  public SSTDecodeException(Exception e) {
+    super(e);
   }
 
-  private Object obj;
-
-  public Object call(String methodName, Object... args) {
-    try {
-      Method method = obj.getClass().getDeclaredMethod(methodName);
-      method.setAccessible(true);
-      return method.invoke(obj, args);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  public SSTDecodeException(String msg) {
+    super(msg);
   }
 }

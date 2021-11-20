@@ -15,7 +15,8 @@
 
 package org.tikv.common;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
@@ -53,15 +54,14 @@ public class RegionManagerTest extends PDMockServerTest {
   }
 
   @Test
-  public void getRegionByKey() throws Exception {
+  public void getRegionByKey() {
     ByteString startKey = ByteString.copyFrom(new byte[] {1});
     ByteString endKey = ByteString.copyFrom(new byte[] {10});
     ByteString searchKey = ByteString.copyFrom(new byte[] {5});
-    ByteString searchKeyNotExists = ByteString.copyFrom(new byte[] {11});
     int confVer = 1026;
     int ver = 1027;
     long regionId = 233;
-    String testAddress = "testAddress";
+    String testAddress = "127.0.0.1";
     pdServer.addGetRegionResp(
         GrpcUtils.makeGetRegionResponse(
             pdServer.getClusterId(),
@@ -89,18 +89,10 @@ public class RegionManagerTest extends PDMockServerTest {
 
     TiRegion regionToSearch = mgr.getRegionByKey(searchKey);
     assertEquals(region, regionToSearch);
-
-    // This will in turn invoke rpc and results in an error
-    // since we set just one rpc response
-    try {
-      mgr.getRegionByKey(searchKeyNotExists);
-      fail();
-    } catch (Exception ignored) {
-    }
   }
 
   @Test
-  public void getStoreByKey() throws Exception {
+  public void getStoreByKey() {
     ByteString startKey = ByteString.copyFrom(new byte[] {1});
     ByteString endKey = ByteString.copyFrom(new byte[] {10});
     ByteString searchKey = ByteString.copyFrom(new byte[] {5});
@@ -137,7 +129,7 @@ public class RegionManagerTest extends PDMockServerTest {
   }
 
   @Test
-  public void getStoreById() throws Exception {
+  public void getStoreById() {
     long storeId = 234;
     String testAddress = "testAddress";
     pdServer.addGetStoreResp(
@@ -162,12 +154,5 @@ public class RegionManagerTest extends PDMockServerTest {
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
     assertNull(mgr.getStoreById(storeId + 1));
-
-    mgr.invalidateStore(storeId);
-    try {
-      mgr.getStoreById(storeId);
-      fail();
-    } catch (Exception ignored) {
-    }
   }
 }

@@ -9,25 +9,21 @@ It is supposed to:
 
 ## How to build
 
-### Maven
-
-The alternative way to build a usable jar for testing will be
-
 ```
-mvn clean install -Dmaven.test.skip=true
+mvn clean package -Dmaven.test.skip=true
 ```
 
-The following command can install dependencies for you.
+## How to run test
 
 ```
-mvn package
+export RAWKV_PD_ADDRESSES=127.0.0.1:2379
+export TXNKV_PD_ADDRESSES=127.0.0.1:2379
+mvn clean test
 ```
-
-The jar can be found in `./target/`
 
 ## Usage
 
-This project is designed to hook with `[pd](https://github.com/tikv/pd)` and `[tikv](https://github.com/tikv/tikv)`.
+This project is designed to hook with [pd](https://github.com/tikv/pd) and [tikv](https://github.com/tikv/tikv).
 
 When you work with this project, you have to communicate with `pd` and `tikv`. Please run TiKV and PD in advance.
 
@@ -98,6 +94,32 @@ The following includes JVM related parameters.
 - timeout of scan/delete range grpc request
 - default: 20s
 
+#### tikv.importer.max_kv_batch_bytes
+- Maximal package size transporting from clients to TiKV Server (ingest API)
+- default: 1048576 (1M)
+
+#### tikv.importer.max_kv_batch_size
+- Maximal batch size transporting from clients to TiKV Server (ingest API)
+- default: 32768 (32K)
+
+#### tikv.scatter_wait_seconds
+- time to wait for scattering regions
+- default: 300 (5min)
+
+#### tikv.rawkv.default_backoff_in_ms
+- RawKV default backoff in milliseconds
+- default: 20000 (20 seconds)
+
+### Metrics Parameter
+
+#### tikv.metrics.enable
+- whether to enable metrics exporting
+- default: false
+
+#### tikv.metrics.port
+- the metrics exporting http port
+- default: 3140
+
 ### ThreadPool Parameter
 
 The following includes ThreadPool related parameters, which can be passed in through JVM parameters.
@@ -125,6 +147,58 @@ The following includes ThreadPool related parameters, which can be passed in thr
 #### tikv.enable_atomic_for_cas
 - whether to enable `Compare And Set`, set true if using `RawKVClient.compareAndSet` or `RawKVClient.putIfAbsent`
 - default: false
+
+### TLS
+
+#### tikv.tls_enable
+- whether to enable TLS
+- default: false
+
+#### tikv.trust_cert_collection
+- Trusted certificates for verifying the remote endpoint's certificate, e.g. /home/tidb/ca.pem. The file should contain an X.509 certificate collection in PEM format.
+- default: null
+
+#### tikv.key_cert_chain
+- an X.509 certificate chain file in PEM format, e.g. /home/tidb/client.pem.
+- default: null
+
+#### tikv.key_file
+- a PKCS#8 private key file in PEM format. e.g. /home/tidb/client-key.pem.
+- default: null
+
+## Metrics
+
+Client Java supports exporting metrics to Prometheus using poll mode and viewing on Grafana. The following steps shows how to enable this function.
+
+### Step 1: Enable metrics exporting
+
+- set the config `tikv.metrics.enable` to `true`
+- call TiConfiguration.setMetricsEnable(true)
+
+### Step 2: Set the metrics port
+
+- set the config `tikv.metrics.port`
+- call TiConfiguration.setMetricsPort
+
+Default port is 3140.
+
+### Step 3: Config Prometheus
+
+Add the following config to `conf/prometheus.yml` and restart Prometheus.
+
+```yaml
+- job_name: "tikv-client"
+    honor_labels: true
+    static_configs:
+    - targets:
+        - '127.0.0.1:3140'
+        - '127.0.0.2:3140'
+        - '127.0.0.3:3140'
+```
+
+### Step 4: Config Grafana
+
+Import the [Client-Java-Summary dashboard config](/metrics/grafana/client_java_summary.json) to Grafana.
 
 ## License
 Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.

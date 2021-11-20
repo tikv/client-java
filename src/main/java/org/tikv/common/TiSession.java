@@ -20,31 +20,28 @@ import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
-import io.prometheus.client.CollectorRegistry;
-import io.prometheus.client.exporter.HTTPServer;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.catalog.Catalog;
-import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.TiKVException;
+import org.tikv.common.importer.ImporterStoreClient;
+import org.tikv.common.importer.SwitchTiKVModeClient;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
-import org.tikv.common.policy.RetryPolicy;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
+import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.txn.KVClient;
@@ -60,7 +57,6 @@ public class TiSession implements AutoCloseable {
   private static final Map<String, TiSession> sessionCachedMap = new HashMap<>();
   private final TiConfiguration conf;
   private final ChannelFactory channelFactory;
-  private Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
   // below object creation is either heavy or making connection (pd), pending for lazy loading
   private volatile PDClient client;
   private volatile Catalog catalog;
@@ -74,34 +70,34 @@ public class TiSession implements AutoCloseable {
   private volatile RegionManager regionManager;
   private volatile boolean enableGrpcForward;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
-  private boolean isClosed = false;
-  private HTTPServer server;
-  private CollectorRegistry collectorRegistry;
+  private volatile ImporterStoreClient.ImporterStoreClientBuilder importerClientBuilder;
+  private volatile boolean isClosed = false;
+  private volatile SwitchTiKVModeClient switchTiKVModeClient;
+  private final MetricsServer metricsServer;
+  private static final int MAX_SPLIT_REGION_STACK_DEPTH = 6;
 
   public TiSession(TiConfiguration conf) {
+    // may throw org.tikv.common.MetricsServer  - http server not up
+    // put it at the beginning of this function to avoid unclosed Thread
+    this.metricsServer = MetricsServer.getInstance(conf);
+
     this.conf = conf;
-    this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
+    this.channelFactory =
+        conf.isTlsEnable()
+            ? new ChannelFactory(
+                conf.getMaxFrameSize(),
+                conf.getKeepaliveTime(),
+                conf.getKeepaliveTimeout(),
+                conf.getTrustCertCollectionFile(),
+                conf.getKeyCertChainFile(),
+                conf.getKeyFile())
+            : new ChannelFactory(
+                conf.getMaxFrameSize(), conf.getKeepaliveTime(), conf.getKeepaliveTimeout());
+
     this.client = PDClient.createRaw(conf, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
-    if (conf.isMetricsEnable()) {
-      try {
-        this.collectorRegistry = new CollectorRegistry();
-        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_LATENCY);
-        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_FAILURE);
-        this.collectorRegistry.register(RawKVClient.RAW_REQUEST_SUCCESS);
-        this.collectorRegistry.register(RegionStoreClient.GRPC_RAW_REQUEST_LATENCY);
-        this.collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
-        this.collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
-        this.collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
-        this.enableGrpcForward = conf.getEnableGrpcForward();
-        this.server =
-            new HTTPServer(
-                new InetSocketAddress(conf.getMetricsPort()), this.collectorRegistry, true);
-        logger.info("http server is up " + this.server.getPort());
-      } catch (Exception e) {
-        logger.error("http server not up");
-        throw new RuntimeException(e);
-      }
+    if (this.enableGrpcForward) {
+      logger.info("enable grpc forward for high available");
     }
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
@@ -126,22 +122,30 @@ public class TiSession implements AutoCloseable {
   }
 
   public RawKVClient createRawClient() {
+    checkIsClosed();
+
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
     return new RawKVClient(this, builder);
   }
 
   public KVClient createKVClient() {
+    checkIsClosed();
+
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
-    return new KVClient(conf, builder);
+    return new KVClient(conf, builder, this);
   }
 
   public TxnKVClient createTxnClient() {
+    checkIsClosed();
+
     return new TxnKVClient(conf, this.getRegionStoreClientBuilder(), this.getPDClient());
   }
 
   public RegionStoreClient.RegionStoreClientBuilder getRegionStoreClientBuilder() {
+    checkIsClosed();
+
     RegionStoreClient.RegionStoreClientBuilder res = clientBuilder;
     if (res == null) {
       synchronized (this) {
@@ -156,23 +160,56 @@ public class TiSession implements AutoCloseable {
     return res;
   }
 
+  public ImporterStoreClient.ImporterStoreClientBuilder getImporterRegionStoreClientBuilder() {
+    checkIsClosed();
+
+    ImporterStoreClient.ImporterStoreClientBuilder res = importerClientBuilder;
+    if (res == null) {
+      synchronized (this) {
+        if (importerClientBuilder == null) {
+          if (conf.isTxnKVMode()) {
+            importerClientBuilder =
+                new ImporterStoreClient.ImporterStoreClientBuilder<
+                    ImportSstpb.WriteRequest, ImportSstpb.WriteRequest>(
+                    conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
+          } else {
+            importerClientBuilder =
+                new ImporterStoreClient.ImporterStoreClientBuilder<
+                    ImportSstpb.RawWriteRequest, ImportSstpb.RawWriteResponse>(
+                    conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
+          }
+        }
+        res = importerClientBuilder;
+      }
+    }
+    return res;
+  }
+
   public TiConfiguration getConf() {
     return conf;
   }
 
   public TiTimestamp getTimestamp() {
+    checkIsClosed();
+
     return getPDClient().getTimestamp(ConcreteBackOffer.newTsoBackOff());
   }
 
   public Snapshot createSnapshot() {
+    checkIsClosed();
+
     return new Snapshot(getTimestamp(), this);
   }
 
   public Snapshot createSnapshot(TiTimestamp ts) {
+    checkIsClosed();
+
     return new Snapshot(ts, this);
   }
 
   public PDClient getPDClient() {
+    checkIsClosed();
+
     PDClient res = client;
     if (res == null) {
       synchronized (this) {
@@ -186,6 +223,8 @@ public class TiSession implements AutoCloseable {
   }
 
   public Catalog getCatalog() {
+    checkIsClosed();
+
     Catalog res = catalog;
     if (res == null) {
       synchronized (this) {
@@ -199,17 +238,13 @@ public class TiSession implements AutoCloseable {
   }
 
   public RegionManager getRegionManager() {
+    checkIsClosed();
+
     RegionManager res = regionManager;
     if (res == null) {
       synchronized (this) {
         if (regionManager == null) {
-          regionManager =
-              new RegionManager(
-                  getConf(),
-                  getPDClient(),
-                  this.cacheInvalidateCallback,
-                  this.channelFactory,
-                  this.enableGrpcForward);
+          regionManager = new RegionManager(getConf(), getPDClient(), this.channelFactory);
         }
         res = regionManager;
       }
@@ -218,6 +253,8 @@ public class TiSession implements AutoCloseable {
   }
 
   public ExecutorService getThreadPoolForIndexScan() {
+    checkIsClosed();
+
     ExecutorService res = indexScanThreadPool;
     if (res == null) {
       synchronized (this) {
@@ -237,6 +274,8 @@ public class TiSession implements AutoCloseable {
   }
 
   public ExecutorService getThreadPoolForTableScan() {
+    checkIsClosed();
+
     ExecutorService res = tableScanThreadPool;
     if (res == null) {
       synchronized (this) {
@@ -253,6 +292,8 @@ public class TiSession implements AutoCloseable {
   }
 
   public ExecutorService getThreadPoolForBatchPut() {
+    checkIsClosed();
+
     ExecutorService res = batchPutThreadPool;
     if (res == null) {
       synchronized (this) {
@@ -272,6 +313,8 @@ public class TiSession implements AutoCloseable {
   }
 
   public ExecutorService getThreadPoolForBatchGet() {
+    checkIsClosed();
+
     ExecutorService res = batchGetThreadPool;
     if (res == null) {
       synchronized (this) {
@@ -291,6 +334,8 @@ public class TiSession implements AutoCloseable {
   }
 
   public ExecutorService getThreadPoolForBatchDelete() {
+    checkIsClosed();
+
     ExecutorService res = batchDeleteThreadPool;
     if (res == null) {
       synchronized (this) {
@@ -310,6 +355,8 @@ public class TiSession implements AutoCloseable {
   }
 
   public ExecutorService getThreadPoolForBatchScan() {
+    checkIsClosed();
+
     ExecutorService res = batchScanThreadPool;
     if (res == null) {
       synchronized (this) {
@@ -329,6 +376,8 @@ public class TiSession implements AutoCloseable {
   }
 
   public ExecutorService getThreadPoolForDeleteRange() {
+    checkIsClosed();
+
     ExecutorService res = deleteRangeThreadPool;
     if (res == null) {
       synchronized (this) {
@@ -349,32 +398,47 @@ public class TiSession implements AutoCloseable {
 
   @VisibleForTesting
   public ChannelFactory getChannelFactory() {
+    checkIsClosed();
+
     return channelFactory;
   }
 
-  public CollectorRegistry getCollectorRegistry() {
-    return collectorRegistry;
-  }
-
   /**
-   * This is used for setting call back function to invalidate cache information
+   * SwitchTiKVModeClient is used for SST Ingest.
    *
-   * @param callBackFunc callback function
+   * @return a SwitchTiKVModeClient
    */
-  public void injectCallBackFunc(Function<CacheInvalidateEvent, Void> callBackFunc) {
-    this.cacheInvalidateCallback = callBackFunc;
+  public SwitchTiKVModeClient getSwitchTiKVModeClient() {
+    checkIsClosed();
+
+    SwitchTiKVModeClient res = switchTiKVModeClient;
+    if (res == null) {
+      synchronized (this) {
+        if (switchTiKVModeClient == null) {
+          switchTiKVModeClient =
+              new SwitchTiKVModeClient(getPDClient(), getImporterRegionStoreClientBuilder());
+        }
+        res = switchTiKVModeClient;
+      }
+    }
+    return res;
   }
 
   /**
    * split region and scatter
    *
    * @param splitKeys
+   * @param splitRegionBackoffMS
+   * @param scatterRegionBackoffMS
+   * @param scatterWaitMS
    */
   public void splitRegionAndScatter(
       List<byte[]> splitKeys,
       int splitRegionBackoffMS,
       int scatterRegionBackoffMS,
       int scatterWaitMS) {
+    checkIsClosed();
+
     logger.info(String.format("split key's size is %d", splitKeys.size()));
     long startMS = System.currentTimeMillis();
 
@@ -383,7 +447,7 @@ public class TiSession implements AutoCloseable {
         splitRegion(
             splitKeys
                 .stream()
-                .map(k -> Key.toRawKey(k).next().toByteString())
+                .map(k -> Key.toRawKey(k).toByteString())
                 .collect(Collectors.toList()),
             ConcreteBackOffer.newCustomBackOff(splitRegionBackoffMS));
 
@@ -418,11 +482,30 @@ public class TiSession implements AutoCloseable {
     logger.info("splitRegionAndScatter cost {} seconds", (endMS - startMS) / 1000);
   }
 
+  /**
+   * split region and scatter
+   *
+   * @param splitKeys
+   */
+  public void splitRegionAndScatter(List<byte[]> splitKeys) {
+    checkIsClosed();
+
+    int splitRegionBackoffMS = BackOffer.SPLIT_REGION_BACKOFF;
+    int scatterRegionBackoffMS = BackOffer.SCATTER_REGION_BACKOFF;
+    int scatterWaitMS = conf.getScatterWaitSeconds() * 1000;
+    splitRegionAndScatter(splitKeys, splitRegionBackoffMS, scatterRegionBackoffMS, scatterWaitMS);
+  }
+
   private List<Metapb.Region> splitRegion(List<ByteString> splitKeys, BackOffer backOffer) {
+    return splitRegion(splitKeys, backOffer, 1);
+  }
+
+  private List<Metapb.Region> splitRegion(
+      List<ByteString> splitKeys, BackOffer backOffer, int depth) {
     List<Metapb.Region> regions = new ArrayList<>();
 
     Map<TiRegion, List<ByteString>> groupKeys =
-        groupKeysByRegion(regionManager, splitKeys, backOffer);
+        groupKeysByRegion(getRegionManager(), splitKeys, backOffer);
     for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {
 
       Pair<TiRegion, TiStore> pair =
@@ -444,12 +527,22 @@ public class TiSession implements AutoCloseable {
         List<Metapb.Region> newRegions;
         try {
           newRegions = getRegionStoreClientBuilder().build(region, store).splitRegion(splits);
+          // invalidate old region
+          getRegionManager().invalidateRegion(region);
         } catch (final TiKVException e) {
           // retry
           logger.warn("ReSplitting ranges for splitRegion", e);
-          clientBuilder.getRegionManager().invalidateRegion(region);
+          getRegionManager().invalidateRegion(region);
           backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
-          newRegions = splitRegion(splits, backOffer);
+          if (depth >= MAX_SPLIT_REGION_STACK_DEPTH) {
+            logger.warn(
+                String.format(
+                    "Skip split region because MAX_SPLIT_REGION_STACK_DEPTH(%d) reached!",
+                    MAX_SPLIT_REGION_STACK_DEPTH));
+            newRegions = new ArrayList<>();
+          } else {
+            newRegions = splitRegion(splits, backOffer, depth + 1);
+          }
         }
         logger.info("region id={}, new region size={}", region.getId(), newRegions.size());
         regions.addAll(newRegions);
@@ -460,51 +553,115 @@ public class TiSession implements AutoCloseable {
     return regions;
   }
 
+  private void checkIsClosed() {
+    if (isClosed) {
+      throw new RuntimeException("this TiSession is closed!");
+    }
+  }
+
+  public synchronized void closeAwaitTermination(long timeoutMS) throws Exception {
+    shutdown(false);
+
+    long startMS = System.currentTimeMillis();
+    while (true) {
+      if (isTerminatedExecutorServices()) {
+        cleanAfterTerminated();
+        return;
+      }
+
+      if (System.currentTimeMillis() - startMS > timeoutMS) {
+        shutdown(true);
+        return;
+      }
+      Thread.sleep(500);
+    }
+  }
+
   @Override
   public synchronized void close() throws Exception {
-    if (isClosed) {
-      logger.warn("this TiSession is already closed!");
-      return;
+    shutdown(true);
+  }
+
+  private synchronized void shutdown(boolean now) throws Exception {
+    if (!isClosed) {
+      isClosed = true;
+      synchronized (sessionCachedMap) {
+        sessionCachedMap.remove(conf.getPdAddrsString());
+      }
+
+      if (metricsServer != null) {
+        metricsServer.close();
+      }
     }
 
-    if (server != null) {
-      server.stop();
-      logger.info("Metrics server on " + server.getPort() + " is stopped");
+    if (now) {
+      shutdownNowExecutorServices();
+      cleanAfterTerminated();
+    } else {
+      shutdownExecutorServices();
     }
+  }
 
-    isClosed = true;
-    synchronized (sessionCachedMap) {
-      sessionCachedMap.remove(conf.getPdAddrsString());
-    }
+  private synchronized void cleanAfterTerminated() throws InterruptedException {
     if (regionManager != null) {
       regionManager.close();
     }
-    if (tableScanThreadPool != null) {
-      tableScanThreadPool.shutdownNow();
-    }
-    if (indexScanThreadPool != null) {
-      indexScanThreadPool.shutdownNow();
-    }
-    if (batchGetThreadPool != null) {
-      batchGetThreadPool.shutdownNow();
-    }
-    if (batchPutThreadPool != null) {
-      batchPutThreadPool.shutdownNow();
-    }
-    if (batchDeleteThreadPool != null) {
-      batchDeleteThreadPool.shutdownNow();
-    }
-    if (batchScanThreadPool != null) {
-      batchScanThreadPool.shutdownNow();
-    }
-    if (deleteRangeThreadPool != null) {
-      deleteRangeThreadPool.shutdownNow();
-    }
     if (client != null) {
-      getPDClient().close();
+      client.close();
     }
     if (catalog != null) {
-      getCatalog().close();
+      catalog.close();
     }
+
+    if (switchTiKVModeClient != null) {
+      switchTiKVModeClient.stopKeepTiKVToImportMode();
+    }
+  }
+
+  private List<ExecutorService> getExecutorServices() {
+    List<ExecutorService> executorServiceList = new ArrayList<>();
+    if (tableScanThreadPool != null) {
+      executorServiceList.add(tableScanThreadPool);
+    }
+    if (indexScanThreadPool != null) {
+      executorServiceList.add(indexScanThreadPool);
+    }
+    if (batchGetThreadPool != null) {
+      executorServiceList.add(batchGetThreadPool);
+    }
+    if (batchPutThreadPool != null) {
+      executorServiceList.add(batchPutThreadPool);
+    }
+    if (batchDeleteThreadPool != null) {
+      executorServiceList.add(batchDeleteThreadPool);
+    }
+    if (batchScanThreadPool != null) {
+      executorServiceList.add(batchScanThreadPool);
+    }
+    if (deleteRangeThreadPool != null) {
+      executorServiceList.add(deleteRangeThreadPool);
+    }
+    return executorServiceList;
+  }
+
+  private void shutdownExecutorServices() {
+    for (ExecutorService executorService : getExecutorServices()) {
+      executorService.shutdown();
+    }
+  }
+
+  private void shutdownNowExecutorServices() {
+    for (ExecutorService executorService : getExecutorServices()) {
+      executorService.shutdownNow();
+    }
+  }
+
+  private boolean isTerminatedExecutorServices() {
+    for (ExecutorService executorService : getExecutorServices()) {
+      if (!executorService.isTerminated()) {
+        return false;
+      }
+    }
+    return true;
   }
 }

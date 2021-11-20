@@ -21,6 +21,9 @@ import static org.tikv.common.pd.PDError.buildFromPdpbError;
 import static org.tikv.common.pd.PDUtils.addrToUri;
 import static org.tikv.common.pd.PDUtils.uriToAddr;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
@@ -34,7 +37,9 @@ import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
 import java.net.URI;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -46,9 +51,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.CodecDataOutput;
@@ -93,16 +102,21 @@ import org.tikv.kvproto.Pdpb.TsoResponse;
 public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     implements ReadOnlyPDClient {
   private static final String TIFLASH_TABLE_SYNC_PROGRESS_PATH = "/tiflash/table/sync";
+  private static final long MIN_TRY_UPDATE_DURATION = 50;
+  private static final int PAUSE_CHECKER_TIMEOUT = 300; // in seconds
+  private static final int KEEP_CHECKER_PAUSE_PERIOD = PAUSE_CHECKER_TIMEOUT / 5; // in seconds
   private final Logger logger = LoggerFactory.getLogger(PDClient.class);
   private RequestHeader header;
   private TsoRequest tsoReq;
   private volatile PDClientWrapper pdClientWrapper;
   private ScheduledExecutorService service;
   private ScheduledExecutorService tiflashReplicaService;
+  private final HashMap<PDChecker, ScheduledExecutorService> pauseCheckerService = new HashMap<>();
   private List<URI> pdAddrs;
   private Client etcdClient;
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
   private HostMapping hostMapping;
+  private long lastUpdateLeaderTime;
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
       Histogram.build()
@@ -141,6 +155,70 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     TsoResponse resp = callWithRetry(backOffer, PDGrpc.getTsoMethod(), request, handler);
     Timestamp timestamp = resp.getTimestamp();
     return new TiTimestamp(timestamp.getPhysical(), timestamp.getLogical());
+  }
+
+  public synchronized void keepPauseChecker(PDChecker checker) {
+    if (!this.pauseCheckerService.containsKey(checker)) {
+      ScheduledExecutorService newService =
+          Executors.newSingleThreadScheduledExecutor(
+              new ThreadFactoryBuilder()
+                  .setNameFormat(String.format("PDClient-pause-%s-pool-%%d", checker.name()))
+                  .setDaemon(true)
+                  .build());
+      newService.scheduleAtFixedRate(
+          () -> pauseChecker(checker, PAUSE_CHECKER_TIMEOUT),
+          0,
+          KEEP_CHECKER_PAUSE_PERIOD,
+          TimeUnit.SECONDS);
+      this.pauseCheckerService.put(checker, newService);
+    }
+  }
+
+  public synchronized void stopKeepPauseChecker(PDChecker checker) {
+    if (this.pauseCheckerService.containsKey(checker)) {
+      this.pauseCheckerService.get(checker).shutdown();
+      this.pauseCheckerService.remove(checker);
+    }
+  }
+
+  public void resumeChecker(PDChecker checker) {
+    pauseChecker(checker, 0);
+  }
+
+  private void pauseChecker(PDChecker checker, int timeout) {
+    String verb = timeout == 0 ? "resume" : "pause";
+    URI url = pdAddrs.get(0);
+    String api = url.toString() + "/pd/api/v1/checker/" + checker.apiName();
+    HashMap<String, Integer> arguments = new HashMap<>();
+    arguments.put("delay", timeout);
+    try (CloseableHttpClient client = HttpClients.createDefault()) {
+      JsonMapper jsonMapper = new JsonMapper();
+      byte[] body = jsonMapper.writeValueAsBytes(arguments);
+      HttpPost post = new HttpPost(api);
+      post.setEntity(new ByteArrayEntity(body));
+      try (CloseableHttpResponse resp = client.execute(post)) {
+        if (resp.getStatusLine().getStatusCode() != 200) {
+          logger.error("failed to {} checker.", verb);
+        }
+        logger.info("checker {} {}d", checker.apiName(), verb);
+      }
+    } catch (Exception e) {
+      logger.error(String.format("failed to %s checker.", verb), e);
+    }
+  }
+
+  public Boolean isCheckerPaused(PDChecker checker) {
+    URI url = pdAddrs.get(0);
+    String api = url.toString() + "/pd/api/v1/checker/" + checker.apiName();
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      HashMap<String, Boolean> status =
+          mapper.readValue(new URL(api), new TypeReference<HashMap<String, Boolean>>() {});
+      return status.get("paused");
+    } catch (Exception e) {
+      logger.error(String.format("failed to get %s checker status.", checker.apiName()), e);
+      return null;
+    }
   }
 
   /**
@@ -187,7 +265,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                   "wait scatter region %d at key %s is %s",
                   region.getId(),
                   KeyUtils.formatBytes(resp.getDesc().toByteArray()),
-                  resp.getStatus().toString()));
+                  resp.getStatus()));
         }
       }
     }
@@ -228,7 +306,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   public Pair<Metapb.Region, Metapb.Peer> getRegionByKey(BackOffer backOffer, ByteString key) {
     Histogram.Timer requestTimer = PD_GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
     try {
-      if (conf.getKvMode() == KVMode.TXN) {
+      if (conf.isTxnKVMode()) {
         CodecDataOutput cdo = new CodecDataOutput();
         BytesCodec.writeBytes(cdo, key.toByteArray());
         key = cdo.toByteString();
@@ -325,7 +403,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   private GetMembersResponse getMembers(URI uri) {
     try {
       ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
-      PDGrpc.PDBlockingStub stub = PDGrpc.newBlockingStub(probChan);
+      PDGrpc.PDBlockingStub stub =
+          PDGrpc.newBlockingStub(probChan).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
       GetMembersRequest request =
           GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
       GetMembersResponse resp = stub.getMembers(request);
@@ -361,6 +440,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       ManagedChannel clientChannel = channelFactory.getChannel(leaderUrlStr, hostMapping);
       pdClientWrapper =
           new PDClientWrapper(leaderUrlStr, leaderUrlStr, clientChannel, System.nanoTime());
+      timeout = conf.getTimeout();
     } catch (IllegalArgumentException e) {
       logger.error("Error updating leader. " + leaderUrlStr, e);
       return false;
@@ -380,6 +460,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       // create new Leader
       ManagedChannel channel = channelFactory.getChannel(followerUrlStr, hostMapping);
       pdClientWrapper = new PDClientWrapper(leaderUrls, followerUrlStr, channel, System.nanoTime());
+      timeout = conf.getForwardTimeout();
     } catch (IllegalArgumentException e) {
       logger.error("Error updating follower. " + followerUrlStr, e);
       return false;
@@ -389,6 +470,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   public synchronized void updateLeaderOrforwardFollower() {
+    if (System.currentTimeMillis() - lastUpdateLeaderTime < MIN_TRY_UPDATE_DURATION) {
+      return;
+    }
     for (URI url : this.pdAddrs) {
       // since resp is null, we need update leader's address by walking through all pd server.
       GetMembersResponse resp = getMembers(url);
@@ -404,6 +488,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
       // if leader is switched, just return.
       if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
+        lastUpdateLeaderTime = System.currentTimeMillis();
         return;
       }
 
@@ -411,13 +496,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         continue;
       }
 
+      logger.info(String.format("can not switch to new leader, try follower forward"));
       List<Pdpb.Member> members = resp.getMembersList();
 
-      boolean hasReachNextMember = false;
       // If we have not used follower forward, try the first follower.
-      if (pdClientWrapper != null && pdClientWrapper.getStoreAddress().equals(leaderUrlStr)) {
-        hasReachNextMember = true;
-      }
+      boolean hasReachNextMember =
+          pdClientWrapper != null && pdClientWrapper.getStoreAddress().equals(leaderUrlStr);
 
       for (int i = 0; i < members.size() * 2; i++) {
         Pdpb.Member member = members.get(i % members.size());
@@ -431,10 +515,13 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
           continue;
         }
         if (hasReachNextMember && createFollowerClientWrapper(followerUrlStr, leaderUrlStr)) {
+          logger.warn(
+              String.format("forward request to pd [%s] by pd [%s]", leaderUrlStr, followerUrlStr));
           return;
         }
       }
     }
+    lastUpdateLeaderTime = System.currentTimeMillis();
     if (pdClientWrapper == null) {
       throw new TiClientInternalException(
           "already tried all address on file, but not leader found yet.");
@@ -464,8 +551,11 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         return;
       }
     }
-    throw new TiClientInternalException(
-        "already tried all address on file, but not leader found yet.");
+    lastUpdateLeaderTime = System.currentTimeMillis();
+    if (pdClientWrapper == null) {
+      throw new TiClientInternalException(
+          "already tried all address on file, but not leader found yet.");
+    }
   }
 
   private synchronized void tryUpdateMembers(List<URI> members) {
@@ -558,6 +648,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     this.hostMapping =
         Optional.ofNullable(getConf().getHostMapping())
             .orElseGet(() -> new DefaultHostMapping(this.etcdClient, conf.getNetworkMappingName()));
+    // The first request may cost too much latency
+    long originTimeout = this.timeout;
+    this.timeout = conf.getPdFirstGetMemberTimeout();
     for (URI u : pdAddrs) {
       resp = getMembers(u);
       if (resp != null) {
@@ -565,6 +658,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       }
       logger.info("Could not get leader member with pd: " + u);
     }
+    this.timeout = originTimeout;
     checkNotNull(resp, "Failed to init client for PD cluster.");
     long clusterId = resp.getHeader().getClusterId();
     header = RequestHeader.newBuilder().setClusterId(clusterId).build();
@@ -654,12 +748,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
     @Override
     public String toString() {
-      return "[leaderInfo: " + leaderInfo + "]";
+      return "[leaderInfo: " + leaderInfo + ", storeAddress: " + storeAddress + "]";
     }
   }
 
   private Metapb.Region decodeRegion(Metapb.Region region) {
-    final boolean isRawRegion = conf.getKvMode() == KVMode.RAW;
+    final boolean isRawRegion = conf.isRawKVMode();
     Metapb.Region.Builder builder =
         Metapb.Region.newBuilder()
             .setId(region.getId())
@@ -669,15 +763,33 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     if (region.getStartKey().isEmpty() || isRawRegion) {
       builder.setStartKey(region.getStartKey());
     } else {
-      byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
-      builder.setStartKey(ByteString.copyFrom(decodedStartKey));
+      if (!conf.isTest()) {
+        byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
+        builder.setStartKey(ByteString.copyFrom(decodedStartKey));
+      } else {
+        try {
+          byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
+          builder.setStartKey(ByteString.copyFrom(decodedStartKey));
+        } catch (Exception e) {
+          builder.setStartKey(region.getStartKey());
+        }
+      }
     }
 
     if (region.getEndKey().isEmpty() || isRawRegion) {
       builder.setEndKey(region.getEndKey());
     } else {
-      byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
-      builder.setEndKey(ByteString.copyFrom(decodedEndKey));
+      if (!conf.isTest()) {
+        byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
+        builder.setEndKey(ByteString.copyFrom(decodedEndKey));
+      } else {
+        try {
+          byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
+          builder.setEndKey(ByteString.copyFrom(decodedEndKey));
+        } catch (Exception e) {
+          builder.setEndKey(region.getEndKey());
+        }
+      }
     }
 
     return builder.build();

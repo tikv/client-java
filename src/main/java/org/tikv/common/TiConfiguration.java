@@ -18,6 +18,8 @@ package org.tikv.common;
 import static org.tikv.common.ConfigUtils.*;
 
 import io.grpc.Metadata;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
 import java.util.*;
@@ -39,8 +41,11 @@ public class TiConfiguration implements Serializable {
       Metadata.Key.of("pd-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
 
   static {
+    // priority: system environment > config file > default
     loadFromSystemProperties();
+    loadFromConfigurationFile();
     loadFromDefaultProperties();
+    listAll();
   }
 
   private static void loadFromSystemProperties() {
@@ -51,9 +56,37 @@ public class TiConfiguration implements Serializable {
     }
   }
 
+  private static void loadFromConfigurationFile() {
+    try (InputStream input =
+        TiConfiguration.class
+            .getClassLoader()
+            .getResourceAsStream(ConfigUtils.TIKV_CONFIGURATION_FILENAME)) {
+      Properties properties = new Properties();
+
+      if (input == null) {
+        logger.warn("Unable to find " + ConfigUtils.TIKV_CONFIGURATION_FILENAME);
+        return;
+      }
+
+      logger.info("loading " + ConfigUtils.TIKV_CONFIGURATION_FILENAME);
+      properties.load(input);
+      for (String key : properties.stringPropertyNames()) {
+        if (key.startsWith("tikv.")) {
+          String value = properties.getProperty(key);
+          setIfMissing(key, value);
+        }
+      }
+    } catch (IOException e) {
+      logger.error("load config file error", e);
+    }
+  }
+
   private static void loadFromDefaultProperties() {
     setIfMissing(TIKV_PD_ADDRESSES, DEF_PD_ADDRESSES);
     setIfMissing(TIKV_GRPC_TIMEOUT, DEF_TIMEOUT);
+    setIfMissing(TIKV_GRPC_INGEST_TIMEOUT, DEF_TIKV_GRPC_INGEST_TIMEOUT);
+    setIfMissing(TIKV_GRPC_FORWARD_TIMEOUT, DEF_FORWARD_TIMEOUT);
+    setIfMissing(TIKV_PD_FIRST_GET_MEMBER_TIMEOUT, DEF_TIKV_PD_FIRST_GET_MEMBER_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_TIMEOUT, DEF_SCAN_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_BATCH_SIZE, DEF_SCAN_BATCH_SIZE);
     setIfMissing(TIKV_GRPC_MAX_FRAME_SIZE, DEF_MAX_FRAME_SIZE);
@@ -79,11 +112,19 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_NETWORK_MAPPING_NAME, DEF_TIKV_NETWORK_MAPPING_NAME);
     setIfMissing(TIKV_ENABLE_GRPC_FORWARD, DEF_GRPC_FORWARD_ENABLE);
     setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
+    setIfMissing(TIKV_HEALTH_CHECK_PERIOD_DURATION, DEF_HEALTH_CHECK_PERIOD_DURATION);
     setIfMissing(TIKV_ENABLE_ATOMIC_FOR_CAS, DEF_TIKV_ENABLE_ATOMIC_FOR_CAS);
+    setIfMissing(TIKV_IMPORTER_MAX_KV_BATCH_BYTES, DEF_TIKV_IMPORTER_MAX_KV_BATCH_BYTES);
+    setIfMissing(TIKV_IMPORTER_MAX_KV_BATCH_SIZE, DEF_TIKV_IMPORTER_MAX_KV_BATCH_SIZE);
+    setIfMissing(TIKV_SCATTER_WAIT_SECONDS, DEF_TIKV_SCATTER_WAIT_SECONDS);
+    setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+    setIfMissing(TIKV_GRPC_KEEPALIVE_TIME, DEF_TIKV_GRPC_KEEPALIVE_TIME);
+    setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
+    setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
   }
 
   public static void listAll() {
-    logger.info(new ArrayList<>(settings.entrySet()).toString());
+    logger.info("static configurations are:" + new ArrayList<>(settings.entrySet()).toString());
   }
 
   private static void set(String key, String value) {
@@ -237,6 +278,9 @@ public class TiConfiguration implements Serializable {
   }
 
   private long timeout = getTimeAsMs(TIKV_GRPC_TIMEOUT);
+  private long ingestTimeout = getTimeAsMs(TIKV_GRPC_INGEST_TIMEOUT);
+  private long forwardTimeout = getTimeAsMs(TIKV_GRPC_FORWARD_TIMEOUT);
+  private long pdFirstGetMemberTimeout = getTimeAsMs(TIKV_PD_FIRST_GET_MEMBER_TIMEOUT);
   private long scanTimeout = getTimeAsMs(TIKV_GRPC_SCAN_TIMEOUT);
   private int maxFrameSize = getInt(TIKV_GRPC_MAX_FRAME_SIZE);
   private List<URI> pdAddrs = getPdAddrs(TIKV_PD_ADDRESSES);
@@ -262,12 +306,31 @@ public class TiConfiguration implements Serializable {
 
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
-  private int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
+  private final int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
+  private final int healthCheckPeriodDuration = getInt(TIKV_HEALTH_CHECK_PERIOD_DURATION);
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
   private HostMapping hostMapping = null;
 
   private boolean enableAtomicForCAS = getBoolean(TIKV_ENABLE_ATOMIC_FOR_CAS);
+
+  private int importerMaxKVBatchBytes = getInt(TIKV_IMPORTER_MAX_KV_BATCH_BYTES);
+
+  private int importerMaxKVBatchSize = getInt(TIKV_IMPORTER_MAX_KV_BATCH_SIZE);
+
+  private int scatterWaitSeconds = getInt(TIKV_SCATTER_WAIT_SECONDS);
+
+  private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+
+  private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
+  private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
+  private String keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN).orElse(null);
+  private String keyFile = getOption(TIKV_KEY_FILE).orElse(null);
+
+  private boolean isTest = false;
+
+  private int keepaliveTime = getInt(TIKV_GRPC_KEEPALIVE_TIME);
+  private int keepaliveTimeout = getInt(TIKV_GRPC_KEEPALIVE_TIMEOUT);
 
   public enum KVMode {
     TXN,
@@ -332,6 +395,31 @@ public class TiConfiguration implements Serializable {
   public TiConfiguration setTimeout(long timeout) {
     this.timeout = timeout;
     return this;
+  }
+
+  public long getIngestTimeout() {
+    return ingestTimeout;
+  }
+
+  public void setIngestTimeout(long ingestTimeout) {
+    this.ingestTimeout = ingestTimeout;
+  }
+
+  public long getForwardTimeout() {
+    return forwardTimeout;
+  }
+
+  public TiConfiguration setForwardTimeout(long timeout) {
+    this.forwardTimeout = timeout;
+    return this;
+  }
+
+  public long getPdFirstGetMemberTimeout() {
+    return pdFirstGetMemberTimeout;
+  }
+
+  public void setPdFirstGetMemberTimeout(long pdFirstGetMemberTimeout) {
+    this.pdFirstGetMemberTimeout = pdFirstGetMemberTimeout;
   }
 
   public long getScanTimeout() {
@@ -476,6 +564,14 @@ public class TiConfiguration implements Serializable {
     return kvMode;
   }
 
+  public boolean isRawKVMode() {
+    return getKvMode() == TiConfiguration.KVMode.RAW;
+  }
+
+  public boolean isTxnKVMode() {
+    return getKvMode() == KVMode.TXN;
+  }
+
   public TiConfiguration setKvMode(String kvMode) {
     this.kvMode = KVMode.valueOf(kvMode);
     return this;
@@ -558,8 +654,16 @@ public class TiConfiguration implements Serializable {
     return this.enableGrpcForward;
   }
 
+  public void setEnableGrpcForward(boolean enableGrpcForward) {
+    this.enableGrpcForward = enableGrpcForward;
+  }
+
   public long getGrpcHealthCheckTimeout() {
     return this.grpcHealthCheckTimeout;
+  }
+
+  public long getHealthCheckPeriodDuration() {
+    return this.healthCheckPeriodDuration;
   }
 
   public boolean isEnableAtomicForCAS() {
@@ -568,5 +672,93 @@ public class TiConfiguration implements Serializable {
 
   public void setEnableAtomicForCAS(boolean enableAtomicForCAS) {
     this.enableAtomicForCAS = enableAtomicForCAS;
+  }
+
+  public int getImporterMaxKVBatchBytes() {
+    return importerMaxKVBatchBytes;
+  }
+
+  public void setImporterMaxKVBatchBytes(int importerMaxKVBatchBytes) {
+    this.importerMaxKVBatchBytes = importerMaxKVBatchBytes;
+  }
+
+  public int getImporterMaxKVBatchSize() {
+    return importerMaxKVBatchSize;
+  }
+
+  public void setImporterMaxKVBatchSize(int importerMaxKVBatchSize) {
+    this.importerMaxKVBatchSize = importerMaxKVBatchSize;
+  }
+
+  public int getScatterWaitSeconds() {
+    return scatterWaitSeconds;
+  }
+
+  public void setScatterWaitSeconds(int scatterWaitSeconds) {
+    this.scatterWaitSeconds = scatterWaitSeconds;
+  }
+
+  public int getRawKVDefaultBackoffInMS() {
+    return rawKVDefaultBackoffInMS;
+  }
+
+  public void setRawKVDefaultBackoffInMS(int rawKVDefaultBackoffInMS) {
+    this.rawKVDefaultBackoffInMS = rawKVDefaultBackoffInMS;
+  }
+
+  public boolean isTest() {
+    return isTest;
+  }
+
+  public void setTest(boolean test) {
+    isTest = test;
+  }
+
+  public int getKeepaliveTime() {
+    return keepaliveTime;
+  }
+
+  public void setKeepaliveTime(int keepaliveTime) {
+    this.keepaliveTime = keepaliveTime;
+  }
+
+  public int getKeepaliveTimeout() {
+    return keepaliveTimeout;
+  }
+
+  public void setKeepaliveTimeout(int timeout) {
+    this.keepaliveTimeout = timeout;
+  }
+
+  public boolean isTlsEnable() {
+    return tlsEnable;
+  }
+
+  public void setTlsEnable(boolean tlsEnable) {
+    this.tlsEnable = tlsEnable;
+  }
+
+  public String getTrustCertCollectionFile() {
+    return trustCertCollectionFile;
+  }
+
+  public void setTrustCertCollectionFile(String trustCertCollectionFile) {
+    this.trustCertCollectionFile = trustCertCollectionFile;
+  }
+
+  public String getKeyCertChainFile() {
+    return keyCertChainFile;
+  }
+
+  public void setKeyCertChainFile(String keyCertChainFile) {
+    this.keyCertChainFile = keyCertChainFile;
+  }
+
+  public String getKeyFile() {
+    return keyFile;
+  }
+
+  public void setKeyFile(String keyFile) {
+    this.keyFile = keyFile;
   }
 }
