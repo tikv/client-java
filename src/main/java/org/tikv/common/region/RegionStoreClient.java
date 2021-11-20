@@ -30,6 +30,7 @@ import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,8 +124,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       }
       ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
 
-      TikvBlockingStub tikvBlockingStub = TikvGrpc.newBlockingStub(channel);
-      TikvGrpc.TikvFutureStub tikvAsyncStub = TikvGrpc.newFutureStub(channel);
+      long timeout = conf.getTimeout();
+      TikvBlockingStub tikvBlockingStub = TikvGrpc.newBlockingStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+      TikvGrpc.TikvFutureStub tikvAsyncStub = TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
 
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
@@ -1254,12 +1256,14 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
         Metadata header = new Metadata();
         header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
-        blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel), header);
-        asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newFutureStub(channel), header);
+        long deadline = conf.getForwardTimeout();
+        blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS), header);
+        asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newFutureStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS), header);
       } else {
         channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
-        blockingStub = TikvGrpc.newBlockingStub(channel);
-        asyncStub = TikvGrpc.newFutureStub(channel);
+        long timeout = conf.getTimeout();
+        blockingStub = TikvGrpc.newBlockingStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+        asyncStub = TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);;
       }
 
       return new RegionStoreClient(
