@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 PingCAP, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,25 @@
  *
  */
 
-package org.tikv.common.region;
+package org.tikv.common.log;
 
-import org.tikv.common.log.SlowLog;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
-public interface RegionErrorReceiver {
-  boolean onNotLeader(TiRegion region);
+public class SlowLogSpanEmptyImpl implements SlowLogSpan {
 
-  /// return whether we need to retry this request.
-  boolean onStoreUnreachable(SlowLog slowLog);
+  public static final SlowLogSpanEmptyImpl INSTANCE = new SlowLogSpanEmptyImpl();
 
-  TiRegion getRegion();
+  private SlowLogSpanEmptyImpl() {}
+
+  @Override
+  public void start() {}
+
+  @Override
+  public void end() {}
+
+  @Override
+  public JsonElement toJsonElement() {
+    return new JsonObject();
+  }
 }

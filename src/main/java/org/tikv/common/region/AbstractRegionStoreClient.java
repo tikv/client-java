@@ -35,6 +35,9 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.log.SlowLog;
+import org.tikv.common.log.SlowLogEmptyImpl;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
@@ -79,7 +82,9 @@ public abstract class AbstractRegionStoreClient
     if (this.store.getProxyStore() != null) {
       this.timeout = conf.getForwardTimeout();
     } else if (!this.store.isReachable()) {
-      onStoreUnreachable();
+      // cannot get Deadline or SlowLog instance here
+      // use SlowLogEmptyImpl instead to skip slow log record
+      onStoreUnreachable(SlowLogEmptyImpl.INSTANCE);
     }
   }
 
@@ -129,7 +134,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   @Override
-  public boolean onStoreUnreachable() {
+  public boolean onStoreUnreachable(SlowLog slowLog) {
     if (!store.isValid()) {
       logger.warn(String.format("store [%d] has been invalid", store.getId()));
       store = regionManager.getStoreById(store.getId());
@@ -138,13 +143,13 @@ public abstract class AbstractRegionStoreClient
     }
 
     // seek an available leader store to send request
-    Boolean result = seekLeaderStore();
+    Boolean result = seekLeaderStore(slowLog);
     if (result != null) {
       return result;
     }
     if (conf.getEnableGrpcForward()) {
       // seek an available proxy store to forward request
-      return seekProxyStore();
+      return seekProxyStore(slowLog);
     }
     return false;
   }
@@ -177,8 +182,9 @@ public abstract class AbstractRegionStoreClient
     }
   }
 
-  private Boolean seekLeaderStore() {
+  private Boolean seekLeaderStore(SlowLog slowLog) {
     Histogram.Timer switchLeaderDurationTimer = SEEK_LEADER_STORE_DURATION.startTimer();
+    SlowLogSpan slowLogSpan = slowLog.start("seekLeaderStore");
     try {
       List<Metapb.Peer> peers = region.getFollowerList();
       if (peers.isEmpty()) {
@@ -215,11 +221,13 @@ public abstract class AbstractRegionStoreClient
       }
     } finally {
       switchLeaderDurationTimer.observeDuration();
+      slowLogSpan.end();
     }
     return null;
   }
 
-  private boolean seekProxyStore() {
+  private boolean seekProxyStore(SlowLog slowLog) {
+    SlowLogSpan slowLogSpan = slowLog.start("seekProxyStore");
     Histogram.Timer grpcForwardDurationTimer = SEEK_PROXY_STORE_DURATION.startTimer();
     try {
       logger.info(String.format("try grpc forward: region[%d]", region.getId()));
@@ -237,6 +245,7 @@ public abstract class AbstractRegionStoreClient
       return true;
     } finally {
       grpcForwardDurationTimer.observeDuration();
+      slowLogSpan.end();
     }
   }
 
