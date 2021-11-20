@@ -146,9 +146,8 @@ public class RawKVClient implements AutoCloseable {
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
     try {
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key, backOffer);
-        slowLog.addProperty("region", client.getRegion().toString());
-        try {
+        try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
+          slowLog.addProperty("region", client.getRegion().toString());
           client.rawPut(backOffer, key, value, ttl, atomic);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return;
@@ -203,9 +202,8 @@ public class RawKVClient implements AutoCloseable {
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
     try {
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key, backOffer);
-        slowLog.addProperty("region", client.getRegion().toString());
-        try {
+        try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
+          slowLog.addProperty("region", client.getRegion().toString());
           ByteString result = client.rawPutIfAbsent(backOffer, key, value, ttl);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return result;
@@ -311,9 +309,8 @@ public class RawKVClient implements AutoCloseable {
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS(), slowLog);
     try {
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key, backOffer);
-        slowLog.addProperty("region", client.getRegion().toString());
-        try {
+        try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
+          slowLog.addProperty("region", client.getRegion().toString());
           ByteString result = client.rawGet(backOffer, key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return result;
@@ -434,9 +431,8 @@ public class RawKVClient implements AutoCloseable {
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS(), slowLog);
     try {
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key, backOffer);
-        slowLog.addProperty("region", client.getRegion().toString());
-        try {
+        try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
+          slowLog.addProperty("region", client.getRegion().toString());
           Long result = client.rawGetKeyTTL(backOffer, key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return result;
@@ -709,9 +705,8 @@ public class RawKVClient implements AutoCloseable {
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
     try {
       while (true) {
-        RegionStoreClient client = clientBuilder.build(key, backOffer);
-        slowLog.addProperty("region", client.getRegion().toString());
-        try {
+        try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
+          slowLog.addProperty("region", client.getRegion().toString());
           client.rawDelete(backOffer, key, atomic);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return;
@@ -887,8 +882,8 @@ public class RawKVClient implements AutoCloseable {
 
   private Pair<List<Batch>, List<KvPair>> doSendBatchGetInBatchesWithRetry(
       BackOffer backOffer, Batch batch) {
-    RegionStoreClient client = clientBuilder.build(batch.getRegion(), backOffer);
-    try {
+
+    try (RegionStoreClient client = clientBuilder.build(batch.getRegion(), backOffer)) {
       List<KvPair> partialResult = client.rawBatchGet(backOffer, batch.getKeys());
       return Pair.create(new ArrayList<>(), partialResult);
     } catch (final TiKVException e) {
@@ -939,8 +934,7 @@ public class RawKVClient implements AutoCloseable {
 
   private List<Batch> doSendBatchDeleteInBatchesWithRetry(
       BackOffer backOffer, Batch batch, boolean atomic) {
-    RegionStoreClient client = clientBuilder.build(batch.getRegion(), backOffer);
-    try {
+    try (RegionStoreClient client = clientBuilder.build(batch.getRegion(), backOffer)) {
       client.rawBatchDelete(backOffer, batch.getKeys(), atomic);
       return new ArrayList<>();
     } catch (final TiKVException e) {
