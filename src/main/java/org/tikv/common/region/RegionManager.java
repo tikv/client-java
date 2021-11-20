@@ -146,7 +146,7 @@ public class RegionManager {
       ByteString key, TiStoreType storeType, BackOffer backOffer) {
     TiRegion region = getRegionByKey(key, backOffer);
     if (!region.isValid()) {
-      throw new TiClientInternalException("Region invalid: " + region);
+      throw new TiClientInternalException("Region invalid: " + region.toString());
     }
 
     TiStore store = null;
@@ -199,9 +199,14 @@ public class RegionManager {
       if (store == null) {
         store = new TiStore(pdClient.getStore(backOffer, id));
       }
-      // if we did not get store info from pd or the store is already tombstone, remove store from
-      // cache
-      if (store.getStore() == null || store.getStore().getState().equals(StoreState.Tombstone)) {
+      // if we did not get store info from pd, remove store from cache
+      if (store.getStore() == null) {
+        logger.warn(String.format("failed to get store %d from pd", id));
+        return null;
+      }
+      // if the store is already tombstone, remove store from cache
+      if (store.getStore().getState().equals(StoreState.Tombstone)) {
+        logger.warn(String.format("store %d is tombstone", id));
         return null;
       }
       if (cache.putStore(id, store) && storeChecker != null) {

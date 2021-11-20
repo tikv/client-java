@@ -75,11 +75,11 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
 
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
-    backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoPDRPC, e);
     // store id is not found
     if (e instanceof StatusRuntimeException && e.getMessage().contains("invalid store ID")) {
       return false;
     }
+    backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoPDRPC, e);
     client.updateLeaderOrforwardFollower();
     return true;
   }
