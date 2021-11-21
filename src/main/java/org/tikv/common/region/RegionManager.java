@@ -33,6 +33,7 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.InvalidStoreException;
 import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
@@ -96,6 +97,7 @@ public class RegionManager {
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
     Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
+    SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("RegionManager.getRegionByKey");
     TiRegion region = cache.getRegionByKey(key, backOffer);
     try {
       if (region == null) {
@@ -106,6 +108,7 @@ public class RegionManager {
       }
     } finally {
       requestTimer.observeDuration();
+      slowLogSpan.end();
     }
 
     return region;
@@ -144,6 +147,7 @@ public class RegionManager {
 
   public Pair<TiRegion, TiStore> getRegionStorePairByKey(
       ByteString key, TiStoreType storeType, BackOffer backOffer) {
+    SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("getRegionStorePairByKey");
     TiRegion region = getRegionByKey(key, backOffer);
     if (!region.isValid()) {
       throw new TiClientInternalException("Region invalid: " + region.toString());
@@ -171,6 +175,7 @@ public class RegionManager {
       }
     }
 
+    slowLogSpan.end();
     return Pair.create(region, store);
   }
 
@@ -223,12 +228,14 @@ public class RegionManager {
   }
 
   public TiStore getStoreById(long id, BackOffer backOffer) {
+    SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("RegionManager.getStoreById");
     TiStore store = getStoreByIdWithBackOff(id, backOffer);
     if (store == null) {
       logger.warn(String.format("failed to fetch store %d, the store may be missing", id));
       cache.clearAll();
       throw new InvalidStoreException(id);
     }
+    slowLogSpan.end();
     return store;
   }
 
