@@ -55,6 +55,9 @@ import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.log.SlowLog;
+import org.tikv.common.log.SlowLogEmptyImpl;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.NoopHandler;
 import org.tikv.common.operation.PDErrorHandler;
@@ -420,12 +423,13 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return true;
   }
 
-  public synchronized boolean updateLeaderOrForwardFollower() {
+  public synchronized boolean updateLeaderOrForwardFollower(SlowLog slowLog) {
     if (System.currentTimeMillis() - lastUpdateLeaderTime < MIN_TRY_UPDATE_DURATION) {
       return false;
     }
 
     Histogram.Timer seekLeaderDurationTimer = PD_SEEK_LEADER_DURATION.startTimer();
+    SlowLogSpan span1 = slowLog.start("PD Seek Leader");
     Pdpb.Member leader;
     try {
       leader = seekLeaderPD();
@@ -445,14 +449,17 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       }
     } finally {
       seekLeaderDurationTimer.observeDuration();
+      span1.end();
     }
     // the leader is unreachable, update leader failed
     if (conf.getEnableGrpcForward()) {
       Histogram.Timer seekProxyDurationTimer = PD_SEEK_PROXY_DURATION.startTimer();
+      SlowLogSpan span2 = slowLog.start("PD Seek Proxy");
       try {
         return seekProxyPD(leader);
       } finally {
         seekProxyDurationTimer.observeDuration();
+        span2.end();
       }
     }
     return false;
@@ -689,7 +696,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
         () -> {
           // Wrap this with a try catch block in case schedule update fails
           try {
-            updateLeaderOrForwardFollower();
+            updateLeaderOrForwardFollower(SlowLogEmptyImpl.INSTANCE);
           } catch (Exception e) {
             logger.warn("Update leader failed", e);
           }
