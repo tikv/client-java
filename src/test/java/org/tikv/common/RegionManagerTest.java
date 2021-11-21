@@ -161,7 +161,12 @@ public class RegionManagerTest extends PDMockServerTest {
                 StoreState.Tombstone,
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
-    assertNull(mgr.getStoreById(storeId + 1));
+
+    try {
+      mgr.getStoreById(storeId + 1);
+      fail();
+    } catch (Exception ignored) {
+    }
 
     mgr.invalidateStore(storeId);
     try {

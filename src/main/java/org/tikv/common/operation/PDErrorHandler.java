@@ -19,6 +19,7 @@ package org.tikv.common.operation;
 
 import static org.tikv.common.pd.PDError.buildFromPdpbError;
 
+import io.grpc.StatusRuntimeException;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,6 +74,10 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
 
   @Override
   public boolean handleRequestError(BackOffer backOffer, Exception e) {
+    // store id is not found
+    if (e instanceof StatusRuntimeException && e.getMessage().contains("invalid store ID")) {
+      return false;
+    }
     backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoPDRPC, e);
     return client.updateLeaderOrForwardFollower();
   }
