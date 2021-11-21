@@ -337,11 +337,13 @@ public abstract class AbstractRegionStoreClient
         try {
           // any answer will do
           Kvrpcpb.RawGetResponse resp = task.task.get();
-          logger.info(
-              String.format(
-                  "rawGetResponse indicates forward from [%s] to [%s]",
-                  task.store.getAddress(), store.getAddress()));
-          return store.withProxy(task.store);
+          if (resp != null) {
+            logger.info(
+                String.format(
+                    "rawGetResponse indicates forward from [%s] to [%s]",
+                    task.store.getAddress(), store.getAddress()));
+            return store.withProxy(task.store);
+          }
         } catch (Exception ignored) {
         }
       }

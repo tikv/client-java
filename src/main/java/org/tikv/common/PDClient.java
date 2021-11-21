@@ -342,10 +342,22 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   private ListenableFuture<GetMembersResponse> getMembersAsync(URI uri) {
+    ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
+    PDGrpc.PDFutureStub stub =
+        PDGrpc.newFutureStub(probChan).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+    GetMembersRequest request =
+        GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
+    return stub.getMembers(request);
+  }
+
+  private ListenableFuture<GetMembersResponse> getMembersForwardAsync(URI proxy, URI leader) {
     try {
-      ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
+      ManagedChannel probChan = channelFactory.getChannel(uriToAddr(proxy), hostMapping);
       PDGrpc.PDFutureStub stub =
-          PDGrpc.newFutureStub(probChan).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+          PDGrpc.newFutureStub(probChan)
+              .withDeadlineAfter(conf.getForwardTimeout(), TimeUnit.MILLISECONDS);
+      Metadata header = new Metadata();
+      header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, uriToAddr(leader));
       GetMembersRequest request =
           GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
       return stub.getMembers(request);
@@ -389,10 +401,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     // TODO: Why not strip protocol info on server side since grpc does not need it
 
     try {
-      if (!checkHealth(followerUrlStr, hostMapping)) {
-        return false;
-      }
-
       // create new Leader
       ManagedChannel channel = channelFactory.getChannel(followerUrlStr, hostMapping);
       timeout = conf.getForwardTimeout();
@@ -409,10 +417,34 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     if (System.currentTimeMillis() - lastUpdateLeaderTime < MIN_TRY_UPDATE_DURATION) {
       return false;
     }
-    List<GetMembersTask> responses = new LinkedList<>();
+
+    Pdpb.Member leader = seekLeaderPD();
+    if (leader == null) {
+      // no leader found, retry
+      logger.warn("failed to fetch leader for pd");
+      return false;
+    } else {
+      // we found a leader
+      String leaderUrlStr = leader.getClientUrlsList().get(0);
+      leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
+      if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
+        // if leader is switched, just return.
+        lastUpdateLeaderTime = System.currentTimeMillis();
+        return true;
+      }
+    }
+    // the leader is unreachable, update leader failed
+    if (conf.getEnableGrpcForward()) {
+      return seekProxyPD(leader);
+    }
+    return false;
+  }
+
+  private Pdpb.Member seekLeaderPD() {
+    List<SeekLeaderPDTask> responses = new LinkedList<>();
     for (URI url : this.pdAddrs) {
       ListenableFuture<GetMembersResponse> task = getMembersAsync(url);
-      responses.add(new GetMembersTask(task, uriToAddr(url)));
+      responses.add(new SeekLeaderPDTask(task, uriToAddr(url)));
     }
     while (true) {
       try {
@@ -420,8 +452,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       } catch (InterruptedException e) {
         throw new GrpcException(e);
       }
-      List<GetMembersTask> unfinished = new LinkedList<>();
-      for (GetMembersTask task : responses) {
+      List<SeekLeaderPDTask> unfinished = new LinkedList<>();
+      for (SeekLeaderPDTask task : responses) {
         if (!task.task.isDone()) {
           unfinished.add(task);
           continue;
@@ -431,8 +463,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
           if (resp != null) {
             if (!resp.getLeader().getClientUrlsList().isEmpty()) {
               // the leader exists
-              String leaderUrlStr = resp.getLeader().getClientUrlsList().get(0);
-              leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
               logger.info(String.format("getMembers indicate [%s] is pd leader", task.addr));
 
               List<Pdpb.Member> members = resp.getMembersList();
@@ -441,21 +471,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
                       .stream()
                       .map(member -> addrToUri(member.getClientUrls(0)))
                       .collect(Collectors.toList()));
-
-              // if leader is switched, just return.
-              if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
-                lastUpdateLeaderTime = System.currentTimeMillis();
-                return true;
-              }
-
-              // the leader is unreachable, update leader failed
-              if (!conf.getEnableGrpcForward()) {
-                break;
-              }
-
-              // we will seek proxy pd to forward request to leader
-              logger.info("can not switch to new leader, try follower forward");
-              return seekProxyPD(members, resp.getLeader());
+              return resp.getLeader();
             }
           }
         } catch (Exception ignored) {
@@ -466,37 +482,52 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       }
       responses = unfinished;
     }
-    lastUpdateLeaderTime = System.currentTimeMillis();
-    if (pdClientWrapper == null) {
-      throw new TiClientInternalException(
-          "already tried all address on file, but no leader found yet.");
-    }
-    return false;
+    return null;
   }
 
-  private synchronized boolean seekProxyPD(List<Pdpb.Member> members, Pdpb.Member leader) {
+  private synchronized boolean seekProxyPD(Pdpb.Member leader) {
     String leaderUrlStr = leader.getClientUrlsList().get(0);
 
-    boolean hasReachNextMember =
-        pdClientWrapper != null && pdClientWrapper.getStoreAddress().equals(leaderUrlStr);
-    // If we have not used follower forward, try the first follower.
+    List<SeekProxyPDTask> responses = new ArrayList<>();
+    for (URI url : pdAddrs) {
+      String followerUrlStr = uriToAddr(url);
+      if (followerUrlStr.equals(leader.getClientUrlsList().get(0))) {
+        continue;
+      }
+      ListenableFuture<GetMembersResponse> task =
+          getMembersForwardAsync(url, addrToUri(leaderUrlStr));
+      responses.add(new SeekProxyPDTask(task, followerUrlStr));
+    }
 
-    for (int i = 0; i < members.size() * 2; i++) {
-      Pdpb.Member member = members.get(i % members.size());
-      if (member.getMemberId() == leader.getMemberId()) {
-        continue;
+    while (true) {
+      try {
+        Thread.sleep(2);
+      } catch (InterruptedException e) {
+        throw new GrpcException(e);
       }
-      String followerUrlStr = member.getClientUrlsList().get(0);
-      followerUrlStr = uriToAddr(addrToUri(followerUrlStr));
-      if (pdClientWrapper != null && pdClientWrapper.getStoreAddress().equals(followerUrlStr)) {
-        hasReachNextMember = true;
-        continue;
+      List<SeekProxyPDTask> unfinished = new LinkedList<>();
+      for (SeekProxyPDTask task : responses) {
+        if (!task.task.isDone()) {
+          unfinished.add(task);
+          continue;
+        }
+        try {
+          // any answer will do
+          GetMembersResponse resp = task.task.get();
+          if (resp != null) {
+            logger.info(
+                String.format(
+                    "getMembersResponse indicates forward from [%s] to [%s]",
+                    task.addr, leaderUrlStr));
+            return createFollowerClientWrapper(task.addr, leaderUrlStr);
+          }
+        } catch (Exception ignored) {
+        }
       }
-      if (hasReachNextMember && createFollowerClientWrapper(followerUrlStr, leaderUrlStr)) {
-        logger.warn(
-            String.format("forward request to pd [%s] by pd [%s]", leaderUrlStr, followerUrlStr));
-        return true;
+      if (unfinished.isEmpty()) {
+        break;
       }
+      responses = unfinished;
     }
     // already tried all members, none of the members is reachable
     return false;
@@ -747,11 +778,21 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return builder.build();
   }
 
-  private static class GetMembersTask {
+  private static class SeekLeaderPDTask {
     private final ListenableFuture<GetMembersResponse> task;
     private final String addr;
 
-    private GetMembersTask(ListenableFuture<GetMembersResponse> task, String addr) {
+    private SeekLeaderPDTask(ListenableFuture<GetMembersResponse> task, String addr) {
+      this.task = task;
+      this.addr = addr;
+    }
+  }
+
+  private static class SeekProxyPDTask {
+    private final ListenableFuture<GetMembersResponse> task;
+    private final String addr;
+
+    private SeekProxyPDTask(ListenableFuture<GetMembersResponse> task, String addr) {
       this.task = task;
       this.addr = addr;
     }
