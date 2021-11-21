@@ -110,6 +110,18 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
           .help("pd getRegionByKey request latency.")
           .register();
 
+  public static final Histogram PD_SEEK_LEADER_DURATION =
+      Histogram.build()
+          .name("client_java_pd_seek_leader_duration")
+          .help("pd seek leader duration.")
+          .register();
+
+  public static final Histogram PD_SEEK_PROXY_DURATION =
+      Histogram.build()
+          .name("client_java_pd_seek_proxy_duration")
+          .help("pd seek proxy duration.")
+          .register();
+
   private PDClient(TiConfiguration conf, ChannelFactory channelFactory) {
     super(conf, channelFactory);
     initCluster();
@@ -418,24 +430,35 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       return false;
     }
 
-    Pdpb.Member leader = seekLeaderPD();
-    if (leader == null) {
-      // no leader found, retry
-      logger.warn("failed to fetch leader for pd");
-      return false;
-    } else {
-      // we found a leader
-      String leaderUrlStr = leader.getClientUrlsList().get(0);
-      leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
-      if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
-        // if leader is switched, just return.
-        lastUpdateLeaderTime = System.currentTimeMillis();
-        return true;
+    Histogram.Timer seekLeaderDurationTimer = PD_SEEK_LEADER_DURATION.startTimer();
+    Pdpb.Member leader;
+    try {
+      leader = seekLeaderPD();
+      if (leader == null) {
+        // no leader found, retry
+        logger.warn("failed to fetch leader for pd");
+        return false;
+      } else {
+        // we found a leader
+        String leaderUrlStr = leader.getClientUrlsList().get(0);
+        leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
+        if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
+          // if leader is switched, just return.
+          lastUpdateLeaderTime = System.currentTimeMillis();
+          return true;
+        }
       }
+    } finally {
+      seekLeaderDurationTimer.observeDuration();
     }
     // the leader is unreachable, update leader failed
     if (conf.getEnableGrpcForward()) {
-      return seekProxyPD(leader);
+      Histogram.Timer seekProxyDurationTimer = PD_SEEK_PROXY_DURATION.startTimer();
+      try {
+        return seekProxyPD(leader);
+      } finally {
+        seekProxyDurationTimer.observeDuration();
+      }
     }
     return false;
   }
