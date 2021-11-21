@@ -110,7 +110,7 @@ public class RegionCache {
         logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
       }
       TiRegion oldRegion = regionCache.get(region.getId());
-      if (!expected.getMeta().equals(oldRegion.getMeta())) {
+      if (oldRegion != null && !expected.getMeta().equals(oldRegion.getMeta())) {
         return false;
       } else {
         if (oldRegion != null) {

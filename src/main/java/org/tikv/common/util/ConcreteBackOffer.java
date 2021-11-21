@@ -127,17 +127,17 @@ public class ConcreteBackOffer implements BackOffer {
         backOffFunction =
             BackOffFunction.create(
                 TiConfiguration.getInt(TIKV_BO_REGION_MISS_BASE_IN_MS),
-                500,
+                100,
                 BackOffStrategy.NoJitter);
         break;
       case BoTxnLock:
         backOffFunction = BackOffFunction.create(200, 3000, BackOffStrategy.EqualJitter);
         break;
       case BoPDRPC:
-        backOffFunction = BackOffFunction.create(100, 600, BackOffStrategy.EqualJitter);
+        backOffFunction = BackOffFunction.create(10, 60, BackOffStrategy.EqualJitter);
         break;
       case BoTiKVRPC:
-        backOffFunction = BackOffFunction.create(10, 400, BackOffStrategy.EqualJitter);
+        backOffFunction = BackOffFunction.create(10, 80, BackOffStrategy.EqualJitter);
         break;
       case BoTxnNotFound:
         backOffFunction = BackOffFunction.create(2, 500, BackOffStrategy.NoJitter);
