@@ -225,6 +225,7 @@ public class RegionManager {
   public TiStore getStoreById(long id, BackOffer backOffer) {
     TiStore store = getStoreByIdWithBackOff(id, backOffer);
     if (store == null) {
+      logger.warn(String.format("failed to fetch store %d, the store may be missing", id));
       cache.clearAll();
       throw new InvalidStoreException(id);
     }

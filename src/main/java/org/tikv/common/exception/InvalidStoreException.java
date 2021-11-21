@@ -18,6 +18,6 @@ package org.tikv.common.exception;
 public class InvalidStoreException extends TiKVException {
 
   public InvalidStoreException(long storeId) {
-    super(String.format("Invalid storeId = %d", storeId));
+    super(String.format("Invalid storeId: %d", storeId));
   }
 }
