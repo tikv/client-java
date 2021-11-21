@@ -363,28 +363,23 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   private ListenableFuture<GetMembersResponse> getMembersForwardAsync(URI proxy, URI leader) {
-    try {
-      ManagedChannel probChan = channelFactory.getChannel(uriToAddr(proxy), hostMapping);
-      PDGrpc.PDFutureStub stub =
-          PDGrpc.newFutureStub(probChan)
-              .withDeadlineAfter(conf.getForwardTimeout(), TimeUnit.MILLISECONDS);
-      Metadata header = new Metadata();
-      header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, uriToAddr(leader));
-      GetMembersRequest request =
-          GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
-      return stub.getMembers(request);
-    } catch (Exception e) {
-      logger.warn("failed to get member from pd server.", e);
-    }
-    return null;
+    ManagedChannel probChan = channelFactory.getChannel(uriToAddr(proxy), hostMapping);
+    PDGrpc.PDFutureStub stub =
+        PDGrpc.newFutureStub(probChan)
+            .withDeadlineAfter(conf.getForwardTimeout(), TimeUnit.MILLISECONDS);
+    Metadata header = new Metadata();
+    header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, uriToAddr(leader));
+    GetMembersRequest request =
+        GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
+    return stub.getMembers(request);
   }
 
   // return whether the leader has changed to target address `leaderUrlStr`.
   synchronized boolean trySwitchLeader(String leaderUrlStr) {
     if (pdClientWrapper != null) {
-      if (leaderUrlStr.equals(pdClientWrapper.getLeaderInfo())) {
+      if (leaderUrlStr.equals(pdClientWrapper.getLeaderAddr())) {
         // The message to leader is not forwarded by follower.
-        if (leaderUrlStr.equals(pdClientWrapper.getStoreAddress())) {
+        if (leaderUrlStr.equals(pdClientWrapper.getProxyAddr())) {
           return true;
         }
       }
@@ -618,7 +613,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     if (pdClientWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
-    return pdClientWrapper.getBlockingStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+    return pdClientWrapper.getBlockingStub();
   }
 
   @Override
@@ -626,7 +621,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     if (pdClientWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
-    return pdClientWrapper.getAsyncStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+    return pdClientWrapper.getAsyncStub();
   }
 
   private void initCluster() {
@@ -714,21 +709,21 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   static class PDClientWrapper {
-    private final String leaderInfo;
+    private final String leaderAddr;
     private final PDBlockingStub blockingStub;
     private final PDFutureStub asyncStub;
     private final long createTime;
-    private final String storeAddress;
+    private final String proxyAddr;
 
     PDClientWrapper(
-        String leaderInfo,
-        String storeAddress,
+        String leaderAddr,
+        String proxyAddr,
         long timeout,
         ManagedChannel clientChannel,
         long createTime) {
-      if (!storeAddress.equals(leaderInfo)) {
+      if (!proxyAddr.equals(leaderAddr)) {
         Metadata header = new Metadata();
-        header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, addrToUri(leaderInfo).toString());
+        header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, addrToUri(leaderAddr).toString());
         this.blockingStub =
             MetadataUtils.attachHeaders(
                 PDGrpc.newBlockingStub(clientChannel)
@@ -745,17 +740,17 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
         this.asyncStub =
             PDGrpc.newFutureStub(clientChannel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
       }
-      this.leaderInfo = leaderInfo;
-      this.storeAddress = storeAddress;
+      this.leaderAddr = leaderAddr;
+      this.proxyAddr = proxyAddr;
       this.createTime = createTime;
     }
 
-    String getLeaderInfo() {
-      return leaderInfo;
+    String getLeaderAddr() {
+      return leaderAddr;
     }
 
-    String getStoreAddress() {
-      return storeAddress;
+    String getProxyAddr() {
+      return proxyAddr;
     }
 
     PDBlockingStub getBlockingStub() {
@@ -772,7 +767,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
     @Override
     public String toString() {
-      return "[leaderInfo: " + leaderInfo + ", storeAddress: " + storeAddress + "]";
+      return "[leaderAddr: " + leaderAddr + ", proxyAddr: " + proxyAddr + "]";
     }
   }
 
