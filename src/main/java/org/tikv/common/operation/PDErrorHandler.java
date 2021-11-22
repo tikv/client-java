@@ -79,6 +79,7 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
       return false;
     }
     backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoPDRPC, e);
+    logger.info("handle request error: ", e);
     return client.updateLeaderOrForwardFollower(backOffer.getSlowLog());
   }
 }

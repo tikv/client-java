@@ -256,9 +256,16 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       PDErrorHandler<GetRegionResponse> handler =
           new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
 
-      GetRegionResponse resp =
-          callWithRetry(backOffer, PDGrpc.getGetRegionMethod(), request, handler);
-      return new Pair<Metapb.Region, Metapb.Peer>(decodeRegion(resp.getRegion()), resp.getLeader());
+      while (true) {
+        try {
+          GetRegionResponse resp =
+              callWithRetry(backOffer, PDGrpc.getGetRegionMethod(), request, handler);
+          return new Pair<Metapb.Region, Metapb.Peer>(
+              decodeRegion(resp.getRegion()), resp.getLeader());
+        } catch (Exception e) {
+          backOffer.doBackOff(BackOffFuncType.BoPDRPC, e);
+        }
+      }
     } finally {
       requestTimer.observeDuration();
     }
@@ -496,6 +503,11 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
                       .stream()
                       .map(member -> addrToUri(member.getClientUrls(0)))
                       .collect(Collectors.toList()));
+              for (SeekLeaderPDTask unfinishedTasks : responses) {
+                if (!unfinishedTasks.task.isDone()) {
+                  unfinishedTasks.task.cancel(true);
+                }
+              }
               return resp.getLeader();
             }
           }
@@ -544,6 +556,11 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
                 String.format(
                     "getMembersResponse indicates forward from [%s] to [%s]",
                     task.addr, leaderUrlStr));
+            for (SeekProxyPDTask unfinishedTasks : responses) {
+              if (!unfinishedTasks.task.isDone()) {
+                unfinishedTasks.task.cancel(true);
+              }
+            }
             return createFollowerClientWrapper(task.addr, leaderUrlStr);
           }
         } catch (Exception ignored) {
@@ -728,6 +745,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
         long timeout,
         ManagedChannel clientChannel,
         long createTime) {
+      timeout *= 100;
       if (!proxyAddr.equals(leaderAddr)) {
         Metadata header = new Metadata();
         header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, addrToUri(leaderAddr).toString());

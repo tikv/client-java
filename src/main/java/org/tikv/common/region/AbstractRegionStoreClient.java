@@ -287,6 +287,11 @@ public abstract class AbstractRegionStoreClient
               // the peer is leader
               logger.info(
                   String.format("rawGet response indicates peer[%d] is leader", task.peer.getId()));
+              for (SwitchLeaderTask unfinishedTasks : responses) {
+                if (!unfinishedTasks.task.isDone()) {
+                  unfinishedTasks.task.cancel(true);
+                }
+              }
               return task.peer;
             }
           }
