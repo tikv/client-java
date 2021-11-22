@@ -44,6 +44,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -105,7 +106,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private Client etcdClient;
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
   private HostMapping hostMapping;
-  private long lastUpdateLeaderTime;
+  private AtomicLong lastUpdateLeaderTime;
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
       Histogram.build()
@@ -430,8 +431,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return true;
   }
 
-  public synchronized boolean updateLeaderOrForwardFollower(SlowLog slowLog) {
-    if (System.currentTimeMillis() - lastUpdateLeaderTime < MIN_TRY_UPDATE_DURATION) {
+  public boolean updateLeaderOrForwardFollower(SlowLog slowLog) {
+    if (System.currentTimeMillis() - lastUpdateLeaderTime.getAndSet(System.currentTimeMillis())
+        < MIN_TRY_UPDATE_DURATION) {
       return false;
     }
 
@@ -450,7 +452,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
         leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
         if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
           // if leader is switched, just return.
-          lastUpdateLeaderTime = System.currentTimeMillis();
           return true;
         }
       }
