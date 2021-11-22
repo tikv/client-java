@@ -475,7 +475,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   private Pdpb.Member seekLeaderPD() {
     List<SeekLeaderPDTask> responses = new LinkedList<>();
-    for (URI url : this.pdAddrs) {
+    List<URI> addrs = new ArrayList<>(this.pdAddrs);
+    for (URI url : addrs) {
       ListenableFuture<GetMembersResponse> task = getMembersAsync(url);
       responses.add(new SeekLeaderPDTask(task, uriToAddr(url)));
     }
@@ -500,6 +501,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
               List<Pdpb.Member> members = resp.getMembersList();
               tryUpdateMembers(
+                  addrs,
                   members
                       .stream()
                       .map(member -> addrToUri(member.getClientUrls(0)))
@@ -523,11 +525,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return null;
   }
 
-  private synchronized boolean seekProxyPD(Pdpb.Member leader) {
+  private boolean seekProxyPD(Pdpb.Member leader) {
     String leaderUrlStr = leader.getClientUrlsList().get(0);
 
     List<SeekProxyPDTask> responses = new ArrayList<>();
-    for (URI url : pdAddrs) {
+    List<URI> addrs = new ArrayList<>(this.pdAddrs);
+    for (URI url : addrs) {
       String followerUrlStr = uriToAddr(url);
       if (followerUrlStr.equals(leader.getClientUrlsList().get(0))) {
         continue;
@@ -576,8 +579,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return false;
   }
 
-  private synchronized void tryUpdateMembers(List<URI> members) {
-    this.pdAddrs = members;
+  private synchronized void tryUpdateMembers(List<URI> originalMembers, List<URI> members) {
+    if (originalMembers.equals(members)) {
+      this.pdAddrs = members;
+    }
   }
 
   public void updateTiFlashReplicaStatus() {
