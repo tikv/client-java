@@ -106,7 +106,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private Client etcdClient;
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
   private HostMapping hostMapping;
-  private AtomicLong lastUpdateLeaderTime;
+  private final AtomicLong lastUpdateLeaderTime = new AtomicLong(0);
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
       Histogram.build()
@@ -432,8 +432,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   public boolean updateLeaderOrForwardFollower(SlowLog slowLog) {
-    if (System.currentTimeMillis() - lastUpdateLeaderTime.getAndSet(System.currentTimeMillis())
-        < MIN_TRY_UPDATE_DURATION) {
+    if (System.currentTimeMillis() - lastUpdateLeaderTime.get() < MIN_TRY_UPDATE_DURATION) {
       return false;
     }
 
@@ -452,6 +451,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
         leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
         if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
           // if leader is switched, just return.
+          lastUpdateLeaderTime.set(System.currentTimeMillis());
           return true;
         }
       }
