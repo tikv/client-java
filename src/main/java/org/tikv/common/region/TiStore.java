@@ -1,25 +1,19 @@
 package org.tikv.common.region;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import org.tikv.kvproto.Metapb;
 
 public class TiStore {
-  private static long MAX_FAIL_FORWARD_TIMES = 4;
   private final Metapb.Store store;
   private final Metapb.Store proxyStore;
-  private AtomicBoolean reachable;
-  private AtomicBoolean valid;
-  private AtomicLong failForwardCount;
-  private AtomicBoolean canForward;
+  private final AtomicBoolean reachable;
+  private final AtomicBoolean valid;
 
   public TiStore(Metapb.Store store) {
     this.store = store;
     this.reachable = new AtomicBoolean(true);
     this.valid = new AtomicBoolean(true);
-    this.canForward = new AtomicBoolean(true);
     this.proxyStore = null;
-    this.failForwardCount = new AtomicLong(0);
   }
 
   private TiStore(Metapb.Store store, Metapb.Store proxyStore) {
@@ -30,9 +24,7 @@ public class TiStore {
       this.reachable = new AtomicBoolean(true);
     }
     this.valid = new AtomicBoolean(true);
-    this.canForward = new AtomicBoolean(true);
     this.proxyStore = proxyStore;
-    this.failForwardCount = new AtomicLong(0);
   }
 
   @java.lang.Override
@@ -79,23 +71,6 @@ public class TiStore {
 
   public void markInvalid() {
     this.valid.set(false);
-  }
-
-  public void forwardFail() {
-    if (this.canForward.get()) {
-      if (this.failForwardCount.addAndGet(1) >= MAX_FAIL_FORWARD_TIMES) {
-        this.canForward.set(false);
-      }
-    }
-  }
-
-  public void makrCanForward() {
-    this.failForwardCount.set(0);
-    this.canForward.set(true);
-  }
-
-  public boolean canForwardFirst() {
-    return this.canForward.get();
   }
 
   public Metapb.Store getStore() {

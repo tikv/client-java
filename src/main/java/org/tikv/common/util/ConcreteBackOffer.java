@@ -29,6 +29,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.log.SlowLog;
+import org.tikv.common.log.SlowLogEmptyImpl;
+import org.tikv.common.log.SlowLogSpan;
 
 public class ConcreteBackOffer implements BackOffer {
   private static final Logger logger = LoggerFactory.getLogger(ConcreteBackOffer.class);
@@ -37,6 +40,7 @@ public class ConcreteBackOffer implements BackOffer {
   private final List<Exception> errors;
   private int totalSleep;
   private final long deadline;
+  private final SlowLog slowLog;
 
   public static final Histogram BACKOFF_DURATION =
       Histogram.build()
@@ -45,7 +49,7 @@ public class ConcreteBackOffer implements BackOffer {
           .labelNames("type")
           .register();
 
-  private ConcreteBackOffer(int maxSleep, long deadline) {
+  private ConcreteBackOffer(int maxSleep, long deadline, SlowLog slowLog) {
     Preconditions.checkArgument(
         maxSleep == 0 || deadline == 0, "Max sleep time should be 0 or Deadline should be 0.");
     Preconditions.checkArgument(maxSleep >= 0, "Max sleep time cannot be less than 0.");
@@ -54,6 +58,7 @@ public class ConcreteBackOffer implements BackOffer {
     this.errors = new ArrayList<>();
     this.backOffFunctionMap = new HashMap<>();
     this.deadline = deadline;
+    this.slowLog = slowLog;
   }
 
   private ConcreteBackOffer(ConcreteBackOffer source) {
@@ -62,39 +67,40 @@ public class ConcreteBackOffer implements BackOffer {
     this.errors = source.errors;
     this.backOffFunctionMap = source.backOffFunctionMap;
     this.deadline = source.deadline;
+    this.slowLog = source.slowLog;
   }
 
-  public static ConcreteBackOffer newDeadlineBackOff(int timeoutInMs) {
+  public static ConcreteBackOffer newDeadlineBackOff(int timeoutInMs, SlowLog slowLog) {
     long deadline = System.currentTimeMillis() + timeoutInMs;
-    return new ConcreteBackOffer(0, deadline);
+    return new ConcreteBackOffer(0, deadline, slowLog);
   }
 
   public static ConcreteBackOffer newCustomBackOff(int maxSleep) {
-    return new ConcreteBackOffer(maxSleep, 0);
+    return new ConcreteBackOffer(maxSleep, 0, SlowLogEmptyImpl.INSTANCE);
   }
 
   public static ConcreteBackOffer newScannerNextMaxBackOff() {
-    return new ConcreteBackOffer(SCANNER_NEXT_MAX_BACKOFF, 0);
+    return new ConcreteBackOffer(SCANNER_NEXT_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
   }
 
   public static ConcreteBackOffer newBatchGetMaxBackOff() {
-    return new ConcreteBackOffer(BATCH_GET_MAX_BACKOFF, 0);
+    return new ConcreteBackOffer(BATCH_GET_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
   }
 
   public static ConcreteBackOffer newCopNextMaxBackOff() {
-    return new ConcreteBackOffer(COP_NEXT_MAX_BACKOFF, 0);
+    return new ConcreteBackOffer(COP_NEXT_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
   }
 
   public static ConcreteBackOffer newGetBackOff() {
-    return new ConcreteBackOffer(GET_MAX_BACKOFF, 0);
+    return new ConcreteBackOffer(GET_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
   }
 
   public static ConcreteBackOffer newRawKVBackOff() {
-    return new ConcreteBackOffer(RAWKV_MAX_BACKOFF, 0);
+    return new ConcreteBackOffer(RAWKV_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
   }
 
   public static ConcreteBackOffer newTsoBackOff() {
-    return new ConcreteBackOffer(TSO_MAX_BACKOFF, 0);
+    return new ConcreteBackOffer(TSO_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
   }
 
   public static ConcreteBackOffer create(BackOffer source) {
@@ -131,7 +137,7 @@ public class ConcreteBackOffer implements BackOffer {
         backOffFunction = BackOffFunction.create(100, 600, BackOffStrategy.EqualJitter);
         break;
       case BoTiKVRPC:
-        backOffFunction = BackOffFunction.create(100, 400, BackOffStrategy.EqualJitter);
+        backOffFunction = BackOffFunction.create(10, 400, BackOffStrategy.EqualJitter);
         break;
       case BoTxnNotFound:
         backOffFunction = BackOffFunction.create(2, 500, BackOffStrategy.NoJitter);
@@ -151,6 +157,7 @@ public class ConcreteBackOffer implements BackOffer {
   }
 
   public boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType, long maxSleepMs) {
+    SlowLogSpan slowLogSpan = getSlowLog().start("backoff " + funcType.name());
     Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(funcType.name()).startTimer();
     BackOffFunction backOffFunction =
         backOffFunctionMap.computeIfAbsent(funcType, this::createBackOffFunc);
@@ -171,8 +178,10 @@ public class ConcreteBackOffer implements BackOffer {
       Thread.sleep(sleep);
     } catch (InterruptedException e) {
       throw new GrpcException(e);
+    } finally {
+      slowLogSpan.end();
+      backOffTimer.observeDuration();
     }
-    backOffTimer.observeDuration();
     if (maxSleep > 0 && totalSleep >= maxSleep) {
       logger.warn(String.format("BackOffer.maxSleep %dms is exceeded, errors:", maxSleep));
       return false;
@@ -205,5 +214,10 @@ public class ConcreteBackOffer implements BackOffer {
     logger.warn(errMsg.toString());
     // Use the last backoff type to generate an exception
     throw new GrpcException("retry is exhausted.", err);
+  }
+
+  @Override
+  public SlowLog getSlowLog() {
+    return slowLog;
   }
 }

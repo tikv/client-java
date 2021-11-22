@@ -159,6 +159,10 @@ public class TiRegion implements Serializable {
     return getContext(currentPeer, resolvedLocks, false);
   }
 
+  public Kvrpcpb.Context getReplicaContext(Peer currentPeer) {
+    return getContext(currentPeer, java.util.Collections.emptySet(), false);
+  }
+
   private Kvrpcpb.Context getContext(
       Peer currentPeer, Set<Long> resolvedLocks, boolean replicaRead) {
 

@@ -20,34 +20,49 @@ package org.tikv.common.region;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
+import io.prometheus.client.Histogram;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.log.SlowLog;
+import org.tikv.common.log.SlowLogEmptyImpl;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
 
 public abstract class AbstractRegionStoreClient
-    extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvStub>
+    extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvFutureStub>
     implements RegionErrorReceiver {
   private static final Logger logger = LoggerFactory.getLogger(AbstractRegionStoreClient.class);
 
+  public static final Histogram SEEK_LEADER_STORE_DURATION =
+      Histogram.build()
+          .name("client_java_seek_leader_store_duration")
+          .help("seek leader store duration.")
+          .register();
+
+  public static final Histogram SEEK_PROXY_STORE_DURATION =
+      Histogram.build()
+          .name("client_java_seek_proxy_store_duration")
+          .help("seek proxy store duration.")
+          .register();
+
   protected final RegionManager regionManager;
   protected TiRegion region;
-  protected TiStore targetStore;
-  protected TiStore originStore;
-  private long retryForwardTimes;
-  private long retryLeaderTimes;
-  private Metapb.Peer candidateLeader;
+  protected TiStore store;
 
   protected AbstractRegionStoreClient(
       TiConfiguration conf,
@@ -55,7 +70,7 @@ public abstract class AbstractRegionStoreClient
       TiStore store,
       ChannelFactory channelFactory,
       TikvGrpc.TikvBlockingStub blockingStub,
-      TikvGrpc.TikvStub asyncStub,
+      TikvGrpc.TikvFutureStub asyncStub,
       RegionManager regionManager) {
     super(conf, channelFactory, blockingStub, asyncStub);
     checkNotNull(region, "Region is empty");
@@ -63,15 +78,13 @@ public abstract class AbstractRegionStoreClient
     checkArgument(region.getLeader() != null, "Leader Peer is null");
     this.region = region;
     this.regionManager = regionManager;
-    this.targetStore = store;
-    this.originStore = null;
-    this.candidateLeader = null;
-    this.retryForwardTimes = 0;
-    this.retryLeaderTimes = 0;
-    if (this.targetStore.getProxyStore() != null) {
+    this.store = store;
+    if (this.store.getProxyStore() != null) {
       this.timeout = conf.getForwardTimeout();
-    } else if (!this.targetStore.isReachable() && !this.targetStore.canForwardFirst()) {
-      onStoreUnreachable();
+    } else if (!this.store.isReachable()) {
+      // cannot get Deadline or SlowLog instance here
+      // use SlowLogEmptyImpl instead to skip slow log record
+      onStoreUnreachable(SlowLogEmptyImpl.INSTANCE);
     }
   }
 
@@ -86,7 +99,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   @Override
-  protected TikvGrpc.TikvStub getAsyncStub() {
+  protected TikvGrpc.TikvFutureStub getAsyncStub() {
     return asyncStub.withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
   }
 
@@ -110,215 +123,252 @@ public abstract class AbstractRegionStoreClient
       return false;
     }
 
-    // If we try one peer but find the leader has not changed, we do not need try other peers.
-    if (candidateLeader != null
-        && region.getLeader().getStoreId() == newRegion.getLeader().getStoreId()) {
-      retryLeaderTimes = newRegion.getFollowerList().size();
-      originStore = null;
+    // If we try one peer but find the leader has not changed, we do not need to try other peers.
+    if (region.getLeader().getStoreId() == newRegion.getLeader().getStoreId()) {
+      store = null;
     }
-    candidateLeader = null;
     region = newRegion;
-    targetStore = regionManager.getStoreById(region.getLeader().getStoreId());
+    store = regionManager.getStoreById(region.getLeader().getStoreId());
     updateClientStub();
     return true;
   }
 
   @Override
-  public boolean onStoreUnreachable() {
-    if (!targetStore.isValid()) {
-      logger.warn(String.format("store [%d] has been invalid", targetStore.getId()));
-      targetStore = regionManager.getStoreById(targetStore.getId());
+  public boolean onStoreUnreachable(SlowLog slowLog) {
+    if (!store.isValid()) {
+      logger.warn(String.format("store [%d] has been invalid", store.getId()));
+      store = regionManager.getStoreById(store.getId());
       updateClientStub();
       return true;
     }
 
-    if (targetStore.getProxyStore() == null) {
-      if (targetStore.isReachable()) {
-        return true;
-      }
+    // seek an available leader store to send request
+    Boolean result = seekLeaderStore(slowLog);
+    if (result != null) {
+      return result;
     }
-
-    // If this store has failed to forward request too many times, we shall try other peer at first
-    // so that we can
-    // reduce the latency cost by fail requests.
-    if (targetStore.canForwardFirst()) {
-      if (retryOtherStoreByProxyForward()) {
-        return true;
-      }
-      if (retryOtherStoreLeader()) {
-        return true;
-      }
-    } else {
-      if (retryOtherStoreLeader()) {
-        return true;
-      }
-      if (retryOtherStoreByProxyForward()) {
-        return true;
-      }
+    if (conf.getEnableGrpcForward()) {
+      // seek an available proxy store to forward request
+      return seekProxyStore(slowLog);
     }
-    logger.warn(
-        String.format(
-            "retry time exceed for region[%d], invalid store[%d]",
-            region.getId(), targetStore.getId()));
-    regionManager.onRequestFail(region);
     return false;
   }
 
   protected Kvrpcpb.Context makeContext(TiStoreType storeType) {
-    if (candidateLeader != null && storeType == TiStoreType.TiKV) {
-      return region.getReplicaContext(candidateLeader, java.util.Collections.emptySet());
-    } else {
-      return region.getReplicaContext(java.util.Collections.emptySet(), storeType);
-    }
+    return region.getReplicaContext(java.util.Collections.emptySet(), storeType);
   }
 
   protected Kvrpcpb.Context makeContext(Set<Long> resolvedLocks, TiStoreType storeType) {
-    if (candidateLeader != null && storeType == TiStoreType.TiKV) {
-      return region.getReplicaContext(candidateLeader, resolvedLocks);
-    } else {
-      return region.getReplicaContext(resolvedLocks, storeType);
-    }
-  }
-
-  @Override
-  public void tryUpdateRegionStore() {
-    if (originStore != null) {
-      if (originStore.getId() == targetStore.getId()) {
-        logger.warn(
-            String.format(
-                "update store [%s] by proxy-store [%s]",
-                targetStore.getStore().getAddress(), targetStore.getProxyStore().getAddress()));
-        // We do not need to mark the store can-forward, because if one store has grpc forward
-        // successfully, it will
-        // create a new store object, which is can-forward.
-        regionManager.updateStore(originStore, targetStore);
-      } else {
-        originStore.forwardFail();
-      }
-    }
-    if (candidateLeader != null) {
-      logger.warn(
-          String.format(
-              "update leader to store [%d] for region[%d]",
-              candidateLeader.getStoreId(), region.getId()));
-      this.regionManager.updateLeader(region, candidateLeader.getStoreId());
-    }
-  }
-
-  private boolean retryOtherStoreLeader() {
-    List<Metapb.Peer> peers = region.getFollowerList();
-    if (retryLeaderTimes >= peers.size()) {
-      return false;
-    }
-    retryLeaderTimes += 1;
-    boolean hasVisitedStore = false;
-    for (Metapb.Peer cur : peers) {
-      if (candidateLeader == null || hasVisitedStore) {
-        TiStore store = regionManager.getStoreById(cur.getStoreId());
-        if (store != null && store.isReachable()) {
-          targetStore = store;
-          candidateLeader = cur;
-          logger.warn(
-              String.format(
-                  "try store [%d],peer[%d] for region[%d], which may be new leader",
-                  targetStore.getId(), candidateLeader.getId(), region.getId()));
-          updateClientStub();
-          return true;
-        } else {
-          continue;
-        }
-      } else if (candidateLeader.getId() == cur.getId()) {
-        hasVisitedStore = true;
-      }
-    }
-    candidateLeader = null;
-    retryLeaderTimes = peers.size();
-    return false;
+    return region.getReplicaContext(resolvedLocks, storeType);
   }
 
   private void updateClientStub() {
-    String addressStr = targetStore.getStore().getAddress();
-    if (targetStore.getProxyStore() != null) {
-      addressStr = targetStore.getProxyStore().getAddress();
+    String addressStr = store.getStore().getAddress();
+    long deadline = timeout;
+    if (store.getProxyStore() != null) {
+      addressStr = store.getProxyStore().getAddress();
+      deadline = conf.getForwardTimeout();
     }
     ManagedChannel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
-    blockingStub = TikvGrpc.newBlockingStub(channel);
-    asyncStub = TikvGrpc.newStub(channel);
-    if (targetStore.getProxyStore() != null) {
+    blockingStub =
+        TikvGrpc.newBlockingStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
+    asyncStub = TikvGrpc.newFutureStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
+    if (store.getProxyStore() != null) {
       Metadata header = new Metadata();
-      header.put(TiConfiguration.FORWARD_META_DATA_KEY, targetStore.getStore().getAddress());
+      header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
       blockingStub = MetadataUtils.attachHeaders(blockingStub, header);
       asyncStub = MetadataUtils.attachHeaders(asyncStub, header);
     }
   }
 
-  private boolean retryOtherStoreByProxyForward() {
-    if (!conf.getEnableGrpcForward()) {
-      return false;
-    }
-    if (retryForwardTimes >= region.getFollowerList().size()) {
-      // If we try to forward request to leader by follower failed, it means that the store of old
-      // leader may be
-      // unavailable but the new leader has not been report to PD. So we can ban this store for a
-      // short time to
-      // avoid too many request try forward rather than try other peer.
-      if (originStore != null) {
-        originStore.forwardFail();
+  private Boolean seekLeaderStore(SlowLog slowLog) {
+    Histogram.Timer switchLeaderDurationTimer = SEEK_LEADER_STORE_DURATION.startTimer();
+    SlowLogSpan slowLogSpan = slowLog.start("seekLeaderStore");
+    try {
+      List<Metapb.Peer> peers = region.getFollowerList();
+      if (peers.isEmpty()) {
+        // no followers available, retry
+        logger.warn(String.format("no followers of region[%d] available, retry", region.getId()));
+        regionManager.onRequestFail(region);
+        return false;
       }
-      return false;
-    }
-    TiStore proxyStore = switchProxyStore();
-    if (proxyStore == null) {
-      logger.warn(
-          String.format(
-              "no forward store can be selected for store [%s] and region[%d]",
-              targetStore.getStore().getAddress(), region.getId()));
-      if (originStore != null) {
-        originStore.forwardFail();
+
+      logger.info(String.format("try switch leader: region[%d]", region.getId()));
+
+      Metapb.Peer peer = switchLeaderStore();
+      if (peer != null) {
+        // we found a leader
+        TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
+        if (currentLeaderStore.isReachable()) {
+          logger.info(
+              String.format(
+                  "update leader using switchLeader logic from store[%d] to store[%d]",
+                  region.getLeader().getStoreId(), peer.getStoreId()));
+          // update region cache
+          region = regionManager.updateLeader(region, peer.getStoreId());
+          // switch to leader store
+          store = currentLeaderStore;
+          updateClientStub();
+          return true;
+        }
       } else {
-        targetStore.forwardFail();
+        // no leader found, some response does not return normally, there may be network partition.
+        logger.warn(
+            String.format(
+                "leader for region[%d] is not found, it is possible that network partition occurred",
+                region.getId()));
       }
-      return false;
+    } finally {
+      switchLeaderDurationTimer.observeDuration();
+      slowLogSpan.end();
     }
-    if (originStore == null) {
-      originStore = targetStore;
-      if (this.targetStore.getProxyStore() != null) {
-        this.timeout = conf.getForwardTimeout();
+    return null;
+  }
+
+  private boolean seekProxyStore(SlowLog slowLog) {
+    SlowLogSpan slowLogSpan = slowLog.start("seekProxyStore");
+    Histogram.Timer grpcForwardDurationTimer = SEEK_PROXY_STORE_DURATION.startTimer();
+    try {
+      logger.info(String.format("try grpc forward: region[%d]", region.getId()));
+      // when current leader cannot be reached
+      TiStore storeWithProxy = switchProxyStore();
+      if (storeWithProxy == null) {
+        // no store available, retry
+        logger.warn(String.format("No store available, retry: region[%d]", region.getId()));
+        return false;
       }
+      // use proxy store to forward requests
+      regionManager.updateStore(store, storeWithProxy);
+      store = storeWithProxy;
+      updateClientStub();
+      return true;
+    } finally {
+      grpcForwardDurationTimer.observeDuration();
+      slowLogSpan.end();
     }
-    targetStore = proxyStore;
-    retryForwardTimes += 1;
-    updateClientStub();
-    logger.warn(
-        String.format(
-            "forward request to store [%s] by store [%s] for region[%d]",
-            targetStore.getStore().getAddress(),
-            targetStore.getProxyStore().getAddress(),
-            region.getId()));
-    return true;
+  }
+
+  // first: leader peer, second: true if any responses returned with grpc error
+  private Metapb.Peer switchLeaderStore() {
+    List<SwitchLeaderTask> responses = new LinkedList<>();
+    for (Metapb.Peer peer : region.getFollowerList()) {
+      ByteString key = region.getStartKey();
+      TiStore peerStore = regionManager.getStoreById(peer.getStoreId());
+      ManagedChannel channel =
+          channelFactory.getChannel(
+              peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
+      TikvGrpc.TikvFutureStub stub =
+          TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+      Kvrpcpb.RawGetRequest rawGetRequest =
+          Kvrpcpb.RawGetRequest.newBuilder()
+              .setContext(region.getReplicaContext(peer))
+              .setKey(key)
+              .build();
+      ListenableFuture<Kvrpcpb.RawGetResponse> task = stub.rawGet(rawGetRequest);
+      responses.add(new SwitchLeaderTask(task, peer));
+    }
+    while (true) {
+      try {
+        Thread.sleep(2);
+      } catch (InterruptedException e) {
+        throw new GrpcException(e);
+      }
+      List<SwitchLeaderTask> unfinished = new LinkedList<>();
+      for (SwitchLeaderTask task : responses) {
+        if (!task.task.isDone()) {
+          unfinished.add(task);
+          continue;
+        }
+        try {
+          Kvrpcpb.RawGetResponse resp = task.task.get();
+          if (resp != null) {
+            if (!resp.hasRegionError()) {
+              // the peer is leader
+              logger.info(
+                  String.format("rawGet response indicates peer[%d] is leader", task.peer.getId()));
+              return task.peer;
+            }
+          }
+        } catch (Exception ignored) {
+        }
+      }
+      if (unfinished.isEmpty()) {
+        return null;
+      }
+      responses = unfinished;
+    }
   }
 
   private TiStore switchProxyStore() {
-    boolean hasVisitedStore = false;
-    List<Metapb.Peer> peers = region.getFollowerList();
-    if (peers.isEmpty()) {
-      return null;
+    long forwardTimeout = conf.getForwardTimeout();
+    List<ForwardCheckTask> responses = new LinkedList<>();
+    for (Metapb.Peer peer : region.getFollowerList()) {
+      ByteString key = region.getStartKey();
+      TiStore peerStore = regionManager.getStoreById(peer.getStoreId());
+      ManagedChannel channel =
+          channelFactory.getChannel(
+              peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
+      TikvGrpc.TikvFutureStub stub =
+          TikvGrpc.newFutureStub(channel).withDeadlineAfter(forwardTimeout, TimeUnit.MILLISECONDS);
+      Metadata header = new Metadata();
+      header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
+      Kvrpcpb.RawGetRequest rawGetRequest =
+          Kvrpcpb.RawGetRequest.newBuilder()
+              .setContext(region.getReplicaContext(peer))
+              .setKey(key)
+              .build();
+      ListenableFuture<Kvrpcpb.RawGetResponse> task =
+          MetadataUtils.attachHeaders(stub, header).rawGet(rawGetRequest);
+      responses.add(new ForwardCheckTask(task, peerStore.getStore()));
     }
-    Metapb.Store proxyStore = targetStore.getProxyStore();
-    if (proxyStore == null || peers.get(peers.size() - 1).getStoreId() == proxyStore.getId()) {
-      hasVisitedStore = true;
-    }
-    for (Metapb.Peer peer : peers) {
-      if (hasVisitedStore) {
-        TiStore store = regionManager.getStoreById(peer.getStoreId());
-        if (store.isReachable()) {
-          return targetStore.withProxy(store.getStore());
-        }
-      } else if (peer.getStoreId() == proxyStore.getId()) {
-        hasVisitedStore = true;
+    while (true) {
+      try {
+        Thread.sleep(2);
+      } catch (InterruptedException e) {
+        throw new GrpcException(e);
       }
+      List<ForwardCheckTask> unfinished = new LinkedList<>();
+      for (ForwardCheckTask task : responses) {
+        if (!task.task.isDone()) {
+          unfinished.add(task);
+          continue;
+        }
+        try {
+          // any answer will do
+          Kvrpcpb.RawGetResponse resp = task.task.get();
+          logger.info(
+              String.format(
+                  "rawGetResponse indicates forward from [%s] to [%s]",
+                  task.store.getAddress(), store.getAddress()));
+          return store.withProxy(task.store);
+        } catch (Exception ignored) {
+        }
+      }
+      if (unfinished.isEmpty()) {
+        return null;
+      }
+      responses = unfinished;
     }
-    return null;
+  }
+
+  private static class SwitchLeaderTask {
+    private final ListenableFuture<Kvrpcpb.RawGetResponse> task;
+    private final Metapb.Peer peer;
+
+    private SwitchLeaderTask(ListenableFuture<Kvrpcpb.RawGetResponse> task, Metapb.Peer peer) {
+      this.task = task;
+      this.peer = peer;
+    }
+  }
+
+  private static class ForwardCheckTask {
+    private final ListenableFuture<Kvrpcpb.RawGetResponse> task;
+    private final Metapb.Store store;
+
+    private ForwardCheckTask(ListenableFuture<Kvrpcpb.RawGetResponse> task, Metapb.Store store) {
+      this.task = task;
+      this.store = store;
+    }
   }
 }
