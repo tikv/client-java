@@ -450,10 +450,12 @@
                                     <pattern>com.google</pattern>
                                     <shadedPattern>org.tikv.shade.com.google</shadedPattern>
                                 </relocation>
+                                <!--
                                 <relocation>
                                     <pattern>io.netty</pattern>
                                     <shadedPattern>org.tikv.shade.io.netty</shadedPattern>
                                 </relocation>
+                                -->
                                 <relocation>
                                     <pattern>io.opencensus</pattern>
                                     <shadedPattern>org.tikv.shade.io.opencensus</shadedPattern>
