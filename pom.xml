@@ -177,7 +177,7 @@
                 </exclusion>
                 <exclusion>
                     <groupId>io.grpc</groupId>
-                    <artifactId>grpc-netty</artifactId>
+                    <artifactId>grpc-grpclb</artifactId>
                 </exclusion>
             </exclusions>
             <version>${jetcd.version}</version>
@@ -444,12 +444,10 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <relocations>
-                                <!--
                                 <relocation>
                                     <pattern>io.grpc</pattern>
                                     <shadedPattern>org.tikv.shade.io.grpc</shadedPattern>
                                 </relocation>
-                                -->
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>org.tikv.shade.com.google</shadedPattern>
