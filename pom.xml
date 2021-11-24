@@ -122,7 +122,7 @@
         <!-- grpc dependencies -->
         <dependency>
             <groupId>io.grpc</groupId>
-            <artifactId>grpc-netty</artifactId>
+            <artifactId>grpc-netty-shaded</artifactId>
             <version>${grpc.version}</version>
         </dependency>
         <dependency>
@@ -140,11 +140,13 @@
             <artifactId>grpc-services</artifactId>
             <version>${grpc.version}</version>
         </dependency>
+        <!--
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-tcnative-boringssl-static</artifactId>
             <version>${netty.tcnative.version}</version>
         </dependency>
+        -->
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-testing</artifactId>
@@ -442,14 +444,17 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <relocations>
+                                <!--
                                 <relocation>
                                     <pattern>io.grpc</pattern>
                                     <shadedPattern>org.tikv.shade.io.grpc</shadedPattern>
                                 </relocation>
+                                -->
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>org.tikv.shade.com.google</shadedPattern>
                                 </relocation>
+                                <!--
                                 <relocation>
                                     <pattern>io.netty</pattern>
                                     <shadedPattern>org.tikv.shade.io.netty</shadedPattern>
@@ -457,6 +462,7 @@
                                         <exclude>io.netty.internal.tcnative.*</exclude>
                                     </excludes>
                                 </relocation>
+                                -->
                                 <relocation>
                                     <pattern>io.opencensus</pattern>
                                     <shadedPattern>org.tikv.shade.io.opencensus</shadedPattern>
