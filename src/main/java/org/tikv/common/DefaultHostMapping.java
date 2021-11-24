@@ -52,7 +52,7 @@ public class DefaultHostMapping implements HostMapping {
 
   @Beta
   private String getMappedHostFromPD(String host) {
-    ByteSequence hostKey = hostToNetworkMappingKey(host);
+    /*ByteSequence hostKey = hostToNetworkMappingKey(host);
     for (int i = 0; i < 5; i++) {
       CompletableFuture<GetResponse> future = etcdClient.getKVClient().get(hostKey);
       try {
@@ -72,7 +72,8 @@ public class DefaultHostMapping implements HostMapping {
         break;
       }
     }
-    return host;
+    return host;*/
+    return "";
   }
 
   public URI getMappedURI(URI uri) {
