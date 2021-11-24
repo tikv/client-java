@@ -444,18 +444,25 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <relocations>
+                                <!--
                                 <relocation>
                                     <pattern>io.grpc</pattern>
                                     <shadedPattern>org.tikv.shade.io.grpc</shadedPattern>
+                                    <excludes>
+                                        <exclude>netty.shaded.*</exclude>
+                                    </excludes>
                                 </relocation>
+                                -->
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>org.tikv.shade.com.google</shadedPattern>
                                 </relocation>
+                                <!--
                                 <relocation>
                                     <pattern>io.netty</pattern>
                                     <shadedPattern>org.tikv.shade.io.netty</shadedPattern>
                                 </relocation>
+                                -->
                                 <relocation>
                                     <pattern>io.opencensus</pattern>
                                     <shadedPattern>org.tikv.shade.io.opencensus</shadedPattern>

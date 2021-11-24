@@ -378,7 +378,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   @Override
   public void close() throws InterruptedException {
-    //etcdClient.close();
+    // etcdClient.close();
     if (service != null) {
       service.shutdownNow();
     }
@@ -636,15 +636,15 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
     List<URI> pdAddrs = getConf().getPdAddrs();
     this.pdAddrs = pdAddrs;
     this.etcdClient = null;
-        /*Client.builder()
-            .endpoints(pdAddrs)
-            .executorService(
-                Executors.newCachedThreadPool(
-                    new ThreadFactoryBuilder()
-                        .setNameFormat("etcd-conn-manager-pool-%d")
-                        .setDaemon(true)
-                        .build()))
-            .build();*/
+    /*Client.builder()
+    .endpoints(pdAddrs)
+    .executorService(
+        Executors.newCachedThreadPool(
+            new ThreadFactoryBuilder()
+                .setNameFormat("etcd-conn-manager-pool-%d")
+                .setDaemon(true)
+                .build()))
+    .build();*/
     this.hostMapping =
         Optional.ofNullable(getConf().getHostMapping())
             .orElseGet(() -> new DefaultHostMapping(this.etcdClient, conf.getNetworkMappingName()));
