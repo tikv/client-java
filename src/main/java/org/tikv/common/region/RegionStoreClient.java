@@ -118,9 +118,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           regionManager.getRegionStorePairByKey(region.getStartKey(), TiStoreType.TiKV).second;
 
       String addressStr = tikvStore.getStore().getAddress();
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("Create region store client on address %s", addressStr));
-      }
+      logger.debug(String.format("Create region store client on address %s", addressStr));
       ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
 
       TikvBlockingStub tikvBlockingStub = TikvGrpc.newBlockingStub(channel);
@@ -1258,9 +1256,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Objects.requireNonNull(storeType, "storeType is null");
 
       String addressStr = store.getStore().getAddress();
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("Create region store client on address %s", addressStr));
-      }
+      logger.debug(String.format("Create region store client on address %s", addressStr));
       ManagedChannel channel = null;
 
       TikvBlockingStub blockingStub = null;

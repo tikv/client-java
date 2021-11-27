@@ -139,7 +139,7 @@ public class ConcreteBackOffer implements BackOffer {
       for (int i = 0; i < errors.size(); i++) {
         Exception curErr = errors.get(i);
         // Print only last 3 errors for non-DEBUG log levels.
-        if (logger.isDebugEnabled() || i >= errors.size() - 3) {
+        if (i >= errors.size() - 3) {
           errMsg.append("\n").append(i).append(".").append(curErr.toString());
         }
       }

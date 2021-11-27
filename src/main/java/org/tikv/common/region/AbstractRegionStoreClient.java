@@ -101,9 +101,8 @@ public abstract class AbstractRegionStoreClient
    */
   @Override
   public boolean onNotLeader(TiRegion newRegion) {
-    if (logger.isDebugEnabled()) {
-      logger.debug(region + ", new leader = " + newRegion.getLeader().getStoreId());
-    }
+    logger.debug(region + ", new leader = " + newRegion.getLeader().getStoreId());
+
     // When switch leader fails or the region changed its region epoch,
     // it would be necessary to re-split task's key range for new region.
     if (!region.getRegionEpoch().equals(newRegion.getRegionEpoch())) {

@@ -43,26 +43,19 @@ public class RegionCache {
     } else {
       regionId = keyToRegionIdCache.get(Key.toRawKey(key));
     }
-    if (logger.isDebugEnabled()) {
-      logger.debug(
-          String.format("getRegionByKey key[%s] -> ID[%s]", formatBytesUTF8(key), regionId));
-    }
+    logger.debug(String.format("getRegionByKey key[%s] -> ID[%s]", formatBytesUTF8(key), regionId));
 
     if (regionId == null) {
       return null;
     }
     TiRegion region;
     region = regionCache.get(regionId);
-    if (logger.isDebugEnabled()) {
-      logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
-    }
+    logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
     return region;
   }
 
   public synchronized TiRegion putRegion(TiRegion region) {
-    if (logger.isDebugEnabled()) {
-      logger.debug("putRegion: " + region);
-    }
+    logger.debug("putRegion: " + region);
     TiRegion oldRegion = regionCache.get(region.getId());
     if (oldRegion != null) {
       if (oldRegion.getMeta().equals(region.getMeta())) {
@@ -79,9 +72,7 @@ public class RegionCache {
   @Deprecated
   public synchronized TiRegion getRegionById(long regionId) {
     TiRegion region = regionCache.get(regionId);
-    if (logger.isDebugEnabled()) {
-      logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
-    }
+    logger.debug(String.format("getRegionByKey ID[%s] -> Region[%s]", regionId, region));
     return region;
   }
 
@@ -92,9 +83,7 @@ public class RegionCache {
   /** Removes region associated with regionId from regionCache. */
   public synchronized void invalidateRegion(TiRegion region) {
     try {
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
-      }
+      logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
       TiRegion oldRegion = regionCache.get(region.getId());
       if (oldRegion != null && oldRegion == region) {
         keyToRegionIdCache.remove(makeRange(region.getStartKey(), region.getEndKey()));
@@ -106,9 +95,7 @@ public class RegionCache {
 
   public synchronized boolean updateRegion(TiRegion expected, TiRegion region) {
     try {
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
-      }
+      logger.debug(String.format("invalidateRegion ID[%s]", region.getId()));
       TiRegion oldRegion = regionCache.get(region.getId());
       if (!expected.getMeta().equals(oldRegion.getMeta())) {
         return false;
@@ -146,9 +133,7 @@ public class RegionCache {
     List<TiRegion> regionToRemove = new ArrayList<>();
     for (TiRegion r : regionCache.values()) {
       if (r.getLeader().getStoreId() == store.getId()) {
-        if (logger.isDebugEnabled()) {
-          logger.debug(String.format("invalidateAllRegionForStore Region[%s]", r));
-        }
+        logger.debug(String.format("invalidateAllRegionForStore Region[%s]", r));
         regionToRemove.add(r);
       }
     }
