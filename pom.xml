@@ -76,7 +76,7 @@
         <proto.folder>${basedir}/proto</proto.folder>
         <gpg.keyname>fake gpg key name</gpg.keyname>
         <gpg.skip>true</gpg.skip>
-        <javadoc.skip>true</javadoc.skip>
+        <javadoc.skip>false</javadoc.skip>
     </properties>
 
     <dependencies>
