@@ -37,7 +37,6 @@ import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
-import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
@@ -124,17 +123,13 @@ public class TiSession implements AutoCloseable {
   public RawKVClient createRawClient() {
     checkIsClosed();
 
-    RegionStoreClientBuilder builder =
-        new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
-    return new RawKVClient(this, builder);
+    return new RawKVClient(this, this.getRegionStoreClientBuilder());
   }
 
   public KVClient createKVClient() {
     checkIsClosed();
 
-    RegionStoreClientBuilder builder =
-        new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
-    return new KVClient(conf, builder, this);
+    return new KVClient(this.conf, this.getRegionStoreClientBuilder(), this);
   }
 
   public TxnKVClient createTxnClient() {
@@ -146,18 +141,19 @@ public class TiSession implements AutoCloseable {
   public RegionStoreClient.RegionStoreClientBuilder getRegionStoreClientBuilder() {
     checkIsClosed();
 
-    RegionStoreClient.RegionStoreClientBuilder res = clientBuilder;
-    if (res == null) {
-      synchronized (this) {
-        if (clientBuilder == null) {
-          clientBuilder =
-              new RegionStoreClient.RegionStoreClientBuilder(
-                  conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
-        }
-        res = clientBuilder;
+    if (this.clientBuilder != null) {
+      return this.clientBuilder;
+    }
+
+    // lazily create the clientBuilder for the current TiSession
+    synchronized (this) {
+      if (this.clientBuilder == null) {
+        this.clientBuilder =
+            new RegionStoreClient.RegionStoreClientBuilder(
+                this.conf, this.channelFactory, this.getRegionManager(), this.getPDClient());
       }
     }
-    return res;
+    return this.clientBuilder;
   }
 
   public ImporterStoreClient.ImporterStoreClientBuilder getImporterRegionStoreClientBuilder() {
