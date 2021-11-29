@@ -692,14 +692,16 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         10,
         10,
         TimeUnit.SECONDS);
-    tiflashReplicaService =
-        Executors.newSingleThreadScheduledExecutor(
-            new ThreadFactoryBuilder()
-                .setNameFormat("PDClient-tiflash-replica-pool-%d")
-                .setDaemon(true)
-                .build());
-    tiflashReplicaService.scheduleAtFixedRate(
-        this::updateTiFlashReplicaStatus, 10, 10, TimeUnit.SECONDS);
+    if (conf.isTiFlashEnabled()) {
+      tiflashReplicaService =
+          Executors.newSingleThreadScheduledExecutor(
+              new ThreadFactoryBuilder()
+                  .setNameFormat("PDClient-tiflash-replica-pool-%d")
+                  .setDaemon(true)
+                  .build());
+      tiflashReplicaService.scheduleAtFixedRate(
+          this::updateTiFlashReplicaStatus, 10, 10, TimeUnit.SECONDS);
+    }
   }
 
   static class PDClientWrapper {
