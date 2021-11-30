@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.log.SlowLog;
 import org.tikv.common.log.SlowLogEmptyImpl;
 import org.tikv.common.log.SlowLogSpan;
@@ -142,6 +143,9 @@ public class ConcreteBackOffer implements BackOffer {
       case BoTxnNotFound:
         backOffFunction = BackOffFunction.create(2, 500, BackOffStrategy.NoJitter);
         break;
+      case CheckTimeout:
+        backOffFunction = BackOffFunction.create(0, 0, BackOffStrategy.NoJitter);
+        break;
     }
     return backOffFunction;
   }
@@ -149,6 +153,13 @@ public class ConcreteBackOffer implements BackOffer {
   @Override
   public void doBackOff(BackOffFunction.BackOffFuncType funcType, Exception err) {
     doBackOffWithMaxSleep(funcType, -1, err);
+  }
+
+  @Override
+  public void checkTimeout() {
+    if (!canRetryAfterSleep(BackOffFunction.BackOffFuncType.CheckTimeout)) {
+      logThrowError(new TiKVException("Request Timeout"));
+    }
   }
 
   @Override
