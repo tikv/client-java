@@ -121,6 +121,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_KEEPALIVE_TIME, DEF_TIKV_GRPC_KEEPALIVE_TIME);
     setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
     setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
+    setIfMissing(TIFLASH_ENABLE, DEF_TIFLASH_ENABLE);
   }
 
   public static void listAll() {
@@ -326,6 +327,8 @@ public class TiConfiguration implements Serializable {
   private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
   private String keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN).orElse(null);
   private String keyFile = getOption(TIKV_KEY_FILE).orElse(null);
+
+  private boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
 
   private boolean isTest = false;
 
@@ -728,6 +731,10 @@ public class TiConfiguration implements Serializable {
 
   public void setKeepaliveTimeout(int timeout) {
     this.keepaliveTimeout = timeout;
+  }
+
+  public boolean isTiFlashEnabled() {
+    return tiFlashEnable;
   }
 
   public boolean isTlsEnable() {
