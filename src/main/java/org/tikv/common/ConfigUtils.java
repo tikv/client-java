@@ -75,6 +75,7 @@ public class ConfigUtils {
       "tikv.rawkv.batch_write_slowlog_in_ms";
   public static final String TIKV_RAWKV_SCAN_SLOWLOG_IN_MS = "tikv.rawkv.scan_slowlog_in_ms";
 
+  public static final String TIFLASH_ENABLE = "tiflash.enable";
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
   public static final String DEF_FORWARD_TIMEOUT = "300ms";
@@ -132,4 +133,12 @@ public class ConfigUtils {
   public static final String LEADER = "LEADER";
   public static final String FOLLOWER = "FOLLOWER";
   public static final String LEADER_AND_FOLLOWER = "LEADER_AND_FOLLOWER";
+<<<<<<< HEAD
+=======
+
+  public static final int DEF_TIKV_GRPC_KEEPALIVE_TIME = 10;
+  public static final int DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT = 3;
+  public static final boolean DEF_TIKV_TLS_ENABLE = false;
+  public static final boolean DEF_TIFLASH_ENABLE = false;
+>>>>>>> e2f10aa... Add a flag to determine if TiFlash is enabled (#351)
 }

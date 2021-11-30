@@ -112,6 +112,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
     setIfMissing(TIKV_HEALTH_CHECK_PERIOD_DURATION, DEF_HEALTH_CHECK_PERIOD_DURATION);
     setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+<<<<<<< HEAD
     setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
@@ -120,6 +121,12 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
     setIfMissing(TIKV_BO_REGION_MISS_BASE_IN_MS, DEF_TIKV_BO_REGION_MISS_BASE_IN_MS);
     setIfMissing(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS, DEF_TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
+=======
+    setIfMissing(TIKV_GRPC_KEEPALIVE_TIME, DEF_TIKV_GRPC_KEEPALIVE_TIME);
+    setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
+    setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
+    setIfMissing(TIFLASH_ENABLE, DEF_TIFLASH_ENABLE);
+>>>>>>> e2f10aa... Add a flag to determine if TiFlash is enabled (#351)
   }
 
   public static void listAll() {
@@ -314,6 +321,7 @@ public class TiConfiguration implements Serializable {
   private HostMapping hostMapping = null;
 
   private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+<<<<<<< HEAD
   private int rawKVReadTimeoutInMS = getInt(TIKV_RAWKV_READ_TIMEOUT_IN_MS);
   private int rawKVWriteTimeoutInMS = getInt(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
   private int rawKVBatchReadTimeoutInMS = getInt(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
@@ -327,6 +335,20 @@ public class TiConfiguration implements Serializable {
   private Optional<Integer> rawKVBatchWriteSlowLogInMS =
       getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS);
   private int rawKVScanSlowLogInMS = getInt(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
+=======
+
+  private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
+  private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
+  private String keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN).orElse(null);
+  private String keyFile = getOption(TIKV_KEY_FILE).orElse(null);
+
+  private boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
+
+  private boolean isTest = false;
+
+  private int keepaliveTime = getInt(TIKV_GRPC_KEEPALIVE_TIME);
+  private int keepaliveTimeout = getInt(TIKV_GRPC_KEEPALIVE_TIMEOUT);
+>>>>>>> e2f10aa... Add a flag to determine if TiFlash is enabled (#351)
 
   public enum KVMode {
     TXN,
@@ -698,8 +720,17 @@ public class TiConfiguration implements Serializable {
     this.rawKVReadSlowLogInMS = Optional.of(rawKVReadSlowLogInMS);
   }
 
+<<<<<<< HEAD
   public Integer getRawKVWriteSlowLogInMS() {
     return rawKVWriteSlowLogInMS.orElse((int) (getTimeout() * 2));
+=======
+  public boolean isTiFlashEnabled() {
+    return tiFlashEnable;
+  }
+
+  public boolean isTlsEnable() {
+    return tlsEnable;
+>>>>>>> e2f10aa... Add a flag to determine if TiFlash is enabled (#351)
   }
 
   public void setRawKVWriteSlowLogInMS(Integer rawKVWriteSlowLogInMS) {

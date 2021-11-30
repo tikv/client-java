@@ -637,6 +637,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
         10,
         10,
         TimeUnit.SECONDS);
+<<<<<<< HEAD
     tiflashReplicaService =
         Executors.newSingleThreadScheduledExecutor(
             new ThreadFactoryBuilder()
@@ -646,6 +647,18 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     tiflashReplicaService.scheduleAtFixedRate(
         this::updateTiFlashReplicaStatus, 10, 10, TimeUnit.SECONDS);
     logger.info("init cluster: finish");
+=======
+    if (conf.isTiFlashEnabled()) {
+      tiflashReplicaService =
+          Executors.newSingleThreadScheduledExecutor(
+              new ThreadFactoryBuilder()
+                  .setNameFormat("PDClient-tiflash-replica-pool-%d")
+                  .setDaemon(true)
+                  .build());
+      tiflashReplicaService.scheduleAtFixedRate(
+          this::updateTiFlashReplicaStatus, 10, 10, TimeUnit.SECONDS);
+    }
+>>>>>>> e2f10aa... Add a flag to determine if TiFlash is enabled (#351)
   }
 
   static class PDClientWrapper {
