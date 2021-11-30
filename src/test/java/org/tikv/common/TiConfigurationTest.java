@@ -16,6 +16,7 @@
 package org.tikv.common;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 import org.junit.Test;
 
@@ -25,5 +26,11 @@ public class TiConfigurationTest {
   public void configFileTest() {
     TiConfiguration conf = TiConfiguration.createRawDefault();
     assertEquals("configFileTest", conf.getDBPrefix());
+  }
+
+  @Test
+  public void tiFlashDefaultValueTest() {
+    TiConfiguration conf = TiConfiguration.createRawDefault();
+    assertFalse(conf.isTiFlashEnabled());
   }
 }
