@@ -110,13 +110,8 @@ public class StoreHealthyChecker implements Runnable {
           }
         } else {
           if (!store.isReachable()) {
-            logger.warn(
-                String.format(
-                    "store [%s] recovers to be reachable and canforward", store.getAddress()));
+            logger.warn(String.format("store [%s] recovers to be reachable", store.getAddress()));
             store.markReachable();
-          }
-          if (!store.canForwardFirst()) {
-            store.makrCanForward();
           }
         }
       } else if (store.isReachable()) {

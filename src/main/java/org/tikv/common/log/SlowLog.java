@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 PingCAP, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,12 @@
  *
  */
 
-package org.tikv.common.region;
+package org.tikv.common.log;
 
-import org.tikv.common.log.SlowLog;
+public interface SlowLog {
+  void addProperty(String key, String value);
 
-public interface RegionErrorReceiver {
-  boolean onNotLeader(TiRegion region);
+  SlowLogSpan start(String name);
 
-  /// return whether we need to retry this request.
-  boolean onStoreUnreachable(SlowLog slowLog);
-
-  TiRegion getRegion();
+  void log();
 }

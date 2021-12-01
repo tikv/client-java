@@ -25,10 +25,10 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
-import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawScanIterator extends ScanIterator {
+  private final BackOffer scanBackOffer;
 
   public RawScanIterator(
       TiConfiguration conf,
@@ -36,15 +36,19 @@ public class RawScanIterator extends ScanIterator {
       ByteString startKey,
       ByteString endKey,
       int limit,
-      boolean keyOnly) {
+      boolean keyOnly,
+      BackOffer scanBackOffer) {
     super(conf, builder, startKey, endKey, limit, keyOnly);
+
+    this.scanBackOffer = scanBackOffer;
   }
 
+  @Override
   TiRegion loadCurrentRegionToCache() throws GrpcException {
-    BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
+    BackOffer backOffer = scanBackOffer;
     while (true) {
-      try (RegionStoreClient client = builder.build(startKey)) {
-        client.setTimeout(conf.getScanTimeout());
+      try (RegionStoreClient client = builder.build(startKey, backOffer)) {
+        client.setTimeout(conf.getRawKVScanTimeoutInMS());
         TiRegion region = client.getRegion();
         if (limit <= 0) {
           currentCache = null;

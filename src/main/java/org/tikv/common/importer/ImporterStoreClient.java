@@ -41,17 +41,22 @@ import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class ImporterStoreClient<RequestClass, ResponseClass>
-    extends AbstractGRPCClient<ImportSSTGrpc.ImportSSTBlockingStub, ImportSSTGrpc.ImportSSTStub>
+    extends AbstractGRPCClient<
+        ImportSSTGrpc.ImportSSTBlockingStub, ImportSSTGrpc.ImportSSTFutureStub>
     implements StreamObserver<ResponseClass> {
 
   private static final Logger logger = LoggerFactory.getLogger(ImporterStoreClient.class);
+
+  private final ImportSSTGrpc.ImportSSTStub stub;
 
   protected ImporterStoreClient(
       TiConfiguration conf,
       ChannelFactory channelFactory,
       ImportSSTGrpc.ImportSSTBlockingStub blockingStub,
-      ImportSSTGrpc.ImportSSTStub asyncStub) {
+      ImportSSTGrpc.ImportSSTFutureStub asyncStub,
+      ImportSSTGrpc.ImportSSTStub stub) {
     super(conf, channelFactory, blockingStub, asyncStub);
+    this.stub = stub;
   }
 
   private StreamObserver<RequestClass> streamObserverRequest;
@@ -108,11 +113,11 @@ public class ImporterStoreClient<RequestClass, ResponseClass>
     if (conf.isRawKVMode()) {
       streamObserverRequest =
           (StreamObserver<RequestClass>)
-              getAsyncStub().rawWrite((StreamObserver<ImportSstpb.RawWriteResponse>) this);
+              getStub().rawWrite((StreamObserver<ImportSstpb.RawWriteResponse>) this);
     } else {
       streamObserverRequest =
           (StreamObserver<RequestClass>)
-              getAsyncStub().write((StreamObserver<ImportSstpb.WriteResponse>) this);
+              getStub().write((StreamObserver<ImportSstpb.WriteResponse>) this);
     }
   }
 
@@ -174,8 +179,12 @@ public class ImporterStoreClient<RequestClass, ResponseClass>
   }
 
   @Override
-  protected ImportSSTGrpc.ImportSSTStub getAsyncStub() {
+  protected ImportSSTGrpc.ImportSSTFutureStub getAsyncStub() {
     return asyncStub.withDeadlineAfter(conf.getIngestTimeout(), TimeUnit.MILLISECONDS);
+  }
+
+  protected ImportSSTGrpc.ImportSSTStub getStub() {
+    return stub.withDeadlineAfter(conf.getIngestTimeout(), TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -209,10 +218,11 @@ public class ImporterStoreClient<RequestClass, ResponseClass>
 
       ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
       ImportSSTGrpc.ImportSSTBlockingStub blockingStub = ImportSSTGrpc.newBlockingStub(channel);
-      ImportSSTGrpc.ImportSSTStub asyncStub = ImportSSTGrpc.newStub(channel);
+      ImportSSTGrpc.ImportSSTFutureStub asyncStub = ImportSSTGrpc.newFutureStub(channel);
+      ImportSSTGrpc.ImportSSTStub stub = ImportSSTGrpc.newStub(channel);
 
       return new ImporterStoreClient<RequestClass, ResponseClass>(
-          conf, channelFactory, blockingStub, asyncStub);
+          conf, channelFactory, blockingStub, asyncStub, stub);
     }
   }
 }

@@ -18,6 +18,10 @@ import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
+import org.tikv.common.log.SlowLogEmptyImpl;
+import org.tikv.common.util.BackOffFunction;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.FastByteComparisons;
 import org.tikv.common.util.Pair;
 import org.tikv.common.util.ScanOption;
@@ -134,6 +138,46 @@ public class RawKVClientTest extends BaseRawKVTest {
   private String generateType() {
     return String.format(
         "%s%02d", RandomStringUtils.randomAlphabetic(3).toUpperCase(Locale.ROOT), r.nextInt(10000));
+  }
+
+  @Test
+  public void testCustomBackOff() {
+    int timeout = 2000;
+    int sleep = 150;
+    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(timeout);
+    long s = System.currentTimeMillis();
+    try {
+      while (true) {
+        Thread.sleep(sleep);
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new Exception("t"));
+      }
+    } catch (Exception ignored) {
+    } finally {
+      long e = System.currentTimeMillis();
+      long duration = e - s;
+      logger.info("duration = " + duration);
+      assert (duration >= 2900);
+    }
+  }
+
+  @Test
+  public void testDeadlineBackOff() {
+    int timeout = 2000;
+    int sleep = 150;
+    BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(timeout, SlowLogEmptyImpl.INSTANCE);
+    long s = System.currentTimeMillis();
+    try {
+      while (true) {
+        Thread.sleep(sleep);
+        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, new Exception("t"));
+      }
+    } catch (Exception ignored) {
+    } finally {
+      long e = System.currentTimeMillis();
+      long duration = e - s;
+      logger.info("duration = " + duration);
+      assert (duration <= timeout + sleep);
+    }
   }
 
   @Test
