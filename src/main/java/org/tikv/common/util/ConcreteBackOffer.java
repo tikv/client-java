@@ -143,7 +143,7 @@ public class ConcreteBackOffer implements BackOffer {
       case BoTxnNotFound:
         backOffFunction = BackOffFunction.create(2, 500, BackOffStrategy.NoJitter);
         break;
-      case CheckTimeout:
+      case BoCheckTimeout:
         backOffFunction = BackOffFunction.create(0, 0, BackOffStrategy.NoJitter);
         break;
     }
@@ -157,7 +157,7 @@ public class ConcreteBackOffer implements BackOffer {
 
   @Override
   public void checkTimeout() {
-    if (!canRetryAfterSleep(BackOffFunction.BackOffFuncType.CheckTimeout)) {
+    if (!canRetryAfterSleep(BackOffFunction.BackOffFuncType.BoCheckTimeout)) {
       logThrowError(new TiKVException("Request Timeout"));
     }
   }
