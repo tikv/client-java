@@ -33,6 +33,7 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.InvalidStoreException;
 import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
@@ -100,6 +101,7 @@ public class RegionManager {
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
     Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
+    SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("getRegionByKey");
     TiRegion region = cache.getRegionByKey(key, backOffer);
     try {
       if (region == null) {
@@ -112,6 +114,7 @@ public class RegionManager {
       return null;
     } finally {
       requestTimer.observeDuration();
+      slowLogSpan.end();
     }
 
     return region;
