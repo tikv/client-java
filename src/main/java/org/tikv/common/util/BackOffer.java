@@ -17,6 +17,8 @@
 
 package org.tikv.common.util;
 
+import org.tikv.common.log.SlowLog;
+
 public interface BackOffer {
   // Back off types.
   int seconds = 1000;
@@ -37,6 +39,12 @@ public interface BackOffer {
    * max back off time exceeded and throw an exception to the caller.
    */
   void doBackOff(BackOffFunction.BackOffFuncType funcType, Exception err);
+  /**
+   * canRetryAfterSleep sleeps a while base on the BackOffType and records the error message. Will
+   * stop until max back off time exceeded and throw an exception to the caller. It will return
+   * false if the total sleep time has exceed some limit condition.
+   */
+  boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType);
 
   /**
    * BackoffWithMaxSleep sleeps a while base on the backoffType and records the error message and
@@ -56,4 +64,6 @@ public interface BackOffer {
     // DecorrJitter increases the maximum jitter based on the last random value.
     DecorrJitter
   }
+
+  SlowLog getSlowLog();
 }

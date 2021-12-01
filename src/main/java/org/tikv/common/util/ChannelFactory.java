@@ -100,7 +100,7 @@ public class ChannelFactory implements AutoCloseable {
                   .idleTimeout(60, TimeUnit.SECONDS);
 
           if (sslContextBuilder == null) {
-            return builder.usePlaintext(true).build();
+            return builder.usePlaintext().build();
           } else {
             SslContext sslContext = null;
             try {

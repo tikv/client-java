@@ -166,6 +166,30 @@ The following includes ThreadPool related parameters, which can be passed in thr
 - a PKCS#8 private key file in PEM format. e.g. /home/tidb/client-key.pem.
 - default: null
 
+#### tikv.rawkv.read_timeout_in_ms
+- RawKV read timeout in milliseconds. This parameter controls the timeout of `get` `getKeyTTL`.
+- default: 2000 (2 seconds)
+
+#### tikv.rawkv.write_timeout_in_ms
+- RawKV write timeout in milliseconds. This parameter controls the timeout of `put` `putAtomic` `putIfAbsent` `delete` `deleteAtomic`.
+- default: 2000 (2 seconds)
+
+#### tikv.rawkv.batch_read_timeout_in_ms
+- RawKV batch read timeout in milliseconds. This parameter controls the timeout of `batchGet`.
+- default: 2000 (2 seconds)
+
+#### tikv.rawkv.batch_write_timeout_in_ms
+- RawKV batch write timeout in milliseconds. This parameter controls the timeout of `batchPut` `batchDelete` `batchDeleteAtomic`.
+- default: 2000 (2 seconds)
+
+#### tikv.rawkv.scan_timeout_in_ms
+- RawKV scan timeout in milliseconds. This parameter controls the timeout of `batchScan` `scan` `scanPrefix`.
+- default: 10000 (10 seconds)
+
+#### tikv.rawkv.clean_timeout_in_ms
+- RawKV clean timeout in milliseconds. This parameter controls the timeout of `deleteRange` `deletePrefix`.
+- default: 600000 (10 minutes)
+
 ## Metrics
 
 Client Java supports exporting metrics to Prometheus using poll mode and viewing on Grafana. The following steps shows how to enable this function.
