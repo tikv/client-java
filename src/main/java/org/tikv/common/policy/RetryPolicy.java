@@ -89,6 +89,7 @@ public abstract class RetryPolicy<RespT> {
         } catch (Exception e) {
           rethrowNotRecoverableException(e);
           // Handle request call error
+          backOffer.checkTimeout();
           boolean retry = handler.handleRequestError(backOffer, e);
           if (retry) {
             GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
