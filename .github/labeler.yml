@@ -1,0 +1,17 @@
+component/config:
+  - config/*
+
+component/br:
+  - src/main/java/org/tikv/br/*
+
+component/cdc:
+  - src/main/java/org/tikv/cdc/*
+
+component/common:
+  - src/main/java/org/tikv/common/*
+
+component/rawkv:
+  - src/main/java/org/tikv/raw/*
+
+component/txnkv:
+  - src/main/java/org/tikv/txn/*
