@@ -42,6 +42,7 @@ import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
+import org.tikv.raw.CircuitBreakerRawKVClient;
 import org.tikv.raw.RawKVClient;
 import org.tikv.txn.KVClient;
 import org.tikv.txn.TxnKVClient;
@@ -124,6 +125,11 @@ public class TiSession implements AutoCloseable {
     checkIsClosed();
 
     return new RawKVClient(this, this.getRegionStoreClientBuilder());
+  }
+
+  public CircuitBreakerRawKVClient createCircuitBreakerRawClient() {
+    RawKVClient rawKVClient = createRawClient();
+    return new CircuitBreakerRawKVClient(rawKVClient, getConf());
   }
 
   public KVClient createKVClient() {
