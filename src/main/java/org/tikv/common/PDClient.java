@@ -356,9 +356,16 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   @Override
   public Store getStore(BackOffer backOffer, long storeId) {
-    return callWithRetry(
-            backOffer, PDGrpc.getGetStoreMethod(), buildGetStoreReq(storeId), buildPDErrorHandler())
-        .getStore();
+    GetStoreResponse resp =
+        callWithRetry(
+            backOffer,
+            PDGrpc.getGetStoreMethod(),
+            buildGetStoreReq(storeId),
+            buildPDErrorHandler());
+    if (resp != null) {
+      return resp.getStore();
+    }
+    return null;
   }
 
   @Override
