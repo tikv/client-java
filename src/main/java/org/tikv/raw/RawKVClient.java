@@ -158,6 +158,7 @@ public class RawKVClient implements AutoCloseable {
       }
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -214,6 +215,7 @@ public class RawKVClient implements AutoCloseable {
       }
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -279,6 +281,7 @@ public class RawKVClient implements AutoCloseable {
       RAW_REQUEST_SUCCESS.labels(label).inc();
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -321,6 +324,7 @@ public class RawKVClient implements AutoCloseable {
       }
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -355,6 +359,7 @@ public class RawKVClient implements AutoCloseable {
       return result;
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -401,6 +406,7 @@ public class RawKVClient implements AutoCloseable {
       return;
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -443,6 +449,7 @@ public class RawKVClient implements AutoCloseable {
       }
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -547,6 +554,7 @@ public class RawKVClient implements AutoCloseable {
       return result;
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -635,6 +643,7 @@ public class RawKVClient implements AutoCloseable {
       return result;
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -717,6 +726,7 @@ public class RawKVClient implements AutoCloseable {
       }
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
