@@ -74,7 +74,7 @@ public class StoreHealthyChecker implements Runnable {
   private boolean checkStoreTombstone(TiStore store) {
     try {
       Metapb.Store newStore = pdClient.getStore(ConcreteBackOffer.newRawKVBackOff(), store.getId());
-      if (newStore.getState() == Metapb.StoreState.Tombstone) {
+      if (newStore != null && newStore.getState() == Metapb.StoreState.Tombstone) {
         return true;
       }
     } catch (Exception e) {
