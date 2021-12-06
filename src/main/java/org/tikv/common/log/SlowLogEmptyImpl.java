@@ -31,5 +31,8 @@ public class SlowLogEmptyImpl implements SlowLog {
   }
 
   @Override
+  public void setError(Throwable err) {}
+
+  @Override
   public void log() {}
 }
