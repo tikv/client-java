@@ -22,5 +22,7 @@ public interface SlowLog {
 
   SlowLogSpan start(String name);
 
+  void setError(Throwable err);
+
   void log();
 }
