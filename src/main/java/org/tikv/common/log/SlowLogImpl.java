@@ -35,6 +35,7 @@ public class SlowLogImpl implements SlowLog {
   public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("HH:mm:ss.SSS");
 
   private final List<SlowLogSpan> slowLogSpans = new ArrayList<>();
+  private Throwable error = null;
 
   private final long startMS;
   private final long slowThresholdMS;
@@ -64,9 +65,14 @@ public class SlowLogImpl implements SlowLog {
   }
 
   @Override
+  public void setError(Throwable err) {
+    this.error = err;
+  }
+
+  @Override
   public void log() {
     long currentMS = System.currentTimeMillis();
-    if (slowThresholdMS >= 0 && currentMS - startMS > slowThresholdMS) {
+    if (error != null || (slowThresholdMS >= 0 && currentMS - startMS > slowThresholdMS)) {
       logger.warn("SlowLog:" + getSlowLogString(currentMS));
     }
   }
@@ -77,6 +83,9 @@ public class SlowLogImpl implements SlowLog {
     jsonObject.addProperty("start", DATE_FORMAT.format(startMS));
     jsonObject.addProperty("end", DATE_FORMAT.format(currentMS));
     jsonObject.addProperty("duration", (currentMS - startMS) + "ms");
+    if (error != null) {
+      jsonObject.addProperty("error", error.getMessage());
+    }
 
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       jsonObject.addProperty(entry.getKey(), entry.getValue());
