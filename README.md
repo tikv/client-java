@@ -7,7 +7,7 @@ It is supposed to:
 + Talk to TiKV for reading/writing data and the resulted data is encoded/decoded just like what we do in TiDB.
 + Talk to Coprocessor for calculation pushdown
 
-## Quick Start with Maven
+## Quick Start
 
 > TiKV Java Client is designed to communicate with [pd](https://github.com/tikv/pd) and [tikv](https://github.com/tikv/tikv), please run TiKV and PD in advance.
 
