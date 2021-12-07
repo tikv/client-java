@@ -206,11 +206,14 @@ public abstract class AbstractRegionStoreClient
                   "update leader using switchLeader logic from store[%d] to store[%d]",
                   region.getLeader().getStoreId(), peer.getStoreId()));
           // update region cache
-          region = regionManager.updateLeader(region, peer.getStoreId());
-          // switch to leader store
-          store = currentLeaderStore;
-          updateClientStub();
-          return true;
+          TiRegion result = regionManager.updateLeader(region, peer.getStoreId());
+          if (result != null) {
+            region = result;
+            // switch to leader store
+            store = currentLeaderStore;
+            updateClientStub();
+          }
+          return false;
         }
       } else {
         // no leader found, some response does not return normally, there may be network partition.
