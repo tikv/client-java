@@ -15,6 +15,8 @@
 
 package org.tikv.service.failsafe;
 
+import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -24,6 +26,19 @@ import org.tikv.common.TiConfiguration;
 
 public class CircuitBreakerImpl implements CircuitBreaker {
   private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerImpl.class);
+
+  private static final Gauge CIRCUIT_BREAKER_STATUS =
+      Gauge.build()
+          .name("client_java_circuit_breaker_status")
+          .help("client circuit breaker status.")
+          .register();
+
+  private static final Counter CIRCUIT_BREAKER_ATTEMPT_COUNTER =
+      Counter.build()
+          .name("client_java_circuit_breaker_attempt_counter")
+          .help("client circuit breaker attempt counter.")
+          .labelNames("type")
+          .register();
 
   private final boolean enable;
   private final int windowInSeconds;
@@ -114,6 +129,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   @Override
   public void recordAttemptSuccess() {
+    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("success").inc();
     if (attemptSuccessCount.incrementAndGet() >= this.attemptRequestCount) {
       halfOpen2Close();
     }
@@ -121,6 +137,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   @Override
   public void recordAttemptFailure() {
+    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("failure").inc();
     halfOpen2Open();
   }
 
@@ -154,6 +171,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
       // it sets the start time for the sleep window
       circuitOpened.set(System.currentTimeMillis());
       logger.info("CLOSED => OPEN");
+      CIRCUIT_BREAKER_STATUS.set(Status.OPEN.getValue());
     }
   }
 
@@ -162,6 +180,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
       // This thread wins the race to close the circuit
       circuitOpened.set(-1L);
       logger.info("HALF_OPEN => CLOSED");
+      CIRCUIT_BREAKER_STATUS.set(Status.CLOSED.getValue());
     }
   }
 
@@ -172,6 +191,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
       attemptCount.set(0);
       attemptSuccessCount.set(0);
       logger.info("OPEN => HALF_OPEN");
+      CIRCUIT_BREAKER_STATUS.set(Status.HALF_OPEN.getValue());
     }
   }
 
@@ -181,6 +201,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
       // it resets the start time for the sleep window
       circuitOpened.set(System.currentTimeMillis());
       logger.info("HALF_OPEN => OPEN");
+      CIRCUIT_BREAKER_STATUS.set(Status.OPEN.getValue());
     }
   }
 

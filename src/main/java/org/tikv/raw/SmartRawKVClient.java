@@ -16,6 +16,8 @@
 package org.tikv.raw;
 
 import com.google.protobuf.ByteString;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Histogram;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,6 +35,34 @@ import org.tikv.service.failsafe.CircuitBreakerMetrics;
 public class SmartRawKVClient implements RawKVClientBase {
   private static final Logger logger = LoggerFactory.getLogger(SmartRawKVClient.class);
 
+  private static final Histogram REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_smart_raw_requests_latency")
+          .help("client smart raw request latency.")
+          .labelNames("type")
+          .register();
+
+  private static final Counter REQUEST_SUCCESS =
+      Counter.build()
+          .name("client_java_smart_raw_requests_success")
+          .help("client smart raw request success.")
+          .labelNames("type")
+          .register();
+
+  private static final Counter REQUEST_FAILURE =
+      Counter.build()
+          .name("client_java_smart_raw_requests_failure")
+          .help("client smart raw request failure.")
+          .labelNames("type")
+          .register();
+
+  private static final Counter CIRCUIT_BREAKER_OPENED =
+      Counter.build()
+          .name("client_java_smart_raw_circuit_breaker_opened")
+          .help("client smart raw circuit breaker opened.")
+          .labelNames("type")
+          .register();
+
   private final RawKVClientBase client;
   private final CircuitBreaker circuitBreaker;
   private final CircuitBreakerMetrics circuitBreakerMetrics;
@@ -45,138 +75,152 @@ public class SmartRawKVClient implements RawKVClientBase {
 
   @Override
   public void put(ByteString key, ByteString value) {
-    callWithCircuitBreaker(() -> client.put(key, value));
+    callWithCircuitBreaker("put", () -> client.put(key, value));
   }
 
   @Override
   public void put(ByteString key, ByteString value, long ttl) {
-    callWithCircuitBreaker(() -> client.put(key, value, ttl));
+    callWithCircuitBreaker("put", () -> client.put(key, value, ttl));
   }
 
   @Override
   public Optional<ByteString> putIfAbsent(ByteString key, ByteString value) {
-    return callWithCircuitBreaker(() -> client.putIfAbsent(key, value));
+    return callWithCircuitBreaker("putIfAbsent", () -> client.putIfAbsent(key, value));
   }
 
   @Override
   public Optional<ByteString> putIfAbsent(ByteString key, ByteString value, long ttl) {
-    return callWithCircuitBreaker(() -> client.putIfAbsent(key, value, ttl));
+    return callWithCircuitBreaker("putIfAbsent", () -> client.putIfAbsent(key, value, ttl));
   }
 
   @Override
   public void compareAndSet(ByteString key, Optional<ByteString> prevValue, ByteString value) {
-    callWithCircuitBreaker(() -> client.compareAndSet(key, prevValue, value));
+    callWithCircuitBreaker("compareAndSet", () -> client.compareAndSet(key, prevValue, value));
   }
 
   @Override
   public void compareAndSet(
       ByteString key, Optional<ByteString> prevValue, ByteString value, long ttl) {
-    callWithCircuitBreaker(() -> client.compareAndSet(key, prevValue, value, ttl));
+    callWithCircuitBreaker("compareAndSet", () -> client.compareAndSet(key, prevValue, value, ttl));
   }
 
   @Override
   public void batchPut(Map<ByteString, ByteString> kvPairs) {
-    callWithCircuitBreaker(() -> client.batchPut(kvPairs));
+    callWithCircuitBreaker("batchPut", () -> client.batchPut(kvPairs));
   }
 
   @Override
   public void batchPut(Map<ByteString, ByteString> kvPairs, long ttl) {
-    callWithCircuitBreaker(() -> client.batchPut(kvPairs, ttl));
+    callWithCircuitBreaker("batchPut", () -> client.batchPut(kvPairs, ttl));
   }
 
   @Override
   public Optional<ByteString> get(ByteString key) {
-    return callWithCircuitBreaker(() -> client.get(key));
+    return callWithCircuitBreaker("get", () -> client.get(key));
   }
 
   @Override
   public List<Kvrpcpb.KvPair> batchGet(List<ByteString> keys) {
-    return callWithCircuitBreaker(() -> client.batchGet(keys));
+    return callWithCircuitBreaker("batchGet", () -> client.batchGet(keys));
   }
 
   @Override
   public void batchDelete(List<ByteString> keys) {
-    callWithCircuitBreaker(() -> client.batchDelete(keys));
+    callWithCircuitBreaker("batchDelete", () -> client.batchDelete(keys));
   }
 
   @Override
   public Optional<Long> getKeyTTL(ByteString key) {
-    return callWithCircuitBreaker(() -> client.getKeyTTL(key));
+    return callWithCircuitBreaker("getKeyTTL", () -> client.getKeyTTL(key));
   }
 
   @Override
   public List<List<ByteString>> batchScanKeys(
       List<Pair<ByteString, ByteString>> ranges, int eachLimit) {
-    return callWithCircuitBreaker(() -> client.batchScanKeys(ranges, eachLimit));
+    return callWithCircuitBreaker("batchScanKeys", () -> client.batchScanKeys(ranges, eachLimit));
   }
 
   @Override
   public List<List<Kvrpcpb.KvPair>> batchScan(List<ScanOption> ranges) {
-    return callWithCircuitBreaker(() -> client.batchScan(ranges));
+    return callWithCircuitBreaker("batchScan", () -> client.batchScan(ranges));
   }
 
   @Override
   public List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey, int limit) {
-    return callWithCircuitBreaker(() -> client.scan(startKey, endKey, limit));
+    return callWithCircuitBreaker("scan", () -> client.scan(startKey, endKey, limit));
   }
 
   @Override
   public List<Kvrpcpb.KvPair> scan(
       ByteString startKey, ByteString endKey, int limit, boolean keyOnly) {
-    return callWithCircuitBreaker(() -> client.scan(startKey, endKey, limit, keyOnly));
+    return callWithCircuitBreaker("scan", () -> client.scan(startKey, endKey, limit, keyOnly));
   }
 
   @Override
   public List<Kvrpcpb.KvPair> scan(ByteString startKey, int limit) {
-    return callWithCircuitBreaker(() -> client.scan(startKey, limit));
+    return callWithCircuitBreaker("scan", () -> client.scan(startKey, limit));
   }
 
   @Override
   public List<Kvrpcpb.KvPair> scan(ByteString startKey, int limit, boolean keyOnly) {
-    return callWithCircuitBreaker(() -> client.scan(startKey, limit, keyOnly));
+    return callWithCircuitBreaker("scan", () -> client.scan(startKey, limit, keyOnly));
   }
 
   @Override
   public List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey) {
-    return callWithCircuitBreaker(() -> client.scan(startKey, endKey));
+    return callWithCircuitBreaker("scan", () -> client.scan(startKey, endKey));
   }
 
   @Override
   public List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey, boolean keyOnly) {
-    return callWithCircuitBreaker(() -> client.scan(startKey, endKey, keyOnly));
+    return callWithCircuitBreaker("scan", () -> client.scan(startKey, endKey, keyOnly));
   }
 
   @Override
   public List<Kvrpcpb.KvPair> scanPrefix(ByteString prefixKey, int limit, boolean keyOnly) {
-    return callWithCircuitBreaker(() -> client.scanPrefix(prefixKey, limit, keyOnly));
+    return callWithCircuitBreaker("scanPrefix", () -> client.scanPrefix(prefixKey, limit, keyOnly));
   }
 
   @Override
   public List<Kvrpcpb.KvPair> scanPrefix(ByteString prefixKey) {
-    return callWithCircuitBreaker(() -> client.scanPrefix(prefixKey));
+    return callWithCircuitBreaker("scanPrefix", () -> client.scanPrefix(prefixKey));
   }
 
   @Override
   public List<Kvrpcpb.KvPair> scanPrefix(ByteString prefixKey, boolean keyOnly) {
-    return callWithCircuitBreaker(() -> client.scanPrefix(prefixKey, keyOnly));
+    return callWithCircuitBreaker("scanPrefix", () -> client.scanPrefix(prefixKey, keyOnly));
   }
 
   @Override
   public void delete(ByteString key) {
-    callWithCircuitBreaker(() -> client.delete(key));
+    callWithCircuitBreaker("delete", () -> client.delete(key));
   }
 
   @Override
   public void deleteRange(ByteString startKey, ByteString endKey) {
-    callWithCircuitBreaker(() -> client.deleteRange(startKey, endKey));
+    callWithCircuitBreaker("deleteRange", () -> client.deleteRange(startKey, endKey));
   }
 
   @Override
   public void deletePrefix(ByteString key) {
-    callWithCircuitBreaker(() -> client.deletePrefix(key));
+    callWithCircuitBreaker("deletePrefix", () -> client.deletePrefix(key));
   }
 
-  <T> T callWithCircuitBreaker(Function1<T> func) {
+  <T> T callWithCircuitBreaker(String funcName, Function1<T> func) {
+    Histogram.Timer requestTimer = REQUEST_LATENCY.labels(funcName).startTimer();
+    try {
+      T result = callWithCircuitBreaker0(funcName, func);
+      REQUEST_SUCCESS.labels(funcName).inc();
+      return result;
+    } catch (Exception e) {
+      REQUEST_FAILURE.labels(funcName).inc();
+      throw e;
+    } finally {
+      requestTimer.observeDuration();
+    }
+  }
+
+  private <T> T callWithCircuitBreaker0(String funcName, Function1<T> func) {
     if (circuitBreaker.allowRequest()) {
       try {
         T result = func.apply();
@@ -202,12 +246,14 @@ public class SmartRawKVClient implements RawKVClientBase {
       }
     } else {
       logger.warn("Circuit Breaker Opened");
+      CIRCUIT_BREAKER_OPENED.labels(funcName).inc();
       throw new CircuitBreakerOpenException();
     }
   }
 
-  void callWithCircuitBreaker(Function0 func) {
+  private void callWithCircuitBreaker(String funcName, Function0 func) {
     callWithCircuitBreaker(
+        funcName,
         (Function1<Void>)
             () -> {
               func.apply();

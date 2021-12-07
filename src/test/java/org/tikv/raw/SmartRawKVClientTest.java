@@ -79,7 +79,7 @@ public class SmartRawKVClientTest extends BaseRawKVTest {
 
   private void error() {
     try {
-      client.callWithCircuitBreaker(() -> 1 / 0);
+      client.callWithCircuitBreaker("error", () -> 1 / 0);
     } catch (Exception ignored) {
     }
   }

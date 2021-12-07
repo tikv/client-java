@@ -15,6 +15,7 @@
 
 package org.tikv.service.failsafe;
 
+import io.prometheus.client.Gauge;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +30,15 @@ import org.slf4j.LoggerFactory;
 
 public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
   private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerMetricsImpl.class);
+
+  private static final Gauge CIRCUIT_BREAKER_REQUEST_IN_WINDOW =
+      Gauge.build()
+          .name("client_java_circuit_breaker_request_in_window")
+          .help("client circuit breaker request in window.")
+          .labelNames("type")
+          .register();
+  private static final String TOTAL_LABEL = "total";
+  private static final String ERROR_LABEL = "error";
 
   private final int windowInMS;
   private final List<MetricsListener> listeners;
@@ -94,13 +104,22 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
     private final AtomicLong totalCount = new AtomicLong(0);
     private final AtomicLong errorCount = new AtomicLong(0);
 
+    public SingleWindowMetrics() {
+      CIRCUIT_BREAKER_REQUEST_IN_WINDOW.labels(TOTAL_LABEL).set(0);
+      CIRCUIT_BREAKER_REQUEST_IN_WINDOW.labels(ERROR_LABEL).set(0);
+    }
+
     public void recordSuccess() {
-      totalCount.incrementAndGet();
+      long total = totalCount.incrementAndGet();
+      CIRCUIT_BREAKER_REQUEST_IN_WINDOW.labels(TOTAL_LABEL).set(total);
     }
 
     public void recordFailure() {
-      totalCount.incrementAndGet();
-      errorCount.incrementAndGet();
+      long total = totalCount.incrementAndGet();
+      CIRCUIT_BREAKER_REQUEST_IN_WINDOW.labels(TOTAL_LABEL).set(total);
+
+      long error = errorCount.incrementAndGet();
+      CIRCUIT_BREAKER_REQUEST_IN_WINDOW.labels(ERROR_LABEL).set(error);
     }
 
     public HealthCounts getHealthCounts() {

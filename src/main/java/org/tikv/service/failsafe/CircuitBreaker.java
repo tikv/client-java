@@ -20,9 +20,19 @@ import java.io.Closeable;
 public interface CircuitBreaker extends Closeable {
 
   enum Status {
-    CLOSED,
-    OPEN,
-    HALF_OPEN;
+    CLOSED(0),
+    HALF_OPEN(1),
+    OPEN(2);
+
+    private final int value;
+
+    private Status(int value) {
+      this.value = value;
+    }
+
+    public int getValue() {
+      return value;
+    }
   }
 
   /**
