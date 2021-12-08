@@ -126,7 +126,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   @Override
   public boolean attemptExecution() {
-    if (!isOpen()) {
+    if (allowRequest()) {
       return true;
     } else {
       if (isAfterSleepWindow()) {
