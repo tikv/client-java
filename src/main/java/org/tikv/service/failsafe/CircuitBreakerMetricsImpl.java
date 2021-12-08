@@ -52,7 +52,10 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
                 .build());
 
     scheduler.scheduleAtFixedRate(
-        this::onReachCircuitWindow, SCHEDULER_INITIAL_DELAY, SCHEDULER_PERIOD, TimeUnit.MILLISECONDS);
+        this::onReachCircuitWindow,
+        SCHEDULER_INITIAL_DELAY,
+        SCHEDULER_PERIOD,
+        TimeUnit.MILLISECONDS);
   }
 
   @Override
