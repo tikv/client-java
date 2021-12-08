@@ -11,7 +11,7 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.CircuitBreakerOpenException;
 
-public class CircuitBreakerRawKVClientTest extends BaseRawKVTest {
+public class SmartRawKVClientTest extends BaseRawKVTest {
   private boolean enable = true;
   private int windowInSeconds = 2;
   private int errorThresholdPercentage = 100;
@@ -22,7 +22,7 @@ public class CircuitBreakerRawKVClientTest extends BaseRawKVTest {
   private int sleepDelta = 100;
 
   private TiSession session;
-  private CircuitBreakerRawKVClient client;
+  private SmartRawKVClient client;
 
   @Before
   public void setup() {
@@ -34,7 +34,7 @@ public class CircuitBreakerRawKVClientTest extends BaseRawKVTest {
     conf.setCircuitBreakSleepWindowInSeconds(sleepWindowInSeconds);
     conf.setCircuitBreakAttemptRequestCount(attemptRequestCount);
     session = TiSession.create(conf);
-    client = session.createCircuitBreakerRawClient();
+    client = session.createSmartRawClient();
   }
 
   @After
