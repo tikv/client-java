@@ -76,7 +76,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   private MetricsListener getMetricsListener() {
     return hc -> {
-      logger.info("onNext " + hc.toString());
+      logger.debug("onNext " + hc.toString());
       // check if we are past the requestVolumeThreshold
       if (hc.getTotalRequests() < requestVolumeThreshold) {
         // we are not past the minimum volume threshold for the stat window,

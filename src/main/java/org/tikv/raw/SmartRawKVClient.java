@@ -231,21 +231,21 @@ public class SmartRawKVClient implements RawKVClientBase {
         throw e;
       }
     } else if (circuitBreaker.attemptExecution()) {
-      logger.info("attemptExecution");
+      logger.debug("attemptExecution");
       try {
         T result = func.apply();
         circuitBreakerMetrics.recordSuccess();
         circuitBreaker.recordAttemptSuccess();
-        logger.info("markSuccess");
+        logger.debug("markSuccess");
         return result;
       } catch (Exception e) {
         circuitBreakerMetrics.recordFailure();
         circuitBreaker.recordAttemptFailure();
-        logger.info("markNonSuccess");
+        logger.debug("markNonSuccess");
         throw e;
       }
     } else {
-      logger.warn("Circuit Breaker Opened");
+      logger.debug("Circuit Breaker Opened");
       CIRCUIT_BREAKER_OPENED.labels(funcName).inc();
       throw new CircuitBreakerOpenException();
     }

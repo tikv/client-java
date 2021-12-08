@@ -76,7 +76,7 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
     if (!currentMetrics.compareAndSet(singleWindowMetrics, new SingleWindowMetrics())) {
       return;
     }
-    logger.info("window timeout, reset SingleWindowMetrics");
+    logger.debug("window timeout, reset SingleWindowMetrics");
     HealthCounts healthCounts = singleWindowMetrics.getHealthCounts();
     for (MetricsListener metricsListener : listeners) {
       metricsListener.onNext(healthCounts);
