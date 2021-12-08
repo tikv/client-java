@@ -30,7 +30,6 @@ import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.service.failsafe.CircuitBreaker;
 import org.tikv.service.failsafe.CircuitBreakerImpl;
-import org.tikv.service.failsafe.CircuitBreakerMetrics;
 
 public class SmartRawKVClient implements RawKVClientBase {
   private static final Logger logger = LoggerFactory.getLogger(SmartRawKVClient.class);
