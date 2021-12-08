@@ -113,14 +113,14 @@ public class CircuitBreakerImpl implements CircuitBreaker {
   }
 
   @Override
-  public void markAttemptSuccess() {
+  public void recordAttemptSuccess() {
     if (attemptSuccessCount.incrementAndGet() >= this.attemptRequestCount) {
       halfOpen2Close();
     }
   }
 
   @Override
-  public void markAttemptFailure() {
+  public void recordAttemptFailure() {
     halfOpen2Open();
   }
 

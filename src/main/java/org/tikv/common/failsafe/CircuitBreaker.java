@@ -40,10 +40,10 @@ public interface CircuitBreaker extends Closeable {
   boolean attemptExecution();
 
   /** Invoked on successful executions as part of feedback mechanism when in a half-open state. */
-  void markAttemptSuccess();
+  void recordAttemptSuccess();
 
   /** Invoked on unsuccessful executions as part of feedback mechanism when in a half-open state. */
-  void markAttemptFailure();
+  void recordAttemptFailure();
 
   /** Get the Circuit Breaker Metrics Object. */
   CircuitBreakerMetrics getMetrics();

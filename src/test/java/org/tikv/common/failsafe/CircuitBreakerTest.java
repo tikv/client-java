@@ -34,7 +34,7 @@ public class CircuitBreakerTest {
 
     // CLOSE => OPEN
     for (int i = 1; i <= requestVolumeThreshold; i++) {
-      metrics.failure();
+      metrics.recordFailure();
     }
     Thread.sleep(windowInSeconds * 1000 + sleepDelta);
     assertTrue(circuitBreaker.isOpen());
@@ -47,21 +47,21 @@ public class CircuitBreakerTest {
     assertEquals(circuitBreaker.getStatus(), CircuitBreaker.Status.HALF_OPEN);
 
     // HALF_OPEN => OPEN
-    circuitBreaker.markAttemptFailure();
+    circuitBreaker.recordAttemptFailure();
     assertTrue(circuitBreaker.isOpen());
     assertEquals(circuitBreaker.getStatus(), CircuitBreaker.Status.OPEN);
 
     // OPEN => HALF_OPEN
     Thread.sleep(sleepWindowInSeconds * 1000 + sleepDelta);
     assertTrue(circuitBreaker.attemptExecution());
-    circuitBreaker.markAttemptSuccess();
+    circuitBreaker.recordAttemptSuccess();
     assertTrue(circuitBreaker.isOpen());
     assertEquals(circuitBreaker.getStatus(), CircuitBreaker.Status.HALF_OPEN);
 
     // HALF_OPEN => CLOSED
     for (int i = 1; i < attemptRequestCount; i++) {
       assertTrue(circuitBreaker.attemptExecution());
-      circuitBreaker.markAttemptSuccess();
+      circuitBreaker.recordAttemptSuccess();
     }
     assertTrue(!circuitBreaker.isOpen());
     assertEquals(circuitBreaker.getStatus(), CircuitBreaker.Status.CLOSED);

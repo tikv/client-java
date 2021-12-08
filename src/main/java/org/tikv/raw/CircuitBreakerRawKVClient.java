@@ -180,23 +180,23 @@ public class CircuitBreakerRawKVClient implements BaseRawKVClient {
     if (circuitBreaker.allowRequest()) {
       try {
         T result = func.apply();
-        circuitBreakerMetrics.success();
+        circuitBreakerMetrics.recordSuccess();
         return result;
       } catch (Exception e) {
-        circuitBreakerMetrics.failure();
+        circuitBreakerMetrics.recordFailure();
         throw e;
       }
     } else if (circuitBreaker.attemptExecution()) {
       logger.info("attemptExecution");
       try {
         T result = func.apply();
-        circuitBreakerMetrics.success();
-        circuitBreaker.markAttemptSuccess();
+        circuitBreakerMetrics.recordSuccess();
+        circuitBreaker.recordAttemptSuccess();
         logger.info("markSuccess");
         return result;
       } catch (Exception e) {
-        circuitBreakerMetrics.failure();
-        circuitBreaker.markAttemptFailure();
+        circuitBreakerMetrics.recordFailure();
+        circuitBreaker.recordAttemptFailure();
         logger.info("markNonSuccess");
         throw e;
       }

@@ -19,10 +19,10 @@ import java.io.Closeable;
 
 public interface CircuitBreakerMetrics extends Closeable {
   /** Record a successful call. */
-  void success();
+  void recordSuccess();
 
   /** Record a failure call. */
-  void failure();
+  void recordFailure();
 
   /** Add metrics listener. */
   void addListener(MetricsListener metricsListener);

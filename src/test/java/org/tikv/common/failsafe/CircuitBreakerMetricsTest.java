@@ -21,7 +21,7 @@ public class CircuitBreakerMetricsTest {
     metrics.addListener(metricsListener);
 
     for (int i = 1; i <= TEST_COUNT; i++) {
-      metrics.success();
+      metrics.recordSuccess();
     }
     Thread.sleep(WINDOW_IN_SECONDS * 1000 + SLEEP_DELTA);
     assertNotNull(healthCounts.get());
@@ -39,7 +39,7 @@ public class CircuitBreakerMetricsTest {
     metrics.addListener(metricsListener);
 
     for (int i = 1; i <= TEST_COUNT; i++) {
-      metrics.failure();
+      metrics.recordFailure();
     }
     Thread.sleep(WINDOW_IN_SECONDS * 1000 + SLEEP_DELTA);
     assertNotNull(healthCounts.get());
@@ -57,8 +57,8 @@ public class CircuitBreakerMetricsTest {
     metrics.addListener(metricsListener);
 
     for (int i = 1; i <= TEST_COUNT; i++) {
-      metrics.failure();
-      metrics.success();
+      metrics.recordFailure();
+      metrics.recordSuccess();
     }
     Thread.sleep(WINDOW_IN_SECONDS * 1000 + SLEEP_DELTA);
     assertNotNull(healthCounts.get());

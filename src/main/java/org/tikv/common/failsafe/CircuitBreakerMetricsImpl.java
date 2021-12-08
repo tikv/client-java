@@ -56,13 +56,13 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
   }
 
   @Override
-  public void success() {
-    currentMetrics.get().success();
+  public void recordSuccess() {
+    currentMetrics.get().recordSuccess();
   }
 
   @Override
-  public void failure() {
-    currentMetrics.get().failure();
+  public void recordFailure() {
+    currentMetrics.get().recordFailure();
   }
 
   private void checkTimeout() {
@@ -94,11 +94,11 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
     private final AtomicLong totalCount = new AtomicLong(0);
     private final AtomicLong errorCount = new AtomicLong(0);
 
-    public void success() {
+    public void recordSuccess() {
       totalCount.incrementAndGet();
     }
 
-    public void failure() {
+    public void recordFailure() {
       totalCount.incrementAndGet();
       errorCount.incrementAndGet();
     }
