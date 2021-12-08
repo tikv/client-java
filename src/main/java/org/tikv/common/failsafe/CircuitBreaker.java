@@ -34,20 +34,6 @@ public interface CircuitBreaker extends Closeable {
   boolean allowRequest();
 
   /**
-   * Whether the circuit is currently open (tripped).
-   *
-   * @return boolean state of circuit breaker
-   */
-  boolean isOpen();
-
-  /**
-   * Get the status of circuit breaker.
-   *
-   * @return The status of circuit breaker.
-   */
-  Status getStatus();
-
-  /**
    * Invoked at start of command execution to attempt an execution. This is non-idempotent - it may
    * modify internal state.
    */

@@ -104,13 +104,11 @@ public class CircuitBreakerImpl implements CircuitBreaker {
     return !isOpen();
   }
 
-  @Override
-  public boolean isOpen() {
+  boolean isOpen() {
     return circuitOpened.get() >= 0;
   }
 
-  @Override
-  public Status getStatus() {
+  Status getStatus() {
     return status.get();
   }
 
