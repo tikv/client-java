@@ -52,7 +52,7 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
                 .build());
 
     scheduler.scheduleAtFixedRate(
-        this::checkTimeout, SCHEDULER_INITIAL_DELAY, SCHEDULER_PERIOD, TimeUnit.MILLISECONDS);
+        this::onReachCircuitWindow, SCHEDULER_INITIAL_DELAY, SCHEDULER_PERIOD, TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -65,16 +65,18 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
     currentMetrics.get().recordFailure();
   }
 
-  private void checkTimeout() {
+  private void onReachCircuitWindow() {
     SingleWindowMetrics singleWindowMetrics = currentMetrics.get();
-    if (System.currentTimeMillis() >= singleWindowMetrics.getStartMS() + windowInMS) {
-      if (currentMetrics.compareAndSet(singleWindowMetrics, new SingleWindowMetrics())) {
-        logger.info("window timeout, reset SingleWindowMetrics");
-        HealthCounts healthCounts = singleWindowMetrics.getHealthCounts();
-        for (MetricsListener metricsListener : listeners) {
-          metricsListener.onNext(healthCounts);
-        }
-      }
+    if (System.currentTimeMillis() < singleWindowMetrics.getStartMS() + windowInMS) {
+      return;
+    }
+    if (!currentMetrics.compareAndSet(singleWindowMetrics, new SingleWindowMetrics())) {
+      return;
+    }
+    logger.info("window timeout, reset SingleWindowMetrics");
+    HealthCounts healthCounts = singleWindowMetrics.getHealthCounts();
+    for (MetricsListener metricsListener : listeners) {
+      metricsListener.onNext(healthCounts);
     }
   }
 
