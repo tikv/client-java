@@ -109,7 +109,12 @@ public class TiSession implements AutoCloseable {
 
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
-    return new RawKVClient(this, builder);
+    RawKVClient rawClient = new RawKVClient(this, builder);
+
+    // Warm up raw client to avoid a slow first call.
+    rawClient.get(ByteString.EMPTY);
+
+    return rawClient;
   }
 
   public KVClient createKVClient() {
