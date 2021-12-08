@@ -70,7 +70,8 @@ public class CircuitBreakerImpl implements CircuitBreaker {
     this.requestVolumeThreshold = requestVolumeThreshold;
     this.sleepWindowInSeconds = sleepWindowInSeconds;
     this.attemptRequestCount = attemptRequestCount;
-    this.metrics = new CircuitBreakerMetricsImpl(windowInSeconds);
+    this.metrics =
+        enable ? new CircuitBreakerMetricsImpl(windowInSeconds) : new NoOpCircuitBreakerMetrics();
     this.metrics.addListener(getMetricsListener());
   }
 
