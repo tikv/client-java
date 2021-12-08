@@ -65,12 +65,10 @@ public class SmartRawKVClient implements RawKVClientBase {
 
   private final RawKVClientBase client;
   private final CircuitBreaker circuitBreaker;
-  private final CircuitBreakerMetrics circuitBreakerMetrics;
 
   public SmartRawKVClient(RawKVClientBase client, TiConfiguration conf) {
     this.client = client;
     this.circuitBreaker = new CircuitBreakerImpl(conf);
-    this.circuitBreakerMetrics = this.circuitBreaker.getMetrics();
   }
 
   @Override
@@ -224,22 +222,22 @@ public class SmartRawKVClient implements RawKVClientBase {
     if (circuitBreaker.allowRequest()) {
       try {
         T result = func.apply();
-        circuitBreakerMetrics.recordSuccess();
+        circuitBreaker.getMetrics().recordSuccess();
         return result;
       } catch (Exception e) {
-        circuitBreakerMetrics.recordFailure();
+        circuitBreaker.getMetrics().recordFailure();
         throw e;
       }
     } else if (circuitBreaker.attemptExecution()) {
       logger.debug("attemptExecution");
       try {
         T result = func.apply();
-        circuitBreakerMetrics.recordSuccess();
+        circuitBreaker.getMetrics().recordSuccess();
         circuitBreaker.recordAttemptSuccess();
         logger.debug("markSuccess");
         return result;
       } catch (Exception e) {
-        circuitBreakerMetrics.recordFailure();
+        circuitBreaker.getMetrics().recordFailure();
         circuitBreaker.recordAttemptFailure();
         logger.debug("markNonSuccess");
         throw e;
