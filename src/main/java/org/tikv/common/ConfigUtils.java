@@ -92,17 +92,17 @@ public class ConfigUtils {
   public static final String TIKV_KEY_CERT_CHAIN = "tikv.key_cert_chain";
   public static final String TIKV_KEY_FILE = "tikv.key_file";
 
-  public static final String TiKV_CIRCUIT_BREAK_ENABLE = "tikv.circuit.break.enable";
+  public static final String TiKV_CIRCUIT_BREAK_ENABLE = "tikv.circuit_break.enable";
   public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS =
-      "tikv.circuit.break.trigger.availability.window_in_seconds";
+      "tikv.circuit_break.trigger.availability.window_in_seconds";
   public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE =
-      "tikv.circuit.break.trigger.availability.error_threshold_percentage";
+      "tikv.circuit_break.trigger.availability.error_threshold_percentage";
   public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD =
-      "tikv.circuit.break.trigger.availability.request_volumn_threshold";
+      "tikv.circuit_break.trigger.availability.request_volumn_threshold";
   public static final String TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS =
-      "tikv.circuit.break.trigger.sleep_window_in_seconds";
+      "tikv.circuit_break.trigger.sleep_window_in_seconds";
   public static final String TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT =
-      "tikv.circuit.break.trigger.attempt_request_count";
+      "tikv.circuit_break.trigger.attempt_request_count";
 
   public static final String TIFLASH_ENABLE = "tiflash.enable";
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
