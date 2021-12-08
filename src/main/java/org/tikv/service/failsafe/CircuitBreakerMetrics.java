@@ -13,8 +13,17 @@
  * limitations under the License.
  */
 
-package org.tikv.common.failsafe;
+package org.tikv.service.failsafe;
 
-public interface MetricsListener {
-  void onNext(HealthCounts healthCounts);
+import java.io.Closeable;
+
+public interface CircuitBreakerMetrics extends Closeable {
+  /** Record a successful call. */
+  void recordSuccess();
+
+  /** Record a failure call. */
+  void recordFailure();
+
+  /** Add metrics listener. */
+  void addListener(MetricsListener metricsListener);
 }

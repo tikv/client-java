@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package org.tikv.common.failsafe;
+package org.tikv.service.failsafe;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;

@@ -23,7 +23,7 @@ import org.tikv.common.util.Pair;
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
-public interface BaseRawKVClient extends AutoCloseable {
+public interface RawKVClientBase extends AutoCloseable {
   // https://www.github.com/pingcap/tidb/blob/master/store/tikv/rawkv.go
   int MAX_RAW_SCAN_LIMIT = 10240;
   int MAX_RAW_BATCH_LIMIT = 1024;

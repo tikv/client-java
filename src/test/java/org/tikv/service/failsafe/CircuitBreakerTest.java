@@ -1,4 +1,4 @@
-package org.tikv.common.failsafe;
+package org.tikv.service.failsafe;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;

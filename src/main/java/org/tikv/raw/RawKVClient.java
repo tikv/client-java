@@ -44,7 +44,7 @@ import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
-public class RawKVClient implements BaseRawKVClient {
+public class RawKVClient implements RawKVClientBase {
   private final TiSession tiSession;
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;

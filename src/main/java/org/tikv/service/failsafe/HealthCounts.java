@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package org.tikv.common.failsafe;
+package org.tikv.service.failsafe;
 
 public class HealthCounts {
   private final long totalCount;

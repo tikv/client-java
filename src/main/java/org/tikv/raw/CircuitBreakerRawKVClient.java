@@ -23,21 +23,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.CircuitBreakerOpenException;
-import org.tikv.common.failsafe.CircuitBreaker;
-import org.tikv.common.failsafe.CircuitBreakerImpl;
-import org.tikv.common.failsafe.CircuitBreakerMetrics;
+import org.tikv.service.failsafe.CircuitBreaker;
+import org.tikv.service.failsafe.CircuitBreakerImpl;
+import org.tikv.service.failsafe.CircuitBreakerMetrics;
 import org.tikv.common.util.Pair;
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
-public class CircuitBreakerRawKVClient implements BaseRawKVClient {
+public class CircuitBreakerRawKVClient implements RawKVClientBase {
   private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerRawKVClient.class);
 
-  private final BaseRawKVClient client;
+  private final RawKVClientBase client;
   private final CircuitBreaker circuitBreaker;
   private final CircuitBreakerMetrics circuitBreakerMetrics;
 
-  public CircuitBreakerRawKVClient(BaseRawKVClient client, TiConfiguration conf) {
+  public CircuitBreakerRawKVClient(RawKVClientBase client, TiConfiguration conf) {
     this.client = client;
     this.circuitBreaker = new CircuitBreakerImpl(conf);
     this.circuitBreakerMetrics = this.circuitBreaker.getMetrics();
