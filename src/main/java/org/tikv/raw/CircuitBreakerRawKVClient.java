@@ -217,7 +217,22 @@ public class CircuitBreakerRawKVClient implements BaseRawKVClient {
 
   @Override
   public void close() throws Exception {
-    client.close();
+    Exception err = null;
+    try {
+      client.close();
+    } catch (Exception e) {
+      err = e;
+    }
+
+    try {
+      circuitBreaker.close();
+    } catch (Exception e) {
+      err = e;
+    }
+
+    if (err != null) {
+      throw err;
+    }
   }
 
   public interface Function1<T> {

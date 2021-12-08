@@ -16,6 +16,8 @@ public class CircuitBreakerTest {
     int sleepWindowInSeconds = 1;
     int attemptRequestCount = 10;
 
+    int sleepDelta = 100;
+
     CircuitBreakerImpl circuitBreaker =
         new CircuitBreakerImpl(
             enable,
@@ -34,8 +36,7 @@ public class CircuitBreakerTest {
     for (int i = 1; i <= requestVolumeThreshold; i++) {
       metrics.failure();
     }
-    Thread.sleep(windowInSeconds * 1000);
-    metrics.failure();
+    Thread.sleep(windowInSeconds * 1000 + sleepDelta);
     assertTrue(circuitBreaker.isOpen());
     assertEquals(circuitBreaker.getStatus(), CircuitBreaker.Status.OPEN);
 
@@ -51,7 +52,7 @@ public class CircuitBreakerTest {
     assertEquals(circuitBreaker.getStatus(), CircuitBreaker.Status.OPEN);
 
     // OPEN => HALF_OPEN
-    Thread.sleep(sleepWindowInSeconds * 1000);
+    Thread.sleep(sleepWindowInSeconds * 1000 + sleepDelta);
     assertTrue(circuitBreaker.attemptExecution());
     circuitBreaker.markAttemptSuccess();
     assertTrue(circuitBreaker.isOpen());

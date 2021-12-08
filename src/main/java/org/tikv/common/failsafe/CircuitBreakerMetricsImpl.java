@@ -15,10 +15,15 @@
 
 package org.tikv.common.failsafe;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,22 +34,35 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
   private final List<MetricsListener> listeners;
   private final AtomicReference<SingleWindowMetrics> currentMetrics;
 
+  private final ScheduledExecutorService scheduler;
+  private static final int SCHEDULER_INITIAL_DELAY = 1000;
+  private static final int SCHEDULER_PERIOD = 1000;
+
   public CircuitBreakerMetricsImpl(int windowInSeconds) {
     this.windowInMS = windowInSeconds * 1000;
-    listeners = new ArrayList<>();
+    this.listeners = new ArrayList<>();
     this.currentMetrics = new AtomicReference<>(new SingleWindowMetrics());
+
+    scheduler =
+        new ScheduledThreadPoolExecutor(
+            1,
+            new BasicThreadFactory.Builder()
+                .namingPattern("circuit-breaker-metrics-%d")
+                .daemon(true)
+                .build());
+
+    scheduler.scheduleAtFixedRate(
+        this::checkTimeout, SCHEDULER_INITIAL_DELAY, SCHEDULER_PERIOD, TimeUnit.MILLISECONDS);
   }
 
   @Override
   public void success() {
     currentMetrics.get().success();
-    checkTimeout();
   }
 
   @Override
   public void failure() {
     currentMetrics.get().failure();
-    checkTimeout();
   }
 
   private void checkTimeout() {
@@ -63,6 +81,11 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
   @Override
   public void addListener(MetricsListener metricsListener) {
     listeners.add(metricsListener);
+  }
+
+  @Override
+  public void close() throws IOException {
+    scheduler.shutdown();
   }
 
   /** Instead of using SingleWindowMetrics, it is better to use RollingWindowMetrics. */

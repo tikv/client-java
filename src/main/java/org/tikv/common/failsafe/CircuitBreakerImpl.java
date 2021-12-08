@@ -15,6 +15,7 @@
 
 package org.tikv.common.failsafe;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
@@ -183,5 +184,10 @@ public class CircuitBreakerImpl implements CircuitBreaker {
       circuitOpened.set(System.currentTimeMillis());
       logger.info("HALF_OPEN => OPEN");
     }
+  }
+
+  @Override
+  public void close() throws IOException {
+    metrics.close();
   }
 }

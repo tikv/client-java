@@ -15,7 +15,9 @@
 
 package org.tikv.common.failsafe;
 
-public interface CircuitBreaker {
+import java.io.Closeable;
+
+public interface CircuitBreaker extends Closeable {
 
   enum Status {
     CLOSED,

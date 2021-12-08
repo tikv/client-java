@@ -15,7 +15,9 @@
 
 package org.tikv.common.failsafe;
 
-public interface CircuitBreakerMetrics {
+import java.io.Closeable;
+
+public interface CircuitBreakerMetrics extends Closeable {
   /** Record a successful call. */
   void success();
 

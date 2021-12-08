@@ -19,6 +19,8 @@ public class CircuitBreakerRawKVClientTest extends BaseRawKVTest {
   private int sleepWindowInSeconds = 1;
   private int attemptRequestCount = 10;
 
+  private int sleepDelta = 100;
+
   private TiSession session;
   private CircuitBreakerRawKVClient client;
 
@@ -46,11 +48,10 @@ public class CircuitBreakerRawKVClientTest extends BaseRawKVTest {
   public void testCircuitBreaker() throws InterruptedException {
     // CLOSED => OPEN
     {
-      for (int i = 1; i < requestVolumeThreshold; i++) {
+      for (int i = 1; i <= requestVolumeThreshold; i++) {
         error();
       }
-      Thread.sleep(windowInSeconds * 1000);
-      error();
+      Thread.sleep(windowInSeconds * 1000 + sleepDelta);
 
       Exception error = null;
       try {
