@@ -33,4 +33,15 @@ public class TiConfigurationTest {
     TiConfiguration conf = TiConfiguration.createRawDefault();
     assertFalse(conf.isTiFlashEnabled());
   }
+
+  @Test
+  public void testGrpcIdleTimeoutValue() {
+    TiConfiguration conf = TiConfiguration.createDefault();
+    // default value
+    assertEquals(TiConfiguration.getInt(ConfigUtils.TIKV_GRPC_IDLE_TIMEOUT), conf.getIdleTimeout());
+    // new value
+    int newValue = 100000;
+    conf.setIdleTimeout(newValue);
+    assertEquals(newValue, conf.getIdleTimeout());
+  }
 }

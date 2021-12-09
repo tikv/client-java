@@ -32,6 +32,7 @@ public class ConfigUtils {
   public static final String TIKV_GRPC_MAX_FRAME_SIZE = "tikv.grpc.max_frame_size";
   public static final String TIKV_GRPC_KEEPALIVE_TIME = "tikv.grpc.keepalive_time";
   public static final String TIKV_GRPC_KEEPALIVE_TIMEOUT = "tikv.grpc.keepalive_timeout";
+  public static final String TIKV_GRPC_IDLE_TIMEOUT = "tikv.grpc.idle_timeout";
 
   public static final String TIKV_INDEX_SCAN_BATCH_SIZE = "tikv.index.scan_batch_size";
   public static final String TIKV_INDEX_SCAN_CONCURRENCY = "tikv.index.scan_concurrency";
@@ -171,6 +172,7 @@ public class ConfigUtils {
 
   public static final int DEF_TIKV_GRPC_KEEPALIVE_TIME = 10;
   public static final int DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT = 3;
+  public static final int DEF_TIKV_GRPC_IDLE_TIMEOUT = 60;
   public static final boolean DEF_TIKV_TLS_ENABLE = false;
   public static final boolean DEF_TIFLASH_ENABLE = false;
 
