@@ -21,10 +21,12 @@ import io.prometheus.client.Histogram;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.CircuitBreakerOpenException;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.util.Pair;
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
@@ -33,6 +35,7 @@ import org.tikv.service.failsafe.CircuitBreakerImpl;
 
 public class SmartRawKVClient implements RawKVClientBase {
   private static final Logger logger = LoggerFactory.getLogger(SmartRawKVClient.class);
+  private static final AtomicBoolean warmed = new AtomicBoolean(false);
 
   private static final Histogram REQUEST_LATENCY =
       Histogram.build()
@@ -66,6 +69,15 @@ public class SmartRawKVClient implements RawKVClientBase {
   private final CircuitBreaker circuitBreaker;
 
   public SmartRawKVClient(RawKVClientBase client, TiConfiguration conf) {
+    // Warm up SmartRawKVClient to avoid the first slow call.
+    if (warmed.compareAndSet(false, true)) {
+      try {
+        logger.info("Warming up SmartRawKVClient");
+        client.get(ByteString.EMPTY);
+      } catch (final TiKVException ignored) {
+      }
+    }
+
     this.client = client;
     this.circuitBreaker = new CircuitBreakerImpl(conf);
   }
