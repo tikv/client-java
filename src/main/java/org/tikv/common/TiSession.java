@@ -41,6 +41,7 @@ import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
+import org.tikv.raw.SmartRawKVClient;
 import org.tikv.txn.KVClient;
 import org.tikv.txn.TxnKVClient;
 
@@ -110,6 +111,11 @@ public class TiSession implements AutoCloseable {
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(conf, channelFactory, this.getRegionManager(), client);
     return new RawKVClient(this, builder);
+  }
+
+  public SmartRawKVClient createSmartRawClient() {
+    RawKVClient rawKVClient = createRawClient();
+    return new SmartRawKVClient(rawKVClient, getConf());
   }
 
   public KVClient createKVClient() {
