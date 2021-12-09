@@ -115,17 +115,17 @@ public class TiSession implements AutoCloseable {
       startKey = region.getEndKey();
     } while (!startKey.isEmpty());
 
-    RawKVClient rawKVClient = createRawClient();
+    SmartRawKVClient smartRawClient = createSmartRawClient();
     ByteString exampleKey = ByteString.EMPTY;
-    Optional<ByteString> prev = rawKVClient.get(exampleKey);
+    Optional<ByteString> prev = smartRawClient.get(exampleKey);
     if (prev.isPresent()) {
-      rawKVClient.delete(exampleKey);
-      rawKVClient.putIfAbsent(exampleKey, prev.get());
-      rawKVClient.put(exampleKey, prev.get());
+      smartRawClient.delete(exampleKey);
+      smartRawClient.putIfAbsent(exampleKey, prev.get());
+      smartRawClient.put(exampleKey, prev.get());
     } else {
-      rawKVClient.putIfAbsent(exampleKey, ByteString.EMPTY);
-      rawKVClient.put(exampleKey, ByteString.EMPTY);
-      rawKVClient.delete(exampleKey);
+      smartRawClient.putIfAbsent(exampleKey, ByteString.EMPTY);
+      smartRawClient.put(exampleKey, ByteString.EMPTY);
+      smartRawClient.delete(exampleKey);
     }
   }
 
