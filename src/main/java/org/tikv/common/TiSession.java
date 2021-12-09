@@ -98,33 +98,39 @@ public class TiSession implements AutoCloseable {
   }
 
   private synchronized void warmUp() {
-    this.client = getPDClient();
-    this.regionManager = getRegionManager();
-    List<Metapb.Store> stores = this.client.getAllStores(ConcreteBackOffer.newGetBackOff());
-    logger.info("number of stores=" + stores.size());
-    // warm up store cache
-    for (Metapb.Store store : stores) {
-      this.regionManager.updateStore(
-          null,
-          new TiStore(this.client.getStore(ConcreteBackOffer.newGetBackOff(), store.getId())));
-    }
-    ByteString startKey = ByteString.EMPTY;
-    do {
-      TiRegion region = regionManager.getRegionByKey(startKey);
-      startKey = region.getEndKey();
-    } while (!startKey.isEmpty());
+    try {
+      this.client = getPDClient();
+      this.regionManager = getRegionManager();
+      List<Metapb.Store> stores = this.client.getAllStores(ConcreteBackOffer.newGetBackOff());
+      logger.info("number of stores=" + stores.size());
+      // warm up store cache
+      for (Metapb.Store store : stores) {
+        this.regionManager.updateStore(
+            null,
+            new TiStore(this.client.getStore(ConcreteBackOffer.newGetBackOff(), store.getId())));
+      }
+      ByteString startKey = ByteString.EMPTY;
 
-    SmartRawKVClient smartRawClient = createSmartRawClient();
-    ByteString exampleKey = ByteString.EMPTY;
-    Optional<ByteString> prev = smartRawClient.get(exampleKey);
-    if (prev.isPresent()) {
-      smartRawClient.delete(exampleKey);
-      smartRawClient.putIfAbsent(exampleKey, prev.get());
-      smartRawClient.put(exampleKey, prev.get());
-    } else {
-      smartRawClient.putIfAbsent(exampleKey, ByteString.EMPTY);
-      smartRawClient.put(exampleKey, ByteString.EMPTY);
-      smartRawClient.delete(exampleKey);
+      do {
+        TiRegion region = regionManager.getRegionByKey(startKey);
+        startKey = region.getEndKey();
+      } while (!startKey.isEmpty());
+
+      RawKVClient rawKVClient = createRawClient();
+      ByteString exampleKey = ByteString.EMPTY;
+      Optional<ByteString> prev = rawKVClient.get(exampleKey);
+      if (prev.isPresent()) {
+        rawKVClient.delete(exampleKey);
+        rawKVClient.putIfAbsent(exampleKey, prev.get());
+        rawKVClient.put(exampleKey, prev.get());
+      } else {
+        rawKVClient.putIfAbsent(exampleKey, ByteString.EMPTY);
+        rawKVClient.put(exampleKey, ByteString.EMPTY);
+        rawKVClient.delete(exampleKey);
+      }
+    } catch (Exception e) {
+      // ignore error
+      logger.info("warm up fails, ignored", e);
     }
   }
 
