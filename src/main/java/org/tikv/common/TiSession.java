@@ -112,16 +112,20 @@ public class TiSession implements AutoCloseable {
       }
 
       // use scan region to load region cache with limit
-      List<Pdpb.Region> regions =
-          regionManager.scanRegions(
-              ConcreteBackOffer.newGetBackOff(),
-              ByteString.EMPTY,
-              ByteString.EMPTY,
-              conf.getScanRegionsLimit());
-      for (Pdpb.Region region : regions) {
-        regionManager.insertRegionToCache(
-            regionManager.createRegion(region.getRegion(), ConcreteBackOffer.newGetBackOff()));
-      }
+      ByteString startKey = ByteString.EMPTY;
+      do {
+        List<Pdpb.Region> regions = regionManager.scanRegions(
+            ConcreteBackOffer.newGetBackOff(),
+            startKey,
+            ByteString.EMPTY,
+            conf.getScanRegionsLimit());
+        for (Pdpb.Region region : regions) {
+          regionManager.insertRegionToCache(
+              regionManager.createRegion(region.getRegion(), ConcreteBackOffer.newGetBackOff()));
+        }
+        startKey = regions.get(regions.size() - 1).getRegion().getEndKey();
+      } while (!startKey.isEmpty());
+
 
       RawKVClient rawKVClient = createRawClient();
       ByteString exampleKey = ByteString.EMPTY;
