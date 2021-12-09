@@ -43,6 +43,7 @@ import org.tikv.common.util.*;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
+import org.tikv.raw.SmartRawKVClient;
 import org.tikv.txn.KVClient;
 import org.tikv.txn.TxnKVClient;
 
@@ -124,6 +125,11 @@ public class TiSession implements AutoCloseable {
     checkIsClosed();
 
     return new RawKVClient(this, this.getRegionStoreClientBuilder());
+  }
+
+  public SmartRawKVClient createSmartRawClient() {
+    RawKVClient rawKVClient = createRawClient();
+    return new SmartRawKVClient(rawKVClient, getConf());
   }
 
   public KVClient createKVClient() {
