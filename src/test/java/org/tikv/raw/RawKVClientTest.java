@@ -99,6 +99,12 @@ public class RawKVClientTest extends BaseRawKVTest {
   }
 
   @Test
+  public void testInitialize() {
+    // do nothing
+    logger.info("init done");
+  }
+
+  @Test
   public void getKeyTTLTest() {
     long ttl = 10;
     ByteString key = ByteString.copyFromUtf8("key_ttl");
