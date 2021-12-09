@@ -133,12 +133,5 @@ public class ConfigUtils {
   public static final String LEADER = "LEADER";
   public static final String FOLLOWER = "FOLLOWER";
   public static final String LEADER_AND_FOLLOWER = "LEADER_AND_FOLLOWER";
-<<<<<<< HEAD
-=======
-
-  public static final int DEF_TIKV_GRPC_KEEPALIVE_TIME = 10;
-  public static final int DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT = 3;
-  public static final boolean DEF_TIKV_TLS_ENABLE = false;
   public static final boolean DEF_TIFLASH_ENABLE = false;
->>>>>>> e2f10aa... Add a flag to determine if TiFlash is enabled (#351)
 }
