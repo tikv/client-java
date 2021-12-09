@@ -83,7 +83,42 @@ public class TiSession implements AutoCloseable {
     if (this.enableGrpcForward) {
       logger.info("enable grpc forward for high available");
     }
+    warmUp();
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
+  }
+
+  private synchronized void warmUp() {
+    long warmUpStartTime = System.currentTimeMillis();
+    try {
+      this.client = getPDClient();
+      this.regionManager = getRegionManager();
+      List<Metapb.Store> stores = this.client.getAllStores(ConcreteBackOffer.newGetBackOff());
+      // warm up store cache
+      for (Metapb.Store store : stores) {
+        this.regionManager.updateStore(
+            null,
+            new TiStore(this.client.getStore(ConcreteBackOffer.newGetBackOff(), store.getId())));
+      }
+      ByteString startKey = ByteString.EMPTY;
+
+      do {
+        TiRegion region = regionManager.getRegionByKey(startKey);
+        startKey = region.getEndKey();
+      } while (!startKey.isEmpty());
+
+      RawKVClient rawKVClient = createRawClient();
+      ByteString exampleKey = ByteString.EMPTY;
+      ByteString prev = rawKVClient.get(exampleKey);
+      rawKVClient.delete(exampleKey);
+      rawKVClient.putIfAbsent(exampleKey, prev);
+      rawKVClient.put(exampleKey, prev);
+    } catch (Exception e) {
+      // ignore error
+      logger.info("warm up fails, ignored ", e);
+    } finally {
+      logger.info(
+          String.format("warm up duration %d ms", System.currentTimeMillis() - warmUpStartTime));
+    }
   }
 
   @VisibleForTesting
