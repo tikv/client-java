@@ -98,11 +98,11 @@ public class TiSession implements AutoCloseable {
   }
 
   private synchronized void warmUp() {
+    long warmUpStartTime = System.currentTimeMillis();
     try {
       this.client = getPDClient();
       this.regionManager = getRegionManager();
       List<Metapb.Store> stores = this.client.getAllStores(ConcreteBackOffer.newGetBackOff());
-      logger.info("number of stores=" + stores.size());
       // warm up store cache
       for (Metapb.Store store : stores) {
         this.regionManager.updateStore(
@@ -130,7 +130,10 @@ public class TiSession implements AutoCloseable {
       }
     } catch (Exception e) {
       // ignore error
-      logger.info("warm up fails, ignored", e);
+      logger.info("warm up fails, ignored ", e);
+    } finally {
+      logger.info(
+          String.format("warm up duration %d ms", System.currentTimeMillis() - warmUpStartTime));
     }
   }
 
