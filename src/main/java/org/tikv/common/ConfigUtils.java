@@ -27,6 +27,12 @@ public class ConfigUtils {
   public static final String TIKV_GRPC_SCAN_TIMEOUT = "tikv.grpc.scan_timeout_in_ms";
   public static final String TIKV_GRPC_SCAN_BATCH_SIZE = "tikv.grpc.scan_batch_size";
   public static final String TIKV_GRPC_MAX_FRAME_SIZE = "tikv.grpc.max_frame_size";
+<<<<<<< HEAD
+=======
+  public static final String TIKV_GRPC_KEEPALIVE_TIME = "tikv.grpc.keepalive_time";
+  public static final String TIKV_GRPC_KEEPALIVE_TIMEOUT = "tikv.grpc.keepalive_timeout";
+  public static final String TIKV_GRPC_IDLE_TIMEOUT = "tikv.grpc.idle_timeout";
+>>>>>>> d8841e7... [close #380] make gRPC idle timeout configurable (#379)
 
   public static final String TIKV_INDEX_SCAN_BATCH_SIZE = "tikv.index.scan_batch_size";
   public static final String TIKV_INDEX_SCAN_CONCURRENCY = "tikv.index.scan_concurrency";
@@ -146,6 +152,15 @@ public class ConfigUtils {
   public static final String FOLLOWER = "FOLLOWER";
   public static final String LEADER_AND_FOLLOWER = "LEADER_AND_FOLLOWER";
 
+<<<<<<< HEAD
+=======
+  public static final int DEF_TIKV_GRPC_KEEPALIVE_TIME = 10;
+  public static final int DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT = 3;
+  public static final int DEF_TIKV_GRPC_IDLE_TIMEOUT = 60;
+  public static final boolean DEF_TIKV_TLS_ENABLE = false;
+  public static final boolean DEF_TIFLASH_ENABLE = false;
+
+>>>>>>> d8841e7... [close #380] make gRPC idle timeout configurable (#379)
   public static final boolean DEF_TiKV_CIRCUIT_BREAK_ENABLE = false;
   public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS = 60;
   public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE = 100;

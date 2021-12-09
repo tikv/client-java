@@ -77,7 +77,26 @@ public class TiSession implements AutoCloseable {
     this.metricsServer = MetricsServer.getInstance(conf);
 
     this.conf = conf;
+<<<<<<< HEAD
     this.channelFactory = new ChannelFactory(conf.getMaxFrameSize());
+=======
+    this.channelFactory =
+        conf.isTlsEnable()
+            ? new ChannelFactory(
+                conf.getMaxFrameSize(),
+                conf.getKeepaliveTime(),
+                conf.getKeepaliveTimeout(),
+                conf.getIdleTimeout(),
+                conf.getTrustCertCollectionFile(),
+                conf.getKeyCertChainFile(),
+                conf.getKeyFile())
+            : new ChannelFactory(
+                conf.getMaxFrameSize(),
+                conf.getKeepaliveTime(),
+                conf.getKeepaliveTimeout(),
+                conf.getIdleTimeout());
+
+>>>>>>> d8841e7... [close #380] make gRPC idle timeout configurable (#379)
     this.client = PDClient.createRaw(conf, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
     if (this.enableGrpcForward) {
