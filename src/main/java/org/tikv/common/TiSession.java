@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +53,6 @@ import org.tikv.txn.TxnKVClient;
  * thread-safe but it's also recommended to have multiple session avoiding lock contention
  */
 public class TiSession implements AutoCloseable {
-  private static final AtomicBoolean warmed = new AtomicBoolean(false);
   private static final Logger logger = LoggerFactory.getLogger(TiSession.class);
   private static final Map<String, TiSession> sessionCachedMap = new HashMap<>();
   private final TiConfiguration conf;
@@ -131,18 +129,7 @@ public class TiSession implements AutoCloseable {
 
   public SmartRawKVClient createSmartRawClient() {
     RawKVClient rawKVClient = createRawClient();
-    SmartRawKVClient client = new SmartRawKVClient(rawKVClient, getConf());
-
-    // Warm up SmartRawKVClient to avoid the first slow call.
-    if (warmed.compareAndSet(false, true)) {
-      try {
-        logger.info("Warming up SmartRawKVClient");
-        client.get(ByteString.EMPTY);
-      } catch (final TiKVException ignored) {
-      }
-    }
-
-    return client;
+    return new SmartRawKVClient(rawKVClient, getConf());
   }
 
   public KVClient createKVClient() {
