@@ -120,6 +120,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
     setIfMissing(TIKV_GRPC_KEEPALIVE_TIME, DEF_TIKV_GRPC_KEEPALIVE_TIME);
     setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
+    setIfMissing(TIKV_GRPC_IDLE_TIMEOUT, DEF_TIKV_GRPC_IDLE_TIMEOUT);
     setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
     setIfMissing(TIFLASH_ENABLE, DEF_TIFLASH_ENABLE);
     setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
@@ -374,6 +375,7 @@ public class TiConfiguration implements Serializable {
 
   private int keepaliveTime = getInt(TIKV_GRPC_KEEPALIVE_TIME);
   private int keepaliveTimeout = getInt(TIKV_GRPC_KEEPALIVE_TIMEOUT);
+  private int idleTimeout = getInt(TIKV_GRPC_IDLE_TIMEOUT);
 
   private boolean circuitBreakEnable = getBoolean(TiKV_CIRCUIT_BREAK_ENABLE);
   private int circuitBreakAvailabilityWindowInSeconds =
@@ -783,6 +785,14 @@ public class TiConfiguration implements Serializable {
 
   public void setKeepaliveTimeout(int timeout) {
     this.keepaliveTimeout = timeout;
+  }
+
+  public int getIdleTimeout() {
+    return idleTimeout;
+  }
+
+  public void setIdleTimeout(int timeout) {
+    this.idleTimeout = timeout;
   }
 
   public boolean isTiFlashEnabled() {
