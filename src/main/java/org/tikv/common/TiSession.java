@@ -76,21 +76,37 @@ public class TiSession implements AutoCloseable {
     this.metricsServer = MetricsServer.getInstance(conf);
 
     this.conf = conf;
-    this.channelFactory =
-        conf.isTlsEnable()
-            ? new ChannelFactory(
+    if (conf.isTlsEnable()) {
+      if (conf.isJksEnable()) {
+        this.channelFactory =
+            new ChannelFactory(
+                conf.getMaxFrameSize(),
+                conf.getKeepaliveTime(),
+                conf.getKeepaliveTimeout(),
+                conf.getIdleTimeout(),
+                conf.getJksKeyPath(),
+                conf.getJksKeyPassword(),
+                conf.getJksTrustPath(),
+                conf.getJksTrustPassword());
+      } else {
+        this.channelFactory =
+            new ChannelFactory(
                 conf.getMaxFrameSize(),
                 conf.getKeepaliveTime(),
                 conf.getKeepaliveTimeout(),
                 conf.getIdleTimeout(),
                 conf.getTrustCertCollectionFile(),
                 conf.getKeyCertChainFile(),
-                conf.getKeyFile())
-            : new ChannelFactory(
-                conf.getMaxFrameSize(),
-                conf.getKeepaliveTime(),
-                conf.getKeepaliveTimeout(),
-                conf.getIdleTimeout());
+                conf.getKeyFile());
+      }
+    } else {
+      this.channelFactory =
+          new ChannelFactory(
+              conf.getMaxFrameSize(),
+              conf.getKeepaliveTime(),
+              conf.getKeepaliveTimeout(),
+              conf.getIdleTimeout());
+    }
 
     this.client = PDClient.createRaw(conf, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
