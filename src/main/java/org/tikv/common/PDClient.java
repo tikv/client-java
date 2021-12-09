@@ -341,6 +341,25 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return new Pair<Metapb.Region, Metapb.Peer>(decodeRegion(resp.getRegion()), resp.getLeader());
   }
 
+  @Override
+  public List<Pdpb.Region> scanRegions(
+      BackOffer backOffer, ByteString startKey, ByteString endKey, int limit) {
+    Supplier<Pdpb.ScanRegionsRequest> request =
+        () ->
+            Pdpb.ScanRegionsRequest.newBuilder()
+                .setHeader(header)
+                .setStartKey(startKey)
+                .setEndKey(endKey)
+                .setLimit(limit)
+                .build();
+    PDErrorHandler<Pdpb.ScanRegionsResponse> handler =
+        new PDErrorHandler<>(r -> buildFromPdpbError(r.getHeader().getError()), this);
+
+    Pdpb.ScanRegionsResponse resp =
+        callWithRetry(backOffer, PDGrpc.getScanRegionsMethod(), request, handler);
+    return resp.getRegionsList();
+  }
+
   private Supplier<GetStoreRequest> buildGetStoreReq(long storeId) {
     return () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
   }

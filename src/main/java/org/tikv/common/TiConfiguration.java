@@ -144,6 +144,7 @@ public class TiConfiguration implements Serializable {
         TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS, DEF_TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS);
     setIfMissing(
         TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT, DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
+    setIfMissing(TIKV_SCAN_REGIONS_LIMIT, DEF_TIKV_SCAN_REGIONS_LIMIT);
   }
 
   public static void listAll() {
@@ -383,6 +384,8 @@ public class TiConfiguration implements Serializable {
       getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD);
   private int circuitBreakSleepWindowInSeconds = getInt(TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS);
   private int circuitBreakAttemptRequestCount = getInt(TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
+
+  private int scanRegionsLimit = getInt(TIKV_SCAN_REGIONS_LIMIT);
 
   public enum KVMode {
     TXN,
@@ -957,5 +960,13 @@ public class TiConfiguration implements Serializable {
 
   public void setCircuitBreakAttemptRequestCount(int circuitBreakAttemptRequestCount) {
     this.circuitBreakAttemptRequestCount = circuitBreakAttemptRequestCount;
+  }
+
+  public int getScanRegionsLimit() {
+    return scanRegionsLimit;
+  }
+
+  public void setScanRegionsLimit(int scanRegionsLimit) {
+    this.scanRegionsLimit = scanRegionsLimit;
   }
 }

@@ -104,6 +104,8 @@ public class ConfigUtils {
   public static final String TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT =
       "tikv.circuit_break.trigger.attempt_request_count";
 
+  public static final String TIKV_SCAN_REGIONS_LIMIT = "tikv.scan_regions_limit";
+
   public static final String TIFLASH_ENABLE = "tiflash.enable";
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
@@ -180,4 +182,6 @@ public class ConfigUtils {
   public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUST_VOLUMN_THRESHOLD = 10;
   public static final int DEF_TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS = 20;
   public static final int DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT = 10;
+
+  public static final int DEF_TIKV_SCAN_REGIONS_LIMIT = 1000;
 }

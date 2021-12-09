@@ -36,6 +36,7 @@ import org.tikv.common.region.*;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
+import org.tikv.kvproto.Pdpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.raw.SmartRawKVClient;
 import org.tikv.txn.KVClient;
@@ -109,12 +110,18 @@ public class TiSession implements AutoCloseable {
             null,
             new TiStore(this.client.getStore(ConcreteBackOffer.newGetBackOff(), store.getId())));
       }
-      ByteString startKey = ByteString.EMPTY;
 
-      do {
-        TiRegion region = regionManager.getRegionByKey(startKey);
-        startKey = region.getEndKey();
-      } while (!startKey.isEmpty());
+      // use scan region to load region cache with limit
+      List<Pdpb.Region> regions =
+          regionManager.scanRegions(
+              ConcreteBackOffer.newGetBackOff(),
+              ByteString.EMPTY,
+              ByteString.EMPTY,
+              conf.getScanRegionsLimit());
+      for (Pdpb.Region region : regions) {
+        regionManager.insertRegionToCache(
+            regionManager.createRegion(region.getRegion(), ConcreteBackOffer.newGetBackOff()));
+      }
 
       RawKVClient rawKVClient = createRawClient();
       ByteString exampleKey = ByteString.EMPTY;
