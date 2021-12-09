@@ -73,8 +73,8 @@ public class SmartRawKVClient implements RawKVClientBase {
     if (warmed.compareAndSet(false, true)) {
       try {
         logger.info("Warming up SmartRawKVClient");
-        client.put(ByteString.EMPTY, ByteString.EMPTY);
         client.get(ByteString.EMPTY);
+        client.put(ByteString.EMPTY, ByteString.EMPTY);
         client.putIfAbsent(ByteString.EMPTY, ByteString.EMPTY);
       } catch (final TiKVException ignored) {
       }
