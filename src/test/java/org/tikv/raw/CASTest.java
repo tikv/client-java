@@ -74,7 +74,7 @@ public class CASTest extends BaseRawKVTest {
     Optional<ByteString> res2 = client.putIfAbsent(key, value2, ttl);
     assertEquals(res2.get(), value);
     try {
-      Thread.sleep(ttl * 1000);
+      Thread.sleep(ttl * 1000 + 100);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
