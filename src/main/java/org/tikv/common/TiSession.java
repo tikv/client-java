@@ -20,10 +20,7 @@ import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -33,11 +30,15 @@ import org.tikv.common.catalog.Catalog;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
+<<<<<<< HEAD
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
+=======
+import org.tikv.common.region.*;
+>>>>>>> c95479e... [close #375] warm up RawKVClient while creating it (#367)
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
@@ -83,7 +84,48 @@ public class TiSession implements AutoCloseable {
     if (this.enableGrpcForward) {
       logger.info("enable grpc forward for high available");
     }
+    warmUp();
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
+  }
+
+  private synchronized void warmUp() {
+    long warmUpStartTime = System.currentTimeMillis();
+    try {
+      this.client = getPDClient();
+      this.regionManager = getRegionManager();
+      List<Metapb.Store> stores = this.client.getAllStores(ConcreteBackOffer.newGetBackOff());
+      // warm up store cache
+      for (Metapb.Store store : stores) {
+        this.regionManager.updateStore(
+            null,
+            new TiStore(this.client.getStore(ConcreteBackOffer.newGetBackOff(), store.getId())));
+      }
+      ByteString startKey = ByteString.EMPTY;
+
+      do {
+        TiRegion region = regionManager.getRegionByKey(startKey);
+        startKey = region.getEndKey();
+      } while (!startKey.isEmpty());
+
+      RawKVClient rawKVClient = createRawClient();
+      ByteString exampleKey = ByteString.EMPTY;
+      Optional<ByteString> prev = rawKVClient.get(exampleKey);
+      if (prev.isPresent()) {
+        rawKVClient.delete(exampleKey);
+        rawKVClient.putIfAbsent(exampleKey, prev.get());
+        rawKVClient.put(exampleKey, prev.get());
+      } else {
+        rawKVClient.putIfAbsent(exampleKey, ByteString.EMPTY);
+        rawKVClient.put(exampleKey, ByteString.EMPTY);
+        rawKVClient.delete(exampleKey);
+      }
+    } catch (Exception e) {
+      // ignore error
+      logger.info("warm up fails, ignored ", e);
+    } finally {
+      logger.info(
+          String.format("warm up duration %d ms", System.currentTimeMillis() - warmUpStartTime));
+    }
   }
 
   @VisibleForTesting
