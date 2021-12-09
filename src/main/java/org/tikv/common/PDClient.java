@@ -39,6 +39,8 @@ import io.prometheus.client.Histogram;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -76,7 +78,7 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.PDGrpc.PDBlockingStub;
-import org.tikv.kvproto.PDGrpc.PDStub;
+import org.tikv.kvproto.PDGrpc.PDFutureStub;
 import org.tikv.kvproto.Pdpb;
 import org.tikv.kvproto.Pdpb.Error;
 import org.tikv.kvproto.Pdpb.ErrorType;
@@ -99,7 +101,7 @@ import org.tikv.kvproto.Pdpb.Timestamp;
 import org.tikv.kvproto.Pdpb.TsoRequest;
 import org.tikv.kvproto.Pdpb.TsoResponse;
 
-public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
+public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     implements ReadOnlyPDClient {
   private static final String TIFLASH_TABLE_SYNC_PROGRESS_PATH = "/tiflash/table/sync";
   private static final long MIN_TRY_UPDATE_DURATION = 50;
@@ -354,9 +356,16 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
   @Override
   public Store getStore(BackOffer backOffer, long storeId) {
-    return callWithRetry(
-            backOffer, PDGrpc.getGetStoreMethod(), buildGetStoreReq(storeId), buildPDErrorHandler())
-        .getStore();
+    GetStoreResponse resp =
+        callWithRetry(
+            backOffer,
+            PDGrpc.getGetStoreMethod(),
+            buildGetStoreReq(storeId),
+            buildPDErrorHandler());
+    if (resp != null) {
+      return resp.getStore();
+    }
+    return null;
   }
 
   @Override
@@ -442,7 +451,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
           new PDClientWrapper(leaderUrlStr, leaderUrlStr, clientChannel, System.nanoTime());
       timeout = conf.getTimeout();
     } catch (IllegalArgumentException e) {
-      logger.error("Error updating leader. " + leaderUrlStr, e);
       return false;
     }
     logger.info(String.format("Switched to new leader: %s", pdClientWrapper));
@@ -462,7 +470,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       pdClientWrapper = new PDClientWrapper(leaderUrls, followerUrlStr, channel, System.nanoTime());
       timeout = conf.getForwardTimeout();
     } catch (IllegalArgumentException e) {
-      logger.error("Error updating follower. " + followerUrlStr, e);
       return false;
     }
     logger.info(String.format("Switched to new leader by follower forward: %s", pdClientWrapper));
@@ -624,7 +631,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   @Override
-  protected PDStub getAsyncStub() {
+  protected PDFutureStub getAsyncStub() {
     if (pdClientWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
@@ -632,8 +639,11 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
   }
 
   private void initCluster() {
+    logger.info("init cluster: start");
     GetMembersResponse resp = null;
-    List<URI> pdAddrs = getConf().getPdAddrs();
+    List<URI> pdAddrs = new ArrayList<>(getConf().getPdAddrs());
+    // shuffle PD addresses so that clients call getMembers from different PD
+    Collections.shuffle(pdAddrs);
     this.pdAddrs = pdAddrs;
     this.etcdClient =
         Client.builder()
@@ -645,19 +655,26 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
                         .setDaemon(true)
                         .build()))
             .build();
+    logger.info("init host mapping: start");
     this.hostMapping =
         Optional.ofNullable(getConf().getHostMapping())
             .orElseGet(() -> new DefaultHostMapping(this.etcdClient, conf.getNetworkMappingName()));
+    logger.info("init host mapping: end");
     // The first request may cost too much latency
     long originTimeout = this.timeout;
     this.timeout = conf.getPdFirstGetMemberTimeout();
     for (URI u : pdAddrs) {
+      logger.info("get members with pd " + u + ": start");
       resp = getMembers(u);
+      logger.info("get members with pd " + u + ": end");
       if (resp != null) {
         break;
       }
-      logger.info("Could not get leader member with pd: " + u);
     }
+    if (resp == null) {
+      logger.error("Could not get leader member with: " + pdAddrs);
+    }
+
     this.timeout = originTimeout;
     checkNotNull(resp, "Failed to init client for PD cluster.");
     long clusterId = resp.getHeader().getClusterId();
@@ -673,7 +690,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
 
     String leaderUrlStr = resp.getLeader().getClientUrls(0);
     leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
+    logger.info("createLeaderClientWrapper with leader " + leaderUrlStr + ": start");
     createLeaderClientWrapper(leaderUrlStr);
+    logger.info("createLeaderClientWrapper with leader " + leaderUrlStr + ": end");
     service =
         Executors.newSingleThreadScheduledExecutor(
             new ThreadFactoryBuilder()
@@ -702,12 +721,13 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       tiflashReplicaService.scheduleAtFixedRate(
           this::updateTiFlashReplicaStatus, 10, 10, TimeUnit.SECONDS);
     }
+    logger.info("init cluster: finish");
   }
 
   static class PDClientWrapper {
     private final String leaderInfo;
     private final PDBlockingStub blockingStub;
-    private final PDStub asyncStub;
+    private final PDFutureStub asyncStub;
     private final long createTime;
     private final String storeAddress;
 
@@ -718,10 +738,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
         header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, addrToUri(leaderInfo).toString());
         this.blockingStub =
             MetadataUtils.attachHeaders(PDGrpc.newBlockingStub(clientChannel), header);
-        this.asyncStub = MetadataUtils.attachHeaders(PDGrpc.newStub(clientChannel), header);
+        this.asyncStub = MetadataUtils.attachHeaders(PDGrpc.newFutureStub(clientChannel), header);
       } else {
         this.blockingStub = PDGrpc.newBlockingStub(clientChannel);
-        this.asyncStub = PDGrpc.newStub(clientChannel);
+        this.asyncStub = PDGrpc.newFutureStub(clientChannel);
       }
       this.leaderInfo = leaderInfo;
       this.storeAddress = storeAddress;
@@ -740,7 +760,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDStub>
       return blockingStub;
     }
 
-    PDStub getAsyncStub() {
+    PDFutureStub getAsyncStub() {
       return asyncStub;
     }
 

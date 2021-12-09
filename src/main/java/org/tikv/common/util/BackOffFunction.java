@@ -1,7 +1,6 @@
 package org.tikv.common.util;
 
 import java.util.concurrent.ThreadLocalRandom;
-import org.tikv.common.exception.GrpcException;
 
 public class BackOffFunction {
   private final int base;
@@ -25,7 +24,7 @@ public class BackOffFunction {
    * Do back off in exponential with optional jitters according to different back off strategies.
    * See http://www.awsarchitectureblog.com/2015/03/backoff.html
    */
-  long doBackOff(long maxSleepMs) {
+  long getSleepMs(long maxSleepMs) {
     long sleep = 0;
     long v = expo(base, cap, attempts);
     switch (strategy) {
@@ -47,11 +46,6 @@ public class BackOffFunction {
       sleep = maxSleepMs;
     }
 
-    try {
-      Thread.sleep(sleep);
-    } catch (InterruptedException e) {
-      throw new GrpcException(e);
-    }
     attempts++;
     lastSleep = sleep;
     return lastSleep;
@@ -69,6 +63,7 @@ public class BackOffFunction {
     BoRegionMiss,
     BoUpdateLeader,
     BoServerBusy,
-    BoTxnNotFound
+    BoTxnNotFound,
+    BoCheckTimeout
   }
 }

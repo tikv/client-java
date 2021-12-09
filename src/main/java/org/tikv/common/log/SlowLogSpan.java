@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 PingCAP, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,14 @@
  *
  */
 
-package org.tikv.common.region;
+package org.tikv.common.log;
 
-import org.tikv.common.util.BackOffer;
+import com.google.gson.JsonElement;
 
-public interface RegionErrorReceiver {
-  boolean onNotLeader(TiRegion region);
+public interface SlowLogSpan {
+  void start();
 
-  /// return whether we need to retry this request.
-  boolean onStoreUnreachable(BackOffer backOffer);
+  void end();
 
-  TiRegion getRegion();
+  JsonElement toJsonElement();
 }

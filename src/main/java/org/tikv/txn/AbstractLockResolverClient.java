@@ -71,7 +71,7 @@ public interface AbstractLockResolverClient {
       TiRegion region,
       TiStore store,
       TikvGrpc.TikvBlockingStub blockingStub,
-      TikvGrpc.TikvStub asyncStub,
+      TikvGrpc.TikvFutureStub asyncStub,
       ChannelFactory channelFactory,
       RegionManager regionManager,
       PDClient pdClient,

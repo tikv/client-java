@@ -1,6 +1,5 @@
 /*
- *
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 PingCAP, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,18 +11,30 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
-package org.tikv.common.region;
+package org.tikv.service.failsafe;
 
-import org.tikv.common.util.BackOffer;
+import java.io.IOException;
 
-public interface RegionErrorReceiver {
-  boolean onNotLeader(TiRegion region);
+public class NoOpCircuitBreakerMetrics implements CircuitBreakerMetrics {
+  @Override
+  public void recordSuccess() {
+    // do nothing
+  }
 
-  /// return whether we need to retry this request.
-  boolean onStoreUnreachable(BackOffer backOffer);
+  @Override
+  public void recordFailure() {
+    // do nothing
+  }
 
-  TiRegion getRegion();
+  @Override
+  public void addListener(MetricsListener metricsListener) {
+    // do nothing
+  }
+
+  @Override
+  public void close() throws IOException {
+    // do nothing
+  }
 }
