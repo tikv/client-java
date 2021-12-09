@@ -129,8 +129,12 @@ public class RegionCache {
     if (!newStore.isValid()) {
       return false;
     }
+    if (oldStore == null) {
+      storeCache.put(newStore.getId(), newStore);
+      return true;
+    }
     TiStore originStore = storeCache.get(oldStore.getId());
-    if (originStore == oldStore) {
+    if (originStore.equals(oldStore)) {
       storeCache.put(newStore.getId(), newStore);
       oldStore.markInvalid();
       return true;
