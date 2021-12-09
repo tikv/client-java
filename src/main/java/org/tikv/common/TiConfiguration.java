@@ -112,6 +112,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
     setIfMissing(TIKV_HEALTH_CHECK_PERIOD_DURATION, DEF_HEALTH_CHECK_PERIOD_DURATION);
     setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+    setIfMissing(TIKV_GRPC_IDLE_TIMEOUT, DEF_TIKV_GRPC_IDLE_TIMEOUT);
     setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
@@ -341,7 +342,7 @@ public class TiConfiguration implements Serializable {
   private Optional<Integer> rawKVBatchWriteSlowLogInMS =
       getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS);
   private int rawKVScanSlowLogInMS = getInt(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
-
+  private int idleTimeout = getInt(TIKV_GRPC_IDLE_TIMEOUT);
   private boolean circuitBreakEnable = getBoolean(TiKV_CIRCUIT_BREAK_ENABLE);
   private int circuitBreakAvailabilityWindowInSeconds =
       getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS);
@@ -664,6 +665,14 @@ public class TiConfiguration implements Serializable {
 
   public void setRawKVDefaultBackoffInMS(int rawKVDefaultBackoffInMS) {
     this.rawKVDefaultBackoffInMS = rawKVDefaultBackoffInMS;
+  }
+
+  public int getIdleTimeout() {
+    return idleTimeout;
+  }
+
+  public void setIdleTimeout(int timeout) {
+    this.idleTimeout = timeout;
   }
 
   public int getRawKVReadTimeoutInMS() {
