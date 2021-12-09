@@ -17,14 +17,20 @@ package org.tikv.common.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.JarURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Objects;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import javax.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ClientClassLoader {
+  private static final Logger logger = LoggerFactory.getLogger(ClientClassLoader.class);
   /**
    * Get all classes under specific package root
    *
@@ -35,16 +41,24 @@ public class ClientClassLoader {
    */
   public static Class<?>[] getClasses(@Nonnull String packageName)
       throws ClassNotFoundException, IOException {
+    logger.info("package name: " + packageName);
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     assert classLoader != null;
     String path = packageName.replace('.', '/');
+    logger.info("package path: " + path);
     Enumeration<URL> resources = classLoader.getResources(path);
     List<File> dirs = new ArrayList<>();
+    ArrayList<Class<?>> classes = new ArrayList<>();
     while (resources.hasMoreElements()) {
       URL resource = resources.nextElement();
-      dirs.add(new File(resource.getFile()));
+      String protocol = resource.getProtocol();
+      if ("jar".equalsIgnoreCase(protocol)) {
+        JarURLConnection connection = (JarURLConnection) resource.openConnection();
+        classes.addAll(findClasses(connection, packageName));
+      } else if ("file".equalsIgnoreCase(protocol)) {
+        dirs.add(new File(resource.getFile()));
+      }
     }
-    ArrayList<Class<?>> classes = new ArrayList<>();
     for (File directory : dirs) {
       classes.addAll(findClasses(directory, packageName));
     }
@@ -78,6 +92,28 @@ public class ClientClassLoader {
         classes.add(
             Class.forName(
                 packageName + '.' + file.getName().substring(0, file.getName().length() - 6)));
+      }
+    }
+    return classes;
+  }
+
+  private static List<Class<?>> findClasses(
+      @Nonnull JarURLConnection connection, String packageName)
+      throws ClassNotFoundException, IOException {
+    List<Class<?>> classes = new ArrayList<>();
+    JarFile jarFile = connection.getJarFile();
+    if (jarFile != null) {
+      Enumeration<JarEntry> jarEntryEnumeration = jarFile.entries();
+      while (jarEntryEnumeration.hasMoreElements()) {
+        JarEntry entry = jarEntryEnumeration.nextElement();
+        String jarEntryName = entry.getName();
+        if (jarEntryName.contains(".class")
+            && jarEntryName.replaceAll("/", ".").startsWith(packageName)) {
+          String className =
+              jarEntryName.substring(0, jarEntryName.lastIndexOf(".")).replace("/", ".");
+          Class<?> cls = Class.forName(className);
+          classes.add(cls);
+        }
       }
     }
     return classes;
