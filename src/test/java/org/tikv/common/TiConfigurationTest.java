@@ -26,14 +26,6 @@ public class TiConfigurationTest {
     TiConfiguration conf = TiConfiguration.createRawDefault();
     assertEquals("configFileTest", conf.getDBPrefix());
   }
-<<<<<<< HEAD
-=======
-
-  @Test
-  public void tiFlashDefaultValueTest() {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
-    assertFalse(conf.isTiFlashEnabled());
-  }
 
   @Test
   public void testGrpcIdleTimeoutValue() {
@@ -45,5 +37,4 @@ public class TiConfigurationTest {
     conf.setIdleTimeout(newValue);
     assertEquals(newValue, conf.getIdleTimeout());
   }
->>>>>>> d8841e7... [close #380] make gRPC idle timeout configurable (#379)
 }

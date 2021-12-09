@@ -112,14 +112,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
     setIfMissing(TIKV_HEALTH_CHECK_PERIOD_DURATION, DEF_HEALTH_CHECK_PERIOD_DURATION);
     setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
-<<<<<<< HEAD
-=======
-    setIfMissing(TIKV_GRPC_KEEPALIVE_TIME, DEF_TIKV_GRPC_KEEPALIVE_TIME);
-    setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
     setIfMissing(TIKV_GRPC_IDLE_TIMEOUT, DEF_TIKV_GRPC_IDLE_TIMEOUT);
-    setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
-    setIfMissing(TIFLASH_ENABLE, DEF_TIFLASH_ENABLE);
->>>>>>> d8841e7... [close #380] make gRPC idle timeout configurable (#379)
     setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
@@ -349,23 +342,7 @@ public class TiConfiguration implements Serializable {
   private Optional<Integer> rawKVBatchWriteSlowLogInMS =
       getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS);
   private int rawKVScanSlowLogInMS = getInt(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
-
-<<<<<<< HEAD
-=======
-  private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
-  private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
-  private String keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN).orElse(null);
-  private String keyFile = getOption(TIKV_KEY_FILE).orElse(null);
-
-  private boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
-
-  private boolean isTest = false;
-
-  private int keepaliveTime = getInt(TIKV_GRPC_KEEPALIVE_TIME);
-  private int keepaliveTimeout = getInt(TIKV_GRPC_KEEPALIVE_TIMEOUT);
   private int idleTimeout = getInt(TIKV_GRPC_IDLE_TIMEOUT);
-
->>>>>>> d8841e7... [close #380] make gRPC idle timeout configurable (#379)
   private boolean circuitBreakEnable = getBoolean(TiKV_CIRCUIT_BREAK_ENABLE);
   private int circuitBreakAvailabilityWindowInSeconds =
       getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS);
@@ -690,32 +667,6 @@ public class TiConfiguration implements Serializable {
     this.rawKVDefaultBackoffInMS = rawKVDefaultBackoffInMS;
   }
 
-<<<<<<< HEAD
-=======
-  public boolean isTest() {
-    return isTest;
-  }
-
-  public void setTest(boolean test) {
-    isTest = test;
-  }
-
-  public int getKeepaliveTime() {
-    return keepaliveTime;
-  }
-
-  public void setKeepaliveTime(int keepaliveTime) {
-    this.keepaliveTime = keepaliveTime;
-  }
-
-  public int getKeepaliveTimeout() {
-    return keepaliveTimeout;
-  }
-
-  public void setKeepaliveTimeout(int timeout) {
-    this.keepaliveTimeout = timeout;
-  }
-
   public int getIdleTimeout() {
     return idleTimeout;
   }
@@ -724,43 +675,6 @@ public class TiConfiguration implements Serializable {
     this.idleTimeout = timeout;
   }
 
-  public boolean isTiFlashEnabled() {
-    return tiFlashEnable;
-  }
-
-  public boolean isTlsEnable() {
-    return tlsEnable;
-  }
-
-  public void setTlsEnable(boolean tlsEnable) {
-    this.tlsEnable = tlsEnable;
-  }
-
-  public String getTrustCertCollectionFile() {
-    return trustCertCollectionFile;
-  }
-
-  public void setTrustCertCollectionFile(String trustCertCollectionFile) {
-    this.trustCertCollectionFile = trustCertCollectionFile;
-  }
-
-  public String getKeyCertChainFile() {
-    return keyCertChainFile;
-  }
-
-  public void setKeyCertChainFile(String keyCertChainFile) {
-    this.keyCertChainFile = keyCertChainFile;
-  }
-
-  public String getKeyFile() {
-    return keyFile;
-  }
-
-  public void setKeyFile(String keyFile) {
-    this.keyFile = keyFile;
-  }
-
->>>>>>> d8841e7... [close #380] make gRPC idle timeout configurable (#379)
   public int getRawKVReadTimeoutInMS() {
     return rawKVReadTimeoutInMS;
   }
