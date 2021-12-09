@@ -20,7 +20,6 @@ import static org.tikv.common.util.ClientUtils.*;
 import com.google.protobuf.ByteString;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
@@ -89,21 +88,6 @@ public class RawKVClient implements AutoCloseable {
 
   private static final TiKVException ERR_MAX_SCAN_LIMIT_EXCEEDED =
       new TiKVException("limit should be less than MAX_RAW_SCAN_LIMIT");
-
-  // warm up the client to load classes needed by protobuf
-  static {
-    logger.info("load start");
-    try {
-      Class<?>[] classes = ClientClassLoader.getClasses("org.tikv.kvproto");
-      logger.info(classes.length + " classes");
-      for (Class<?> c : classes) {
-        logger.info("load: " + c.getName());
-      }
-    } catch (ClassNotFoundException | IOException e) {
-      e.printStackTrace();
-    }
-    logger.info("load complete");
-  }
 
   public RawKVClient(TiSession session, RegionStoreClientBuilder clientBuilder) {
     Objects.requireNonNull(session, "session is null");
