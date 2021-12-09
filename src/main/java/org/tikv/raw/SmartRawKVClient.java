@@ -20,18 +20,10 @@ import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
 import java.util.List;
 import java.util.Map;
-<<<<<<< HEAD
-=======
-import java.util.Optional;
->>>>>>> c95479e... [close #375] warm up RawKVClient while creating it (#367)
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.CircuitBreakerOpenException;
-<<<<<<< HEAD
-=======
-import org.tikv.common.util.Pair;
->>>>>>> c95479e... [close #375] warm up RawKVClient while creating it (#367)
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.service.failsafe.CircuitBreaker;

@@ -30,15 +30,11 @@ import org.tikv.common.catalog.Catalog;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
-<<<<<<< HEAD
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
-=======
-import org.tikv.common.region.*;
->>>>>>> c95479e... [close #375] warm up RawKVClient while creating it (#367)
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
@@ -109,16 +105,10 @@ public class TiSession implements AutoCloseable {
 
       RawKVClient rawKVClient = createRawClient();
       ByteString exampleKey = ByteString.EMPTY;
-      Optional<ByteString> prev = rawKVClient.get(exampleKey);
-      if (prev.isPresent()) {
-        rawKVClient.delete(exampleKey);
-        rawKVClient.putIfAbsent(exampleKey, prev.get());
-        rawKVClient.put(exampleKey, prev.get());
-      } else {
-        rawKVClient.putIfAbsent(exampleKey, ByteString.EMPTY);
-        rawKVClient.put(exampleKey, ByteString.EMPTY);
-        rawKVClient.delete(exampleKey);
-      }
+      ByteString prev = rawKVClient.get(exampleKey);
+      rawKVClient.delete(exampleKey);
+      rawKVClient.putIfAbsent(exampleKey, prev);
+      rawKVClient.put(exampleKey, prev);
     } catch (Exception e) {
       // ignore error
       logger.info("warm up fails, ignored ", e);
