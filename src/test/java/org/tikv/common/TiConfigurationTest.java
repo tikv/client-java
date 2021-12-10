@@ -60,8 +60,9 @@ public class TiConfigurationTest {
     int newValue = 100000;
     conf.setHealthCheckPeriodDuration(newValue);
     Assert.assertEquals(newValue, conf.getHealthCheckPeriodDuration());
-   }
+  }
 
+  @Test
   public void testGrpcIdleTimeoutValue() {
     TiConfiguration conf = TiConfiguration.createDefault();
     // default value
