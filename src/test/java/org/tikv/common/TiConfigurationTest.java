@@ -35,6 +35,12 @@ public class TiConfigurationTest {
   }
 
   @Test
+  public void tiJksDefaultValueTest() {
+    TiConfiguration conf = TiConfiguration.createRawDefault();
+    assertFalse(conf.isJksEnable());
+  }
+
+  @Test
   public void testGrpcIdleTimeoutValue() {
     TiConfiguration conf = TiConfiguration.createDefault();
     // default value
