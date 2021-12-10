@@ -50,7 +50,7 @@ public class TiConfigurationTest {
   }
 
   @Test
-  public void testHealthCheckPeriodDuration() {
+  public void testHealthCheckPeriodDurationValue() {
     TiConfiguration conf = TiConfiguration.createDefault();
     // default value
     Assert.assertEquals(
@@ -60,5 +60,15 @@ public class TiConfigurationTest {
     int newValue = 100000;
     conf.setHealthCheckPeriodDuration(newValue);
     Assert.assertEquals(newValue, conf.getHealthCheckPeriodDuration());
+   }
+
+  public void testGrpcIdleTimeoutValue() {
+    TiConfiguration conf = TiConfiguration.createDefault();
+    // default value
+    assertEquals(TiConfiguration.getInt(ConfigUtils.TIKV_GRPC_IDLE_TIMEOUT), conf.getIdleTimeout());
+    // new value
+    int newValue = 100000;
+    conf.setIdleTimeout(newValue);
+    assertEquals(newValue, conf.getIdleTimeout());
   }
 }

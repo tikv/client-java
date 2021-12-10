@@ -36,13 +36,16 @@ public class ChannelFactory implements AutoCloseable {
   private final int maxFrameSize;
   private final int keepaliveTime;
   private final int keepaliveTimeout;
+  private final int idleTimeout;
   private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
   private final SslContextBuilder sslContextBuilder;
 
-  public ChannelFactory(int maxFrameSize, int keepaliveTime, int keepaliveTimeout) {
+  public ChannelFactory(
+      int maxFrameSize, int keepaliveTime, int keepaliveTimeout, int idleTimeout) {
     this.maxFrameSize = maxFrameSize;
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
+    this.idleTimeout = idleTimeout;
     this.sslContextBuilder = null;
   }
 
@@ -50,12 +53,14 @@ public class ChannelFactory implements AutoCloseable {
       int maxFrameSize,
       int keepaliveTime,
       int keepaliveTimeout,
+      int idleTimeout,
       String trustCertCollectionFilePath,
       String keyCertChainFilePath,
       String keyFilePath) {
     this.maxFrameSize = maxFrameSize;
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
+    this.idleTimeout = idleTimeout;
     this.sslContextBuilder =
         getSslContextBuilder(trustCertCollectionFilePath, keyCertChainFilePath, keyFilePath);
   }
@@ -97,7 +102,7 @@ public class ChannelFactory implements AutoCloseable {
                   .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
                   .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
                   .keepAliveWithoutCalls(true)
-                  .idleTimeout(60, TimeUnit.SECONDS);
+                  .idleTimeout(idleTimeout, TimeUnit.SECONDS);
 
           if (sslContextBuilder == null) {
             return builder.usePlaintext().build();
