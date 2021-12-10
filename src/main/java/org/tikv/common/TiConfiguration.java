@@ -655,10 +655,53 @@ public class TiConfiguration implements Serializable {
     return this.grpcHealthCheckTimeout;
   }
 
+  public void setGrpcHealthCheckTimeout(int grpcHealthCheckTimeout) {
+    this.grpcHealthCheckTimeout = grpcHealthCheckTimeout;
+  }
+
   public long getHealthCheckPeriodDuration() {
     return this.healthCheckPeriodDuration;
   }
 
+<<<<<<< HEAD
+=======
+  public void setHealthCheckPeriodDuration(int healthCheckPeriodDuration) {
+    this.healthCheckPeriodDuration = healthCheckPeriodDuration;
+  }
+
+  public boolean isEnableAtomicForCAS() {
+    return enableAtomicForCAS;
+  }
+
+  public void setEnableAtomicForCAS(boolean enableAtomicForCAS) {
+    this.enableAtomicForCAS = enableAtomicForCAS;
+  }
+
+  public int getImporterMaxKVBatchBytes() {
+    return importerMaxKVBatchBytes;
+  }
+
+  public void setImporterMaxKVBatchBytes(int importerMaxKVBatchBytes) {
+    this.importerMaxKVBatchBytes = importerMaxKVBatchBytes;
+  }
+
+  public int getImporterMaxKVBatchSize() {
+    return importerMaxKVBatchSize;
+  }
+
+  public void setImporterMaxKVBatchSize(int importerMaxKVBatchSize) {
+    this.importerMaxKVBatchSize = importerMaxKVBatchSize;
+  }
+
+  public int getScatterWaitSeconds() {
+    return scatterWaitSeconds;
+  }
+
+  public void setScatterWaitSeconds(int scatterWaitSeconds) {
+    this.scatterWaitSeconds = scatterWaitSeconds;
+  }
+
+>>>>>>> 2eb77d6... [close #370] make gRPC and TiKV health check configurable (#369)
   public int getRawKVDefaultBackoffInMS() {
     return rawKVDefaultBackoffInMS;
   }
