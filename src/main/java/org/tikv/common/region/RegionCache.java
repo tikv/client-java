@@ -104,6 +104,18 @@ public class RegionCache {
     }
   }
 
+  public synchronized void insertRegionToCache(TiRegion region) {
+    try {
+      TiRegion oldRegion = regionCache.get(region.getId());
+      if (oldRegion != null) {
+        keyToRegionIdCache.remove(makeRange(oldRegion.getStartKey(), oldRegion.getEndKey()));
+      }
+      regionCache.put(region.getId(), region);
+      keyToRegionIdCache.put(makeRange(region.getStartKey(), region.getEndKey()), region.getId());
+    } catch (Exception ignore) {
+    }
+  }
+
   public synchronized boolean updateRegion(TiRegion expected, TiRegion region) {
     try {
       if (logger.isDebugEnabled()) {
@@ -129,8 +141,12 @@ public class RegionCache {
     if (!newStore.isValid()) {
       return false;
     }
+    if (oldStore == null) {
+      storeCache.put(newStore.getId(), newStore);
+      return true;
+    }
     TiStore originStore = storeCache.get(oldStore.getId());
-    if (originStore == oldStore) {
+    if (originStore.equals(oldStore)) {
       storeCache.put(newStore.getId(), newStore);
       oldStore.markInvalid();
       return true;

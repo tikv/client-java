@@ -82,6 +82,10 @@ public class TiRegion implements Serializable {
     replicaIdx = 0;
   }
 
+  public TiConfiguration getConf() {
+    return conf;
+  }
+
   public Peer getLeader() {
     return leader;
   }
@@ -153,6 +157,10 @@ public class TiRegion implements Serializable {
 
   public Kvrpcpb.Context getReplicaContext(Peer currentPeer, Set<Long> resolvedLocks) {
     return getContext(currentPeer, resolvedLocks, false);
+  }
+
+  public Kvrpcpb.Context getReplicaContext(Peer currentPeer) {
+    return getContext(currentPeer, java.util.Collections.emptySet(), false);
   }
 
   private Kvrpcpb.Context getContext(
@@ -269,6 +277,18 @@ public class TiRegion implements Serializable {
       this.id = id;
       this.confVer = confVer;
       this.ver = ver;
+    }
+
+    public long getId() {
+      return id;
+    }
+
+    public long getConfVer() {
+      return confVer;
+    }
+
+    public long getVer() {
+      return ver;
     }
 
     @Override

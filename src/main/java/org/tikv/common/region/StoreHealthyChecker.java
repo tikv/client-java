@@ -74,7 +74,7 @@ public class StoreHealthyChecker implements Runnable {
   private boolean checkStoreTombstone(TiStore store) {
     try {
       Metapb.Store newStore = pdClient.getStore(ConcreteBackOffer.newRawKVBackOff(), store.getId());
-      if (newStore.getState() == Metapb.StoreState.Tombstone) {
+      if (newStore != null && newStore.getState() == Metapb.StoreState.Tombstone) {
         return true;
       }
     } catch (Exception e) {
@@ -110,13 +110,8 @@ public class StoreHealthyChecker implements Runnable {
           }
         } else {
           if (!store.isReachable()) {
-            logger.warn(
-                String.format(
-                    "store [%s] recovers to be reachable and canforward", store.getAddress()));
+            logger.warn(String.format("store [%s] recovers to be reachable", store.getAddress()));
             store.markReachable();
-          }
-          if (!store.canForwardFirst()) {
-            store.makrCanForward();
           }
         }
       } else if (store.isReachable()) {

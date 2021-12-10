@@ -23,6 +23,7 @@ import io.grpc.MethodDescriptor;
 import io.grpc.health.v1.HealthCheckRequest;
 import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.health.v1.HealthGrpc;
+import io.grpc.stub.AbstractFutureStub;
 import io.grpc.stub.AbstractStub;
 import io.grpc.stub.ClientCalls;
 import io.grpc.stub.StreamObserver;
@@ -38,14 +39,15 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 
 public abstract class AbstractGRPCClient<
-        BlockingStubT extends AbstractStub<BlockingStubT>, StubT extends AbstractStub<StubT>>
+        BlockingStubT extends AbstractStub<BlockingStubT>,
+        FutureStubT extends AbstractFutureStub<FutureStubT>>
     implements AutoCloseable {
   protected final Logger logger = LoggerFactory.getLogger(this.getClass());
   protected final ChannelFactory channelFactory;
   protected TiConfiguration conf;
   protected long timeout;
   protected BlockingStubT blockingStub;
-  protected StubT asyncStub;
+  protected FutureStubT asyncStub;
 
   protected AbstractGRPCClient(TiConfiguration conf, ChannelFactory channelFactory) {
     this.conf = conf;
@@ -57,7 +59,7 @@ public abstract class AbstractGRPCClient<
       TiConfiguration conf,
       ChannelFactory channelFactory,
       BlockingStubT blockingStub,
-      StubT asyncStub) {
+      FutureStubT asyncStub) {
     this.conf = conf;
     this.timeout = conf.getTimeout();
     this.channelFactory = channelFactory;
@@ -88,7 +90,8 @@ public abstract class AbstractGRPCClient<
                   return ClientCalls.blockingUnaryCall(
                       stub.getChannel(), method, stub.getCallOptions(), requestFactory.get());
                 },
-                method.getFullMethodName());
+                method.getFullMethodName(),
+                backOffer);
 
     if (logger.isTraceEnabled()) {
       logger.trace(String.format("leaving %s...", method.getFullMethodName()));
@@ -109,14 +112,15 @@ public abstract class AbstractGRPCClient<
         .create(handler)
         .callWithRetry(
             () -> {
-              StubT stub = getAsyncStub();
+              FutureStubT stub = getAsyncStub();
               ClientCalls.asyncUnaryCall(
                   stub.getChannel().newCall(method, stub.getCallOptions()),
                   requestFactory.get(),
                   responseObserver);
               return null;
             },
-            method.getFullMethodName());
+            method.getFullMethodName(),
+            backOffer);
     logger.debug(String.format("leaving %s...", method.getFullMethodName()));
   }
 
@@ -133,11 +137,12 @@ public abstract class AbstractGRPCClient<
             .create(handler)
             .callWithRetry(
                 () -> {
-                  StubT stub = getAsyncStub();
+                  FutureStubT stub = getAsyncStub();
                   return asyncBidiStreamingCall(
                       stub.getChannel().newCall(method, stub.getCallOptions()), responseObserver);
                 },
-                method.getFullMethodName());
+                method.getFullMethodName(),
+                backOffer);
     logger.debug(String.format("leaving %s...", method.getFullMethodName()));
     return observer;
   }
@@ -160,7 +165,8 @@ public abstract class AbstractGRPCClient<
                       blockingServerStreamingCall(
                           stub.getChannel(), method, stub.getCallOptions(), requestFactory.get()));
                 },
-                method.getFullMethodName());
+                method.getFullMethodName(),
+                backOffer);
     logger.debug(String.format("leaving %s...", method.getFullMethodName()));
     return response;
   }
@@ -175,7 +181,7 @@ public abstract class AbstractGRPCClient<
 
   protected abstract BlockingStubT getBlockingStub();
 
-  protected abstract StubT getAsyncStub();
+  protected abstract FutureStubT getAsyncStub();
 
   protected boolean checkHealth(String addressStr, HostMapping hostMapping) {
     ManagedChannel channel = channelFactory.getChannel(addressStr, hostMapping);

@@ -19,6 +19,8 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class ConfigUtils {
+  public static final String TIKV_CONFIGURATION_FILENAME = "tikv.properties";
+
   public static final String TIKV_PD_ADDRESSES = "tikv.pd.addresses";
   public static final String TIKV_GRPC_TIMEOUT = "tikv.grpc.timeout_in_ms";
   public static final String TIKV_GRPC_INGEST_TIMEOUT = "tikv.grpc.ingest_timeout_in_ms";
@@ -30,6 +32,7 @@ public class ConfigUtils {
   public static final String TIKV_GRPC_MAX_FRAME_SIZE = "tikv.grpc.max_frame_size";
   public static final String TIKV_GRPC_KEEPALIVE_TIME = "tikv.grpc.keepalive_time";
   public static final String TIKV_GRPC_KEEPALIVE_TIMEOUT = "tikv.grpc.keepalive_timeout";
+  public static final String TIKV_GRPC_IDLE_TIMEOUT = "tikv.grpc.idle_timeout";
 
   public static final String TIKV_INDEX_SCAN_BATCH_SIZE = "tikv.index.scan_batch_size";
   public static final String TIKV_INDEX_SCAN_CONCURRENCY = "tikv.index.scan_concurrency";
@@ -68,12 +71,41 @@ public class ConfigUtils {
   public static final String TIKV_SCATTER_WAIT_SECONDS = "tikv.scatter_wait_seconds";
 
   public static final String TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS = "tikv.rawkv.default_backoff_in_ms";
+  public static final String TIKV_RAWKV_READ_TIMEOUT_IN_MS = "tikv.rawkv.read_timeout_in_ms";
+  public static final String TIKV_RAWKV_WRITE_TIMEOUT_IN_MS = "tikv.rawkv.write_timeout_in_ms";
+  public static final String TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS =
+      "tikv.rawkv.batch_read_timeout_in_ms";
+  public static final String TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS =
+      "tikv.rawkv.batch_write_timeout_in_ms";
+  public static final String TIKV_RAWKV_SCAN_TIMEOUT_IN_MS = "tikv.rawkv.scan_timeout_in_ms";
+  public static final String TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS = "tikv.rawkv.clean_timeout_in_ms";
+  public static final String TIKV_BO_REGION_MISS_BASE_IN_MS = "tikv.bo_region_miss_base_in_ms";
+  public static final String TIKV_RAWKV_READ_SLOWLOG_IN_MS = "tikv.rawkv.read_slowlog_in_ms";
+  public static final String TIKV_RAWKV_WRITE_SLOWLOG_IN_MS = "tikv.rawkv.write_slowlog_in_ms";
+  public static final String TIKV_RAWKV_BATCH_READ_SLOWLOG_IN_MS =
+      "tikv.rawkv.batch_read_slowlog_in_ms";
+  public static final String TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS =
+      "tikv.rawkv.batch_write_slowlog_in_ms";
+  public static final String TIKV_RAWKV_SCAN_SLOWLOG_IN_MS = "tikv.rawkv.scan_slowlog_in_ms";
 
   public static final String TIKV_TLS_ENABLE = "tikv.tls_enable";
   public static final String TIKV_TRUST_CERT_COLLECTION = "tikv.trust_cert_collection";
   public static final String TIKV_KEY_CERT_CHAIN = "tikv.key_cert_chain";
   public static final String TIKV_KEY_FILE = "tikv.key_file";
 
+  public static final String TiKV_CIRCUIT_BREAK_ENABLE = "tikv.circuit_break.enable";
+  public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS =
+      "tikv.circuit_break.trigger.availability.window_in_seconds";
+  public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE =
+      "tikv.circuit_break.trigger.availability.error_threshold_percentage";
+  public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD =
+      "tikv.circuit_break.trigger.availability.request_volumn_threshold";
+  public static final String TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS =
+      "tikv.circuit_break.trigger.sleep_window_in_seconds";
+  public static final String TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT =
+      "tikv.circuit_break.trigger.attempt_request_count";
+
+  public static final String TIFLASH_ENABLE = "tiflash.enable";
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
   public static final String DEF_TIKV_GRPC_INGEST_TIMEOUT = "200s";
@@ -114,6 +146,16 @@ public class ConfigUtils {
   public static final int DEF_TIKV_SCATTER_WAIT_SECONDS = 300;
   public static final int DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS = BackOffer.RAWKV_MAX_BACKOFF;
 
+  public static final int DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS = 2000;
+  public static final int DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS = 2000;
+  public static final int DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS = 2000;
+  public static final int DEF_TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS = 2000;
+  public static final int DEF_TIKV_RAWKV_SCAN_TIMEOUT_IN_MS = 10000;
+  public static final int DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS = 600000;
+
+  public static final int DEF_TIKV_BO_REGION_MISS_BASE_IN_MS = 20;
+  public static final String DEF_TIKV_RAWKV_SCAN_SLOWLOG_IN_MS = "5000";
+
   public static final String NORMAL_COMMAND_PRIORITY = "NORMAL";
   public static final String LOW_COMMAND_PRIORITY = "LOW";
   public static final String HIGH_COMMAND_PRIORITY = "HIGH";
@@ -130,5 +172,14 @@ public class ConfigUtils {
 
   public static final int DEF_TIKV_GRPC_KEEPALIVE_TIME = 10;
   public static final int DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT = 3;
+  public static final int DEF_TIKV_GRPC_IDLE_TIMEOUT = 60;
   public static final boolean DEF_TIKV_TLS_ENABLE = false;
+  public static final boolean DEF_TIFLASH_ENABLE = false;
+
+  public static final boolean DEF_TiKV_CIRCUIT_BREAK_ENABLE = false;
+  public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS = 60;
+  public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE = 100;
+  public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUST_VOLUMN_THRESHOLD = 10;
+  public static final int DEF_TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS = 20;
+  public static final int DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT = 10;
 }

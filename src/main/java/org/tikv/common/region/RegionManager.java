@@ -31,7 +31,9 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.InvalidStoreException;
 import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
@@ -94,11 +96,12 @@ public class RegionManager {
   }
 
   public TiRegion getRegionByKey(ByteString key) {
-    return getRegionByKey(key, ConcreteBackOffer.newGetBackOff());
+    return getRegionByKey(key, defaultBackOff());
   }
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
     Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
+    SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("getRegionByKey");
     TiRegion region = cache.getRegionByKey(key, backOffer);
     try {
       if (region == null) {
@@ -111,6 +114,7 @@ public class RegionManager {
       return null;
     } finally {
       requestTimer.observeDuration();
+      slowLogSpan.end();
     }
 
     return region;
@@ -124,7 +128,7 @@ public class RegionManager {
   // Consider region A, B. After merge of (A, B) -> A, region ID B does not exist.
   // This request is unrecoverable.
   public TiRegion getRegionById(long regionId) {
-    BackOffer backOffer = ConcreteBackOffer.newGetBackOff();
+    BackOffer backOffer = defaultBackOff();
     TiRegion region = cache.getRegionById(regionId);
     if (region == null) {
       Pair<Metapb.Region, Metapb.Peer> regionAndLeader =
@@ -144,7 +148,7 @@ public class RegionManager {
   }
 
   public Pair<TiRegion, TiStore> getRegionStorePairByKey(ByteString key, TiStoreType storeType) {
-    return getRegionStorePairByKey(key, storeType, ConcreteBackOffer.newGetBackOff());
+    return getRegionStorePairByKey(key, storeType, defaultBackOff());
   }
 
   public Pair<TiRegion, TiStore> getRegionStorePairByKey(
@@ -158,9 +162,6 @@ public class RegionManager {
     if (storeType == TiStoreType.TiKV) {
       Peer peer = region.getCurrentReplica();
       store = getStoreById(peer.getStoreId(), backOffer);
-      if (store == null) {
-        cache.clearAll();
-      }
     } else {
       outerLoop:
       for (Peer peer : region.getLearnerList()) {
@@ -174,17 +175,17 @@ public class RegionManager {
         }
       }
       if (store == null) {
-        // clear the region cache so we may get the learner peer next time
+        // clear the region cache, so we may get the learner peer next time
         cache.invalidateRegion(region);
       }
     }
-
-    if (store == null) {
-      throw new TiClientInternalException(
-          "Cannot find valid store on " + storeType + " for region " + region);
-    }
-
     return Pair.create(region, store);
+  }
+
+  public TiRegion createRegion(Metapb.Region region, BackOffer backOffer) {
+    List<Metapb.Peer> peers = region.getPeersList();
+    List<TiStore> stores = getRegionStore(peers, backOffer);
+    return new TiRegion(conf, region, null, peers, stores);
   }
 
   private TiRegion createRegion(Metapb.Region region, Metapb.Peer leader, BackOffer backOffer) {
@@ -194,16 +195,28 @@ public class RegionManager {
   }
 
   private List<TiStore> getRegionStore(List<Metapb.Peer> peers, BackOffer backOffer) {
-    return peers.stream().map(p -> getStoreById(p.getStoreId())).collect(Collectors.toList());
+    return peers
+        .stream()
+        .map(p -> getStoreById(p.getStoreId(), backOffer))
+        .collect(Collectors.toList());
   }
 
-  public TiStore getStoreById(long id, BackOffer backOffer) {
+  private TiStore getStoreByIdWithBackOff(long id, BackOffer backOffer) {
     try {
       TiStore store = cache.getStoreById(id);
       if (store == null) {
         store = new TiStore(pdClient.getStore(backOffer, id));
+      } else {
+        return store;
       }
+      // if we did not get store info from pd, remove store from cache
+      if (store.getStore() == null) {
+        logger.warn(String.format("failed to get store %d from pd", id));
+        return null;
+      }
+      // if the store is already tombstone, remove store from cache
       if (store.getStore().getState().equals(StoreState.Tombstone)) {
+        logger.warn(String.format("store %d is tombstone", id));
         return null;
       }
       if (cache.putStore(id, store) && storeChecker != null) {
@@ -216,7 +229,17 @@ public class RegionManager {
   }
 
   public TiStore getStoreById(long id) {
-    return getStoreById(id, ConcreteBackOffer.newGetBackOff());
+    return getStoreById(id, defaultBackOff());
+  }
+
+  public TiStore getStoreById(long id, BackOffer backOffer) {
+    TiStore store = getStoreByIdWithBackOff(id, backOffer);
+    if (store == null) {
+      logger.warn(String.format("failed to fetch store %d, the store may be missing", id));
+      cache.clearAll();
+      throw new InvalidStoreException(id);
+    }
+    return store;
   }
 
   public void onRegionStale(TiRegion region) {
@@ -263,5 +286,13 @@ public class RegionManager {
 
   public void invalidateRegion(TiRegion region) {
     cache.invalidateRegion(region);
+  }
+
+  public void insertRegionToCache(TiRegion region) {
+    cache.insertRegionToCache(region);
+  }
+
+  private BackOffer defaultBackOff() {
+    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
   }
 }

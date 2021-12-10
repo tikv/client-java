@@ -18,6 +18,8 @@ package org.tikv.common;
 import static org.tikv.common.ConfigUtils.*;
 
 import io.grpc.Metadata;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
 import java.util.*;
@@ -33,14 +35,17 @@ public class TiConfiguration implements Serializable {
 
   private static final Logger logger = LoggerFactory.getLogger(TiConfiguration.class);
   private static final ConcurrentHashMap<String, String> settings = new ConcurrentHashMap<>();
-  public static final Metadata.Key FORWARD_META_DATA_KEY =
+  public static final Metadata.Key<String> FORWARD_META_DATA_KEY =
       Metadata.Key.of("tikv-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
-  public static final Metadata.Key PD_FORWARD_META_DATA_KEY =
+  public static final Metadata.Key<String> PD_FORWARD_META_DATA_KEY =
       Metadata.Key.of("pd-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
 
   static {
+    // priority: system environment > config file > default
     loadFromSystemProperties();
+    loadFromConfigurationFile();
     loadFromDefaultProperties();
+    listAll();
   }
 
   private static void loadFromSystemProperties() {
@@ -48,6 +53,31 @@ public class TiConfiguration implements Serializable {
       if (prop.getKey().startsWith("tikv.")) {
         set(prop.getKey(), prop.getValue());
       }
+    }
+  }
+
+  private static void loadFromConfigurationFile() {
+    try (InputStream input =
+        TiConfiguration.class
+            .getClassLoader()
+            .getResourceAsStream(ConfigUtils.TIKV_CONFIGURATION_FILENAME)) {
+      Properties properties = new Properties();
+
+      if (input == null) {
+        logger.warn("Unable to find " + ConfigUtils.TIKV_CONFIGURATION_FILENAME);
+        return;
+      }
+
+      logger.info("loading " + ConfigUtils.TIKV_CONFIGURATION_FILENAME);
+      properties.load(input);
+      for (String key : properties.stringPropertyNames()) {
+        if (key.startsWith("tikv.")) {
+          String value = properties.getProperty(key);
+          setIfMissing(key, value);
+        }
+      }
+    } catch (IOException e) {
+      logger.error("load config file error", e);
     }
   }
 
@@ -90,11 +120,35 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
     setIfMissing(TIKV_GRPC_KEEPALIVE_TIME, DEF_TIKV_GRPC_KEEPALIVE_TIME);
     setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
+    setIfMissing(TIKV_GRPC_IDLE_TIMEOUT, DEF_TIKV_GRPC_IDLE_TIMEOUT);
     setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
+    setIfMissing(TIFLASH_ENABLE, DEF_TIFLASH_ENABLE);
+    setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_RAWKV_SCAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_SCAN_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
+    setIfMissing(TIKV_BO_REGION_MISS_BASE_IN_MS, DEF_TIKV_BO_REGION_MISS_BASE_IN_MS);
+    setIfMissing(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS, DEF_TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
+    setIfMissing(TiKV_CIRCUIT_BREAK_ENABLE, DEF_TiKV_CIRCUIT_BREAK_ENABLE);
+    setIfMissing(
+        TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS,
+        DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS);
+    setIfMissing(
+        TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE,
+        DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE);
+    setIfMissing(
+        TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD,
+        DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUST_VOLUMN_THRESHOLD);
+    setIfMissing(
+        TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS, DEF_TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS);
+    setIfMissing(
+        TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT, DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
   }
 
   public static void listAll() {
-    logger.info(new ArrayList<>(settings.entrySet()).toString());
+    logger.info("static configurations are:" + new ArrayList<>(settings.entrySet()).toString());
   }
 
   private static void set(String key, String value) {
@@ -137,8 +191,12 @@ public class TiConfiguration implements Serializable {
     return option.get();
   }
 
-  private static int getInt(String key) {
+  public static int getInt(String key) {
     return Integer.parseInt(get(key));
+  }
+
+  public static Optional<Integer> getIntOption(String key) {
+    return getOption(key).map(Integer::parseInt);
   }
 
   private static int getInt(String key, int defaultValue) {
@@ -276,8 +334,8 @@ public class TiConfiguration implements Serializable {
 
   private boolean metricsEnable = getBoolean(TIKV_METRICS_ENABLE);
   private int metricsPort = getInt(TIKV_METRICS_PORT);
-  private final int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
-  private final int healthCheckPeriodDuration = getInt(TIKV_HEALTH_CHECK_PERIOD_DURATION);
+  private int grpcHealthCheckTimeout = getInt(TIKV_GRPC_HEALTH_CHECK_TIMEOUT);
+  private int healthCheckPeriodDuration = getInt(TIKV_HEALTH_CHECK_PERIOD_DURATION);
 
   private final String networkMappingName = get(TIKV_NETWORK_MAPPING_NAME);
   private HostMapping hostMapping = null;
@@ -291,16 +349,42 @@ public class TiConfiguration implements Serializable {
   private int scatterWaitSeconds = getInt(TIKV_SCATTER_WAIT_SECONDS);
 
   private int rawKVDefaultBackoffInMS = getInt(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+  private int rawKVReadTimeoutInMS = getInt(TIKV_RAWKV_READ_TIMEOUT_IN_MS);
+  private int rawKVWriteTimeoutInMS = getInt(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
+  private int rawKVBatchReadTimeoutInMS = getInt(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
+  private int rawKVBatchWriteTimeoutInMS = getInt(TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS);
+  private int rawKVScanTimeoutInMS = getInt(TIKV_RAWKV_SCAN_TIMEOUT_IN_MS);
+  private int rawKVCleanTimeoutInMS = getInt(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
+  private Optional<Integer> rawKVReadSlowLogInMS = getIntOption(TIKV_RAWKV_READ_SLOWLOG_IN_MS);
+  private Optional<Integer> rawKVWriteSlowLogInMS = getIntOption(TIKV_RAWKV_WRITE_SLOWLOG_IN_MS);
+  private Optional<Integer> rawKVBatchReadSlowLogInMS =
+      getIntOption(TIKV_RAWKV_BATCH_READ_SLOWLOG_IN_MS);
+  private Optional<Integer> rawKVBatchWriteSlowLogInMS =
+      getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS);
+  private int rawKVScanSlowLogInMS = getInt(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
 
   private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
   private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
   private String keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN).orElse(null);
   private String keyFile = getOption(TIKV_KEY_FILE).orElse(null);
 
+  private boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
+
   private boolean isTest = false;
 
   private int keepaliveTime = getInt(TIKV_GRPC_KEEPALIVE_TIME);
   private int keepaliveTimeout = getInt(TIKV_GRPC_KEEPALIVE_TIMEOUT);
+  private int idleTimeout = getInt(TIKV_GRPC_IDLE_TIMEOUT);
+
+  private boolean circuitBreakEnable = getBoolean(TiKV_CIRCUIT_BREAK_ENABLE);
+  private int circuitBreakAvailabilityWindowInSeconds =
+      getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS);
+  private int circuitBreakAvailabilityErrorThresholdPercentage =
+      getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE);
+  private int circuitBreakAvailabilityRequestVolumnThreshold =
+      getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD);
+  private int circuitBreakSleepWindowInSeconds = getInt(TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS);
+  private int circuitBreakAttemptRequestCount = getInt(TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
 
   public enum KVMode {
     TXN,
@@ -632,8 +716,16 @@ public class TiConfiguration implements Serializable {
     return this.grpcHealthCheckTimeout;
   }
 
+  public void setGrpcHealthCheckTimeout(int grpcHealthCheckTimeout) {
+    this.grpcHealthCheckTimeout = grpcHealthCheckTimeout;
+  }
+
   public long getHealthCheckPeriodDuration() {
     return this.healthCheckPeriodDuration;
+  }
+
+  public void setHealthCheckPeriodDuration(int healthCheckPeriodDuration) {
+    this.healthCheckPeriodDuration = healthCheckPeriodDuration;
   }
 
   public boolean isEnableAtomicForCAS() {
@@ -700,6 +792,18 @@ public class TiConfiguration implements Serializable {
     this.keepaliveTimeout = timeout;
   }
 
+  public int getIdleTimeout() {
+    return idleTimeout;
+  }
+
+  public void setIdleTimeout(int timeout) {
+    this.idleTimeout = timeout;
+  }
+
+  public boolean isTiFlashEnabled() {
+    return tiFlashEnable;
+  }
+
   public boolean isTlsEnable() {
     return tlsEnable;
   }
@@ -730,5 +834,146 @@ public class TiConfiguration implements Serializable {
 
   public void setKeyFile(String keyFile) {
     this.keyFile = keyFile;
+  }
+
+  public int getRawKVReadTimeoutInMS() {
+    return rawKVReadTimeoutInMS;
+  }
+
+  public void setRawKVReadTimeoutInMS(int rawKVReadTimeoutInMS) {
+    this.rawKVReadTimeoutInMS = rawKVReadTimeoutInMS;
+  }
+
+  public int getRawKVWriteTimeoutInMS() {
+    return rawKVWriteTimeoutInMS;
+  }
+
+  public void setRawKVWriteTimeoutInMS(int rawKVWriteTimeoutInMS) {
+    this.rawKVWriteTimeoutInMS = rawKVWriteTimeoutInMS;
+  }
+
+  public int getRawKVBatchReadTimeoutInMS() {
+    return rawKVBatchReadTimeoutInMS;
+  }
+
+  public void setRawKVBatchReadTimeoutInMS(int rawKVBatchReadTimeoutInMS) {
+    this.rawKVBatchReadTimeoutInMS = rawKVBatchReadTimeoutInMS;
+  }
+
+  public int getRawKVBatchWriteTimeoutInMS() {
+    return rawKVBatchWriteTimeoutInMS;
+  }
+
+  public void setRawKVBatchWriteTimeoutInMS(int rawKVBatchWriteTimeoutInMS) {
+    this.rawKVBatchWriteTimeoutInMS = rawKVBatchWriteTimeoutInMS;
+  }
+
+  public int getRawKVScanTimeoutInMS() {
+    return rawKVScanTimeoutInMS;
+  }
+
+  public void setRawKVScanTimeoutInMS(int rawKVScanTimeoutInMS) {
+    this.rawKVScanTimeoutInMS = rawKVScanTimeoutInMS;
+  }
+
+  public int getRawKVCleanTimeoutInMS() {
+    return rawKVCleanTimeoutInMS;
+  }
+
+  public void setRawKVCleanTimeoutInMS(int rawKVCleanTimeoutInMS) {
+    this.rawKVCleanTimeoutInMS = rawKVCleanTimeoutInMS;
+  }
+
+  public Integer getRawKVReadSlowLogInMS() {
+    return rawKVReadSlowLogInMS.orElse((int) (getTimeout() * 2));
+  }
+
+  public void setRawKVReadSlowLogInMS(Integer rawKVReadSlowLogInMS) {
+    this.rawKVReadSlowLogInMS = Optional.of(rawKVReadSlowLogInMS);
+  }
+
+  public Integer getRawKVWriteSlowLogInMS() {
+    return rawKVWriteSlowLogInMS.orElse((int) (getTimeout() * 2));
+  }
+
+  public void setRawKVWriteSlowLogInMS(Integer rawKVWriteSlowLogInMS) {
+    this.rawKVWriteSlowLogInMS = Optional.of(rawKVWriteSlowLogInMS);
+  }
+
+  public Integer getRawKVBatchReadSlowLogInMS() {
+    return rawKVBatchReadSlowLogInMS.orElse((int) (getTimeout() * 2));
+  }
+
+  public void setRawKVBatchReadSlowLogInMS(Integer rawKVBatchReadSlowLogInMS) {
+    this.rawKVBatchReadSlowLogInMS = Optional.of(rawKVBatchReadSlowLogInMS);
+  }
+
+  public Integer getRawKVBatchWriteSlowLogInMS() {
+    return rawKVBatchWriteSlowLogInMS.orElse((int) (getTimeout() * 2));
+  }
+
+  public void setRawKVBatchWriteSlowLogInMS(Integer rawKVBatchWriteSlowLogInMS) {
+    this.rawKVBatchWriteSlowLogInMS = Optional.of(rawKVBatchWriteSlowLogInMS);
+  }
+
+  public int getRawKVScanSlowLogInMS() {
+    return rawKVScanSlowLogInMS;
+  }
+
+  public void setRawKVScanSlowLogInMS(int rawKVScanSlowLogInMS) {
+    this.rawKVScanSlowLogInMS = rawKVScanSlowLogInMS;
+  }
+
+  public boolean isCircuitBreakEnable() {
+    return circuitBreakEnable;
+  }
+
+  public void setCircuitBreakEnable(boolean circuitBreakEnable) {
+    this.circuitBreakEnable = circuitBreakEnable;
+  }
+
+  public int getCircuitBreakAvailabilityWindowInSeconds() {
+    return circuitBreakAvailabilityWindowInSeconds;
+  }
+
+  public void setCircuitBreakAvailabilityWindowInSeconds(
+      int circuitBreakAvailabilityWindowInSeconds) {
+    this.circuitBreakAvailabilityWindowInSeconds = circuitBreakAvailabilityWindowInSeconds;
+  }
+
+  public int getCircuitBreakAvailabilityErrorThresholdPercentage() {
+    return circuitBreakAvailabilityErrorThresholdPercentage;
+  }
+
+  public void setCircuitBreakAvailabilityErrorThresholdPercentage(
+      int circuitBreakAvailabilityErrorThresholdPercentage) {
+    this.circuitBreakAvailabilityErrorThresholdPercentage =
+        circuitBreakAvailabilityErrorThresholdPercentage;
+  }
+
+  public int getCircuitBreakAvailabilityRequestVolumnThreshold() {
+    return circuitBreakAvailabilityRequestVolumnThreshold;
+  }
+
+  public void setCircuitBreakAvailabilityRequestVolumnThreshold(
+      int circuitBreakAvailabilityRequestVolumnThreshold) {
+    this.circuitBreakAvailabilityRequestVolumnThreshold =
+        circuitBreakAvailabilityRequestVolumnThreshold;
+  }
+
+  public int getCircuitBreakSleepWindowInSeconds() {
+    return circuitBreakSleepWindowInSeconds;
+  }
+
+  public void setCircuitBreakSleepWindowInSeconds(int circuitBreakSleepWindowInSeconds) {
+    this.circuitBreakSleepWindowInSeconds = circuitBreakSleepWindowInSeconds;
+  }
+
+  public int getCircuitBreakAttemptRequestCount() {
+    return circuitBreakAttemptRequestCount;
+  }
+
+  public void setCircuitBreakAttemptRequestCount(int circuitBreakAttemptRequestCount) {
+    this.circuitBreakAttemptRequestCount = circuitBreakAttemptRequestCount;
   }
 }

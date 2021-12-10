@@ -16,7 +16,7 @@
 package org.tikv.common;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
 import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
@@ -153,6 +153,18 @@ public class RegionManagerTest extends PDMockServerTest {
                 StoreState.Tombstone,
                 GrpcUtils.makeStoreLabel("k1", "v1"),
                 GrpcUtils.makeStoreLabel("k2", "v2"))));
-    assertNull(mgr.getStoreById(storeId + 1));
+
+    try {
+      mgr.getStoreById(storeId + 1);
+      fail();
+    } catch (Exception ignored) {
+    }
+
+    mgr.invalidateStore(storeId);
+    try {
+      mgr.getStoreById(storeId);
+      fail();
+    } catch (Exception ignored) {
+    }
   }
 }

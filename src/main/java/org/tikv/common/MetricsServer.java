@@ -14,15 +14,10 @@
  */
 package org.tikv.common;
 
-import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.exporter.HTTPServer;
-import java.net.InetSocketAddress;
+import io.prometheus.client.hotspot.DefaultExports;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.policy.RetryPolicy;
-import org.tikv.common.region.RegionManager;
-import org.tikv.common.region.RegionStoreClient;
-import org.tikv.raw.RawKVClient;
 
 public class MetricsServer {
   private static final Logger logger = LoggerFactory.getLogger(MetricsServer.class);
@@ -57,16 +52,9 @@ public class MetricsServer {
 
   private MetricsServer(int port) {
     try {
-      CollectorRegistry collectorRegistry = new CollectorRegistry();
-      collectorRegistry.register(RawKVClient.RAW_REQUEST_LATENCY);
-      collectorRegistry.register(RawKVClient.RAW_REQUEST_FAILURE);
-      collectorRegistry.register(RawKVClient.RAW_REQUEST_SUCCESS);
-      collectorRegistry.register(RegionStoreClient.GRPC_RAW_REQUEST_LATENCY);
-      collectorRegistry.register(RetryPolicy.GRPC_SINGLE_REQUEST_LATENCY);
-      collectorRegistry.register(RegionManager.GET_REGION_BY_KEY_REQUEST_LATENCY);
-      collectorRegistry.register(PDClient.PD_GET_REGION_BY_KEY_REQUEST_LATENCY);
       this.port = port;
-      this.server = new HTTPServer(new InetSocketAddress(port), collectorRegistry, true);
+      DefaultExports.initialize();
+      this.server = new HTTPServer(port, true);
       logger.info("http server is up " + this.server.getPort());
     } catch (Exception e) {
       logger.error("http server not up");

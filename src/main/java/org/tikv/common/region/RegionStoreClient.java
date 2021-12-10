@@ -48,7 +48,7 @@ import org.tikv.kvproto.Kvrpcpb.*;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
-import org.tikv.kvproto.TikvGrpc.TikvStub;
+import org.tikv.kvproto.TikvGrpc.TikvFutureStub;
 import org.tikv.txn.AbstractLockResolverClient;
 import org.tikv.txn.Lock;
 import org.tikv.txn.ResolveLockResult;
@@ -93,7 +93,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       TiStoreType storeType,
       ChannelFactory channelFactory,
       TikvBlockingStub blockingStub,
-      TikvStub asyncStub,
+      TikvFutureStub asyncStub,
       RegionManager regionManager,
       PDClient pdClient,
       RegionStoreClient.RegionStoreClientBuilder clientBuilder) {
@@ -124,7 +124,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
 
       TikvBlockingStub tikvBlockingStub = TikvGrpc.newBlockingStub(channel);
-      TikvStub tikvAsyncStub = TikvGrpc.newStub(channel);
+      TikvGrpc.TikvFutureStub tikvAsyncStub = TikvGrpc.newFutureStub(channel);
 
       this.lockResolverClient =
           AbstractLockResolverClient.getInstance(
@@ -975,7 +975,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throws RawCASConflictException {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
-      throw new TiClientInternalException("RawPutResponse failed without a cause");
+      throw new TiClientInternalException("RawCASResponse failed without a cause");
     }
     String error = resp.getError();
     if (!error.isEmpty()) {
@@ -1264,7 +1264,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       ManagedChannel channel = null;
 
       TikvBlockingStub blockingStub = null;
-      TikvStub asyncStub = null;
+      TikvFutureStub asyncStub = null;
 
       if (conf.getEnableGrpcForward() && store.getProxyStore() != null && !store.isReachable()) {
         addressStr = store.getProxyStore().getAddress();
@@ -1273,11 +1273,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
         Metadata header = new Metadata();
         header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
         blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel), header);
-        asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newStub(channel), header);
+        asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newFutureStub(channel), header);
       } else {
         channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
         blockingStub = TikvGrpc.newBlockingStub(channel);
-        asyncStub = TikvGrpc.newStub(channel);
+        asyncStub = TikvGrpc.newFutureStub(channel);
       }
 
       return new RegionStoreClient(
@@ -1302,19 +1302,39 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       return build(key, TiStoreType.TiKV);
     }
 
+    public synchronized RegionStoreClient build(ByteString key, BackOffer backOffer)
+        throws GrpcException {
+      return build(key, TiStoreType.TiKV, backOffer);
+    }
+
     public synchronized RegionStoreClient build(ByteString key, TiStoreType storeType)
         throws GrpcException {
-      Pair<TiRegion, TiStore> pair = regionManager.getRegionStorePairByKey(key, storeType);
+      return build(key, storeType, defaultBackOff());
+    }
+
+    public synchronized RegionStoreClient build(
+        ByteString key, TiStoreType storeType, BackOffer backOffer) throws GrpcException {
+      Pair<TiRegion, TiStore> pair =
+          regionManager.getRegionStorePairByKey(key, storeType, backOffer);
       return build(pair.first, pair.second, storeType);
     }
 
     public synchronized RegionStoreClient build(TiRegion region) throws GrpcException {
-      TiStore store = regionManager.getStoreById(region.getLeader().getStoreId());
+      return build(region, defaultBackOff());
+    }
+
+    public synchronized RegionStoreClient build(TiRegion region, BackOffer backOffer)
+        throws GrpcException {
+      TiStore store = regionManager.getStoreById(region.getLeader().getStoreId(), backOffer);
       return build(region, store, TiStoreType.TiKV);
     }
 
     public RegionManager getRegionManager() {
       return regionManager;
+    }
+
+    private BackOffer defaultBackOff() {
+      return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
     }
   }
 }
