@@ -74,7 +74,7 @@ public class SmartRawKVClientTest {
   }
 
   @Test
-  public void testMultiClients() throws InterruptedException {
+  public void testMultiClients() {
     for (int i = 0; i < 10240; i++) {
       client = session.createSmartRawClient();
     }
