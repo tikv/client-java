@@ -67,12 +67,6 @@ public class SmartRawKVClient implements RawKVClientBase {
   }
 
   @Override
-  public void close() throws Exception {
-    circuitBreaker.close();
-    client.close();
-  }
-
-  @Override
   public void put(ByteString key, ByteString value) {
     callWithCircuitBreaker("put", () -> client.put(key, value));
   }
@@ -266,6 +260,11 @@ public class SmartRawKVClient implements RawKVClientBase {
               func.apply();
               return null;
             });
+  }
+
+  @Override
+  public void close() throws Exception {
+    client.close();
   }
 
   public interface Function1<T> {
