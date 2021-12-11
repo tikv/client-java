@@ -22,12 +22,10 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.CircuitBreakerOpenException;
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.service.failsafe.CircuitBreaker;
-import org.tikv.service.failsafe.CircuitBreakerImpl;
 
 public class SmartRawKVClient implements RawKVClientBase {
   private static final Logger logger = LoggerFactory.getLogger(SmartRawKVClient.class);
@@ -63,9 +61,9 @@ public class SmartRawKVClient implements RawKVClientBase {
   private final RawKVClientBase client;
   private final CircuitBreaker circuitBreaker;
 
-  public SmartRawKVClient(RawKVClientBase client, TiConfiguration conf) {
+  public SmartRawKVClient(RawKVClientBase client, CircuitBreaker breaker) {
     this.client = client;
-    this.circuitBreaker = new CircuitBreakerImpl(conf);
+    this.circuitBreaker = breaker;
   }
 
   @Override
