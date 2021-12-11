@@ -71,14 +71,8 @@ public class TiSession implements AutoCloseable {
   private volatile boolean enableGrpcForward;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private volatile boolean isClosed = false;
-<<<<<<< HEAD
   private MetricsServer metricsServer;
-=======
-  private volatile SwitchTiKVModeClient switchTiKVModeClient;
-  private final MetricsServer metricsServer;
   private final CircuitBreaker circuitBreaker;
-  private static final int MAX_SPLIT_REGION_STACK_DEPTH = 6;
->>>>>>> faf1da7... [fix #389] move CircuitBreaker to TiSession (#390)
 
   public TiSession(TiConfiguration conf) {
     // may throw org.tikv.common.MetricsServer  - http server not up
