@@ -258,7 +258,6 @@ public class SmartRawKVClient implements RawKVClientBase {
 
   @Override
   public void close() throws Exception {
-    circuitBreaker.close();
     client.close();
   }
 
