@@ -72,6 +72,13 @@ public class SmartRawKVClientTest {
     }
   }
 
+  @Test
+  public void testMultiClients() {
+    for (int i = 0; i < 10240; i++) {
+      client = session.createSmartRawClient();
+    }
+  }
+
   private void success() {
     client.get(ByteString.copyFromUtf8("key"));
   }

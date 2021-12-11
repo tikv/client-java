@@ -28,7 +28,7 @@ public class ConfigUtils {
   public static final String TIKV_GRPC_SCAN_BATCH_SIZE = "tikv.grpc.scan_batch_size";
   public static final String TIKV_GRPC_MAX_FRAME_SIZE = "tikv.grpc.max_frame_size";
   public static final String TIKV_GRPC_IDLE_TIMEOUT = "tikv.grpc.idle_timeout";
-  
+
   public static final String TIKV_INDEX_SCAN_BATCH_SIZE = "tikv.index.scan_batch_size";
   public static final String TIKV_INDEX_SCAN_CONCURRENCY = "tikv.index.scan_concurrency";
   public static final String TIKV_TABLE_SCAN_CONCURRENCY = "tikv.table.scan_concurrency";
