@@ -653,6 +653,10 @@ public class TiSession implements AutoCloseable {
       if (metricsServer != null) {
         metricsServer.close();
       }
+
+      if (circuitBreaker != null) {
+        circuitBreaker.close();
+      }
     }
 
     if (now) {
