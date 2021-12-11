@@ -28,6 +28,7 @@ public class SmartRawKVClientTest extends BaseRawKVTest {
   public void setup() {
     TiConfiguration conf = createTiConfiguration();
     conf.setCircuitBreakEnable(enable);
+    conf.setEnableAtomicForCAS(enable);
     conf.setCircuitBreakAvailabilityWindowInSeconds(windowInSeconds);
     conf.setCircuitBreakAvailabilityErrorThresholdPercentage(errorThresholdPercentage);
     conf.setCircuitBreakAvailabilityRequestVolumnThreshold(requestVolumeThreshold);
@@ -70,6 +71,13 @@ public class SmartRawKVClientTest extends BaseRawKVTest {
         success();
       }
       client.get(ByteString.copyFromUtf8("key"));
+    }
+  }
+
+  @Test
+  public void testMultiClients() throws InterruptedException {
+    for (int i = 0; i < 10240; i++) {
+      client = session.createSmartRawClient();
     }
   }
 

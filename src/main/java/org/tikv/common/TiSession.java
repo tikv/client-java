@@ -38,6 +38,8 @@ import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.raw.SmartRawKVClient;
+import org.tikv.service.failsafe.CircuitBreaker;
+import org.tikv.service.failsafe.CircuitBreakerImpl;
 import org.tikv.txn.KVClient;
 import org.tikv.txn.TxnKVClient;
 
@@ -68,6 +70,7 @@ public class TiSession implements AutoCloseable {
   private volatile boolean isClosed = false;
   private volatile SwitchTiKVModeClient switchTiKVModeClient;
   private final MetricsServer metricsServer;
+  private final CircuitBreaker circuitBreaker;
   private static final int MAX_SPLIT_REGION_STACK_DEPTH = 6;
 
   public TiSession(TiConfiguration conf) {
@@ -114,6 +117,7 @@ public class TiSession implements AutoCloseable {
       logger.info("enable grpc forward for high available");
     }
     warmUp();
+    this.circuitBreaker = new CircuitBreakerImpl(conf);
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
 
@@ -184,7 +188,7 @@ public class TiSession implements AutoCloseable {
 
   public SmartRawKVClient createSmartRawClient() {
     RawKVClient rawKVClient = createRawClient();
-    return new SmartRawKVClient(rawKVClient, getConf());
+    return new SmartRawKVClient(rawKVClient, circuitBreaker);
   }
 
   public KVClient createKVClient() {
