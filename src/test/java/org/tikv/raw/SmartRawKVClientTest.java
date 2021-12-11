@@ -27,7 +27,6 @@ public class SmartRawKVClientTest {
   public void setup() {
     TiConfiguration conf = TiConfiguration.createRawDefault();
     conf.setCircuitBreakEnable(enable);
-    conf.setEnableAtomicForCAS(enable);
     conf.setCircuitBreakAvailabilityWindowInSeconds(windowInSeconds);
     conf.setCircuitBreakAvailabilityErrorThresholdPercentage(errorThresholdPercentage);
     conf.setCircuitBreakAvailabilityRequestVolumnThreshold(requestVolumeThreshold);
