@@ -20,10 +20,7 @@ import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -35,14 +32,14 @@ import org.tikv.common.importer.ImporterStoreClient;
 import org.tikv.common.importer.SwitchTiKVModeClient;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
-import org.tikv.common.region.RegionManager;
-import org.tikv.common.region.RegionStoreClient;
-import org.tikv.common.region.TiRegion;
-import org.tikv.common.region.TiStore;
+import org.tikv.common.region.*;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.raw.RawKVClient;
+import org.tikv.raw.SmartRawKVClient;
+import org.tikv.service.failsafe.CircuitBreaker;
+import org.tikv.service.failsafe.CircuitBreakerImpl;
 import org.tikv.txn.KVClient;
 import org.tikv.txn.TxnKVClient;
 
@@ -73,6 +70,7 @@ public class TiSession implements AutoCloseable {
   private volatile boolean isClosed = false;
   private volatile SwitchTiKVModeClient switchTiKVModeClient;
   private final MetricsServer metricsServer;
+  private final CircuitBreaker circuitBreaker;
   private static final int MAX_SPLIT_REGION_STACK_DEPTH = 6;
 
   public TiSession(TiConfiguration conf) {
@@ -87,18 +85,64 @@ public class TiSession implements AutoCloseable {
                 conf.getMaxFrameSize(),
                 conf.getKeepaliveTime(),
                 conf.getKeepaliveTimeout(),
+                conf.getIdleTimeout(),
                 conf.getTrustCertCollectionFile(),
                 conf.getKeyCertChainFile(),
                 conf.getKeyFile())
             : new ChannelFactory(
-                conf.getMaxFrameSize(), conf.getKeepaliveTime(), conf.getKeepaliveTimeout());
+                conf.getMaxFrameSize(),
+                conf.getKeepaliveTime(),
+                conf.getKeepaliveTimeout(),
+                conf.getIdleTimeout());
 
     this.client = PDClient.createRaw(conf, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
     if (this.enableGrpcForward) {
       logger.info("enable grpc forward for high available");
     }
+    warmUp();
+    this.circuitBreaker = new CircuitBreakerImpl(conf);
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
+  }
+
+  private synchronized void warmUp() {
+    long warmUpStartTime = System.currentTimeMillis();
+    try {
+      this.client = getPDClient();
+      this.regionManager = getRegionManager();
+      List<Metapb.Store> stores = this.client.getAllStores(ConcreteBackOffer.newGetBackOff());
+      // warm up store cache
+      for (Metapb.Store store : stores) {
+        this.regionManager.updateStore(
+            null,
+            new TiStore(this.client.getStore(ConcreteBackOffer.newGetBackOff(), store.getId())));
+      }
+      ByteString startKey = ByteString.EMPTY;
+
+      do {
+        TiRegion region = regionManager.getRegionByKey(startKey);
+        startKey = region.getEndKey();
+      } while (!startKey.isEmpty());
+
+      RawKVClient rawKVClient = createRawClient();
+      ByteString exampleKey = ByteString.EMPTY;
+      Optional<ByteString> prev = rawKVClient.get(exampleKey);
+      if (prev.isPresent()) {
+        rawKVClient.delete(exampleKey);
+        rawKVClient.putIfAbsent(exampleKey, prev.get());
+        rawKVClient.put(exampleKey, prev.get());
+      } else {
+        rawKVClient.putIfAbsent(exampleKey, ByteString.EMPTY);
+        rawKVClient.put(exampleKey, ByteString.EMPTY);
+        rawKVClient.delete(exampleKey);
+      }
+    } catch (Exception e) {
+      // ignore error
+      logger.info("warm up fails, ignored ", e);
+    } finally {
+      logger.info(
+          String.format("warm up duration %d ms", System.currentTimeMillis() - warmUpStartTime));
+    }
   }
 
   @VisibleForTesting
@@ -124,6 +168,11 @@ public class TiSession implements AutoCloseable {
     checkIsClosed();
 
     return new RawKVClient(this, this.getRegionStoreClientBuilder());
+  }
+
+  public SmartRawKVClient createSmartRawClient() {
+    RawKVClient rawKVClient = createRawClient();
+    return new SmartRawKVClient(rawKVClient, circuitBreaker);
   }
 
   public KVClient createKVClient() {
@@ -587,6 +636,10 @@ public class TiSession implements AutoCloseable {
 
       if (metricsServer != null) {
         metricsServer.close();
+      }
+
+      if (circuitBreaker != null) {
+        circuitBreaker.close();
       }
     }
 
