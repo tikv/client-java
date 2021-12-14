@@ -19,6 +19,7 @@ Problem Description: **TBD**
 - Has exported variable/fields change
 - Has interface methods change
 - Has persistent data change
+- No code
 
 ### Check List for Tests
 
@@ -34,6 +35,7 @@ This PR has been tested by the at least one of the following methods:
 - Possible performance regression, WHY: **TBD**
 - Increased code complexity, WHY: **TBD**
 - Breaking backward compatibility, WHY: **TBD**
+- NO side effects
 
 ### Related changes
 
@@ -41,3 +43,4 @@ This PR has been tested by the at least one of the following methods:
 - Need to cherry-pick to the release branch
 - Need to update the documentation
 - Need to be included in the release note
+- NO related changes
