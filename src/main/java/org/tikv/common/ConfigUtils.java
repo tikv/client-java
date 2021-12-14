@@ -93,8 +93,12 @@ public class ConfigUtils {
   public static final String TIKV_KEY_CERT_CHAIN = "tikv.key_cert_chain";
   public static final String TIKV_KEY_FILE = "tikv.key_file";
 
-<<<<<<< HEAD
-=======
+  public static final String TIKV_USE_JKS = "tikv.use_jks";
+  public static final String TIKV_JKS_KEY_PATH = "tikv.jks.key_path";
+  public static final String TIKV_JKS_KEY_PASSWORD = "tikv.jks.key_password";
+  public static final String TIKV_JKS_TRUST_PATH = "tikv.jks.trust_path";
+  public static final String TIKV_JKS_TRUST_PASSWORD = "tikv.jks.trust_password";
+
   public static final String TiKV_CIRCUIT_BREAK_ENABLE = "tikv.circuit_break.enable";
   public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS =
       "tikv.circuit_break.trigger.availability.window_in_seconds";
@@ -176,6 +180,7 @@ public class ConfigUtils {
   public static final int DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT = 3;
   public static final int DEF_TIKV_GRPC_IDLE_TIMEOUT = 60;
   public static final boolean DEF_TIKV_TLS_ENABLE = false;
+  public static final boolean DEF_TIKV_USE_JKS = false;
   public static final boolean DEF_TIFLASH_ENABLE = false;
 
   public static final boolean DEF_TiKV_CIRCUIT_BREAK_ENABLE = false;
