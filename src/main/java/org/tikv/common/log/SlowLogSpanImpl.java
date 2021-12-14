@@ -26,21 +26,31 @@ public class SlowLogSpanImpl implements SlowLogSpan {
   private final String name;
   private long startMS;
   private long endMS;
+  /**
+   * use System.nanoTime() to calculate duration, cause System.currentTimeMillis() is not monotonic
+   */
+  private long startNano;
+
+  private long endNano;
 
   public SlowLogSpanImpl(String name) {
     this.name = name;
     this.startMS = 0;
+    this.startNano = 0;
     this.endMS = 0;
+    this.endNano = 0;
   }
 
   @Override
   public void start() {
     this.startMS = System.currentTimeMillis();
+    this.startNano = System.nanoTime();
   }
 
   @Override
   public void end() {
     this.endMS = System.currentTimeMillis();
+    this.endNano = System.nanoTime();
   }
 
   @Override
@@ -72,6 +82,6 @@ public class SlowLogSpanImpl implements SlowLogSpan {
     if (startMS == 0 || endMS == 0) {
       return "N/A";
     }
-    return (endMS - startMS) + "ms";
+    return ((endNano - startNano) / 1000000) + "ms";
   }
 }
