@@ -5,7 +5,7 @@ the rendered developer and contributor documents.
 
 This directory contains all the source of developer and contributor
 documentations in markdown format. The table of content can be found in
-[./src/SUMMARY.md](./docs/src/SUMMARY.md).
+[./src/SUMMARY.md](./src/SUMMARY.md).
 
 ## How to contribute to the document
 
