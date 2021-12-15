@@ -122,6 +122,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_KEEPALIVE_TIMEOUT, DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT);
     setIfMissing(TIKV_GRPC_IDLE_TIMEOUT, DEF_TIKV_GRPC_IDLE_TIMEOUT);
     setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
+    setIfMissing(TIKV_USE_JKS, DEF_TIKV_USE_JKS);
     setIfMissing(TIFLASH_ENABLE, DEF_TIFLASH_ENABLE);
     setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
@@ -367,6 +368,12 @@ public class TiConfiguration implements Serializable {
   private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
   private String keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN).orElse(null);
   private String keyFile = getOption(TIKV_KEY_FILE).orElse(null);
+
+  private boolean useJks = getBoolean(TIKV_USE_JKS);
+  private String jksKeyPath = getOption(TIKV_JKS_KEY_PATH).orElse(null);
+  private String jksKeyPassword = getOption(TIKV_JKS_KEY_PASSWORD).orElse(null);
+  private String jksTrustPath = getOption(TIKV_JKS_TRUST_PATH).orElse(null);
+  private String jksTrustPassword = getOption(TIKV_JKS_TRUST_PASSWORD).orElse(null);
 
   private boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
 
@@ -834,6 +841,46 @@ public class TiConfiguration implements Serializable {
 
   public void setKeyFile(String keyFile) {
     this.keyFile = keyFile;
+  }
+
+  public boolean isJksEnable() {
+    return useJks;
+  }
+
+  public void setJksEnable(boolean useJks) {
+    this.useJks = useJks;
+  }
+
+  public String getJksKeyPath() {
+    return jksKeyPath;
+  }
+
+  public void setJksKeyPath(String jksKeyPath) {
+    this.jksKeyPath = jksKeyPath;
+  }
+
+  public String getJksKeyPassword() {
+    return jksKeyPassword;
+  }
+
+  public void setJksKeyPassword(String jksKeyPassword) {
+    this.jksKeyPassword = jksKeyPassword;
+  }
+
+  public String getJksTrustPath() {
+    return jksTrustPath;
+  }
+
+  public void setJksTrustPath(String jksTrustPath) {
+    this.jksTrustPath = jksTrustPath;
+  }
+
+  public String getJksTrustPassword() {
+    return jksTrustPassword;
+  }
+
+  public void setJksTrustPassword(String jksTrustPassword) {
+    this.jksTrustPassword = jksTrustPassword;
   }
 
   public int getRawKVReadTimeoutInMS() {
