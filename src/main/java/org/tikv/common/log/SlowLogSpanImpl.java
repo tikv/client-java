@@ -24,6 +24,9 @@ import com.google.gson.JsonObject;
 
 public class SlowLogSpanImpl implements SlowLogSpan {
   private final String name;
+  private final long requestStartNS;
+  private final long requestStartMS;
+
   private long startMS;
   private long endMS;
   /**
@@ -33,8 +36,10 @@ public class SlowLogSpanImpl implements SlowLogSpan {
 
   private long endNS;
 
-  public SlowLogSpanImpl(String name) {
+  public SlowLogSpanImpl(String name, long requestStartMS, long requestStartNS) {
     this.name = name;
+    this.requestStartMS = requestStartMS;
+    this.requestStartNS = requestStartNS;
     this.startMS = 0;
     this.startNS = 0;
     this.endMS = 0;
@@ -43,14 +48,14 @@ public class SlowLogSpanImpl implements SlowLogSpan {
 
   @Override
   public void start() {
-    this.startMS = System.currentTimeMillis();
-    this.startNS = System.nanoTime();
+    startNS = System.nanoTime();
+    startMS = requestStartMS + (startNS - requestStartNS) / 1000000;
   }
 
   @Override
   public void end() {
-    this.endMS = System.currentTimeMillis();
-    this.endNS = System.nanoTime();
+    endNS = System.nanoTime();
+    endMS = startMS + (endNS - startNS) / 1000000;
   }
 
   @Override

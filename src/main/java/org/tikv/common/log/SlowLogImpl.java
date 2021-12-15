@@ -62,7 +62,7 @@ public class SlowLogImpl implements SlowLog {
 
   @Override
   public synchronized SlowLogSpan start(String name) {
-    SlowLogSpan slowLogSpan = new SlowLogSpanImpl(name);
+    SlowLogSpan slowLogSpan = new SlowLogSpanImpl(name, startMS, startNS);
     if (slowLogSpans.size() < MAX_SPAN_SIZE) {
       slowLogSpans.add(slowLogSpan);
     }
@@ -77,8 +77,8 @@ public class SlowLogImpl implements SlowLog {
 
   @Override
   public void log() {
-    long currentMS = System.currentTimeMillis();
     long currentNS = System.nanoTime();
+    long currentMS = startMS + (currentNS - startNS) / 1000000;
     if (error != null
         || (slowThresholdMS >= 0 && currentNS - startNS > slowThresholdMS * 1000000)) {
       logger.warn("SlowLog:" + getSlowLogString(currentMS, currentNS));
