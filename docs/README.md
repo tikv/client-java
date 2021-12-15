@@ -1,5 +1,7 @@
 # Client Java Docs
 
+The document source is maintained in this directory.
+
 ## Administration
 
 - [Configuration](./configuration.md)
