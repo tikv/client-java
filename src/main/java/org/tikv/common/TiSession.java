@@ -103,6 +103,18 @@ public class TiSession implements AutoCloseable {
     warmUp();
     this.circuitBreaker = new CircuitBreakerImpl(conf);
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
+    printVersionInfo();
+  }
+
+  private void printVersionInfo() {
+    try {
+      final Properties properties = new Properties();
+      properties.load(this.getClass().getClassLoader().getResourceAsStream("git.properties"));
+      logger.info("Release Version: " + properties.getProperty("git.build.version"));
+      logger.info("Git Commit Hash: " + properties.getProperty("git.commit.id.full"));
+    } catch (Exception e) {
+      logger.error("Fail to read package info: " + e.getMessage());
+    }
   }
 
   private synchronized void warmUp() {
