@@ -72,4 +72,10 @@ public class TiConfigurationTest {
     conf.setIdleTimeout(newValue);
     assertEquals(newValue, conf.getIdleTimeout());
   }
+
+  @Test
+  public void tiJksDefaultValueTest() {
+    TiConfiguration conf = TiConfiguration.createRawDefault();
+    assertFalse(conf.isJksEnable());
+  }
 }
