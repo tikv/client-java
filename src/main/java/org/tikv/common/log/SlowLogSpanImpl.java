@@ -49,13 +49,13 @@ public class SlowLogSpanImpl implements SlowLogSpan {
   @Override
   public void start() {
     startNS = System.nanoTime();
-    startMS = requestStartMS + (startNS - requestStartNS) / 1000000;
+    startMS = requestStartMS + (startNS - requestStartNS) / 10_00_000;
   }
 
   @Override
   public void end() {
     endNS = System.nanoTime();
-    endMS = startMS + (endNS - startNS) / 1000000;
+    endMS = startMS + (endNS - startNS) / 10_00_000;
   }
 
   @Override
