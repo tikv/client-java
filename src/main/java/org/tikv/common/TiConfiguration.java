@@ -124,6 +124,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_IDLE_TIMEOUT, DEF_TIKV_GRPC_IDLE_TIMEOUT);
     setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
     setIfMissing(TIFLASH_ENABLE, DEF_TIFLASH_ENABLE);
+    setIfMissing(TIKV_WARM_UP_ENABLE, DEF_TIKV_WARM_UP_ENABLE);
     setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
@@ -372,6 +373,7 @@ public class TiConfiguration implements Serializable {
   private String keyFile = getOption(TIKV_KEY_FILE).orElse(null);
 
   private boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
+  private boolean warmUpEnable = getBoolean(TIKV_WARM_UP_ENABLE);
 
   private boolean isTest = false;
 
@@ -816,6 +818,14 @@ public class TiConfiguration implements Serializable {
 
   public boolean isTiFlashEnabled() {
     return tiFlashEnable;
+  }
+
+  public boolean isWarmUpEnable() {
+    return warmUpEnable;
+  }
+
+  public void setWarmUpEnable(boolean warmUpEnable) {
+    this.warmUpEnable = warmUpEnable;
   }
 
   public boolean isTlsEnable() {

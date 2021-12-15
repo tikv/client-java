@@ -101,7 +101,9 @@ public class TiSession implements AutoCloseable {
     if (this.enableGrpcForward) {
       logger.info("enable grpc forward for high available");
     }
-    warmUp();
+    if (conf.isWarmUpEnable() && conf.isRawKVMode()) {
+      warmUp();
+    }
     this.circuitBreaker = new CircuitBreakerImpl(conf);
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }

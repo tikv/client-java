@@ -435,7 +435,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
       PDGrpc.PDBlockingStub stub =
           PDGrpc.newBlockingStub(probChan).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
-      GetMembersRequest request = GetMembersRequest.newBuilder().setHeader(header).build();
+      GetMembersRequest request =
+          GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
       GetMembersResponse resp = stub.getMembers(request);
       // check if the response contains a valid leader
       if (resp != null && resp.getLeader().getMemberId() == 0) {
