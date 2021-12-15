@@ -79,18 +79,17 @@ public class SlowLogImpl implements SlowLog {
   public void log() {
     long currentNS = System.nanoTime();
     long currentMS = startMS + (currentNS - startNS) / 1000000;
-    if (error != null
-        || (slowThresholdMS >= 0 && currentNS - startNS > slowThresholdMS * 1000000)) {
-      logger.warn("SlowLog:" + getSlowLogString(currentMS, currentNS));
+    if (error != null || (slowThresholdMS >= 0 && currentMS - startMS > slowThresholdMS)) {
+      logger.warn("SlowLog:" + getSlowLogString(currentMS));
     }
   }
 
-  private String getSlowLogString(long currentMS, long currentNS) {
+  private String getSlowLogString(long currentMS) {
     JsonObject jsonObject = new JsonObject();
 
     jsonObject.addProperty("start", DATE_FORMAT.format(startMS));
     jsonObject.addProperty("end", DATE_FORMAT.format(currentMS));
-    jsonObject.addProperty("duration", ((currentNS - startNS) / 1000000) + "ms");
+    jsonObject.addProperty("duration", (currentMS - startMS) + "ms");
     if (error != null) {
       jsonObject.addProperty("error", error.getMessage());
     }

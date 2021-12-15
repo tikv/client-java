@@ -87,6 +87,6 @@ public class SlowLogSpanImpl implements SlowLogSpan {
     if (startMS == 0 || endMS == 0) {
       return "N/A";
     }
-    return ((endNS - startNS) / 1000000) + "ms";
+    return (endMS - startMS) + "ms";
   }
 }
