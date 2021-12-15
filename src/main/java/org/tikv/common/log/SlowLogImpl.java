@@ -78,7 +78,7 @@ public class SlowLogImpl implements SlowLog {
   @Override
   public void log() {
     long currentNS = System.nanoTime();
-    long currentMS = startMS + (currentNS - startNS) / 10_00_000;
+    long currentMS = startMS + (currentNS - startNS) / 1_000_000;
     if (error != null || (slowThresholdMS >= 0 && currentMS - startMS > slowThresholdMS)) {
       logger.warn("SlowLog:" + getSlowLogString(currentMS));
     }
