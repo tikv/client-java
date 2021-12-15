@@ -41,7 +41,7 @@ public class SlowLogImpl implements SlowLog {
   /**
    * use System.nanoTime() to calculate duration, cause System.currentTimeMillis() is not monotonic
    */
-  private final long startNano;
+  private final long startNS;
 
   private final long slowThresholdMS;
 
@@ -50,7 +50,7 @@ public class SlowLogImpl implements SlowLog {
 
   public SlowLogImpl(long slowThresholdMS, Map<String, String> properties) {
     this.startMS = System.currentTimeMillis();
-    this.startNano = System.nanoTime();
+    this.startNS = System.nanoTime();
     this.slowThresholdMS = slowThresholdMS;
     this.properties = new HashMap<>(properties);
   }
@@ -78,19 +78,19 @@ public class SlowLogImpl implements SlowLog {
   @Override
   public void log() {
     long currentMS = System.currentTimeMillis();
-    long currentNano = System.nanoTime();
+    long currentNS = System.nanoTime();
     if (error != null
-        || (slowThresholdMS >= 0 && currentNano - startNano > slowThresholdMS * 1000000)) {
-      logger.warn("SlowLog:" + getSlowLogString(currentMS, currentNano));
+        || (slowThresholdMS >= 0 && currentNS - startNS > slowThresholdMS * 1000000)) {
+      logger.warn("SlowLog:" + getSlowLogString(currentMS, currentNS));
     }
   }
 
-  private String getSlowLogString(long currentMS, long currentNano) {
+  private String getSlowLogString(long currentMS, long currentNS) {
     JsonObject jsonObject = new JsonObject();
 
     jsonObject.addProperty("start", DATE_FORMAT.format(startMS));
     jsonObject.addProperty("end", DATE_FORMAT.format(currentMS));
-    jsonObject.addProperty("duration", ((currentNano - startNano) / 1000000) + "ms");
+    jsonObject.addProperty("duration", ((currentNS - startNS) / 1000000) + "ms");
     if (error != null) {
       jsonObject.addProperty("error", error.getMessage());
     }
