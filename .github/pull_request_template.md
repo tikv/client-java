@@ -1,33 +1,46 @@
-### What problem does this PR solve? <!--add issue link with summary if exists-->
+<!-- Thank you for contributing to TiKV Java Client!
 
+PR Title Format: "[close/to/fix #issue_number] summary" -->
+
+### What problem does this PR solve?
+
+Issue Number: close #issue_number
+
+Problem Description: **TBD**
 
 ### What is changed and how it works?
 
 
-### Check List <!--REMOVE the items that are not applicable-->
 
-Tests <!-- At least one of them must be included. -->
+### Code changes
 
- - Unit test
- - Integration test
- - Manual test (add detailed scripts or steps below)
- - No code
+<!-- REMOVE the items that are not applicable -->
+- Has exported function/method change
+- Has exported variable/fields change
+- Has interface methods change
+- Has persistent data change
+- No code
 
-Code changes
+### Check List for Tests
 
- - Has exported function/method change
- - Has exported variable/fields change
- - Has interface methods change
- - Has persistent data change
+This PR has been tested by the at least one of the following methods:
+- Unit test
+- Integration test
+- Manual test (add detailed scripts or steps below)
+- No code
 
-Side effects
+### Side effects
 
- - Possible performance regression
- - Increased code complexity
- - Breaking backward compatibility
+<!-- REMOVE the items that are not applicable -->
+- Possible performance regression, WHY: **TBD**
+- Increased code complexity, WHY: **TBD**
+- Breaking backward compatibility, WHY: **TBD**
+- NO side effects
 
-Related changes
+### Related changes
 
- - Need to cherry-pick to the release branch
- - Need to update the documentation
- - Need to be included in the release note
+<!-- REMOVE the items that are not applicable -->
+- Need to cherry-pick to the release branch
+- Need to update the documentation
+- Need to be included in the release note
+- NO related changes
