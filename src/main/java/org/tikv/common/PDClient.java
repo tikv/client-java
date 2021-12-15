@@ -344,19 +344,19 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   @Override
   public List<Pdpb.Region> scanRegions(
       BackOffer backOffer, ByteString startKey, ByteString endKey, int limit) {
-    Supplier<Pdpb.ScanRegionsRequest> request =
-        () ->
+    // no need to backoff because ScanRegions is just for optimization
+    PDGrpc.PDBlockingStub stub = getBlockingStub().withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+    Pdpb.ScanRegionsRequest request =
             Pdpb.ScanRegionsRequest.newBuilder()
                 .setHeader(header)
                 .setStartKey(startKey)
                 .setEndKey(endKey)
                 .setLimit(limit)
                 .build();
-    PDErrorHandler<Pdpb.ScanRegionsResponse> handler =
-        new PDErrorHandler<>(r -> buildFromPdpbError(r.getHeader().getError()), this);
-
-    Pdpb.ScanRegionsResponse resp =
-        callWithRetry(backOffer, PDGrpc.getScanRegionsMethod(), request, handler);
+    Pdpb.ScanRegionsResponse resp = stub.scanRegions(request);
+    if (resp == null) {
+      return null;
+    }
     return resp.getRegionsList();
   }
 
@@ -434,7 +434,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       PDGrpc.PDBlockingStub stub =
           PDGrpc.newBlockingStub(probChan).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
       GetMembersRequest request =
-          GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
+          GetMembersRequest.newBuilder().setHeader(header).build();
       GetMembersResponse resp = stub.getMembers(request);
       // check if the response contains a valid leader
       if (resp != null && resp.getLeader().getMemberId() == 0) {
