@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 
 public class CircuitBreakerImpl implements CircuitBreaker {
+
   private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerImpl.class);
 
   private static final Counter CIRCUIT_BREAKER_ATTEMPT_COUNTER =
@@ -77,7 +78,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   private MetricsListener getMetricsListener() {
     return hc -> {
-      logger.debug("onNext " + hc.toString());
+      logger.atDebug().log("onNext {}", hc);
       // check if we are past the requestVolumeThreshold
       if (hc.getTotalRequests() < requestVolumeThreshold) {
         // we are not past the minimum volume threshold for the stat window,

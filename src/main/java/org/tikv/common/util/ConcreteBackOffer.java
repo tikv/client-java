@@ -35,6 +35,7 @@ import org.tikv.common.log.SlowLogEmptyImpl;
 import org.tikv.common.log.SlowLogSpan;
 
 public class ConcreteBackOffer implements BackOffer {
+
   private static final Logger logger = LoggerFactory.getLogger(ConcreteBackOffer.class);
   private final int maxSleep;
   private final Map<BackOffFunction.BackOffFuncType, BackOffFunction> backOffFunctionMap;
@@ -203,10 +204,13 @@ public class ConcreteBackOffer implements BackOffer {
   @Override
   public void doBackOffWithMaxSleep(
       BackOffFunction.BackOffFuncType funcType, long maxSleepMs, Exception err) {
-    logger.debug(
-        String.format(
-            "%s, retry later(totalSleep %dms, maxSleep %dms)",
-            err.getMessage(), totalSleep, maxSleep));
+    logger
+        .atDebug()
+        .log(
+            "{}, retry later(totalSleep {}ms, maxSleep {}ms)",
+            err.getMessage(),
+            totalSleep,
+            maxSleep);
     errors.add(err);
     if (!canRetryAfterSleep(funcType, maxSleepMs)) {
       logThrowError(err);

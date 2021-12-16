@@ -73,7 +73,7 @@ public class SlowLogImpl implements SlowLog {
   public void log() {
     long currentMS = System.currentTimeMillis();
     if (error != null || (slowThresholdMS >= 0 && currentMS - startMS > slowThresholdMS)) {
-      logger.warn("SlowLog:" + getSlowLogString(currentMS));
+      logger.atWarn().addArgument(() -> getSlowLogString(currentMS)).log("SlowLog:{}");
     }
   }
 

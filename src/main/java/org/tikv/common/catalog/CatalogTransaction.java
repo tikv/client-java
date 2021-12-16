@@ -37,6 +37,7 @@ import org.tikv.common.meta.TiTableInfo;
 import org.tikv.common.util.Pair;
 
 public class CatalogTransaction {
+
   protected static final Logger logger = LoggerFactory.getLogger(CatalogTransaction.class);
   private final Snapshot snapshot;
 
@@ -48,7 +49,11 @@ public class CatalogTransaction {
     Objects.requireNonNull(json, "json is null");
     Objects.requireNonNull(cls, "cls is null");
 
-    logger.debug(String.format("Parse Json %s : %s", cls.getSimpleName(), json.toStringUtf8()));
+    logger
+        .atDebug()
+        .addArgument(cls::getSimpleName)
+        .addArgument(json::toStringUtf8)
+        .log("Parse Json {} : {}");
     ObjectMapper mapper = new ObjectMapper();
     try {
       return mapper.readValue(json.toStringUtf8(), cls);

@@ -30,6 +30,7 @@ import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.service.failsafe.CircuitBreaker;
 
 public class SmartRawKVClient implements RawKVClientBase {
+
   private static final Logger logger = LoggerFactory.getLogger(SmartRawKVClient.class);
 
   private static final Histogram REQUEST_LATENCY =
@@ -226,21 +227,21 @@ public class SmartRawKVClient implements RawKVClientBase {
         throw e;
       }
     } else if (circuitBreaker.attemptExecution()) {
-      logger.debug("attemptExecution");
+      logger.atDebug().log("attemptExecution");
       try {
         T result = func.apply();
         circuitBreaker.getMetrics().recordSuccess();
         circuitBreaker.recordAttemptSuccess();
-        logger.debug("markSuccess");
+        logger.atDebug().log("markSuccess");
         return result;
       } catch (Exception e) {
         circuitBreaker.getMetrics().recordFailure();
         circuitBreaker.recordAttemptFailure();
-        logger.debug("markNonSuccess");
+        logger.atDebug().log("markNonSuccess");
         throw e;
       }
     } else {
-      logger.debug("Circuit Breaker Opened");
+      logger.atDebug().log("Circuit Breaker Opened");
       CIRCUIT_BREAKER_OPENED.labels(funcName).inc();
       throw new CircuitBreakerOpenException();
     }
@@ -262,10 +263,12 @@ public class SmartRawKVClient implements RawKVClientBase {
   }
 
   public interface Function1<T> {
+
     T apply();
   }
 
   public interface Function0 {
+
     void apply();
   }
 }

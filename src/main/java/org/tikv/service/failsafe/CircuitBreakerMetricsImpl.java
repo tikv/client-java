@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
+
   private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerMetricsImpl.class);
 
   private final int windowInMS;
@@ -76,7 +77,7 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
     if (!currentMetrics.compareAndSet(singleWindowMetrics, new SingleWindowMetrics())) {
       return;
     }
-    logger.debug("window timeout, reset SingleWindowMetrics");
+    logger.atDebug().log("window timeout, reset SingleWindowMetrics");
     HealthCounts healthCounts = singleWindowMetrics.getHealthCounts();
     for (MetricsListener metricsListener : listeners) {
       metricsListener.onNext(healthCounts);
@@ -95,6 +96,7 @@ public class CircuitBreakerMetricsImpl implements CircuitBreakerMetrics {
 
   /** Instead of using SingleWindowMetrics, it is better to use RollingWindowMetrics. */
   static class SingleWindowMetrics {
+
     private final long startMS = System.currentTimeMillis();
     private final AtomicLong totalCount = new AtomicLong(0);
     private final AtomicLong errorCount = new AtomicLong(0);

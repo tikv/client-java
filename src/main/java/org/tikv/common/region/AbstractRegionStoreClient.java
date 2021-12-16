@@ -45,6 +45,7 @@ import org.tikv.kvproto.TikvGrpc;
 public abstract class AbstractRegionStoreClient
     extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvFutureStub>
     implements RegionErrorReceiver {
+
   private static final Logger logger = LoggerFactory.getLogger(AbstractRegionStoreClient.class);
 
   public static final Histogram SEEK_LEADER_STORE_DURATION =
@@ -109,9 +110,7 @@ public abstract class AbstractRegionStoreClient
    */
   @Override
   public boolean onNotLeader(TiRegion newRegion) {
-    if (logger.isDebugEnabled()) {
-      logger.debug(region + ", new leader = " + newRegion.getLeader().getStoreId());
-    }
+    logger.atDebug().log("{}, new leader = {}", region, newRegion.getLeader().getStoreId());
     // When switch leader fails or the region changed its region epoch,
     // it would be necessary to re-split task's key range for new region.
     if (!region.getRegionEpoch().equals(newRegion.getRegionEpoch())) {
@@ -353,6 +352,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   private static class SwitchLeaderTask {
+
     private final ListenableFuture<Kvrpcpb.RawGetResponse> task;
     private final Metapb.Peer peer;
 
@@ -363,6 +363,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   private static class ForwardCheckTask {
+
     private final ListenableFuture<Kvrpcpb.RawGetResponse> task;
     private final Metapb.Store store;
 

@@ -57,6 +57,7 @@ import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Coprocessor.KeyRange;
 
 public class TiKVScanAnalyzer {
+
   private static final double INDEX_SCAN_COST_FACTOR = 1.2;
   private static final double TABLE_SCAN_COST_FACTOR = 1.0;
   private static final double DOUBLE_READ_COST_FACTOR = TABLE_SCAN_COST_FACTOR * 3;
@@ -437,6 +438,7 @@ public class TiKVScanAnalyzer {
   }
 
   public static class TiKVScanPlan {
+
     private final Map<Long, List<KeyRange>> keyRanges;
     private final Set<Expression> filters;
     private final double cost;
@@ -502,6 +504,7 @@ public class TiKVScanAnalyzer {
     }
 
     public static class Builder {
+
       private final String tableName;
       private final Logger logger = LoggerFactory.getLogger(getClass().getName());
       private Map<Long, List<KeyRange>> keyRanges;
@@ -593,17 +596,15 @@ public class TiKVScanAnalyzer {
             plan = "None";
             desc = "";
         }
-        logger.debug(
-            "[Table:"
-                + tableName
-                + "]["
-                + plan
-                + ":"
-                + desc
-                + "] cost="
-                + cost
-                + " estimated row count="
-                + estimatedRowCount);
+        logger
+            .atDebug()
+            .log(
+                "[Table:{}][{}:{}] cost={} estimated row count={}",
+                tableName,
+                plan,
+                desc,
+                cost,
+                estimatedRowCount);
       }
 
       // TODO: Fine-grained statistics usage

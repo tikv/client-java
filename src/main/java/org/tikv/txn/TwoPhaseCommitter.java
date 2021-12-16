@@ -396,11 +396,12 @@ public class TwoPhaseCommitter {
       BatchKeys batchKeys,
       Map<ByteString, Kvrpcpb.Mutation> mutations)
       throws TiBatchWriteException {
-    LOG.debug(
-        "start prewrite secondary key, row={}, size={}KB, regionId={}",
-        batchKeys.getKeys().size(),
-        batchKeys.getSizeInKB(),
-        batchKeys.getRegion().getId());
+    LOG.atDebug()
+        .log(
+            "start prewrite secondary key, row={}, size={}KB, regionId={}",
+            batchKeys.getKeys().size(),
+            batchKeys.getSizeInKB(),
+            batchKeys.getRegion().getId());
 
     List<ByteString> keyList = batchKeys.getKeys();
     int batchSize = keyList.size();
@@ -444,11 +445,12 @@ public class TwoPhaseCommitter {
         throw new TiBatchWriteException(errorMsg, e);
       }
     }
-    LOG.debug(
-        "prewrite secondary key successfully, row={}, size={}KB, regionId={}",
-        batchKeys.getKeys().size(),
-        batchKeys.getSizeInKB(),
-        batchKeys.getRegion().getId());
+    LOG.atDebug()
+        .log(
+            "prewrite secondary key successfully, row={}, size={}KB, regionId={}",
+            batchKeys.getKeys().size(),
+            batchKeys.getSizeInKB(),
+            batchKeys.getRegion().getId());
   }
 
   private void appendBatchBySize(
