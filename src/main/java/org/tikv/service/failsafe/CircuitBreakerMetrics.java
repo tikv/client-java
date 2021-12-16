@@ -1,5 +1,4 @@
 /*
- *
  * Copyright 2021 PingCAP, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,17 +11,19 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
-package org.tikv.common.log;
+package org.tikv.service.failsafe;
 
-public interface SlowLog {
-  void addProperty(String key, String value);
+import java.io.Closeable;
 
-  SlowLogSpan start(String name);
+public interface CircuitBreakerMetrics extends Closeable {
+  /** Record a successful call. */
+  void recordSuccess();
 
-  void setError(Throwable err);
+  /** Record a failure call. */
+  void recordFailure();
 
-  void log();
+  /** Add metrics listener. */
+  void addListener(MetricsListener metricsListener);
 }

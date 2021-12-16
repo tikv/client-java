@@ -5,7 +5,7 @@
 
     <groupId>org.tikv</groupId>
     <artifactId>tikv-client-java</artifactId>
-    <version>3.1.10-SNAPSHOT</version>
+    <version>3.1.12-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>TiKV Java Client</name>
     <description>A Java Client for TiKV</description>

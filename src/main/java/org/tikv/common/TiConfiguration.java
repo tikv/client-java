@@ -112,6 +112,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_HEALTH_CHECK_TIMEOUT, DEF_CHECK_HEALTH_TIMEOUT);
     setIfMissing(TIKV_HEALTH_CHECK_PERIOD_DURATION, DEF_HEALTH_CHECK_PERIOD_DURATION);
     setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
+    setIfMissing(TIKV_GRPC_IDLE_TIMEOUT, DEF_TIKV_GRPC_IDLE_TIMEOUT);
     setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
@@ -120,6 +121,20 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
     setIfMissing(TIKV_BO_REGION_MISS_BASE_IN_MS, DEF_TIKV_BO_REGION_MISS_BASE_IN_MS);
     setIfMissing(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS, DEF_TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
+    setIfMissing(TiKV_CIRCUIT_BREAK_ENABLE, DEF_TiKV_CIRCUIT_BREAK_ENABLE);
+    setIfMissing(
+        TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS,
+        DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS);
+    setIfMissing(
+        TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE,
+        DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE);
+    setIfMissing(
+        TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD,
+        DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUST_VOLUMN_THRESHOLD);
+    setIfMissing(
+        TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS, DEF_TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS);
+    setIfMissing(
+        TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT, DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
   }
 
   public static void listAll() {
@@ -327,6 +342,16 @@ public class TiConfiguration implements Serializable {
   private Optional<Integer> rawKVBatchWriteSlowLogInMS =
       getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS);
   private int rawKVScanSlowLogInMS = getInt(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
+  private int idleTimeout = getInt(TIKV_GRPC_IDLE_TIMEOUT);
+  private boolean circuitBreakEnable = getBoolean(TiKV_CIRCUIT_BREAK_ENABLE);
+  private int circuitBreakAvailabilityWindowInSeconds =
+      getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS);
+  private int circuitBreakAvailabilityErrorThresholdPercentage =
+      getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE);
+  private int circuitBreakAvailabilityRequestVolumnThreshold =
+      getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD);
+  private int circuitBreakSleepWindowInSeconds = getInt(TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS);
+  private int circuitBreakAttemptRequestCount = getInt(TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
 
   public enum KVMode {
     TXN,
@@ -642,6 +667,14 @@ public class TiConfiguration implements Serializable {
     this.rawKVDefaultBackoffInMS = rawKVDefaultBackoffInMS;
   }
 
+  public int getIdleTimeout() {
+    return idleTimeout;
+  }
+
+  public void setIdleTimeout(int timeout) {
+    this.idleTimeout = timeout;
+  }
+
   public int getRawKVReadTimeoutInMS() {
     return rawKVReadTimeoutInMS;
   }
@@ -728,5 +761,58 @@ public class TiConfiguration implements Serializable {
 
   public void setRawKVScanSlowLogInMS(int rawKVScanSlowLogInMS) {
     this.rawKVScanSlowLogInMS = rawKVScanSlowLogInMS;
+  }
+
+  public boolean isCircuitBreakEnable() {
+    return circuitBreakEnable;
+  }
+
+  public void setCircuitBreakEnable(boolean circuitBreakEnable) {
+    this.circuitBreakEnable = circuitBreakEnable;
+  }
+
+  public int getCircuitBreakAvailabilityWindowInSeconds() {
+    return circuitBreakAvailabilityWindowInSeconds;
+  }
+
+  public void setCircuitBreakAvailabilityWindowInSeconds(
+      int circuitBreakAvailabilityWindowInSeconds) {
+    this.circuitBreakAvailabilityWindowInSeconds = circuitBreakAvailabilityWindowInSeconds;
+  }
+
+  public int getCircuitBreakAvailabilityErrorThresholdPercentage() {
+    return circuitBreakAvailabilityErrorThresholdPercentage;
+  }
+
+  public void setCircuitBreakAvailabilityErrorThresholdPercentage(
+      int circuitBreakAvailabilityErrorThresholdPercentage) {
+    this.circuitBreakAvailabilityErrorThresholdPercentage =
+        circuitBreakAvailabilityErrorThresholdPercentage;
+  }
+
+  public int getCircuitBreakAvailabilityRequestVolumnThreshold() {
+    return circuitBreakAvailabilityRequestVolumnThreshold;
+  }
+
+  public void setCircuitBreakAvailabilityRequestVolumnThreshold(
+      int circuitBreakAvailabilityRequestVolumnThreshold) {
+    this.circuitBreakAvailabilityRequestVolumnThreshold =
+        circuitBreakAvailabilityRequestVolumnThreshold;
+  }
+
+  public int getCircuitBreakSleepWindowInSeconds() {
+    return circuitBreakSleepWindowInSeconds;
+  }
+
+  public void setCircuitBreakSleepWindowInSeconds(int circuitBreakSleepWindowInSeconds) {
+    this.circuitBreakSleepWindowInSeconds = circuitBreakSleepWindowInSeconds;
+  }
+
+  public int getCircuitBreakAttemptRequestCount() {
+    return circuitBreakAttemptRequestCount;
+  }
+
+  public void setCircuitBreakAttemptRequestCount(int circuitBreakAttemptRequestCount) {
+    this.circuitBreakAttemptRequestCount = circuitBreakAttemptRequestCount;
   }
 }

@@ -97,7 +97,7 @@ public class RegionManager {
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
     Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
-    SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("RegionManager.getRegionByKey");
+    SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("getRegionByKey");
     TiRegion region = cache.getRegionByKey(key, backOffer);
     try {
       if (region == null) {
@@ -203,6 +203,8 @@ public class RegionManager {
       TiStore store = cache.getStoreById(id);
       if (store == null) {
         store = new TiStore(pdClient.getStore(backOffer, id));
+      } else {
+        return store;
       }
       // if we did not get store info from pd, remove store from cache
       if (store.getStore() == null) {

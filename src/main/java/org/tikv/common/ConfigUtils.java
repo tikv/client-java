@@ -27,6 +27,7 @@ public class ConfigUtils {
   public static final String TIKV_GRPC_SCAN_TIMEOUT = "tikv.grpc.scan_timeout_in_ms";
   public static final String TIKV_GRPC_SCAN_BATCH_SIZE = "tikv.grpc.scan_batch_size";
   public static final String TIKV_GRPC_MAX_FRAME_SIZE = "tikv.grpc.max_frame_size";
+  public static final String TIKV_GRPC_IDLE_TIMEOUT = "tikv.grpc.idle_timeout";
 
   public static final String TIKV_INDEX_SCAN_BATCH_SIZE = "tikv.index.scan_batch_size";
   public static final String TIKV_INDEX_SCAN_CONCURRENCY = "tikv.index.scan_concurrency";
@@ -75,6 +76,19 @@ public class ConfigUtils {
       "tikv.rawkv.batch_write_slowlog_in_ms";
   public static final String TIKV_RAWKV_SCAN_SLOWLOG_IN_MS = "tikv.rawkv.scan_slowlog_in_ms";
 
+  public static final String TiKV_CIRCUIT_BREAK_ENABLE = "tikv.circuit_break.enable";
+  public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS =
+      "tikv.circuit_break.trigger.availability.window_in_seconds";
+  public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE =
+      "tikv.circuit_break.trigger.availability.error_threshold_percentage";
+  public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD =
+      "tikv.circuit_break.trigger.availability.request_volumn_threshold";
+  public static final String TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS =
+      "tikv.circuit_break.trigger.sleep_window_in_seconds";
+  public static final String TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT =
+      "tikv.circuit_break.trigger.attempt_request_count";
+
+  public static final String TIFLASH_ENABLE = "tiflash.enable";
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
   public static final String DEF_FORWARD_TIMEOUT = "300ms";
@@ -132,4 +146,13 @@ public class ConfigUtils {
   public static final String LEADER = "LEADER";
   public static final String FOLLOWER = "FOLLOWER";
   public static final String LEADER_AND_FOLLOWER = "LEADER_AND_FOLLOWER";
+
+  public static final int DEF_TIKV_GRPC_IDLE_TIMEOUT = 60;
+
+  public static final boolean DEF_TiKV_CIRCUIT_BREAK_ENABLE = false;
+  public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS = 60;
+  public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE = 100;
+  public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUST_VOLUMN_THRESHOLD = 10;
+  public static final int DEF_TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS = 20;
+  public static final int DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT = 10;
 }

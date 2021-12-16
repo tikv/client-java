@@ -25,10 +25,12 @@ import org.tikv.common.pd.PDUtils;
 
 public class ChannelFactory implements AutoCloseable {
   private final int maxFrameSize;
+  private final int idleTimeout;
   private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
 
-  public ChannelFactory(int maxFrameSize) {
+  public ChannelFactory(int maxFrameSize, int idleTimeout) {
     this.maxFrameSize = maxFrameSize;
+    this.idleTimeout = idleTimeout;
   }
 
   public ManagedChannel getChannel(String addressStr, HostMapping hostMapping) {
@@ -52,7 +54,7 @@ public class ChannelFactory implements AutoCloseable {
           return ManagedChannelBuilder.forAddress(mappedAddr.getHost(), mappedAddr.getPort())
               .maxInboundMessageSize(maxFrameSize)
               .usePlaintext()
-              .idleTimeout(60, TimeUnit.SECONDS)
+              .idleTimeout(idleTimeout, TimeUnit.SECONDS)
               .build();
         });
   }

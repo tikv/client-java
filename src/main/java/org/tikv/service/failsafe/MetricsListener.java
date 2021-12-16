@@ -1,5 +1,4 @@
 /*
- *
  * Copyright 2021 PingCAP, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,17 +11,10 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
-package org.tikv.common.log;
+package org.tikv.service.failsafe;
 
-public interface SlowLog {
-  void addProperty(String key, String value);
-
-  SlowLogSpan start(String name);
-
-  void setError(Throwable err);
-
-  void log();
+public interface MetricsListener {
+  void onNext(HealthCounts healthCounts);
 }

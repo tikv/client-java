@@ -40,7 +40,7 @@ import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
-public class RawKVClient implements AutoCloseable {
+public class RawKVClient implements RawKVClientBase {
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
   private final ExecutorService batchGetThreadPool;
@@ -49,15 +49,6 @@ public class RawKVClient implements AutoCloseable {
   private final ExecutorService batchScanThreadPool;
   private final ExecutorService deleteRangeThreadPool;
   private static final Logger logger = LoggerFactory.getLogger(RawKVClient.class);
-
-  // https://www.github.com/pingcap/tidb/blob/master/store/tikv/rawkv.go
-  private static final int MAX_RAW_SCAN_LIMIT = 10240;
-  private static final int MAX_RAW_BATCH_LIMIT = 1024;
-  private static final int RAW_BATCH_PUT_SIZE = 1024 * 1024; // 1 MB
-  private static final int RAW_BATCH_GET_SIZE = 16 * 1024; // 16 K
-  private static final int RAW_BATCH_DELETE_SIZE = 16 * 1024; // 16 K
-  private static final int RAW_BATCH_SCAN_SIZE = 16;
-  private static final int RAW_BATCH_PAIR_COUNT = 512;
 
   public static final Histogram RAW_REQUEST_LATENCY =
       Histogram.build()
@@ -98,34 +89,17 @@ public class RawKVClient implements AutoCloseable {
   @Override
   public void close() {}
 
-  /**
-   * Put a raw key-value pair to TiKV
-   *
-   * @param key raw key
-   * @param value raw value
-   */
+  @Override
   public void put(ByteString key, ByteString value) {
     put(key, value, 0);
   }
 
-  /**
-   * Put a raw key-value pair to TiKV
-   *
-   * @param key raw key
-   * @param value raw value
-   * @param ttl the ttl of the key (in seconds), 0 means the key will never be outdated
-   */
+  @Override
   public void put(ByteString key, ByteString value, long ttl) {
     put(key, value, ttl, false);
   }
 
-  /**
-   * Put a raw key-value pair to TiKV. This API is atomic.
-   *
-   * @param key raw key
-   * @param value raw value
-   * @param ttl the ttl of the key (in seconds), 0 means the key will never be outdated
-   */
+  @Override
   public void putAtomic(ByteString key, ByteString value, long ttl) {
     put(key, value, ttl, true);
   }
@@ -158,6 +132,7 @@ public class RawKVClient implements AutoCloseable {
       }
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -165,27 +140,12 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Put a key-value pair if it does not exist. This API is atomic.
-   *
-   * @param key key
-   * @param value value
-   * @return a ByteString. returns ByteString.EMPTY if the value is written successfully. returns
-   *     the previous key if the value already exists, and does not write to TiKV.
-   */
+  @Override
   public ByteString putIfAbsent(ByteString key, ByteString value) {
     return putIfAbsent(key, value, 0L);
   }
 
-  /**
-   * Put a key-value pair with TTL if it does not exist. This API is atomic.
-   *
-   * @param key key
-   * @param value value
-   * @param ttl TTL of key (in seconds), 0 means the key will never be outdated.
-   * @return a ByteString. returns ByteString.EMPTY if the value is written successfully. returns
-   *     the previous key if the value already exists, and does not write to TiKV.
-   */
+  @Override
   public ByteString putIfAbsent(ByteString key, ByteString value, long ttl) {
     String label = "client_raw_put_if_absent";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
@@ -214,6 +174,7 @@ public class RawKVClient implements AutoCloseable {
       }
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -221,40 +182,22 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Put a set of raw key-value pair to TiKV, this API does not ensure the operation is atomic.
-   *
-   * @param kvPairs kvPairs
-   */
+  @Override
   public void batchPut(Map<ByteString, ByteString> kvPairs) {
     batchPut(kvPairs, 0);
   }
 
-  /**
-   * Put a set of raw key-value pair to TiKV, this API does not ensure the operation is atomic.
-   *
-   * @param kvPairs kvPairs
-   * @param ttl the TTL of keys to be put (in seconds), 0 means the keys will never be outdated
-   */
+  @Override
   public void batchPut(Map<ByteString, ByteString> kvPairs, long ttl) {
     batchPut(kvPairs, ttl, false);
   }
 
-  /**
-   * Put a set of raw key-value pair to TiKV, this API is atomic
-   *
-   * @param kvPairs kvPairs
-   */
+  @Override
   public void batchPutAtomic(Map<ByteString, ByteString> kvPairs) {
     batchPutAtomic(kvPairs, 0);
   }
 
-  /**
-   * Put a set of raw key-value pair to TiKV, this API is atomic.
-   *
-   * @param kvPairs kvPairs
-   * @param ttl the TTL of keys to be put (in seconds), 0 means the keys will never be outdated
-   */
+  @Override
   public void batchPutAtomic(Map<ByteString, ByteString> kvPairs, long ttl) {
     batchPut(kvPairs, ttl, true);
   }
@@ -279,6 +222,7 @@ public class RawKVClient implements AutoCloseable {
       RAW_REQUEST_SUCCESS.labels(label).inc();
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -286,12 +230,7 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Get a raw key-value pair from TiKV if key exists
-   *
-   * @param key raw key
-   * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
-   */
+  @Override
   public ByteString get(ByteString key) {
     String label = "client_raw_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
@@ -321,6 +260,7 @@ public class RawKVClient implements AutoCloseable {
       }
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -328,12 +268,7 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Get a list of raw key-value pair from TiKV if key exists
-   *
-   * @param keys list of raw key
-   * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
-   */
+  @Override
   public List<KvPair> batchGet(List<ByteString> keys) {
     String label = "client_raw_batch_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
@@ -355,6 +290,7 @@ public class RawKVClient implements AutoCloseable {
       return result;
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -362,20 +298,12 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Delete a list of raw key-value pair from TiKV if key exists
-   *
-   * @param keys list of raw key
-   */
+  @Override
   public void batchDelete(List<ByteString> keys) {
     batchDelete(keys, false);
   }
 
-  /**
-   * Delete a list of raw key-value pair from TiKV if key exists, this API is atomic
-   *
-   * @param keys list of raw key
-   */
+  @Override
   public void batchDeleteAtomic(List<ByteString> keys) {
     batchDelete(keys, true);
   }
@@ -401,6 +329,7 @@ public class RawKVClient implements AutoCloseable {
       return;
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -408,13 +337,7 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Get the TTL of a raw key from TiKV if key exists
-   *
-   * @param key raw key
-   * @return a Long indicating the TTL of key ttl is a non-null long value indicating TTL if key
-   *     exists. - ttl=0 if the key will never be outdated. - ttl=null if the key does not exist
-   */
+  @Override
   public Long getKeyTTL(ByteString key) {
     String label = "client_raw_get_key_ttl";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
@@ -443,6 +366,7 @@ public class RawKVClient implements AutoCloseable {
       }
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -450,6 +374,7 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
+  @Override
   public List<List<KvPair>> batchScan(List<ScanOption> ranges) {
     String label = "client_raw_batch_scan";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
@@ -500,27 +425,12 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Scan raw key-value pairs from TiKV in range [startKey, endKey)
-   *
-   * @param startKey raw start key, inclusive
-   * @param endKey raw end key, exclusive
-   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
-   * @return list of key-value pairs in range
-   */
+  @Override
   public List<KvPair> scan(ByteString startKey, ByteString endKey, int limit) {
     return scan(startKey, endKey, limit, false);
   }
 
-  /**
-   * Scan raw key-value pairs from TiKV in range [startKey, endKey)
-   *
-   * @param startKey raw start key, inclusive
-   * @param endKey raw end key, exclusive
-   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
-   * @param keyOnly whether to scan in key-only mode
-   * @return list of key-value pairs in range
-   */
+  @Override
   public List<KvPair> scan(ByteString startKey, ByteString endKey, int limit, boolean keyOnly) {
     String label = "client_raw_scan";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
@@ -547,6 +457,7 @@ public class RawKVClient implements AutoCloseable {
       return result;
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -554,48 +465,22 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Scan raw key-value pairs from TiKV in range [startKey, ♾)
-   *
-   * @param startKey raw start key, inclusive
-   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
-   * @return list of key-value pairs in range
-   */
+  @Override
   public List<KvPair> scan(ByteString startKey, int limit) {
     return scan(startKey, limit, false);
   }
 
-  /**
-   * Scan raw key-value pairs from TiKV in range [startKey, ♾)
-   *
-   * @param startKey raw start key, inclusive
-   * @param limit limit of key-value pairs scanned, should be less than {@link #MAX_RAW_SCAN_LIMIT}
-   * @param keyOnly whether to scan in key-only mode
-   * @return list of key-value pairs in range
-   */
+  @Override
   public List<KvPair> scan(ByteString startKey, int limit, boolean keyOnly) {
     return scan(startKey, ByteString.EMPTY, limit, keyOnly);
   }
 
-  /**
-   * Scan all raw key-value pairs from TiKV in range [startKey, endKey)
-   *
-   * @param startKey raw start key, inclusive
-   * @param endKey raw end key, exclusive
-   * @return list of key-value pairs in range
-   */
+  @Override
   public List<KvPair> scan(ByteString startKey, ByteString endKey) {
     return scan(startKey, endKey, false);
   }
 
-  /**
-   * Scan all raw key-value pairs from TiKV in range [startKey, endKey)
-   *
-   * @param startKey raw start key, inclusive
-   * @param endKey raw end key, exclusive
-   * @param keyOnly whether to scan in key-only mode
-   * @return list of key-value pairs in range
-   */
+  @Override
   public List<KvPair> scan(ByteString startKey, ByteString endKey, boolean keyOnly) {
     String label = "client_raw_scan_without_limit";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
@@ -635,6 +520,7 @@ public class RawKVClient implements AutoCloseable {
       return result;
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -650,40 +536,27 @@ public class RawKVClient implements AutoCloseable {
     return scan(startKey, endKey, limit, keyOnly);
   }
 
-  /**
-   * Scan keys with prefix
-   *
-   * @param prefixKey prefix key
-   * @param limit limit of keys retrieved
-   * @param keyOnly whether to scan in keyOnly mode
-   * @return kvPairs with the specified prefix
-   */
+  @Override
   public List<KvPair> scanPrefix(ByteString prefixKey, int limit, boolean keyOnly) {
     return scan(prefixKey, Key.toRawKey(prefixKey).nextPrefix().toByteString(), limit, keyOnly);
   }
 
+  @Override
   public List<KvPair> scanPrefix(ByteString prefixKey) {
     return scan(prefixKey, Key.toRawKey(prefixKey).nextPrefix().toByteString());
   }
 
+  @Override
   public List<KvPair> scanPrefix(ByteString prefixKey, boolean keyOnly) {
     return scan(prefixKey, Key.toRawKey(prefixKey).nextPrefix().toByteString(), keyOnly);
   }
 
-  /**
-   * Delete a raw key-value pair from TiKV if key exists
-   *
-   * @param key raw key to be deleted
-   */
+  @Override
   public void delete(ByteString key) {
     delete(key, false);
   }
 
-  /**
-   * Delete a raw key-value pair from TiKV if key exists. This API is atomic.
-   *
-   * @param key raw key to be deleted
-   */
+  @Override
   public void deleteAtomic(ByteString key) {
     delete(key, true);
   }
@@ -717,6 +590,7 @@ public class RawKVClient implements AutoCloseable {
       }
     } catch (Exception e) {
       RAW_REQUEST_FAILURE.labels(label).inc();
+      slowLog.setError(e);
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -724,15 +598,7 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Delete all raw key-value pairs in range [startKey, endKey) from TiKV
-   *
-   * <p>Cautious, this API cannot be used concurrently, if multiple clients write keys into this
-   * range along with deleteRange API, the result will be undefined.
-   *
-   * @param startKey raw start key to be deleted
-   * @param endKey raw start key to be deleted
-   */
+  @Override
   public synchronized void deleteRange(ByteString startKey, ByteString endKey) {
     String label = "client_raw_delete_range";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
@@ -751,14 +617,7 @@ public class RawKVClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Delete all raw key-value pairs with the prefix `key` from TiKV
-   *
-   * <p>Cautious, this API cannot be used concurrently, if multiple clients write keys into this
-   * range along with deleteRange API, the result will be undefined.
-   *
-   * @param key prefix of keys to be deleted
-   */
+  @Override
   public synchronized void deletePrefix(ByteString key) {
     ByteString endKey = Key.toRawKey(key).nextPrefix().toByteString();
     deleteRange(key, endKey);

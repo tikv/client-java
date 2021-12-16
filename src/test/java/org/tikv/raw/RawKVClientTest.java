@@ -179,8 +179,7 @@ public class RawKVClientTest {
     } finally {
       long e = System.currentTimeMillis();
       long duration = e - s;
-      logger.info("duration = " + duration);
-      assert (duration >= 2900);
+      assertTrue(duration >= 2900);
     }
   }
 
@@ -199,8 +198,26 @@ public class RawKVClientTest {
     } finally {
       long e = System.currentTimeMillis();
       long duration = e - s;
-      logger.info("duration = " + duration);
-      assert (duration <= timeout + sleep);
+      assertTrue(duration <= timeout + sleep);
+    }
+  }
+
+  @Test
+  public void testBackoffTimeout() {
+    int timeout = 500;
+    int sleep = 150;
+    BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(timeout, SlowLogEmptyImpl.INSTANCE);
+    long s = System.currentTimeMillis();
+    try {
+      while (true) {
+        Thread.sleep(sleep);
+        backOffer.checkTimeout();
+      }
+    } catch (Exception ignored) {
+    } finally {
+      long e = System.currentTimeMillis();
+      long duration = e - s;
+      assertTrue(duration <= timeout + sleep);
     }
   }
 
