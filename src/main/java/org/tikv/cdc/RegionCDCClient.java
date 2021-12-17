@@ -26,6 +26,7 @@ import org.tikv.kvproto.ChangeDataGrpc.ChangeDataStub;
 import org.tikv.kvproto.Coprocessor.KeyRange;
 
 class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(RegionCDCClient.class);
   private static final AtomicLong REQ_ID_COUNTER = new AtomicLong(0);
   private static final Set<LogType> ALLOWED_LOGTYPE =
@@ -127,7 +128,7 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
       channel.shutdown();
     }
     try {
-      LOGGER.debug("awaitTermination (region: {})", region.getId());
+      LOGGER.atDebug().log("awaitTermination (region: {})", region.getId());
       channel.awaitTermination(60, TimeUnit.SECONDS);
     } catch (final InterruptedException e) {
       LOGGER.error("Failed to shutdown channel(regionId: {})", region.getId());
@@ -178,7 +179,7 @@ class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeDataEvent> 
   }
 
   private void submitEvent(final CDCEvent event) {
-    LOGGER.debug("submit event: {}", event);
+    LOGGER.atDebug().log("submit event: {}", event);
     eventConsumer.accept(event);
   }
 }

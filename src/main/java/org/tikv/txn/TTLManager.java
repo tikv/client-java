@@ -42,6 +42,7 @@ import org.tikv.txn.type.ClientRPCResult;
  * https://github.com/pingcap/tidb/blob/master/store/tikv/2pc.go
  */
 public class TTLManager {
+
   /** 20 seconds */
   public static final int MANAGED_LOCK_TTL = 20000;
 
@@ -133,8 +134,10 @@ public class TTLManager {
       }
     }
 
-    LOG.debug(
-        "sendTxnHeartBeat success key={} ttl={} success", KeyUtils.formatBytes(primaryLock), ttl);
+    LOG.atDebug()
+        .addArgument(() -> KeyUtils.formatBytes(primaryLock))
+        .addArgument(() -> ttl)
+        .log("sendTxnHeartBeat success key={} ttl={} success");
   }
 
   public void close() throws InterruptedException {

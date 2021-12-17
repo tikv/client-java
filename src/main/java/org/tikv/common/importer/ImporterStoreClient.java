@@ -191,6 +191,7 @@ public class ImporterStoreClient<RequestClass, ResponseClass>
   public void close() throws Exception {}
 
   public static class ImporterStoreClientBuilder<RequestClass, ResponseClass> {
+
     private final TiConfiguration conf;
     private final ChannelFactory channelFactory;
     private final RegionManager regionManager;
@@ -214,7 +215,7 @@ public class ImporterStoreClient<RequestClass, ResponseClass>
       Objects.requireNonNull(store, "store is null");
 
       String addressStr = store.getStore().getAddress();
-      logger.debug(String.format("Create region store client on address %s", addressStr));
+      logger.atDebug().log("Create region store client on address {}", addressStr);
 
       ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
       ImportSSTGrpc.ImportSSTBlockingStub blockingStub = ImportSSTGrpc.newBlockingStub(channel);

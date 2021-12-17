@@ -44,6 +44,7 @@ import org.tikv.kvproto.Metapb.StoreState;
 
 @SuppressWarnings("UnstableApiUsage")
 public class RegionManager {
+
   private static final Logger logger = LoggerFactory.getLogger(RegionManager.class);
   public static final Histogram GET_REGION_BY_KEY_REQUEST_LATENCY =
       Histogram.build()
@@ -105,7 +106,10 @@ public class RegionManager {
     TiRegion region = cache.getRegionByKey(key, backOffer);
     try {
       if (region == null) {
-        logger.debug("Key not found in keyToRegionIdCache:" + formatBytesUTF8(key));
+        logger
+            .atDebug()
+            .addArgument(() -> formatBytesUTF8(key))
+            .log("Key not found in keyToRegionIdCache:{}");
         Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
         region =
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));

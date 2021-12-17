@@ -63,6 +63,7 @@ import org.tikv.txn.exception.LockException;
 
 /** Note that RegionStoreClient itself is not thread-safe */
 public class RegionStoreClient extends AbstractRegionStoreClient {
+
   private static final Logger logger = LoggerFactory.getLogger(RegionStoreClient.class);
   @VisibleForTesting public final AbstractLockResolverClient lockResolverClient;
   private final TiStoreType storeType;
@@ -118,9 +119,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           regionManager.getRegionStorePairByKey(region.getStartKey(), TiStoreType.TiKV).second;
 
       String addressStr = tikvStore.getStore().getAddress();
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("Create region store client on address %s", addressStr));
-      }
+      logger.atDebug().log("Create region store client on address {}", addressStr);
       ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
 
       TikvBlockingStub tikvBlockingStub = TikvGrpc.newBlockingStub(channel);
@@ -647,7 +646,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     if (response.hasLocked()) {
       Lock lock = new Lock(response.getLocked());
-      logger.debug(String.format("coprocessor encounters locks: %s", lock));
+      logger.atDebug().log("coprocessor encounters locks: {}", lock);
       ResolveLockResult resolveLockResult =
           lockResolverClient.resolveLocks(
               backOffer, startTs, Collections.singletonList(lock), forWrite);
@@ -1232,6 +1231,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public static class RegionStoreClientBuilder {
+
     private final TiConfiguration conf;
     private final ChannelFactory channelFactory;
     private final RegionManager regionManager;
@@ -1258,9 +1258,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       Objects.requireNonNull(storeType, "storeType is null");
 
       String addressStr = store.getStore().getAddress();
-      if (logger.isDebugEnabled()) {
-        logger.debug(String.format("Create region store client on address %s", addressStr));
-      }
+      logger.atDebug().log("Create region store client on address {}", addressStr);
       ManagedChannel channel = null;
 
       TikvBlockingStub blockingStub = null;

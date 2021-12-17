@@ -42,6 +42,7 @@ public abstract class AbstractGRPCClient<
         BlockingStubT extends AbstractStub<BlockingStubT>,
         FutureStubT extends AbstractFutureStub<FutureStubT>>
     implements AutoCloseable {
+
   protected final Logger logger = LoggerFactory.getLogger(this.getClass());
   protected final ChannelFactory channelFactory;
   protected TiConfiguration conf;
@@ -105,7 +106,7 @@ public abstract class AbstractGRPCClient<
       Supplier<ReqT> requestFactory,
       StreamObserver<RespT> responseObserver,
       ErrorHandler<RespT> handler) {
-    logger.debug(String.format("Calling %s...", method.getFullMethodName()));
+    logger.atDebug().log("Calling {}...", method.getFullMethodName());
 
     RetryPolicy.Builder<RespT> builder = new Builder<>(backOffer);
     builder
@@ -121,7 +122,7 @@ public abstract class AbstractGRPCClient<
             },
             method.getFullMethodName(),
             backOffer);
-    logger.debug(String.format("leaving %s...", method.getFullMethodName()));
+    logger.atDebug().log("Leaving {}...", method.getFullMethodName());
   }
 
   <ReqT, RespT> StreamObserver<ReqT> callBidiStreamingWithRetry(
@@ -129,7 +130,7 @@ public abstract class AbstractGRPCClient<
       MethodDescriptor<ReqT, RespT> method,
       StreamObserver<RespT> responseObserver,
       ErrorHandler<StreamObserver<ReqT>> handler) {
-    logger.debug(String.format("Calling %s...", method.getFullMethodName()));
+    logger.atDebug().log("Calling {}...", method.getFullMethodName());
 
     RetryPolicy.Builder<StreamObserver<ReqT>> builder = new Builder<>(backOffer);
     StreamObserver<ReqT> observer =
@@ -143,7 +144,7 @@ public abstract class AbstractGRPCClient<
                 },
                 method.getFullMethodName(),
                 backOffer);
-    logger.debug(String.format("leaving %s...", method.getFullMethodName()));
+    logger.atDebug().log("Leaving {}...", method.getFullMethodName());
     return observer;
   }
 
@@ -152,7 +153,7 @@ public abstract class AbstractGRPCClient<
       MethodDescriptor<ReqT, RespT> method,
       Supplier<ReqT> requestFactory,
       ErrorHandler<StreamingResponse> handler) {
-    logger.debug(String.format("Calling %s...", method.getFullMethodName()));
+    logger.atDebug().log("Calling {}...", method.getFullMethodName());
 
     RetryPolicy.Builder<StreamingResponse> builder = new Builder<>(backOffer);
     StreamingResponse response =
@@ -167,7 +168,7 @@ public abstract class AbstractGRPCClient<
                 },
                 method.getFullMethodName(),
                 backOffer);
-    logger.debug(String.format("leaving %s...", method.getFullMethodName()));
+    logger.atDebug().log("Leaving {}...", method.getFullMethodName());
     return response;
   }
 

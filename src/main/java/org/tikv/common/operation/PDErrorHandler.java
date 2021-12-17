@@ -32,6 +32,7 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Pdpb;
 
 public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
+
   public static final Function<Pdpb.GetRegionResponse, PDError> getRegionResponseErrorExtractor =
       r ->
           r.getHeader().hasError()
@@ -62,7 +63,7 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
           client.updateLeaderOrforwardFollower();
           return true;
         case REGION_PEER_NOT_ELECTED:
-          logger.debug(error.getMessage());
+          logger.atDebug().log(error.getMessage());
           backOffer.doBackOff(
               BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
           return true;
