@@ -37,7 +37,7 @@ func ParseLog(opts Opts) ([]*SlowLog, error) {
 		if filtered == "" {
 			continue
 		}
-		logText := strings.TrimPrefix(filtered, "SlowLog:")
+		logText := strings.TrimPrefix(filtered, logPrefix)
 
 		slowLog := &SlowLog{}
 		err := json.Unmarshal([]byte(logText), slowLog)
