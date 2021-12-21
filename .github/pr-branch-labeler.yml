@@ -1,5 +1,0 @@
-type/3.1-cherry-pick:
-  base: "release-3.1"
-
-type/3.0-cherry-pick:
-  base: "release-3.0"
