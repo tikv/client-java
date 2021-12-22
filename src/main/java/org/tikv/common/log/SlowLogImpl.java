@@ -38,6 +38,11 @@ public class SlowLogImpl implements SlowLog {
   private Throwable error = null;
 
   private final long startMS;
+  /**
+   * use System.nanoTime() to calculate duration, cause System.currentTimeMillis() is not monotonic
+   */
+  private final long startNS;
+
   private final long slowThresholdMS;
 
   /** Key-Value pairs which will be logged, e.g. function name, key, region, etc. */
@@ -45,6 +50,7 @@ public class SlowLogImpl implements SlowLog {
 
   public SlowLogImpl(long slowThresholdMS, Map<String, String> properties) {
     this.startMS = System.currentTimeMillis();
+    this.startNS = System.nanoTime();
     this.slowThresholdMS = slowThresholdMS;
     this.properties = new HashMap<>(properties);
   }
@@ -56,7 +62,7 @@ public class SlowLogImpl implements SlowLog {
 
   @Override
   public synchronized SlowLogSpan start(String name) {
-    SlowLogSpan slowLogSpan = new SlowLogSpanImpl(name);
+    SlowLogSpan slowLogSpan = new SlowLogSpanImpl(name, startMS, startNS);
     if (slowLogSpans.size() < MAX_SPAN_SIZE) {
       slowLogSpans.add(slowLogSpan);
     }
@@ -71,7 +77,8 @@ public class SlowLogImpl implements SlowLog {
 
   @Override
   public void log() {
-    long currentMS = System.currentTimeMillis();
+    long currentNS = System.nanoTime();
+    long currentMS = startMS + (currentNS - startNS) / 1_000_000;
     if (error != null || (slowThresholdMS >= 0 && currentMS - startMS > slowThresholdMS)) {
       logger.warn("SlowLog:" + getSlowLogString(currentMS));
     }
