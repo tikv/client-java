@@ -49,6 +49,7 @@ import org.tikv.txn.TxnKVClient;
  * thread-safe but it's also recommended to have multiple session avoiding lock contention
  */
 public class TiSession implements AutoCloseable {
+
   private static final Logger logger = LoggerFactory.getLogger(TiSession.class);
   private static final Map<String, TiSession> sessionCachedMap = new HashMap<>();
   private final TiConfiguration conf;
@@ -72,6 +73,26 @@ public class TiSession implements AutoCloseable {
   private final MetricsServer metricsServer;
   private final CircuitBreaker circuitBreaker;
   private static final int MAX_SPLIT_REGION_STACK_DEPTH = 6;
+
+  static {
+    logger.info("Welcome to TiKV Java Client {}", getVersionInfo());
+  }
+
+  private static class VersionInfo {
+
+    private final String buildVersion;
+    private final String commitHash;
+
+    public VersionInfo(String buildVersion, String commitHash) {
+      this.buildVersion = buildVersion;
+      this.commitHash = commitHash;
+    }
+
+    @Override
+    public String toString() {
+      return buildVersion + "@" + commitHash;
+    }
+  }
 
   public TiSession(TiConfiguration conf) {
     // may throw org.tikv.common.MetricsServer  - http server not up
@@ -119,6 +140,21 @@ public class TiSession implements AutoCloseable {
     warmUp();
     this.circuitBreaker = new CircuitBreakerImpl(conf);
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
+  }
+
+  private static VersionInfo getVersionInfo() {
+    VersionInfo info;
+    try {
+      final Properties properties = new Properties();
+      properties.load(TiSession.class.getClassLoader().getResourceAsStream("git.properties"));
+      String version = properties.getProperty("git.build.version");
+      String commitHash = properties.getProperty("git.commit.id.full");
+      info = new VersionInfo(version, commitHash);
+    } catch (Exception e) {
+      logger.info("Fail to read package info: " + e.getMessage());
+      info = new VersionInfo("unknown", "unknown");
+    }
+    return info;
   }
 
   private synchronized void warmUp() {
