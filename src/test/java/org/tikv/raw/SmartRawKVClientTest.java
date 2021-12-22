@@ -6,11 +6,12 @@ import com.google.protobuf.ByteString;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.tikv.BaseRawKVTest;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.CircuitBreakerOpenException;
 
-public class SmartRawKVClientTest {
+public class SmartRawKVClientTest extends BaseRawKVTest {
   private boolean enable = true;
   private int windowInSeconds = 2;
   private int errorThresholdPercentage = 100;
@@ -25,7 +26,7 @@ public class SmartRawKVClientTest {
 
   @Before
   public void setup() {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
+    TiConfiguration conf = createTiConfiguration();
     conf.setCircuitBreakEnable(enable);
     conf.setCircuitBreakAvailabilityWindowInSeconds(windowInSeconds);
     conf.setCircuitBreakAvailabilityErrorThresholdPercentage(errorThresholdPercentage);

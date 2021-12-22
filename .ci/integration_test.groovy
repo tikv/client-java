@@ -1,16 +1,7 @@
 def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPullDescription, credentialsId) {
 
-    def TIDB_BRANCH = "master"
     def TIKV_BRANCH = "master"
     def PD_BRANCH = "master"
-
-    // parse tidb branch
-    def m1 = ghprbCommentBody =~ /tidb\s*=\s*([^\s\\]+)(\s|\\|$)/
-    if (m1) {
-        TIDB_BRANCH = "${m1[0][1]}"
-    }
-    m1 = null
-    println "TIDB_BRANCH=${TIDB_BRANCH}"
 
     // parse pd branch
     def m2 = ghprbCommentBody =~ /pd\s*=\s*([^\s\\]+)(\s|\\|$)/
@@ -48,9 +39,6 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
                     }
 
                     dir("/home/jenkins/agent/git/client-java/_run") {
-                        // tidb
-                        def tidb_sha1 = sh(returnStdout: true, script: "curl ${FILE_SERVER_URL}/download/refs/pingcap/tidb/${TIDB_BRANCH}/sha1").trim()
-                        sh "curl ${FILE_SERVER_URL}/download/builds/pingcap/tidb/${tidb_sha1}/centos7/tidb-server.tar.gz | tar xz"
                         // tikv
                         def tikv_sha1 = sh(returnStdout: true, script: "curl ${FILE_SERVER_URL}/download/refs/pingcap/tikv/${TIKV_BRANCH}/sha1").trim()
                         sh "curl ${FILE_SERVER_URL}/download/builds/pingcap/tikv/${tikv_sha1}/centos7/tikv-server.tar.gz | tar xz"
@@ -59,20 +47,33 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
                         sh "curl ${FILE_SERVER_URL}/download/builds/pingcap/pd/${pd_sha1}/centos7/pd-server.tar.gz | tar xz"
 
                         sh """
-                        killall -9 tidb-server || true
                         killall -9 tikv-server || true
                         killall -9 pd-server || true
                         killall -9 java || true
                         sleep 10
-                        bin/pd-server --name=pd --data-dir=pd --config=../config/pd.toml &>pd.log &
+                        """
+
+                        sh """
+                        echo "start TiKV for RawKV test"
+                        bin/pd-server --name=pd_rawkv --data-dir=pd_rawkv --client-urls="http://0.0.0.0:2379" --advertise-client-urls="http://127.0.0.1:2379" --peer-urls="http://0.0.0.0:2380" --advertise-peer-urls="http://127.0.0.1:2380" --config=../config/pd.toml &>pd_rawkv.log &
                         sleep 10
-                        bin/tikv-server --pd=127.0.0.1:2379 -s tikv --addr=0.0.0.0:20160 --advertise-addr=127.0.0.1:20160 --config=../config/tikv.toml &>tikv.log &
+                        bin/tikv-server --pd 127.0.0.1:2379 --data-dir tikv_rawkv --addr 0.0.0.0:20160 --advertise-addr 127.0.0.1:20160 --status-addr 0.0.0.0:20180 --config ../config/tikv_rawkv.toml &>tikv_rawkv.log &
                         sleep 10
                         ps aux | grep '-server' || true
                         curl -s 127.0.0.1:2379/pd/api/v1/status || true
-                        bin/tidb-server --store=tikv --path="127.0.0.1:2379" --config=../config/tidb.toml &>tidb.log &
-                        sleep 60
                         """
+
+                        sh """
+                        echo "start TiKV for TxnKV test"
+                        bin/pd-server --name=pd_txnkv --data-dir=pd_txnkv --client-urls="http://0.0.0.0:3379" --advertise-client-urls="http://127.0.0.1:3379" --peer-urls="http://0.0.0.0:3380" --advertise-peer-urls="http://127.0.0.1:3380" --config=../config/pd.toml &>pd_txnkv.log &
+                        sleep 10
+                        bin/tikv-server --pd 127.0.0.1:3379 --data-dir tikv_txnkv --addr 0.0.0.0:21160 --advertise-addr 127.0.0.1:21160 --status-addr 0.0.0.0:21180 --config ../config/tikv_txnkv.toml &>tikv_txnkv.log &
+                        sleep 10
+                        ps aux | grep '-server' || true
+                        curl -s 127.0.0.1:3379/pd/api/v1/status || true
+                        """
+
+                        sh "sleep 30"
                     }
                 }
 
@@ -87,9 +88,10 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
                             ps aux | grep '-server' || true
                             curl -s 127.0.0.1:2379/pd/api/v1/status || true
                             """
-                            sh "cat _run/pd.log"
-                            sh "cat _run/tikv.log"
-                            sh "cat _run/tidb.log"
+                            sh "cat _run/pd_rawkv.log"
+                            sh "cat _run/tikv_rawkv.log"
+                            sh "cat _run/pd_txnkv.log"
+                            sh "cat _run/tikv_txnkv.log"
                             throw err
                         }
                     }
@@ -102,11 +104,11 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
     stage('Summary') {
         def duration = ((System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000 / 60).setScale(2, BigDecimal.ROUND_HALF_UP)
         def msg = "[#${ghprbPullId}: ${ghprbPullTitle}]" + "\n" +
-        "${ghprbPullLink}" + "\n" +
-        "${ghprbPullDescription}" + "\n" +
-        "Integration Common Test Result: `${currentBuild.result}`" + "\n" +
-        "Elapsed Time: `${duration} mins` " + "\n" +
-        "${env.RUN_DISPLAY_URL}"
+                "${ghprbPullLink}" + "\n" +
+                "${ghprbPullDescription}" + "\n" +
+                "Integration Common Test Result: `${currentBuild.result}`" + "\n" +
+                "Elapsed Time: `${duration} mins` " + "\n" +
+                "${env.RUN_DISPLAY_URL}"
 
         print msg
     }
