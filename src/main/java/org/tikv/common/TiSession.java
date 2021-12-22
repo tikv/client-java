@@ -74,6 +74,10 @@ public class TiSession implements AutoCloseable {
   private final CircuitBreaker circuitBreaker;
   private static final int MAX_SPLIT_REGION_STACK_DEPTH = 6;
 
+  static {
+    logger.info("Welcome to TiKV Java Client {}", getVersionInfo());
+  }
+
   private static class VersionInfo {
 
     private final String buildVersion;
@@ -136,14 +140,13 @@ public class TiSession implements AutoCloseable {
     warmUp();
     this.circuitBreaker = new CircuitBreakerImpl(conf);
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
-    logger.info("Welcome to TiKV Java Client {}", getVersionInfo());
   }
 
-  private VersionInfo getVersionInfo() {
+  private static VersionInfo getVersionInfo() {
     VersionInfo info;
     try {
       final Properties properties = new Properties();
-      properties.load(this.getClass().getClassLoader().getResourceAsStream("git.properties"));
+      properties.load(TiSession.class.getClassLoader().getResourceAsStream("git.properties"));
       String version = properties.getProperty("git.build.version");
       String commitHash = properties.getProperty("git.commit.id.full");
       info = new VersionInfo(version, commitHash);
