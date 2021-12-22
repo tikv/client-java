@@ -1,5 +1,7 @@
 # Summary
 
+- [Introduction](./introduction/introduction.md)
+
 - [Start With Examples](./examples/introduction.md)
     - [Quick Start](./examples/quick-start.md)
     - [Interact with TiKV RawKV API](./examples/rawkv.md)
