@@ -10,10 +10,10 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.BaseRawKVTest;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
@@ -27,7 +27,7 @@ import org.tikv.common.util.FastByteComparisons;
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
-public class RawKVClientTest {
+public class RawKVClientTest extends BaseRawKVTest {
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -41,7 +41,6 @@ public class RawKVClientTest {
   private static final List<ByteString> values;
   private static final int limit;
   private TreeMap<ByteString, ByteString> data;
-  private boolean initialized;
   private final Random r = new Random(1234);
   private static final ByteStringComparator bsc = new ByteStringComparator();
   private static final ExecutorService executors = Executors.newFixedThreadPool(WORKER_CNT);
@@ -77,14 +76,12 @@ public class RawKVClientTest {
   @Before
   public void setup() throws IOException {
     try {
-      TiConfiguration conf = TiConfiguration.createRawDefault();
+      TiConfiguration conf = createTiConfiguration();
       session = TiSession.create(conf);
-      initialized = false;
       if (client == null) {
         client = session.createRawClient();
       }
       data = new TreeMap<>(bsc);
-      initialized = true;
     } catch (Exception e) {
       logger.warn(
           "Cannot initialize raw client, please check whether TiKV is running. Test skipped.", e);
@@ -98,10 +95,8 @@ public class RawKVClientTest {
     }
   }
 
-  // tikv-4.0 does not support atomic api
-  @Ignore
+  @Test
   public void atomicAPITest() {
-    if (!initialized) return;
     long ttl = 10;
     ByteString key = ByteString.copyFromUtf8("key_atomic");
     ByteString value = ByteString.copyFromUtf8("value");
@@ -120,10 +115,8 @@ public class RawKVClientTest {
     assertTrue(res3.isEmpty());
   }
 
-  // tikv-4.0 doest not support ttl
-  @Ignore
+  @Test
   public void getKeyTTLTest() {
-    if (!initialized) return;
     long ttl = 10;
     ByteString key = ByteString.copyFromUtf8("key_ttl");
     ByteString value = ByteString.copyFromUtf8("value");
@@ -223,7 +216,6 @@ public class RawKVClientTest {
 
   @Test
   public void batchPutTest() {
-    if (!initialized) return;
     ExecutorService executors = Executors.newFixedThreadPool(200);
     ExecutorCompletionService<Object> completionService =
         new ExecutorCompletionService<>(executors);
@@ -312,13 +304,11 @@ public class RawKVClientTest {
 
   @Test
   public void deleteRangeTest() {
-    if (!initialized) return;
     client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
   }
 
   @Test
   public void simpleTest() {
-    if (!initialized) return;
     ByteString key = rawKey("key");
     ByteString key0 = rawKey("key0");
     ByteString key1 = rawKey("key1");
@@ -372,14 +362,12 @@ public class RawKVClientTest {
 
   @Test
   public void validate() {
-    if (!initialized) return;
     baseTest(100, 100, 100, 100, false, false, false, false, false);
     baseTest(100, 100, 100, 100, false, true, true, true, true);
   }
 
   /** Example of benchmarking base test */
   public void benchmark() {
-    if (!initialized) return;
     baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, false, false, false, false);
     baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, true, true, true, true);
   }

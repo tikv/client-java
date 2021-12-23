@@ -18,18 +18,19 @@ package org.tikv.common;
 import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
+import org.tikv.BaseRawKVTest;
 
-public class TiConfigurationTest {
+public class TiConfigurationTest extends BaseRawKVTest {
 
   @Test
   public void configFileTest() {
-    TiConfiguration conf = TiConfiguration.createRawDefault();
+    TiConfiguration conf = createTiConfiguration();
     assertEquals("configFileTest", conf.getDBPrefix());
   }
 
   @Test
   public void testGrpcIdleTimeoutValue() {
-    TiConfiguration conf = TiConfiguration.createDefault();
+    TiConfiguration conf = createTiConfiguration();
     // default value
     assertEquals(TiConfiguration.getInt(ConfigUtils.TIKV_GRPC_IDLE_TIMEOUT), conf.getIdleTimeout());
     // new value

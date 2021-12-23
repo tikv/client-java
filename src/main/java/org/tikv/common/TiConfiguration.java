@@ -651,6 +651,10 @@ public class TiConfiguration implements Serializable {
     return this.enableGrpcForward;
   }
 
+  public void setEnableGrpcForward(boolean enableGrpcForward) {
+    this.enableGrpcForward = enableGrpcForward;
+  }
+
   public long getGrpcHealthCheckTimeout() {
     return this.grpcHealthCheckTimeout;
   }
