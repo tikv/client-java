@@ -130,12 +130,13 @@ public class TiSessionTest extends BaseRawKVTest {
   public void warmUpTest() throws Exception {
     TiConfiguration conf = createTiConfiguration();
     conf.setWarmUpEnable(true);
-    doTest(conf);
+    long t0 = doTest(conf);
     conf.setWarmUpEnable(false);
-    doTest(conf);
+    long t1 = doTest(conf);
+    assertTrue(t0 < t1);
   }
 
-  private void doTest(TiConfiguration conf) throws Exception {
+  private long doTest(TiConfiguration conf) throws Exception {
     session = TiSession.create(conf);
     long start = System.currentTimeMillis();
     try (RawKVClient client = session.createRawClient()) {
@@ -149,5 +150,6 @@ public class TiSessionTest extends BaseRawKVTest {
             + (end - start)
             + "ms");
     session.close();
+    return end - start;
   }
 }
