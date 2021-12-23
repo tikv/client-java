@@ -76,7 +76,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
         // onNotLeader is only needed when updateLeader succeeds, thus switch
         // to a new store address.
         TiRegion newRegion = this.regionManager.updateLeader(recv.getRegion(), newStoreId);
-        retry = newRegion != null && recv.onNotLeader(newRegion);
+        retry = newRegion != null && recv.onNotLeader(newRegion, backOffer);
 
         backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
       } else {
