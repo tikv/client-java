@@ -93,23 +93,46 @@ public class TiSession implements AutoCloseable {
 
   private synchronized void warmUp() {
     long warmUpStartTime = System.currentTimeMillis();
+    warmUpStore();
+    warmUpRegion();
+    warmUpGrpc();
+    logger.info(
+        String.format("warm up duration %d ms", System.currentTimeMillis() - warmUpStartTime));
+  }
+
+  private void warmUpStore() {
     try {
+      BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
       this.client = getPDClient();
       this.regionManager = getRegionManager();
-      List<Metapb.Store> stores = this.client.getAllStores(ConcreteBackOffer.newGetBackOff());
+      List<Metapb.Store> stores = this.client.getAllStores(backOffer);
       // warm up store cache
       for (Metapb.Store store : stores) {
         this.regionManager.updateStore(
-            null,
-            new TiStore(this.client.getStore(ConcreteBackOffer.newGetBackOff(), store.getId())));
+            null, new TiStore(this.client.getStore(backOffer, store.getId())));
       }
-      ByteString startKey = ByteString.EMPTY;
+    } catch (Exception e) {
+      // ignore error
+      logger.info("warm up store fails, ignored ", e);
+    }
+  }
 
+  private void warmUpRegion() {
+    try {
+      BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
+      ByteString startKey = ByteString.EMPTY;
       do {
-        TiRegion region = regionManager.getRegionByKey(startKey);
+        TiRegion region = regionManager.getRegionByKey(startKey, backOffer);
         startKey = region.getEndKey();
       } while (!startKey.isEmpty());
+    } catch (Exception e) {
+      // ignore error
+      logger.info("warm up region fails, ignored ", e);
+    }
+  }
 
+  private void warmUpGrpc() {
+    try {
       RawKVClient rawKVClient = createRawClient();
       ByteString exampleKey = ByteString.EMPTY;
       ByteString prev = rawKVClient.get(exampleKey);
@@ -118,10 +141,7 @@ public class TiSession implements AutoCloseable {
       rawKVClient.put(exampleKey, prev);
     } catch (Exception e) {
       // ignore error
-      logger.info("warm up fails, ignored ", e);
-    } finally {
-      logger.info(
-          String.format("warm up duration %d ms", System.currentTimeMillis() - warmUpStartTime));
+      logger.info("warm up grpc fails, ignored ", e);
     }
   }
 
