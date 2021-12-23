@@ -228,13 +228,18 @@ public class RegionManager {
   }
 
   public TiStore getStoreById(long id, BackOffer backOffer) {
-    TiStore store = getStoreByIdWithBackOff(id, backOffer);
-    if (store == null) {
-      logger.warn(String.format("failed to fetch store %d, the store may be missing", id));
-      cache.clearAll();
-      throw new InvalidStoreException(id);
+    SlowLogSpan span = backOffer.getSlowLog().start("getStoreById");
+    try {
+      TiStore store = getStoreByIdWithBackOff(id, backOffer);
+      if (store == null) {
+        logger.warn(String.format("failed to fetch store %d, the store may be missing", id));
+        cache.clearAll();
+        throw new InvalidStoreException(id);
+      }
+      return store;
+    } finally {
+      span.end();
     }
-    return store;
   }
 
   public void onRegionStale(TiRegion region) {
