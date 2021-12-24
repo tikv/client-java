@@ -274,7 +274,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     boolean forWrite = false;
     while (true) {
       // we should refresh region
-      region = regionManager.getRegionByKey(startKey);
+      region = regionManager.getRegionByKey(startKey, backOffer);
 
       Supplier<ScanRequest> request =
           () ->

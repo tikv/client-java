@@ -92,21 +92,22 @@ public class TiSession implements AutoCloseable {
   }
 
   private synchronized void warmUp() {
-    long warmUpStartTime = System.currentTimeMillis();
+    long warmUpStartTime = System.nanoTime();
+    BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
+
     try {
       this.client = getPDClient();
       this.regionManager = getRegionManager();
-      List<Metapb.Store> stores = this.client.getAllStores(ConcreteBackOffer.newGetBackOff());
+      List<Metapb.Store> stores = this.client.getAllStores(backOffer);
       // warm up store cache
       for (Metapb.Store store : stores) {
         this.regionManager.updateStore(
-            null,
-            new TiStore(this.client.getStore(ConcreteBackOffer.newGetBackOff(), store.getId())));
+            null, new TiStore(this.client.getStore(backOffer, store.getId())));
       }
       ByteString startKey = ByteString.EMPTY;
 
       do {
-        TiRegion region = regionManager.getRegionByKey(startKey);
+        TiRegion region = regionManager.getRegionByKey(startKey, backOffer);
         startKey = region.getEndKey();
       } while (!startKey.isEmpty());
 
@@ -121,7 +122,8 @@ public class TiSession implements AutoCloseable {
       logger.info("warm up fails, ignored ", e);
     } finally {
       logger.info(
-          String.format("warm up duration %d ms", System.currentTimeMillis() - warmUpStartTime));
+          String.format(
+              "warm up duration %d ms", (System.nanoTime() - warmUpStartTime) / 1_000_000));
     }
   }
 
