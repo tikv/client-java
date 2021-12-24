@@ -161,16 +161,16 @@ public class TiSession implements AutoCloseable {
   }
 
   private synchronized void warmUp() {
-    long warmUpStartTime = System.currentTimeMillis();
+    long warmUpStartTime = System.nanoTime();
+    BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
     try {
       this.client = getPDClient();
       this.regionManager = getRegionManager();
-      List<Metapb.Store> stores = this.client.getAllStores(ConcreteBackOffer.newGetBackOff());
+      List<Metapb.Store> stores = this.client.getAllStores(backOffer);
       // warm up store cache
       for (Metapb.Store store : stores) {
         this.regionManager.updateStore(
-            null,
-            new TiStore(this.client.getStore(ConcreteBackOffer.newGetBackOff(), store.getId())));
+            null, new TiStore(this.client.getStore(backOffer, store.getId())));
       }
 
       // use scan region to load region cache with limit
@@ -178,17 +178,14 @@ public class TiSession implements AutoCloseable {
       do {
         List<Pdpb.Region> regions =
             regionManager.scanRegions(
-                ConcreteBackOffer.newGetBackOff(),
-                startKey,
-                ByteString.EMPTY,
-                conf.getScanRegionsLimit());
+                backOffer, startKey, ByteString.EMPTY, conf.getScanRegionsLimit());
         if (regions == null || regions.isEmpty()) {
           // something went wrong, but the warm-up process could continue
           break;
         }
         for (Pdpb.Region region : regions) {
           regionManager.insertRegionToCache(
-              regionManager.createRegion(region.getRegion(), ConcreteBackOffer.newGetBackOff()));
+              regionManager.createRegion(region.getRegion(), backOffer));
         }
         startKey = regions.get(regions.size() - 1).getRegion().getEndKey();
       } while (!startKey.isEmpty());
@@ -211,7 +208,8 @@ public class TiSession implements AutoCloseable {
       logger.info("warm up fails, ignored ", e);
     } finally {
       logger.info(
-          String.format("warm up duration %d ms", System.currentTimeMillis() - warmUpStartTime));
+          String.format(
+              "warm up duration %d ms", (System.nanoTime() - warmUpStartTime) / 1_000_000));
     }
   }
 

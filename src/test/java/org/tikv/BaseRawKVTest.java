@@ -14,6 +14,7 @@ public class BaseRawKVTest {
     conf.setTest(true);
     conf.setEnableAtomicForCAS(true);
     conf.setEnableGrpcForward(false);
+    conf.setEnableAtomicForCAS(true);
     return conf;
   }
 }
