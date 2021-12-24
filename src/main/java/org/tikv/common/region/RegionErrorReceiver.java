@@ -20,7 +20,7 @@ package org.tikv.common.region;
 import org.tikv.common.util.BackOffer;
 
 public interface RegionErrorReceiver {
-  boolean onNotLeader(TiRegion region);
+  boolean onNotLeader(TiRegion region, BackOffer backOffer);
 
   /// return whether we need to retry this request.
   boolean onStoreUnreachable(BackOffer backOffer);

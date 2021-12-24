@@ -86,6 +86,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_TIMEOUT, DEF_TIMEOUT);
     setIfMissing(TIKV_GRPC_INGEST_TIMEOUT, DEF_TIKV_GRPC_INGEST_TIMEOUT);
     setIfMissing(TIKV_GRPC_FORWARD_TIMEOUT, DEF_FORWARD_TIMEOUT);
+    setIfMissing(TIKV_GRPC_WARM_UP_TIMEOUT, DEF_TIKV_GRPC_WARM_UP_TIMEOUT);
     setIfMissing(TIKV_PD_FIRST_GET_MEMBER_TIMEOUT, DEF_TIKV_PD_FIRST_GET_MEMBER_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_TIMEOUT, DEF_SCAN_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_BATCH_SIZE, DEF_SCAN_BATCH_SIZE);
@@ -124,6 +125,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_TLS_ENABLE, DEF_TIKV_TLS_ENABLE);
     setIfMissing(TIKV_USE_JKS, DEF_TIKV_USE_JKS);
     setIfMissing(TIFLASH_ENABLE, DEF_TIFLASH_ENABLE);
+    setIfMissing(TIKV_WARM_UP_ENABLE, DEF_TIKV_WARM_UP_ENABLE);
     setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
@@ -146,6 +148,7 @@ public class TiConfiguration implements Serializable {
         TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS, DEF_TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS);
     setIfMissing(
         TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT, DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
+    setIfMissing(TIKV_SCAN_REGIONS_LIMIT, DEF_TIKV_SCAN_REGIONS_LIMIT);
   }
 
   public static void listAll() {
@@ -309,6 +312,7 @@ public class TiConfiguration implements Serializable {
   private long timeout = getTimeAsMs(TIKV_GRPC_TIMEOUT);
   private long ingestTimeout = getTimeAsMs(TIKV_GRPC_INGEST_TIMEOUT);
   private long forwardTimeout = getTimeAsMs(TIKV_GRPC_FORWARD_TIMEOUT);
+  private long warmUpTimeout = getTimeAsMs(TIKV_GRPC_WARM_UP_TIMEOUT);
   private long pdFirstGetMemberTimeout = getTimeAsMs(TIKV_PD_FIRST_GET_MEMBER_TIMEOUT);
   private long scanTimeout = getTimeAsMs(TIKV_GRPC_SCAN_TIMEOUT);
   private int maxFrameSize = getInt(TIKV_GRPC_MAX_FRAME_SIZE);
@@ -376,6 +380,7 @@ public class TiConfiguration implements Serializable {
   private String jksTrustPassword = getOption(TIKV_JKS_TRUST_PASSWORD).orElse(null);
 
   private boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
+  private boolean warmUpEnable = getBoolean(TIKV_WARM_UP_ENABLE);
 
   private boolean isTest = false;
 
@@ -392,6 +397,8 @@ public class TiConfiguration implements Serializable {
       getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD);
   private int circuitBreakSleepWindowInSeconds = getInt(TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS);
   private int circuitBreakAttemptRequestCount = getInt(TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
+
+  private int scanRegionsLimit = getInt(TIKV_SCAN_REGIONS_LIMIT);
 
   public enum KVMode {
     TXN,
@@ -472,6 +479,15 @@ public class TiConfiguration implements Serializable {
 
   public TiConfiguration setForwardTimeout(long timeout) {
     this.forwardTimeout = timeout;
+    return this;
+  }
+
+  public long getWarmUpTimeout() {
+    return warmUpTimeout;
+  }
+
+  public TiConfiguration setWarmUpTimeout(long timeout) {
+    this.warmUpTimeout = timeout;
     return this;
   }
 
@@ -811,6 +827,14 @@ public class TiConfiguration implements Serializable {
     return tiFlashEnable;
   }
 
+  public boolean isWarmUpEnable() {
+    return warmUpEnable;
+  }
+
+  public void setWarmUpEnable(boolean warmUpEnable) {
+    this.warmUpEnable = warmUpEnable;
+  }
+
   public boolean isTlsEnable() {
     return tlsEnable;
   }
@@ -1022,5 +1046,13 @@ public class TiConfiguration implements Serializable {
 
   public void setCircuitBreakAttemptRequestCount(int circuitBreakAttemptRequestCount) {
     this.circuitBreakAttemptRequestCount = circuitBreakAttemptRequestCount;
+  }
+
+  public int getScanRegionsLimit() {
+    return scanRegionsLimit;
+  }
+
+  public void setScanRegionsLimit(int scanRegionsLimit) {
+    this.scanRegionsLimit = scanRegionsLimit;
   }
 }

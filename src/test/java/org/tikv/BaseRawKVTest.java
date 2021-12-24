@@ -12,7 +12,9 @@ public class BaseRawKVTest {
             ? TiConfiguration.createRawDefault()
             : TiConfiguration.createRawDefault(pdAddrsStr);
     conf.setTest(true);
+    conf.setEnableAtomicForCAS(true);
     conf.setEnableGrpcForward(false);
+    conf.setEnableAtomicForCAS(true);
     return conf;
   }
 }
