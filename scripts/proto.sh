@@ -14,7 +14,7 @@
 #   limitations under the License.
 #
 
-kvproto_hash=d62ddcee4ccd95f19f3ffa89c2832f2fb81030ca
+kvproto_hash=ac84cea4c441b2eb0dbdfecde68f06b93ced21e6
 raft_rs_hash=b9891b673573fad77ebcf9bbe0969cf945841926
 tipb_hash=c4d518eb1d60c21f05b028b36729e64610346dac
 
@@ -32,7 +32,7 @@ cd "$TIKV_CLIENT_HOME" || exit
 if [ -d "$kvproto_dir" ]; then
 	git -C ${kvproto_dir} fetch -p
 else
-	git clone https://github.com/pingcap/kvproto ${kvproto_dir}
+	git clone https://github.com/iosmanthus/kvproto ${kvproto_dir}
 fi
 git -C ${kvproto_dir} checkout ${kvproto_hash}
 
