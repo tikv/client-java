@@ -14,11 +14,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.BaseRawKVTest;
 import org.tikv.common.region.TiRegion;
 import org.tikv.raw.RawKVClient;
 
 public class TiSessionTest extends BaseRawKVTest {
+  private static final Logger logger = LoggerFactory.getLogger(TiSessionTest.class);
   private TiSession session;
 
   @After
@@ -121,5 +124,32 @@ public class TiSessionTest extends BaseRawKVTest {
     } catch (RejectedExecutionException e) {
       assertTrue(e.getMessage().contains("rejected from java.util.concurrent.ThreadPoolExecutor"));
     }
+  }
+
+  @Test
+  public void warmUpTest() throws Exception {
+    TiConfiguration conf = createTiConfiguration();
+    conf.setWarmUpEnable(true);
+    long t0 = doTest(conf);
+    conf.setWarmUpEnable(false);
+    long t1 = doTest(conf);
+    assertTrue(t0 < t1);
+  }
+
+  private long doTest(TiConfiguration conf) throws Exception {
+    session = TiSession.create(conf);
+    long start = System.currentTimeMillis();
+    try (RawKVClient client = session.createRawClient()) {
+      client.get(ByteString.EMPTY);
+    }
+    long end = System.currentTimeMillis();
+    logger.info(
+        "[warm up "
+            + (conf.isWarmUpEnable() ? "enabled" : "disabled")
+            + "] duration "
+            + (end - start)
+            + "ms");
+    session.close();
+    return end - start;
   }
 }

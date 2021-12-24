@@ -341,6 +341,27 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return new Pair<Metapb.Region, Metapb.Peer>(decodeRegion(resp.getRegion()), resp.getLeader());
   }
 
+  @Override
+  public List<Pdpb.Region> scanRegions(
+      BackOffer backOffer, ByteString startKey, ByteString endKey, int limit) {
+    // no need to backoff because ScanRegions is just for optimization
+    // introduce a warm-up timeout for ScanRegions requests
+    PDGrpc.PDBlockingStub stub =
+        getBlockingStub().withDeadlineAfter(conf.getWarmUpTimeout(), TimeUnit.MILLISECONDS);
+    Pdpb.ScanRegionsRequest request =
+        Pdpb.ScanRegionsRequest.newBuilder()
+            .setHeader(header)
+            .setStartKey(startKey)
+            .setEndKey(endKey)
+            .setLimit(limit)
+            .build();
+    Pdpb.ScanRegionsResponse resp = stub.scanRegions(request);
+    if (resp == null) {
+      return null;
+    }
+    return resp.getRegionsList();
+  }
+
   private Supplier<GetStoreRequest> buildGetStoreReq(long storeId) {
     return () -> GetStoreRequest.newBuilder().setHeader(header).setStoreId(storeId).build();
   }
