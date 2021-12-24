@@ -168,6 +168,8 @@ public class ConcreteBackOffer implements BackOffer {
   }
 
   public boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType, long maxSleepMs) {
+    Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(funcType.name()).startTimer();
+    SlowLogSpan slowLogSpan = getSlowLog().start("backoff " + funcType.name());
     BackOffFunction backOffFunction =
         backOffFunctionMap.computeIfAbsent(funcType, this::createBackOffFunc);
 
@@ -179,12 +181,12 @@ public class ConcreteBackOffer implements BackOffer {
       long currentMs = System.currentTimeMillis();
       if (currentMs + sleep >= deadline) {
         logger.warn(String.format("Deadline %d is exceeded, errors:", deadline));
+        slowLogSpan.end();
+        backOffTimer.observeDuration();
         return false;
       }
     }
 
-    Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(funcType.name()).startTimer();
-    SlowLogSpan slowLogSpan = getSlowLog().start("backoff " + funcType.name());
     try {
       Thread.sleep(sleep);
     } catch (InterruptedException e) {
