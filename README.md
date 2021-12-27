@@ -50,7 +50,7 @@ Find more demo in [KVRawClientTest](https://github.com/birdstorm/KVRawClientTest
 
 See [Java Client Documents](/docs/README.md) for references about how to config and monitor Java Client.
 
-An [API reference](https://tikv.github.io/apidocs) is also available.
+An [API reference](https://tikv.github.io/client-java/apidocs) is also available.
 
 ## Community
 
