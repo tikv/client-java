@@ -17,6 +17,13 @@ package org.tikv.common;
 
 import static org.junit.Assert.assertEquals;
 
+<<<<<<< HEAD
+=======
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import org.junit.Assert;
+>>>>>>> b94b3cb... [close #446] Fix Optional fields type (#445)
 import org.junit.Test;
 import org.tikv.BaseRawKVTest;
 
@@ -38,4 +45,32 @@ public class TiConfigurationTest extends BaseRawKVTest {
     conf.setIdleTimeout(newValue);
     assertEquals(newValue, conf.getIdleTimeout());
   }
+<<<<<<< HEAD
+=======
+
+  @Test
+  public void tiJksDefaultValueTest() {
+    TiConfiguration conf = TiConfiguration.createRawDefault();
+    assertFalse(conf.isJksEnable());
+  }
+
+  @Test
+  public void slowLogDefaultValueTest() {
+    TiConfiguration conf = TiConfiguration.createRawDefault();
+    assertEquals(conf.getTimeout() * 2, conf.getRawKVReadSlowLogInMS().longValue());
+    assertEquals(conf.getTimeout() * 2, conf.getRawKVWriteSlowLogInMS().longValue());
+    assertEquals(conf.getTimeout() * 2, conf.getRawKVBatchReadSlowLogInMS().longValue());
+    assertEquals(conf.getTimeout() * 2, conf.getRawKVBatchWriteSlowLogInMS().longValue());
+  }
+
+  @Test
+  public void serializeTest() throws IOException {
+    TiConfiguration conf = TiConfiguration.createDefault();
+    try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+      oos.writeObject(conf);
+      oos.flush();
+    }
+  }
+>>>>>>> b94b3cb... [close #446] Fix Optional fields type (#445)
 }
