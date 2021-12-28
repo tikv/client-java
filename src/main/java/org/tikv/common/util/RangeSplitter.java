@@ -49,7 +49,7 @@ public class RangeSplitter {
    *
    * @param tableId Table id used for the handle
    * @param handles Handle list
-   * @return <Region, HandleList> map
+   * @return {@code <Region, HandleList>} map
    */
   public Map<Pair<TiRegion, TiStore>, TLongArrayList> groupByAndSortHandlesByRegionId(
       long tableId, TLongArrayList handles) {
