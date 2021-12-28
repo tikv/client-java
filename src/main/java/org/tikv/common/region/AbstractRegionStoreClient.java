@@ -38,6 +38,7 @@ import org.tikv.common.exception.GrpcException;
 import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
+import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
@@ -288,6 +289,15 @@ public abstract class AbstractRegionStoreClient
               logger.info(
                   String.format("rawGet response indicates peer[%d] is leader", task.peer.getId()));
               return task.peer;
+            } else {
+              Errorpb.Error error = resp.getRegionError();
+              if (error.hasStoreNotMatch()) {
+                long actualStoreId = error.getStoreNotMatch().getActualStoreId();
+                logger.warn(
+                    String.format(
+                        "Store Not Match happened with actual store id %d, peer is %s, StoreNotMatch is %s",
+                        actualStoreId, task.peer.toString(), error.getStoreNotMatch()));
+              }
             }
           }
         } catch (Exception ignored) {
@@ -341,6 +351,16 @@ public abstract class AbstractRegionStoreClient
               String.format(
                   "rawGetResponse indicates forward from [%s] to [%s]",
                   task.store.getAddress(), store.getAddress()));
+
+          Errorpb.Error error = resp.getRegionError();
+          if (error.hasStoreNotMatch()) {
+            long actualStoreId = error.getStoreNotMatch().getActualStoreId();
+            logger.warn(
+                String.format(
+                    "Store Not Match happened with actual store id %d, StoreNotMatch is %s",
+                    actualStoreId, error.getStoreNotMatch()));
+          }
+
           return store.withProxy(task.store);
         } catch (Exception ignored) {
         }
