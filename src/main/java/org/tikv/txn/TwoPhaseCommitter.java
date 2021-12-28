@@ -142,7 +142,6 @@ public class TwoPhaseCommitter {
    * @param backOffer
    * @param primaryKey
    * @param value
-   * @return
    */
   public void prewritePrimaryKey(BackOffer backOffer, byte[] primaryKey, byte[] value)
       throws TiBatchWriteException {
@@ -198,7 +197,6 @@ public class TwoPhaseCommitter {
    *
    * @param backOffer
    * @param key
-   * @return
    */
   public void commitPrimaryKey(BackOffer backOffer, byte[] key, long commitTs)
       throws TiBatchWriteException {
@@ -238,7 +236,6 @@ public class TwoPhaseCommitter {
    *
    * @param primaryKey
    * @param pairs
-   * @return
    */
   public void prewriteSecondaryKeys(
       byte[] primaryKey, Iterator<BytePairWrapper> pairs, int maxBackOfferMS)
@@ -501,7 +498,6 @@ public class TwoPhaseCommitter {
    *
    * @param keys
    * @param commitTs
-   * @return
    */
   public void commitSecondaryKeys(
       Iterator<org.tikv.common.ByteWrapper> keys, long commitTs, int commitBackOfferMS)

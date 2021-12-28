@@ -106,8 +106,6 @@ public class ImporterStoreClient<RequestClass, ResponseClass>
   /**
    * Ingest KV pairs to RawKV/Txn using gRPC streaming mode. This API should be called on both
    * leader and followers.
-   *
-   * @return
    */
   public void startWrite() {
     if (conf.isRawKVMode()) {

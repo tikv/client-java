@@ -19,13 +19,11 @@ package org.tikv.txn;
 
 import org.tikv.kvproto.Kvrpcpb;
 
-/**
- * ttl > 0: lock is not resolved
- *
- * <p>ttl = 0 && commitTS = 0: lock is deleted
- *
- * <p>ttl = 0 && commitTS > 0: lock is committed
- */
+// ttl > 0: lock is not resolved
+//
+// <p>ttl = 0 && commitTS = 0: lock is deleted
+//
+// <p>ttl = 0 && commitTS > 0: lock is committed
 public class TxnStatus {
   private long ttl;
   private long commitTS;
