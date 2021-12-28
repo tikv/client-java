@@ -24,11 +24,16 @@ import slowlog.SlowLog;
 
 public class Timeline implements Callable<Integer> {
 
-  @Option(names = {"--resolution"}, defaultValue = "70", description = "resolution of timelines")
+  @Option(
+      names = {"--resolution"},
+      defaultValue = "70",
+      description = "resolution of timelines")
   private int resolution;
 
-  @Option(names = {
-      "--threshold"}, defaultValue = "10", description = "threshold of warning time, in ms")
+  @Option(
+      names = {"--threshold"},
+      defaultValue = "10",
+      description = "threshold of warning time, in ms")
   int threshold;
 
   @Parameters(index = "0", description = "The log file to parse")

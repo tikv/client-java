@@ -506,6 +506,9 @@
                 <configuration>
                     <sourceDirectory>src/main/java</sourceDirectory>
                     <testSourceDirectory>src/test/java</testSourceDirectory>
+                    <additionalSourceDirectories>
+                        <param>tools</param>
+                    </additionalSourceDirectories>
                     <verbose>true</verbose>
                     <filesNamePattern>.*\.java</filesNamePattern>
                     <skip>false</skip>

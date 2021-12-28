@@ -30,12 +30,14 @@ public class SpanDeserializer implements JsonDeserializer<Span> {
   private String name;
 
   @Override
-  public Span deserialize(JsonElement jsonElement, Type type,
-      JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
+  public Span deserialize(
+      JsonElement jsonElement, Type type, JsonDeserializationContext jsonDeserializationContext)
+      throws JsonParseException {
 
-    Gson gson = new GsonBuilder()
-        .registerTypeAdapter(TimeRange.class, new TimeRangeDeserializer())
-        .create();
+    Gson gson =
+        new GsonBuilder()
+            .registerTypeAdapter(TimeRange.class, new TimeRangeDeserializer())
+            .create();
     SpanDeserializer spanDeserializer = gson.fromJson(jsonElement, SpanDeserializer.class);
     TimeRange timeRange = gson.fromJson(jsonElement, TimeRange.class);
     return new Span(spanDeserializer.name, timeRange);

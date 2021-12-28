@@ -40,7 +40,6 @@ public class TimeRange {
     return DATE_FORMAT.format(start);
   }
 
-
   public Date getEnd() {
     return end;
   }
@@ -54,8 +53,10 @@ public class TimeRange {
   }
 
   public static TimeRange fromJson(JsonElement jsonElement) {
-    Gson gson = new GsonBuilder().registerTypeAdapter(TimeRange.class, new TimeRangeDeserializer())
-        .create();
+    Gson gson =
+        new GsonBuilder()
+            .registerTypeAdapter(TimeRange.class, new TimeRangeDeserializer())
+            .create();
     return gson.fromJson(jsonElement, TimeRange.class);
   }
 

@@ -35,19 +35,19 @@ public class SlowLogDeserializer implements JsonDeserializer<SlowLog> {
   private String key;
   private Span[] spans;
 
-
   @Override
   public SlowLog deserialize(
       JsonElement jsonElement, Type type, JsonDeserializationContext jsonDeserializationContext)
       throws JsonParseException {
 
-    Gson gson = new GsonBuilder()
-        .registerTypeAdapter(Span.class, new SpanDeserializer())
-        .registerTypeAdapter(TimeRange.class, new TimeRangeDeserializer())
-        .create();
+    Gson gson =
+        new GsonBuilder()
+            .registerTypeAdapter(Span.class, new SpanDeserializer())
+            .registerTypeAdapter(TimeRange.class, new TimeRangeDeserializer())
+            .create();
     TimeRange timeRange = TimeRange.fromJson(jsonElement);
     SlowLogDeserializer deserializer = gson.fromJson(jsonElement, SlowLogDeserializer.class);
-    return new SlowLog(deserializer.name, timeRange, deserializer.region, deserializer.key,
-        deserializer.spans);
+    return new SlowLog(
+        deserializer.name, timeRange, deserializer.region, deserializer.key, deserializer.spans);
   }
 }

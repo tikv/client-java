@@ -31,8 +31,9 @@ import java.util.Objects;
 public class TimeRangeDeserializer implements JsonDeserializer<TimeRange> {
 
   @Override
-  public TimeRange deserialize(JsonElement jsonElement, Type type,
-      JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
+  public TimeRange deserialize(
+      JsonElement jsonElement, Type type, JsonDeserializationContext jsonDeserializationContext)
+      throws JsonParseException {
     JsonObject jsonObject = jsonElement.getAsJsonObject();
     String startStr = jsonObject.get("start").getAsString();
     String endStr = jsonObject.get("end").getAsString();
