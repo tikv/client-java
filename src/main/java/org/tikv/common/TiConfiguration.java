@@ -585,6 +585,14 @@ public class TiConfiguration implements Serializable {
     return kvMode;
   }
 
+  public boolean isRawKVMode() {
+    return getKvMode() == TiConfiguration.KVMode.RAW;
+  }
+
+  public boolean isTxnKVMode() {
+    return getKvMode() == KVMode.TXN;
+  }
+
   public TiConfiguration setKvMode(String kvMode) {
     this.kvMode = KVMode.valueOf(kvMode);
     return this;
