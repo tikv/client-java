@@ -50,7 +50,7 @@ public class LogParser {
           SlowLog slowLog = SlowLog.fromJson(reader);
           logs.add(slowLog);
         } catch (Exception e) {
-          System.out.println("Error parsing log: " + e.getMessage());
+          System.err.println("Error parsing log: " + e.getMessage());
         }
       }
     }
