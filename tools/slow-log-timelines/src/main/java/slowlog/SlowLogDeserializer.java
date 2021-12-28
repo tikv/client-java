@@ -34,4 +34,3 @@ public class SlowLogDeserializer implements JsonDeserializer<SlowLog> {
         deserializer.spans);
   }
 }
-

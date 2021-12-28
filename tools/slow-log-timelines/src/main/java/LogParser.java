@@ -1,4 +1,3 @@
-import com.google.gson.stream.JsonReader;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringReader;
@@ -31,8 +30,7 @@ public class LogParser {
         String log = StringUtils.stripStart(matcher.group(), logPrefix);
         try {
           StringReader reader = new StringReader(log);
-          JsonReader jsonReader = new JsonReader(reader);
-          SlowLog slowLog = SlowLog.fromJson(jsonReader);
+          SlowLog slowLog = SlowLog.fromJson(reader);
           logs.add(slowLog);
         } catch (Exception e) {
           System.out.println("Error parsing log: " + e.getMessage());
