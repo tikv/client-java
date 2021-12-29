@@ -17,6 +17,9 @@ package org.tikv.common;
 
 import static org.junit.Assert.assertEquals;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import org.junit.Test;
 import org.tikv.BaseRawKVTest;
 
@@ -37,5 +40,24 @@ public class TiConfigurationTest extends BaseRawKVTest {
     int newValue = 100000;
     conf.setIdleTimeout(newValue);
     assertEquals(newValue, conf.getIdleTimeout());
+  }
+
+  @Test
+  public void slowLogDefaultValueTest() {
+    TiConfiguration conf = TiConfiguration.createRawDefault();
+    assertEquals(conf.getTimeout() * 2, conf.getRawKVReadSlowLogInMS().longValue());
+    assertEquals(conf.getTimeout() * 2, conf.getRawKVWriteSlowLogInMS().longValue());
+    assertEquals(conf.getTimeout() * 2, conf.getRawKVBatchReadSlowLogInMS().longValue());
+    assertEquals(conf.getTimeout() * 2, conf.getRawKVBatchWriteSlowLogInMS().longValue());
+  }
+
+  @Test
+  public void serializeTest() throws IOException {
+    TiConfiguration conf = TiConfiguration.createDefault();
+    try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+      oos.writeObject(conf);
+      oos.flush();
+    }
   }
 }
