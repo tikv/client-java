@@ -325,7 +325,7 @@ public abstract class AbstractRegionStoreClient
       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
       Kvrpcpb.RawGetRequest rawGetRequest =
           Kvrpcpb.RawGetRequest.newBuilder()
-              .setContext(region.getReplicaContext(peer))
+              .setContext(region.getReplicaContext(region.getLeader()))
               .setKey(key)
               .build();
       ListenableFuture<Kvrpcpb.RawGetResponse> task =
