@@ -339,12 +339,12 @@ public class TiConfiguration implements Serializable {
   private int rawKVBatchWriteTimeoutInMS = getInt(TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS);
   private int rawKVScanTimeoutInMS = getInt(TIKV_RAWKV_SCAN_TIMEOUT_IN_MS);
   private int rawKVCleanTimeoutInMS = getInt(TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS);
-  private Optional<Integer> rawKVReadSlowLogInMS = getIntOption(TIKV_RAWKV_READ_SLOWLOG_IN_MS);
-  private Optional<Integer> rawKVWriteSlowLogInMS = getIntOption(TIKV_RAWKV_WRITE_SLOWLOG_IN_MS);
-  private Optional<Integer> rawKVBatchReadSlowLogInMS =
-      getIntOption(TIKV_RAWKV_BATCH_READ_SLOWLOG_IN_MS);
-  private Optional<Integer> rawKVBatchWriteSlowLogInMS =
-      getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS);
+  private Integer rawKVReadSlowLogInMS = getIntOption(TIKV_RAWKV_READ_SLOWLOG_IN_MS).orElse(null);
+  private Integer rawKVWriteSlowLogInMS = getIntOption(TIKV_RAWKV_WRITE_SLOWLOG_IN_MS).orElse(null);
+  private Integer rawKVBatchReadSlowLogInMS =
+      getIntOption(TIKV_RAWKV_BATCH_READ_SLOWLOG_IN_MS).orElse(null);
+  private Integer rawKVBatchWriteSlowLogInMS =
+      getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS).orElse(null);
   private int rawKVScanSlowLogInMS = getInt(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
   private boolean warmUpEnable = getBoolean(TIKV_WARM_UP_ENABLE);
   private int idleTimeout = getInt(TIKV_GRPC_IDLE_TIMEOUT);
@@ -760,35 +760,35 @@ public class TiConfiguration implements Serializable {
   }
 
   public Integer getRawKVReadSlowLogInMS() {
-    return rawKVReadSlowLogInMS.orElse((int) (getTimeout() * 2));
+    return Optional.ofNullable(rawKVReadSlowLogInMS).orElse((int) (getTimeout() * 2));
   }
 
   public void setRawKVReadSlowLogInMS(Integer rawKVReadSlowLogInMS) {
-    this.rawKVReadSlowLogInMS = Optional.of(rawKVReadSlowLogInMS);
+    this.rawKVReadSlowLogInMS = rawKVReadSlowLogInMS;
   }
 
   public Integer getRawKVWriteSlowLogInMS() {
-    return rawKVWriteSlowLogInMS.orElse((int) (getTimeout() * 2));
+    return Optional.ofNullable(rawKVWriteSlowLogInMS).orElse((int) (getTimeout() * 2));
   }
 
   public void setRawKVWriteSlowLogInMS(Integer rawKVWriteSlowLogInMS) {
-    this.rawKVWriteSlowLogInMS = Optional.of(rawKVWriteSlowLogInMS);
+    this.rawKVWriteSlowLogInMS = rawKVWriteSlowLogInMS;
   }
 
   public Integer getRawKVBatchReadSlowLogInMS() {
-    return rawKVBatchReadSlowLogInMS.orElse((int) (getTimeout() * 2));
+    return Optional.ofNullable(rawKVBatchReadSlowLogInMS).orElse((int) (getTimeout() * 2));
   }
 
   public void setRawKVBatchReadSlowLogInMS(Integer rawKVBatchReadSlowLogInMS) {
-    this.rawKVBatchReadSlowLogInMS = Optional.of(rawKVBatchReadSlowLogInMS);
+    this.rawKVBatchReadSlowLogInMS = rawKVBatchReadSlowLogInMS;
   }
 
   public Integer getRawKVBatchWriteSlowLogInMS() {
-    return rawKVBatchWriteSlowLogInMS.orElse((int) (getTimeout() * 2));
+    return Optional.ofNullable(rawKVBatchWriteSlowLogInMS).orElse((int) (getTimeout() * 2));
   }
 
   public void setRawKVBatchWriteSlowLogInMS(Integer rawKVBatchWriteSlowLogInMS) {
-    this.rawKVBatchWriteSlowLogInMS = Optional.of(rawKVBatchWriteSlowLogInMS);
+    this.rawKVBatchWriteSlowLogInMS = rawKVBatchWriteSlowLogInMS;
   }
 
   public int getRawKVScanSlowLogInMS() {
