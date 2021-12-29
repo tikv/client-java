@@ -113,10 +113,7 @@ public class TiSession implements AutoCloseable {
       do {
         List<Pdpb.Region> regions =
             regionManager.scanRegions(
-                ConcreteBackOffer.newGetBackOff(),
-                startKey,
-                ByteString.EMPTY,
-                conf.getScanRegionsLimit());
+                backOffer, startKey, ByteString.EMPTY, conf.getScanRegionsLimit());
         if (regions == null || regions.isEmpty()) {
           // something went wrong, but the warm-up process could continue
           break;
