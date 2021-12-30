@@ -22,6 +22,7 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
+import org.tikv.kvproto.Pdpb;
 
 /** Readonly PD client including only reading related interface Supposed for TiDB-like use cases */
 public interface ReadOnlyPDClient {
@@ -47,6 +48,9 @@ public interface ReadOnlyPDClient {
    * @return the region corresponding to the given Id
    */
   Pair<Metapb.Region, Metapb.Peer> getRegionByID(BackOffer backOffer, long id);
+
+  List<Pdpb.Region> scanRegions(
+      BackOffer backOffer, ByteString startKey, ByteString endKey, int limit);
 
   HostMapping getHostMapping();
 

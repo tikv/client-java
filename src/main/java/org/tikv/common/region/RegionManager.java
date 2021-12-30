@@ -21,6 +21,7 @@ import static org.tikv.common.codec.KeyUtils.formatBytesUTF8;
 
 import com.google.protobuf.ByteString;
 import io.prometheus.client.Histogram;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -41,6 +42,7 @@ import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Peer;
 import org.tikv.kvproto.Metapb.StoreState;
+import org.tikv.kvproto.Pdpb;
 
 @SuppressWarnings("UnstableApiUsage")
 public class RegionManager {
@@ -49,6 +51,11 @@ public class RegionManager {
       Histogram.build()
           .name("client_java_get_region_by_requests_latency")
           .help("getRegionByKey request latency.")
+          .register();
+  public static final Histogram SCAN_REGIONS_REQUEST_LATENCY =
+      Histogram.build()
+          .name("client_java_scan_regions_request_latency")
+          .help("scanRegions request latency.")
           .register();
 
   // TODO: the region cache logic need rewrite.
@@ -89,6 +96,20 @@ public class RegionManager {
 
   public ReadOnlyPDClient getPDClient() {
     return this.pdClient;
+  }
+
+  public List<Pdpb.Region> scanRegions(
+      BackOffer backOffer, ByteString startKey, ByteString endKey, int limit) {
+    Histogram.Timer requestTimer = SCAN_REGIONS_REQUEST_LATENCY.startTimer();
+    SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("scanRegions");
+    try {
+      return pdClient.scanRegions(backOffer, startKey, endKey, limit);
+    } catch (Exception e) {
+      return new ArrayList<>();
+    } finally {
+      requestTimer.observeDuration();
+      slowLogSpan.end();
+    }
   }
 
   public TiRegion getRegionByKey(ByteString key) {

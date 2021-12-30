@@ -85,6 +85,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_PD_ADDRESSES, DEF_PD_ADDRESSES);
     setIfMissing(TIKV_GRPC_TIMEOUT, DEF_TIMEOUT);
     setIfMissing(TIKV_GRPC_FORWARD_TIMEOUT, DEF_FORWARD_TIMEOUT);
+    setIfMissing(TIKV_GRPC_WARM_UP_TIMEOUT, DEF_TIKV_GRPC_WARM_UP_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_TIMEOUT, DEF_SCAN_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_BATCH_SIZE, DEF_SCAN_BATCH_SIZE);
     setIfMissing(TIKV_GRPC_MAX_FRAME_SIZE, DEF_MAX_FRAME_SIZE);
@@ -113,6 +114,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_HEALTH_CHECK_PERIOD_DURATION, DEF_HEALTH_CHECK_PERIOD_DURATION);
     setIfMissing(TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS, DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS);
     setIfMissing(TIKV_GRPC_IDLE_TIMEOUT, DEF_TIKV_GRPC_IDLE_TIMEOUT);
+    setIfMissing(TIKV_WARM_UP_ENABLE, DEF_TIKV_WARM_UP_ENABLE);
     setIfMissing(TIKV_RAWKV_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_WRITE_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS);
     setIfMissing(TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS, DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS);
@@ -135,6 +137,7 @@ public class TiConfiguration implements Serializable {
         TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS, DEF_TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS);
     setIfMissing(
         TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT, DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
+    setIfMissing(TIKV_SCAN_REGIONS_LIMIT, DEF_TIKV_SCAN_REGIONS_LIMIT);
   }
 
   public static void listAll() {
@@ -297,6 +300,7 @@ public class TiConfiguration implements Serializable {
 
   private long timeout = getTimeAsMs(TIKV_GRPC_TIMEOUT);
   private long forwardTimeout = getTimeAsMs(TIKV_GRPC_FORWARD_TIMEOUT);
+  private long warmUpTimeout = getTimeAsMs(TIKV_GRPC_WARM_UP_TIMEOUT);
   private long scanTimeout = getTimeAsMs(TIKV_GRPC_SCAN_TIMEOUT);
   private int maxFrameSize = getInt(TIKV_GRPC_MAX_FRAME_SIZE);
   private List<URI> pdAddrs = getPdAddrs(TIKV_PD_ADDRESSES);
@@ -342,6 +346,7 @@ public class TiConfiguration implements Serializable {
   private Integer rawKVBatchWriteSlowLogInMS =
       getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS).orElse(null);
   private int rawKVScanSlowLogInMS = getInt(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
+  private boolean warmUpEnable = getBoolean(TIKV_WARM_UP_ENABLE);
   private int idleTimeout = getInt(TIKV_GRPC_IDLE_TIMEOUT);
   private boolean circuitBreakEnable = getBoolean(TiKV_CIRCUIT_BREAK_ENABLE);
   private int circuitBreakAvailabilityWindowInSeconds =
@@ -352,6 +357,8 @@ public class TiConfiguration implements Serializable {
       getInt(TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD);
   private int circuitBreakSleepWindowInSeconds = getInt(TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS);
   private int circuitBreakAttemptRequestCount = getInt(TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
+
+  private int scanRegionsLimit = getInt(TIKV_SCAN_REGIONS_LIMIT);
 
   public enum KVMode {
     TXN,
@@ -424,6 +431,15 @@ public class TiConfiguration implements Serializable {
 
   public TiConfiguration setForwardTimeout(long timeout) {
     this.forwardTimeout = timeout;
+    return this;
+  }
+
+  public long getWarmUpTimeout() {
+    return warmUpTimeout;
+  }
+
+  public TiConfiguration setWarmUpTimeout(long timeout) {
+    this.warmUpTimeout = timeout;
     return this;
   }
 
@@ -569,6 +585,14 @@ public class TiConfiguration implements Serializable {
     return kvMode;
   }
 
+  public boolean isRawKVMode() {
+    return getKvMode() == TiConfiguration.KVMode.RAW;
+  }
+
+  public boolean isTxnKVMode() {
+    return getKvMode() == KVMode.TXN;
+  }
+
   public TiConfiguration setKvMode(String kvMode) {
     this.kvMode = KVMode.valueOf(kvMode);
     return this;
@@ -677,6 +701,14 @@ public class TiConfiguration implements Serializable {
 
   public void setIdleTimeout(int timeout) {
     this.idleTimeout = timeout;
+  }
+
+  public boolean isWarmUpEnable() {
+    return warmUpEnable;
+  }
+
+  public void setWarmUpEnable(boolean warmUpEnable) {
+    this.warmUpEnable = warmUpEnable;
   }
 
   public int getRawKVReadTimeoutInMS() {
@@ -818,5 +850,13 @@ public class TiConfiguration implements Serializable {
 
   public void setCircuitBreakAttemptRequestCount(int circuitBreakAttemptRequestCount) {
     this.circuitBreakAttemptRequestCount = circuitBreakAttemptRequestCount;
+  }
+
+  public int getScanRegionsLimit() {
+    return scanRegionsLimit;
+  }
+
+  public void setScanRegionsLimit(int scanRegionsLimit) {
+    this.scanRegionsLimit = scanRegionsLimit;
   }
 }

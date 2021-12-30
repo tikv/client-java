@@ -40,6 +40,7 @@ import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Metapb;
+import org.tikv.kvproto.Pdpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.raw.SmartRawKVClient;
 import org.tikv.service.failsafe.CircuitBreaker;
@@ -86,7 +87,9 @@ public class TiSession implements AutoCloseable {
     if (this.enableGrpcForward) {
       logger.info("enable grpc forward for high available");
     }
-    warmUp();
+    if (conf.isWarmUpEnable() && conf.isRawKVMode()) {
+      warmUp();
+    }
     this.circuitBreaker = new CircuitBreakerImpl(conf);
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
@@ -104,19 +107,37 @@ public class TiSession implements AutoCloseable {
         this.regionManager.updateStore(
             null, new TiStore(this.client.getStore(backOffer, store.getId())));
       }
-      ByteString startKey = ByteString.EMPTY;
 
+      // use scan region to load region cache with limit
+      ByteString startKey = ByteString.EMPTY;
       do {
-        TiRegion region = regionManager.getRegionByKey(startKey, backOffer);
-        startKey = region.getEndKey();
+        List<Pdpb.Region> regions =
+            regionManager.scanRegions(
+                backOffer, startKey, ByteString.EMPTY, conf.getScanRegionsLimit());
+        if (regions == null || regions.isEmpty()) {
+          // something went wrong, but the warm-up process could continue
+          break;
+        }
+        for (Pdpb.Region region : regions) {
+          regionManager.insertRegionToCache(
+              regionManager.createRegion(region.getRegion(), ConcreteBackOffer.newGetBackOff()));
+        }
+        startKey = regions.get(regions.size() - 1).getRegion().getEndKey();
       } while (!startKey.isEmpty());
 
-      RawKVClient rawKVClient = createRawClient();
-      ByteString exampleKey = ByteString.EMPTY;
-      ByteString prev = rawKVClient.get(exampleKey);
-      rawKVClient.delete(exampleKey);
-      rawKVClient.putIfAbsent(exampleKey, prev);
-      rawKVClient.put(exampleKey, prev);
+      try (RawKVClient rawKVClient = createRawClient()) {
+        ByteString exampleKey = ByteString.EMPTY;
+        ByteString prev = rawKVClient.get(exampleKey);
+        if (prev != null) {
+          rawKVClient.delete(exampleKey);
+          rawKVClient.putIfAbsent(exampleKey, prev);
+          rawKVClient.put(exampleKey, prev);
+        } else {
+          rawKVClient.putIfAbsent(exampleKey, ByteString.EMPTY);
+          rawKVClient.put(exampleKey, ByteString.EMPTY);
+          rawKVClient.delete(exampleKey);
+        }
+      }
     } catch (Exception e) {
       // ignore error
       logger.info("warm up fails, ignored ", e);
