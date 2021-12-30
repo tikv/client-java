@@ -21,4 +21,5 @@ header:
     - '**/*.json'
     - '**/*.pem'
     - '**/*.crt'
+    - '**/*.g4'
   comment: on-failure
