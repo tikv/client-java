@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2017 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -168,8 +168,8 @@ public class ConcreteBackOffer implements BackOffer {
   }
 
   public boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType, long maxSleepMs) {
-    SlowLogSpan slowLogSpan = getSlowLog().start("backoff " + funcType.name());
     Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(funcType.name()).startTimer();
+    SlowLogSpan slowLogSpan = getSlowLog().start("backoff " + funcType.name());
     BackOffFunction backOffFunction =
         backOffFunctionMap.computeIfAbsent(funcType, this::createBackOffFunc);
 
@@ -181,6 +181,8 @@ public class ConcreteBackOffer implements BackOffer {
       long currentMs = System.currentTimeMillis();
       if (currentMs + sleep >= deadline) {
         logger.warn(String.format("Deadline %d is exceeded, errors:", deadline));
+        slowLogSpan.end();
+        backOffTimer.observeDuration();
         return false;
       }
     }

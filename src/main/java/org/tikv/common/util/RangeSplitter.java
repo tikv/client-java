@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2017 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ public class RangeSplitter {
    *
    * @param tableId Table id used for the handle
    * @param handles Handle list
-   * @return <Region, HandleList> map
+   * @return {@code <Region, HandleList>} map
    */
   public Map<Pair<TiRegion, TiStore>, TLongArrayList> groupByAndSortHandlesByRegionId(
       long tableId, TLongArrayList handles) {

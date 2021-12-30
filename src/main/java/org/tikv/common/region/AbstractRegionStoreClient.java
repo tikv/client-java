@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2019 PingCAP, Inc.
+ * Copyright 2019 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ public abstract class AbstractRegionStoreClient
    * @return false when re-split is needed.
    */
   @Override
-  public boolean onNotLeader(TiRegion newRegion) {
+  public boolean onNotLeader(TiRegion newRegion, BackOffer backOffer) {
     if (logger.isDebugEnabled()) {
       logger.debug(region + ", new leader = " + newRegion.getLeader().getStoreId());
     }
@@ -123,7 +123,7 @@ public abstract class AbstractRegionStoreClient
       store = null;
     }
     region = newRegion;
-    store = regionManager.getStoreById(region.getLeader().getStoreId());
+    store = regionManager.getStoreById(region.getLeader().getStoreId(), backOffer);
     updateClientStub();
     return true;
   }
@@ -193,10 +193,10 @@ public abstract class AbstractRegionStoreClient
 
       logger.info(String.format("try switch leader: region[%d]", region.getId()));
 
-      Metapb.Peer peer = switchLeaderStore();
+      Metapb.Peer peer = switchLeaderStore(backOffer);
       if (peer != null) {
         // we found a leader
-        TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId());
+        TiStore currentLeaderStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
         if (currentLeaderStore.isReachable()) {
           logger.info(
               String.format(
@@ -232,7 +232,7 @@ public abstract class AbstractRegionStoreClient
     try {
       logger.info(String.format("try grpc forward: region[%d]", region.getId()));
       // when current leader cannot be reached
-      TiStore storeWithProxy = switchProxyStore();
+      TiStore storeWithProxy = switchProxyStore(backOffer);
       if (storeWithProxy == null) {
         // no store available, retry
         logger.warn(String.format("No store available, retry: region[%d]", region.getId()));
@@ -250,11 +250,11 @@ public abstract class AbstractRegionStoreClient
   }
 
   // first: leader peer, second: true if any responses returned with grpc error
-  private Metapb.Peer switchLeaderStore() {
+  private Metapb.Peer switchLeaderStore(BackOffer backOffer) {
     List<SwitchLeaderTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
-      TiStore peerStore = regionManager.getStoreById(peer.getStoreId());
+      TiStore peerStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
       ManagedChannel channel =
           channelFactory.getChannel(
               peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
@@ -300,12 +300,12 @@ public abstract class AbstractRegionStoreClient
     }
   }
 
-  private TiStore switchProxyStore() {
+  private TiStore switchProxyStore(BackOffer backOffer) {
     long forwardTimeout = conf.getForwardTimeout();
     List<ForwardCheckTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
-      TiStore peerStore = regionManager.getStoreById(peer.getStoreId());
+      TiStore peerStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
       ManagedChannel channel =
           channelFactory.getChannel(
               peerStore.getAddress(), regionManager.getPDClient().getHostMapping());

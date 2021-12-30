@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021 PingCAP, Inc.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,8 +106,6 @@ public class ImporterStoreClient<RequestClass, ResponseClass>
   /**
    * Ingest KV pairs to RawKV/Txn using gRPC streaming mode. This API should be called on both
    * leader and followers.
-   *
-   * @return
    */
   public void startWrite() {
     if (conf.isRawKVMode()) {

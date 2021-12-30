@@ -21,6 +21,15 @@ jobs:
 
       - run: mdbook build ./docs
 
+      - name: Set up JDK 8
+        uses: actions/setup-java@v2
+        with:
+          java-version: '8'
+          distribution: 'adopt'
+
+      - name: Javadoc
+        run: mvn clean javadoc:javadoc -Djavadoc.skip=false && mv ./target/site/apidocs ./docs/book/apidocs
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         if: ${{ github.ref == 'refs/heads/master' }}

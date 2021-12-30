@@ -74,3 +74,6 @@ out/
 
 # vscode
 .settings
+
+# mdbook
+docs/book
