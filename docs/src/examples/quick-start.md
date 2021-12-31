@@ -97,5 +97,6 @@ public class Main {
 Run following command:
 
 ```
-mvn package exec:java -Dexec.mainClass=com.example.App
+mvn assembly:assembly -DdescriptorId=jar-with-dependencies
+java -cp target/java-client-example-1.0-SNAPSHOT-jar-with-dependencies.jar com.example.App
 ```
