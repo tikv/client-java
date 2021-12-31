@@ -21,6 +21,21 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.util.TestUtils;
 
 public class BaseRawKVTest {
+
+  protected String getTiKVVersion() {
+    String tikvVersion = TestUtils.getEnv("TIKV_VERSION");
+    return tikvVersion == null ? "master" : tikvVersion;
+  }
+
+  protected boolean tikvVersionNewerThan(String expectedVersion) {
+    String version = getTiKVVersion();
+    // the minimum version of master TiKV is v5.3.0
+    if (version.equals("master")) {
+      return true;
+    }
+    return version.compareTo(expectedVersion) >= 0;
+  }
+
   protected TiConfiguration createTiConfiguration() {
     String pdAddrsStr = TestUtils.getEnv("RAWKV_PD_ADDRESSES");
 

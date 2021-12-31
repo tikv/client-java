@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.After;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.tikv.BaseRawKVTest;
@@ -37,6 +38,7 @@ import org.tikv.raw.RawKVClient;
 import org.tikv.util.TestUtils;
 
 public class RawKVIngestTest extends BaseRawKVTest {
+
   private TiSession session;
 
   private static final int KEY_NUMBER = 16;
@@ -59,6 +61,7 @@ public class RawKVIngestTest extends BaseRawKVTest {
 
   @Test
   public void rawKVIngestTest() {
+    Assume.assumeTrue(tikvVersionNewerThan("v5.2.0"));
     RawKVClient client = session.createRawClient();
 
     // gen test data
