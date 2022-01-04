@@ -24,12 +24,14 @@ import slowlog.SlowLog;
 
 public class Timeline implements Callable<Integer> {
 
+  // `resolution` is the maximum bar count for the timelines.
   @Option(
       names = {"--resolution"},
       defaultValue = "70",
       description = "resolution of timelines")
   private int resolution;
 
+  // `threshold` is the threshold for the timeline needs to report warning.
   @Option(
       names = {"--threshold"},
       defaultValue = "10",
