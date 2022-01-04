@@ -5,7 +5,7 @@
 
     <groupId>org.tikv</groupId>
     <artifactId>tikv-client-java</artifactId>
-    <version>3.1.9-SNAPSHOT</version>
+    <version>3.1.9.1-jh</version>
     <packaging>jar</packaging>
     <name>TiKV Java Client</name>
     <description>A Java Client for TiKV</description>
@@ -117,6 +117,20 @@
             <groupId>io.grpc</groupId>
             <artifactId>grpc-netty</artifactId>
             <version>${grpc.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-handler</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-codec-http2</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-handler-proxy</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.grpc</groupId>
@@ -138,6 +152,21 @@
             <artifactId>grpc-testing</artifactId>
             <version>${grpc.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-handler</artifactId>
+            <version>4.1.71.Final</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http2</artifactId>
+            <version>4.1.71.Final</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-handler-proxy</artifactId>
+            <version>4.1.71.Final</version>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
