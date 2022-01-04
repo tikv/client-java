@@ -17,10 +17,21 @@
 
 package org.tikv;
 
+import org.tikv.common.PDClient;
+import org.tikv.common.StoreVersion;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
 import org.tikv.util.TestUtils;
 
 public class BaseRawKVTest {
+
+  protected boolean tikvVersionNewerThan(String expectedVersion) {
+    TiConfiguration conf = createTiConfiguration();
+    TiSession session = TiSession.create(conf);
+    PDClient pdClient = session.getPDClient();
+    return StoreVersion.minTiKVVersion(expectedVersion, pdClient);
+  }
+
   protected TiConfiguration createTiConfiguration() {
     String pdAddrsStr = TestUtils.getEnv("RAWKV_PD_ADDRESSES");
 
