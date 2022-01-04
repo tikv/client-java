@@ -43,16 +43,14 @@ public class SlowLog {
   public String getTimelines(int resolution, Duration threhold) {
     StringBuilder sb = new StringBuilder();
     float factor = (float) resolution / (float) range.getDuration().toNanos();
+    Attribute attrColor = Attribute.YELLOW_TEXT();
 
-    sb.append(Ansi.colorize(String.format("function: %s\n", name), Attribute.BRIGHT_YELLOW_TEXT()));
-    sb.append(
-        Ansi.colorize(
-            String.format("start: %s\n", range.getStartString()), Attribute.BRIGHT_YELLOW_TEXT()));
-    sb.append(
-        Ansi.colorize(
-            String.format("end: %s\n", range.getEndString()), Attribute.BRIGHT_YELLOW_TEXT()));
-    sb.append(Ansi.colorize(String.format("region: %s\n", region), Attribute.BRIGHT_YELLOW_TEXT()));
-    sb.append(Ansi.colorize(String.format("key: %s\n", key), Attribute.BRIGHT_YELLOW_TEXT()));
+    sb.append(Ansi.colorize(String.format("function: %s\n", name), attrColor));
+
+    sb.append(Ansi.colorize(String.format("start: %s\n", range.getStartString()), attrColor));
+    sb.append(Ansi.colorize(String.format("end: %s\n", range.getEndString()), attrColor));
+    sb.append(Ansi.colorize(String.format("region: %s\n", region), attrColor));
+    sb.append(Ansi.colorize(String.format("key: %s\n", key), attrColor));
     sb.append(StringUtils.repeat("=", resolution))
         .append("  total ")
         .append(range.getDuration().toMillis())
