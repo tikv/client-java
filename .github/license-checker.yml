@@ -22,4 +22,5 @@ header:
     - '**/*.pem'
     - '**/*.crt'
     - '**/*.g4'
+    - '**/*.log'
   comment: on-failure
