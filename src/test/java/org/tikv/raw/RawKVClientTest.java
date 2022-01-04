@@ -384,9 +384,7 @@ public class RawKVClientTest extends BaseRawKVTest {
     baseTest(100, 100, 100, 100, false, true, true, true, true);
   }
 
-  /**
-   * Example of benchmarking base test
-   */
+  /** Example of benchmarking base test */
   public void benchmark() {
     baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, false, false, false, false);
     baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, true, true, true, true);
