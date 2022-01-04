@@ -17,8 +17,6 @@
 
 package org.tikv;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.tikv.common.PDClient;
 import org.tikv.common.StoreVersion;
 import org.tikv.common.TiConfiguration;
