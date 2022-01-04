@@ -91,6 +91,7 @@ public class RawKVIngestTest extends BaseRawKVTest {
 
   @Test
   public void rawKVIngestTestWithTTL() throws InterruptedException {
+    Assume.assumeTrue(tikvVersionNewerThan("v5.2.0"));
     long ttl = 10;
     RawKVClient client = session.createRawClient();
 

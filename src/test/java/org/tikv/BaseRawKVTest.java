@@ -17,23 +17,21 @@
 
 package org.tikv;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.tikv.common.PDClient;
+import org.tikv.common.StoreVersion;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
 import org.tikv.util.TestUtils;
 
 public class BaseRawKVTest {
 
-  protected String getTiKVVersion() {
-    String tikvVersion = TestUtils.getEnv("TIKV_VERSION");
-    return tikvVersion == null ? "master" : tikvVersion;
-  }
-
   protected boolean tikvVersionNewerThan(String expectedVersion) {
-    String version = getTiKVVersion();
-    // the minimum version of master TiKV is v5.3.0
-    if (version.equals("master")) {
-      return true;
-    }
-    return version.compareTo(expectedVersion) >= 0;
+    TiConfiguration conf = createTiConfiguration();
+    TiSession session = TiSession.create(conf);
+    PDClient pdClient = session.getPDClient();
+    return StoreVersion.minTiKVVersion(expectedVersion, pdClient);
   }
 
   protected TiConfiguration createTiConfiguration() {
