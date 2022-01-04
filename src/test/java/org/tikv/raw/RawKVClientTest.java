@@ -45,6 +45,7 @@ import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest extends BaseRawKVTest {
+
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -308,6 +309,23 @@ public class RawKVClientTest extends BaseRawKVTest {
   }
 
   @Test
+  public void batchDeleteTest() {
+    int cnt = 8;
+    List<ByteString> keys = new ArrayList<>();
+    for (int i = 0; i < cnt; i++) {
+      ByteString key = getRandomRawKey().concat(ByteString.copyFromUtf8("batch_delete_test"));
+      client.put(key, key);
+      keys.add(key);
+    }
+
+    client.batchDelete(keys);
+
+    for (int i = 0; i < cnt; i++) {
+      checkNotExist(keys.get(i));
+    }
+  }
+
+  @Test
   public void simpleTest() {
     ByteString key = rawKey("key");
     ByteString key0 = rawKey("key0");
@@ -366,7 +384,9 @@ public class RawKVClientTest extends BaseRawKVTest {
     baseTest(100, 100, 100, 100, false, true, true, true, true);
   }
 
-  /** Example of benchmarking base test */
+  /**
+   * Example of benchmarking base test
+   */
   public void benchmark() {
     baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, false, false, false, false);
     baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, true, true, true, true);
@@ -449,7 +469,9 @@ public class RawKVClientTest extends BaseRawKVTest {
       int i = cnt;
       completionService.submit(
           () -> {
-            for (int j = 0; j < base; j++) checkDelete(remainingKeys.get(i * base + j).getKey());
+            for (int j = 0; j < base; j++) {
+              checkDelete(remainingKeys.get(i * base + j).getKey());
+            }
             return null;
           });
     }
@@ -955,6 +977,7 @@ public class RawKVClientTest extends BaseRawKVTest {
   }
 
   private static class ByteStringComparator implements Comparator<ByteString> {
+
     @Override
     public int compare(ByteString startKey, ByteString endKey) {
       return FastByteComparisons.compareTo(startKey.toByteArray(), endKey.toByteArray());
