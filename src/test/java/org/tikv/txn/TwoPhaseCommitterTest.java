@@ -22,6 +22,7 @@ import static org.junit.Assert.fail;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,6 +44,13 @@ public class TwoPhaseCommitterTest extends BaseTxnKVTest {
       session = TiSession.create(conf);
     } catch (Exception e) {
       fail("TiDB cluster may not be present");
+    }
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    if (session != null) {
+      session.close();
     }
   }
 
