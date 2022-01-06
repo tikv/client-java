@@ -101,7 +101,9 @@ public abstract class RetryPolicy<RespT> {
 
         // Handle response error
         if (handler != null) {
+          SlowLogSpan span = backOffer.getSlowLog().start("handleResponseError " + methodName);
           boolean retry = handler.handleResponseError(backOffer, result);
+          span.end();
           if (retry) {
             GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
             continue;
