@@ -158,9 +158,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     logger.warn(String.format("Unknown error %s for region [%s]", error, recv.getRegion()));
     // For other errors, we only drop cache here.
     // Upper level may split this task.
-    SlowLogSpan invalidateRegionCacheSlowLogSpan = backOffer.getSlowLog().start("invalidateRegionCache");
     invalidateRegionStoreCache(recv.getRegion());
-    invalidateRegionCacheSlowLogSpan.end();
     // retry if raft proposal is dropped, it indicates the store is in the middle of transition
     if (error.getMessage().contains("Raft ProposalDropped")) {
       backOffer.doBackOff(
@@ -250,8 +248,14 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     return recv.getRegion();
   }
 
-  private void invalidateRegionStoreCache(TiRegion ctxRegion) {
+  private void invalidateRegionStoreCache(TiRegion ctxRegion, BackOffer backOffer) {
+    SlowLogSpan invalidateRegionCacheSlowLogSpan =
+        backOffer.getSlowLog().start("invalidRegionCache");
     regionManager.invalidateRegion(ctxRegion);
+    invalidateRegionCacheSlowLogSpan.end();
+
+    SlowLogSpan invalidateStoreCacheSlowLogSpan = backOffer.getSlowLog().start("invalidStoreCache");
     regionManager.invalidateStore(ctxRegion.getLeader().getStoreId());
+    invalidateStoreCacheSlowLogSpan.end();
   }
 }
