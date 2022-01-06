@@ -45,11 +45,15 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     }
     // Region error handling logic
     SlowLogSpan span = backOffer.getSlowLog().start("getRegionError");
+    long start = System.nanoTime();
     Errorpb.Error error = getRegionError(resp);
+    logger.warn("getRegionError used {}ms", (System.nanoTime() - start) / 1_000_000);
     span.end();
     if (error != null) {
       span = backOffer.getSlowLog().start("handleRegionError");
+      start = System.nanoTime();
       boolean retry = handleRegionError(backOffer, error);
+      logger.warn("handleRegionError used {}ms", (System.nanoTime() - start) / 1_000_000);
       span.end();
       return retry;
     }
@@ -160,10 +164,12 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
       throw new StatusRuntimeException(Status.UNKNOWN.withDescription(error.toString()));
     }
 
+    long start = System.nanoTime();
     logger.warn(String.format("Unknown error %s for region [%s]", error, recv.getRegion()));
     // For other errors, we only drop cache here.
     // Upper level may split this task.
     invalidateRegionStoreCache(recv.getRegion(), backOffer);
+    logger.warn("invalidate cache used {}ms", (System.nanoTime() - start) / 1_000_000);
     // retry if raft proposal is dropped, it indicates the store is in the middle of transition
     if (error.getMessage().contains("Raft ProposalDropped")) {
       backOffer.doBackOff(

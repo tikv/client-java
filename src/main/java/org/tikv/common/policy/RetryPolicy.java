@@ -20,6 +20,8 @@ import io.grpc.Status;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
 import java.util.concurrent.Callable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.operation.ErrorHandler;
@@ -28,6 +30,7 @@ import org.tikv.common.util.ConcreteBackOffer;
 
 public abstract class RetryPolicy<RespT> {
   BackOffer backOffer = ConcreteBackOffer.newCopNextMaxBackOff();
+  private static final Logger logger = LoggerFactory.getLogger(RetryPolicy.class);
   public static final Histogram GRPC_SINGLE_REQUEST_LATENCY =
       Histogram.build()
           .name("client_java_grpc_single_requests_latency")
@@ -80,9 +83,11 @@ public abstract class RetryPolicy<RespT> {
           Histogram.Timer requestTimer =
               GRPC_SINGLE_REQUEST_LATENCY.labels(methodName).startTimer();
           SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("gRPC " + methodName);
+          long start = System.nanoTime();
           try {
             result = proc.call();
           } finally {
+            logger.warn("gRPC {} used {}ms", methodName, (System.nanoTime() - start)/1_000_000);
             slowLogSpan.end();
             requestTimer.observeDuration();
           }
@@ -102,8 +107,10 @@ public abstract class RetryPolicy<RespT> {
         // Handle response error
         if (handler != null) {
           SlowLogSpan span = backOffer.getSlowLog().start("handleResponseError " + methodName);
+          long start = System.nanoTime();
           boolean retry = handler.handleResponseError(backOffer, result);
           span.end();
+          logger.warn("handleResponseError {} used {}ms", methodName, (System.nanoTime() - start)/1_000_000);
           if (retry) {
             GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
             continue;
