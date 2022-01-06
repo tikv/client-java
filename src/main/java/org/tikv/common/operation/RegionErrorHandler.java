@@ -46,7 +46,10 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     // Region error handling logic
     Errorpb.Error error = getRegionError(resp);
     if (error != null) {
-      return handleRegionError(backOffer, error);
+      SlowLogSpan span = backOffer.getSlowLog().start("handleRegionError");
+      boolean retry = handleRegionError(backOffer, error);
+      span.end();
+      return retry;
     }
     return false;
   }
