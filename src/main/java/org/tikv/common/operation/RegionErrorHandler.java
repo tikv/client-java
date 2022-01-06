@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.region.RegionErrorReceiver;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
@@ -157,7 +158,9 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     logger.warn(String.format("Unknown error %s for region [%s]", error, recv.getRegion()));
     // For other errors, we only drop cache here.
     // Upper level may split this task.
+    SlowLogSpan invalidateRegionCacheSlowLogSpan = backOffer.getSlowLog().start("invalidateRegionCache");
     invalidateRegionStoreCache(recv.getRegion());
+    invalidateRegionCacheSlowLogSpan.end();
     // retry if raft proposal is dropped, it indicates the store is in the middle of transition
     if (error.getMessage().contains("Raft ProposalDropped")) {
       backOffer.doBackOff(
