@@ -158,7 +158,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     logger.warn(String.format("Unknown error %s for region [%s]", error, recv.getRegion()));
     // For other errors, we only drop cache here.
     // Upper level may split this task.
-    invalidateRegionStoreCache(recv.getRegion());
+    invalidateRegionStoreCache(recv.getRegion(), backOffer);
     // retry if raft proposal is dropped, it indicates the store is in the middle of transition
     if (error.getMessage().contains("Raft ProposalDropped")) {
       backOffer.doBackOff(
