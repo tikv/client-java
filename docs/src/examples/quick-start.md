@@ -6,15 +6,15 @@ The package is hosted on maven central repository. To build from source, refer t
 
 First download [maven] and follow the [installation instructoins][install]. Then `mvn` command should be available in the `$PATH`.
 
+[maven]: https://maven.apache.org/download.html
+[install]: https://maven.apache.org/install.html
+
 create a maven project by following command:
 
 ```
 mvn archetype:generate -DgroupId=com.example -DartifactId=java-client-example -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
 cd java-client-example
 ```
-
-[maven]: https://maven.apache.org/download.html
-[install]: https://maven.apache.org/install.html
 
 ## Add dependency
 
