@@ -72,7 +72,8 @@ Now `pom.xml` should look like this:
 
 ## Writing code
 
-Write code in `src/main/java/com/example/App.java`:
+To interact with TiKV, we should first create a `TiConfiguration` with PD address, create a `TiSession` using `TiSession.create`, and then create a client.
+For example, if we want to put a `World` in `Hello` key in RawKV, write the following code in `src/main/java/com/example/App.java`.
 
 ```java
 import org.tikv.common.TiConfiguration;
@@ -86,12 +87,16 @@ public class Main {
     TiConfiguration conf = TiConfiguration.createRawDefault(pdAddr);
     try (TiSession session = TiSession.create(conf)) {
       try (RawKVClient client = session.createRawClient()) {
-        // ... do operations with client
+				client.put(ByteString.copyFromUtf8("Hello"), ByteString.copyFromUtf8("World"));
+				Optional<ByteString> value = client.get(ByteString.copyFromUtf8("Hello"));
+				System.out.println(value.get());
       }
     }
   }
 }
 ```
+
+More examples for RawKV and TxnKV are in following chapters.
 
 ## Running program
 
