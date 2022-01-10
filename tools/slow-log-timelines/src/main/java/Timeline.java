@@ -26,9 +26,9 @@ public class Timeline implements Callable<Integer> {
 
   // `resolution` is the maximum bar count for the timelines.
   @Option(
-      names = {"--resolution"},
+      names = {"--width"},
       defaultValue = "70",
-      description = "resolution of timelines")
+      description = "width of timelines")
   private int resolution;
 
   // `threshold` is the threshold for the timeline needs to report warning.

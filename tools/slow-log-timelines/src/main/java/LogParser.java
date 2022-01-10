@@ -43,15 +43,16 @@ public class LogParser {
     while (sc.hasNextLine()) {
       String line = sc.nextLine();
       Matcher matcher = logPattern.matcher(line);
-      if (matcher.find()) {
-        String log = StringUtils.stripStart(matcher.group(), logPrefix);
-        try {
-          StringReader reader = new StringReader(log);
-          SlowLog slowLog = SlowLog.fromJson(reader);
-          logs.add(slowLog);
-        } catch (Exception e) {
-          System.err.println("Error parsing log: " + e.getMessage());
-        }
+      if (!matcher.find()) {
+        continue;
+      }
+      String log = StringUtils.stripStart(matcher.group(), logPrefix);
+      try {
+        StringReader reader = new StringReader(log);
+        SlowLog slowLog = SlowLog.fromJson(reader);
+        logs.add(slowLog);
+      } catch (Exception e) {
+        System.err.println("Error parsing log: " + e.getMessage());
       }
     }
     return logs;
