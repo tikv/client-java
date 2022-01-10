@@ -22,7 +22,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
-import io.grpc.ManagedChannel;
+import io.grpc.Channel;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
@@ -169,7 +169,7 @@ public abstract class AbstractRegionStoreClient
       addressStr = store.getProxyStore().getAddress();
       deadline = conf.getForwardTimeout();
     }
-    ManagedChannel channel =
+    Channel channel =
         channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
     blockingStub =
         TikvGrpc.newBlockingStub(channel).withDeadlineAfter(deadline, TimeUnit.MILLISECONDS);
@@ -255,7 +255,7 @@ public abstract class AbstractRegionStoreClient
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
       TiStore peerStore = regionManager.getStoreById(peer.getStoreId());
-      ManagedChannel channel =
+      Channel channel =
           channelFactory.getChannel(
               peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
       TikvGrpc.TikvFutureStub stub =
@@ -306,7 +306,7 @@ public abstract class AbstractRegionStoreClient
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
       TiStore peerStore = regionManager.getStoreById(peer.getStoreId());
-      ManagedChannel channel =
+      Channel channel =
           channelFactory.getChannel(
               peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
       TikvGrpc.TikvFutureStub stub =

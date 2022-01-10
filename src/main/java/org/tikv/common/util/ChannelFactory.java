@@ -15,23 +15,25 @@
 
 package org.tikv.common.util;
 
+import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.net.URI;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import org.tikv.grpc.ClientTracingInterceptor;
 import org.tikv.common.HostMapping;
 import org.tikv.common.pd.PDUtils;
 
 public class ChannelFactory implements AutoCloseable {
   private final int maxFrameSize;
-  private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, Channel> connPool = new ConcurrentHashMap<>();
 
   public ChannelFactory(int maxFrameSize) {
     this.maxFrameSize = maxFrameSize;
   }
 
-  public ManagedChannel getChannel(String addressStr, HostMapping hostMapping) {
+  public Channel getChannel(String addressStr, HostMapping hostMapping) {
     return connPool.computeIfAbsent(
         addressStr,
         key -> {
@@ -49,17 +51,21 @@ public class ChannelFactory implements AutoCloseable {
           }
           // Channel should be lazy without actual connection until first call
           // So a coarse grain lock is ok here
-          return ManagedChannelBuilder.forAddress(mappedAddr.getHost(), mappedAddr.getPort())
-              .maxInboundMessageSize(maxFrameSize)
-              .usePlaintext()
-              .idleTimeout(60, TimeUnit.SECONDS)
-              .build();
+          ManagedChannel channel =
+              ManagedChannelBuilder.forAddress(mappedAddr.getHost(), mappedAddr.getPort())
+                  .maxInboundMessageSize(maxFrameSize)
+                  .usePlaintext()
+                  .idleTimeout(60, TimeUnit.SECONDS)
+                  .build();
+
+          ClientTracingInterceptor tracingInterceptor = new ClientTracingInterceptor();
+          return tracingInterceptor.intercept(channel);
         });
   }
 
   public void close() {
-    for (ManagedChannel ch : connPool.values()) {
-      ch.shutdown();
+    for (Channel ch : connPool.values()) {
+      // ch.shutdown();
     }
     connPool.clear();
   }

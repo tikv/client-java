@@ -17,15 +17,15 @@
 
 package org.tikv.common.log;
 
-import static org.tikv.common.log.SlowLogImpl.DATE_FORMAT;
-
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.text.SimpleDateFormat;
 
 public class SlowLogSpanImpl implements SlowLogSpan {
   private final String name;
   private long startMS;
   private long endMS;
+  private SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("HH:mm:ss.SSS");
 
   public SlowLogSpanImpl(String name) {
     this.name = name;

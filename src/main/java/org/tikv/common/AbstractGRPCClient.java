@@ -18,7 +18,7 @@ package org.tikv.common;
 import static io.grpc.stub.ClientCalls.asyncBidiStreamingCall;
 import static io.grpc.stub.ClientCalls.blockingServerStreamingCall;
 
-import io.grpc.ManagedChannel;
+import io.grpc.Channel;
 import io.grpc.MethodDescriptor;
 import io.grpc.health.v1.HealthCheckRequest;
 import io.grpc.health.v1.HealthCheckResponse;
@@ -184,7 +184,7 @@ public abstract class AbstractGRPCClient<
   protected abstract FutureStubT getAsyncStub();
 
   protected boolean checkHealth(String addressStr, HostMapping hostMapping) {
-    ManagedChannel channel = channelFactory.getChannel(addressStr, hostMapping);
+    Channel channel = channelFactory.getChannel(addressStr, hostMapping);
     HealthGrpc.HealthBlockingStub stub =
         HealthGrpc.newBlockingStub(channel).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
     HealthCheckRequest req = HealthCheckRequest.newBuilder().build();

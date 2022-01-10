@@ -1,6 +1,6 @@
 package org.tikv.common.region;
 
-import io.grpc.ManagedChannel;
+import io.grpc.Channel;
 import io.grpc.health.v1.HealthCheckRequest;
 import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.health.v1.HealthGrpc;
@@ -63,7 +63,7 @@ public class StoreHealthyChecker implements Runnable {
   private boolean checkStoreHealth(TiStore store) {
     String addressStr = store.getStore().getAddress();
     try {
-      ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
+      Channel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
       HealthGrpc.HealthBlockingStub stub =
           HealthGrpc.newBlockingStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
       HealthCheckRequest req = HealthCheckRequest.newBuilder().build();

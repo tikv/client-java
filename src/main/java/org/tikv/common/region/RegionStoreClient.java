@@ -25,7 +25,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.pingcap.tidb.tipb.DAGRequest;
 import com.pingcap.tidb.tipb.SelectResponse;
-import io.grpc.ManagedChannel;
+import io.grpc.Channel;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
@@ -121,7 +121,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("Create region store client on address %s", addressStr));
       }
-      ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
+      Channel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
 
       TikvBlockingStub tikvBlockingStub = TikvGrpc.newBlockingStub(channel);
       TikvGrpc.TikvFutureStub tikvAsyncStub = TikvGrpc.newFutureStub(channel);
@@ -1243,7 +1243,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       if (logger.isDebugEnabled()) {
         logger.debug(String.format("Create region store client on address %s", addressStr));
       }
-      ManagedChannel channel = null;
+      Channel channel = null;
 
       TikvBlockingStub blockingStub = null;
       TikvFutureStub asyncStub = null;

@@ -29,7 +29,7 @@ import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KeyValue;
 import io.etcd.jetcd.kv.GetResponse;
 import io.etcd.jetcd.options.GetOption;
-import io.grpc.ManagedChannel;
+import io.grpc.Channel;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
@@ -328,7 +328,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   private GetMembersResponse getMembers(URI uri) {
     try {
-      ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
+      Channel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
       PDGrpc.PDBlockingStub stub =
           PDGrpc.newBlockingStub(probChan).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
       GetMembersRequest request =
@@ -363,7 +363,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private synchronized boolean createLeaderClientWrapper(String leaderUrlStr) {
     try {
       // create new Leader
-      ManagedChannel clientChannel = channelFactory.getChannel(leaderUrlStr, hostMapping);
+      Channel clientChannel = channelFactory.getChannel(leaderUrlStr, hostMapping);
       pdClientWrapper =
           new PDClientWrapper(leaderUrlStr, leaderUrlStr, clientChannel, System.nanoTime());
       timeout = conf.getTimeout();
@@ -383,7 +383,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       }
 
       // create new Leader
-      ManagedChannel channel = channelFactory.getChannel(followerUrlStr, hostMapping);
+      Channel channel = channelFactory.getChannel(followerUrlStr, hostMapping);
       pdClientWrapper = new PDClientWrapper(leaderUrls, followerUrlStr, channel, System.nanoTime());
       timeout = conf.getForwardTimeout();
     } catch (IllegalArgumentException e) {
@@ -649,7 +649,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     private final String storeAddress;
 
     PDClientWrapper(
-        String leaderInfo, String storeAddress, ManagedChannel clientChannel, long createTime) {
+        String leaderInfo, String storeAddress, Channel clientChannel, long createTime) {
       if (!storeAddress.equals(leaderInfo)) {
         Metadata header = new Metadata();
         header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, addrToUri(leaderInfo).toString());
