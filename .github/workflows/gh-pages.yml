@@ -27,8 +27,8 @@ jobs:
           java-version: '8'
           distribution: 'adopt'
 
-      - name: Javadoc
-        run: mvn clean javadoc:javadoc -Djavadoc.skip=false && mv ./target/site/apidocs ./docs/book/apidocs
+      - name: Maven site
+        run: mvn clean compile site && mv ./target/site ./docs/book/site
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
