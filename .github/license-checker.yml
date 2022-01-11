@@ -11,6 +11,7 @@ header:
     - 'LICENSE'
     - 'Makefile'
     - 'pom.xml'
+      'spotbugs-include.xml'
     - 'shell.nix'
     - '.ci/'
     - '.gitignore'
