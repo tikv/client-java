@@ -2,9 +2,12 @@
 
 If a request take too much time, we can collect the detailed time spend in each component in a “slow log”.
 
-```
+<!-- wrap text in the code block -->
+<pre>
+<code class="hljs" style="white-space: pre-wrap;">
 22/01/07 16:16:07 WARN log.SlowLogImpl: SlowLog:{"start":"16:16:07.613","end":"16:16:07.618","duration":"5ms","func":"get","region":"{Region[6] ConfVer[5] Version[2] Store[4] KeyRange[]:[t\\200\\000\\000\\000\\000\\000\\000\\377\\005\\000\\000\\000\\000\\000\\000\\000\\370]}","key":"k1","spans":[{"name":"getRegionByKey","start":"16:16:07.613","end":"16:16:07.613","duration":"0ms"},{"name":"callWithRetry tikvpb.Tikv/RawGet","start":"16:16:07.613","end":"16:16:07.617","duration":"4ms"},{"name":"gRPC tikvpb.Tikv/RawGet","start":"16:16:07.613","end":"16:16:07.617","duration":"4ms"}]}
-```
+</code>
+</pre>
 
 ## Slow log configurations
 
