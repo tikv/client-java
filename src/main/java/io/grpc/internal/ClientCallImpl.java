@@ -50,6 +50,7 @@ import io.grpc.internal.ManagedChannelServiceConfig.MethodInfo;
 import io.perfmark.Link;
 import io.perfmark.PerfMark;
 import io.perfmark.Tag;
+import io.prometheus.client.Histogram;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Locale;
@@ -62,14 +63,19 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
-/**
- * Implementation of {@link ClientCall}.
- */
+/** Implementation of {@link ClientCall}. */
 final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
 
+  public static final Histogram perfmarkClientCallImplDuration =
+      Histogram.build()
+          .name("perfmark_client_call_impl_duration_seconds")
+          .help("perfmark_client_call_impl_duration_seconds")
+          .labelNames("type")
+          .register();
+
   private static final Logger log = Logger.getLogger(ClientCallImpl.class.getName());
-  private static final byte[] FULL_STREAM_DECOMPRESSION_ENCODINGS
-      = "gzip".getBytes(Charset.forName("US-ASCII"));
+  private static final byte[] FULL_STREAM_DECOMPRESSION_ENCODINGS =
+      "gzip".getBytes(Charset.forName("US-ASCII"));
 
   private final MethodDescriptor<ReqT, RespT> method;
   private final Tag tag;
@@ -93,7 +99,9 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
   private CompressorRegistry compressorRegistry = CompressorRegistry.getDefaultInstance();
 
   ClientCallImpl(
-      MethodDescriptor<ReqT, RespT> method, Executor executor, CallOptions callOptions,
+      MethodDescriptor<ReqT, RespT> method,
+      Executor executor,
+      CallOptions callOptions,
       ClientStreamProvider clientStreamProvider,
       ScheduledExecutorService deadlineCancellationExecutor,
       CallTracer channelCallsTracer,
@@ -115,8 +123,8 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
     this.channelCallsTracer = channelCallsTracer;
     // Propagate the context from the thread which initiated the call to all callbacks.
     this.context = Context.current();
-    this.unaryRequest = method.getType() == MethodType.UNARY
-        || method.getType() == MethodType.SERVER_STREAMING;
+    this.unaryRequest =
+        method.getType() == MethodType.UNARY || method.getType() == MethodType.SERVER_STREAMING;
     this.callOptions = callOptions;
     this.clientStreamProvider = clientStreamProvider;
     this.deadlineCancellationExecutor = deadlineCancellationExecutor;
@@ -130,15 +138,10 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
     }
   }
 
-  /**
-   * Provider of {@link ClientStream}s.
-   */
+  /** Provider of {@link ClientStream}s. */
   interface ClientStreamProvider {
     ClientStream newStream(
-        MethodDescriptor<?, ?> method,
-        CallOptions callOptions,
-        Metadata headers,
-        Context context);
+        MethodDescriptor<?, ?> method, CallOptions callOptions, Metadata headers, Context context);
   }
 
   ClientCallImpl<ReqT, RespT> setFullStreamDecompression(boolean fullStreamDecompression) {
@@ -184,10 +187,12 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
   @Override
   public void start(Listener<RespT> observer, Metadata headers) {
     PerfMark.startTask("ClientCall.start", tag);
+    Histogram.Timer start = perfmarkClientCallImplDuration.labels("ClientCall.start").startTimer();
     try {
       startInternal(observer, headers);
     } finally {
       PerfMark.stopTask("ClientCall.start", tag);
+      start.observeDuration();
     }
   }
 
@@ -254,9 +259,10 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
           effectiveDeadline, context.getDeadline(), callOptions.getDeadline());
       stream = clientStreamProvider.newStream(method, callOptions, headers, context);
     } else {
-      stream = new FailingClientStream(
-          DEADLINE_EXCEEDED.withDescription(
-              "ClientCall started after deadline exceeded: " + effectiveDeadline));
+      stream =
+          new FailingClientStream(
+              DEADLINE_EXCEEDED.withDescription(
+                  "ClientCall started after deadline exceeded: " + effectiveDeadline));
     }
 
     if (callExecutorIsDirect) {
@@ -343,16 +349,20 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
   }
 
   private static void logIfContextNarrowedTimeout(
-      Deadline effectiveDeadline, @Nullable Deadline outerCallDeadline,
+      Deadline effectiveDeadline,
+      @Nullable Deadline outerCallDeadline,
       @Nullable Deadline callDeadline) {
-    if (!log.isLoggable(Level.FINE) || effectiveDeadline == null
+    if (!log.isLoggable(Level.FINE)
+        || effectiveDeadline == null
         || !effectiveDeadline.equals(outerCallDeadline)) {
       return;
     }
 
     long effectiveTimeout = max(0, effectiveDeadline.timeRemaining(TimeUnit.NANOSECONDS));
-    StringBuilder builder = new StringBuilder(String.format(
-        "Call timeout set to '%d' ns, due to context deadline.", effectiveTimeout));
+    StringBuilder builder =
+        new StringBuilder(
+            String.format(
+                "Call timeout set to '%d' ns, due to context deadline.", effectiveTimeout));
     if (callDeadline == null) {
       builder.append(" Explicit call timeout was not set.");
     } else {
@@ -403,8 +413,9 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
   private ScheduledFuture<?> startDeadlineTimer(Deadline deadline) {
     long remainingNanos = deadline.timeRemaining(TimeUnit.NANOSECONDS);
     return deadlineCancellationExecutor.schedule(
-        new LogExceptionRunnable(
-            new DeadlineTimer(remainingNanos)), remainingNanos, TimeUnit.NANOSECONDS);
+        new LogExceptionRunnable(new DeadlineTimer(remainingNanos)),
+        remainingNanos,
+        TimeUnit.NANOSECONDS);
   }
 
   @Nullable
@@ -427,22 +438,28 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
   @Override
   public void request(int numMessages) {
     PerfMark.startTask("ClientCall.request", tag);
+    Histogram.Timer request =
+        perfmarkClientCallImplDuration.labels("ClientCall.request").startTimer();
     try {
       checkState(stream != null, "Not started");
       checkArgument(numMessages >= 0, "Number requested must be non-negative");
       stream.request(numMessages);
     } finally {
       PerfMark.stopTask("ClientCall.request", tag);
+      request.observeDuration();
     }
   }
 
   @Override
   public void cancel(@Nullable String message, @Nullable Throwable cause) {
     PerfMark.startTask("ClientCall.cancel", tag);
+    Histogram.Timer cancel =
+        perfmarkClientCallImplDuration.labels("ClientCall.cancel").startTimer();
     try {
       cancelInternal(message, cause);
     } finally {
       PerfMark.stopTask("ClientCall.cancel", tag);
+      cancel.observeDuration();
     }
   }
 
@@ -478,10 +495,13 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
   @Override
   public void halfClose() {
     PerfMark.startTask("ClientCall.halfClose", tag);
+    Histogram.Timer halfClose =
+        perfmarkClientCallImplDuration.labels("ClientCall.halfClose").startTimer();
     try {
       halfCloseInternal();
     } finally {
       PerfMark.stopTask("ClientCall.halfClose", tag);
+      halfClose.observeDuration();
     }
   }
 
@@ -496,10 +516,13 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
   @Override
   public void sendMessage(ReqT message) {
     PerfMark.startTask("ClientCall.sendMessage", tag);
+    Histogram.Timer sendMessage =
+        perfmarkClientCallImplDuration.labels("ClientCall.sendMessage").startTimer();
     try {
       sendMessageInternal(message);
     } finally {
       PerfMark.stopTask("ClientCall.sendMessage", tag);
+      sendMessage.observeDuration();
     }
   }
 
@@ -581,6 +604,8 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
     @Override
     public void headersRead(final Metadata headers) {
       PerfMark.startTask("ClientStreamListener.headersRead", tag);
+      Histogram.Timer headersRead =
+          perfmarkClientCallImplDuration.labels("ClientStreamListener.headersRead").startTimer();
       final Link link = PerfMark.linkOut();
 
       final class HeadersRead extends ContextRunnable {
@@ -591,11 +616,14 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
         @Override
         public void runInContext() {
           PerfMark.startTask("ClientCall$Listener.headersRead", tag);
+          Histogram.Timer headersRead =
+              perfmarkClientCallImplDuration.labels("ClientCall$Listener.headersRead").startTimer();
           PerfMark.linkIn(link);
           try {
             runInternal();
           } finally {
             PerfMark.stopTask("ClientCall$Listener.headersRead", tag);
+            headersRead.observeDuration();
           }
         }
 
@@ -616,12 +644,17 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
         callExecutor.execute(new HeadersRead());
       } finally {
         PerfMark.stopTask("ClientStreamListener.headersRead", tag);
+        headersRead.observeDuration();
       }
     }
 
     @Override
     public void messagesAvailable(final MessageProducer producer) {
       PerfMark.startTask("ClientStreamListener.messagesAvailable", tag);
+      Histogram.Timer messagesAvailable =
+          perfmarkClientCallImplDuration
+              .labels("ClientStreamListener.messagesAvailable")
+              .startTimer();
       final Link link = PerfMark.linkOut();
 
       final class MessagesAvailable extends ContextRunnable {
@@ -632,11 +665,16 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
         @Override
         public void runInContext() {
           PerfMark.startTask("ClientCall$Listener.messagesAvailable", tag);
+          Histogram.Timer messagesAvailable =
+              perfmarkClientCallImplDuration
+                  .labels("ClientCall$Listener.messagesAvailable")
+                  .startTimer();
           PerfMark.linkIn(link);
           try {
             runInternal();
           } finally {
             PerfMark.stopTask("ClientCall$Listener.messagesAvailable", tag);
+            messagesAvailable.observeDuration();
           }
         }
 
@@ -668,6 +706,7 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
         callExecutor.execute(new MessagesAvailable());
       } finally {
         PerfMark.stopTask("ClientStreamListener.messagesAvailable", tag);
+        messagesAvailable.observeDuration();
       }
     }
 
@@ -679,10 +718,13 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
     @Override
     public void closed(Status status, RpcProgress rpcProgress, Metadata trailers) {
       PerfMark.startTask("ClientStreamListener.closed", tag);
+      Histogram.Timer closed =
+          perfmarkClientCallImplDuration.labels("ClientStreamListener.closed").startTimer();
       try {
         closedInternal(status, rpcProgress, trailers);
       } finally {
         PerfMark.stopTask("ClientStreamListener.closed", tag);
+        closed.observeDuration();
       }
     }
 
@@ -696,8 +738,9 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
         if (deadline.isExpired()) {
           InsightBuilder insight = new InsightBuilder();
           stream.appendTimeoutInsight(insight);
-          status = DEADLINE_EXCEEDED.augmentDescription(
-              "ClientCall was cancelled at or after deadline. " + insight);
+          status =
+              DEADLINE_EXCEEDED.augmentDescription(
+                  "ClientCall was cancelled at or after deadline. " + insight);
           // Replace trailers to prevent mixing sources of status and trailers.
           trailers = new Metadata();
         }
@@ -713,11 +756,14 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
         @Override
         public void runInContext() {
           PerfMark.startTask("ClientCall$Listener.onClose", tag);
+          Histogram.Timer onClose =
+              perfmarkClientCallImplDuration.labels("ClientCall$Listener.onClose").startTimer();
           PerfMark.linkIn(link);
           try {
             runInternal();
           } finally {
             PerfMark.stopTask("ClientCall$Listener.onClose", tag);
+            onClose.observeDuration();
           }
         }
 
@@ -754,6 +800,8 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
       }
 
       PerfMark.startTask("ClientStreamListener.onReady", tag);
+      Histogram.Timer onReady =
+          perfmarkClientCallImplDuration.labels("ClientStreamListener.onReady").startTimer();
       final Link link = PerfMark.linkOut();
 
       final class StreamOnReady extends ContextRunnable {
@@ -764,11 +812,14 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
         @Override
         public void runInContext() {
           PerfMark.startTask("ClientCall$Listener.onReady", tag);
+          Histogram.Timer onReady =
+              perfmarkClientCallImplDuration.labels("ClientCall$Listener.onReady").startTimer();
           PerfMark.linkIn(link);
           try {
             runInternal();
           } finally {
             PerfMark.stopTask("ClientCall$Listener.onReady", tag);
+            onReady.observeDuration();
           }
         }
 
@@ -789,6 +840,7 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
         callExecutor.execute(new StreamOnReady());
       } finally {
         PerfMark.stopTask("ClientStreamListener.onReady", tag);
+        onReady.observeDuration();
       }
     }
   }

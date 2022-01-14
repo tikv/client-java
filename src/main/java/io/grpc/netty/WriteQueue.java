@@ -92,6 +92,13 @@ class WriteQueue {
           .help("Duration of a flush of the write queue.")
           .register();
 
+  public static final Histogram perfmarkWriteQueueDuration =
+      Histogram.build()
+          .name("perfmark_write_queue_duration_seconds")
+          .help("perfmark_write_queue_duration_seconds")
+          .labelNames("type")
+          .register();
+
   public WriteQueue(Channel channel) {
     this.channel = Preconditions.checkNotNull(channel, "channel");
     queue = new ConcurrentLinkedQueue<>();
@@ -163,6 +170,8 @@ class WriteQueue {
     List<Record> batch = new ArrayList<>();
 
     PerfMark.startTask("WriteQueue.periodicFlush");
+    Histogram.Timer periodicFlush =
+        perfmarkWriteQueueDuration.labels("WriteQueue.periodicFlush").startTimer();
 
     long start = System.nanoTime();
     try {
@@ -193,6 +202,8 @@ class WriteQueue {
           // might never end as new events are continuously added to the queue, if we never
           // flushed in that case we would be guaranteed to OOM.
           PerfMark.startTask("WriteQueue.flush0");
+          Histogram.Timer flush0 =
+              perfmarkWriteQueueDuration.labels("WriteQueue.flush0").startTimer();
           Histogram.Timer channelFlushTimer =
               writeQueueChannelFlushDuration.labels("flush0").startTimer();
           Record flushRecord = new Record("flush0");
@@ -204,6 +215,7 @@ class WriteQueue {
             flushRecord.end();
             batch.add(flushRecord);
             PerfMark.stopTask("WriteQueue.flush0");
+            flush0.observeDuration();
           }
           flushedOnce = true;
         }
@@ -211,6 +223,8 @@ class WriteQueue {
       // Must flush at least once, even if there were no writes.
       if (i != 0 || !flushedOnce) {
         PerfMark.startTask("WriteQueue.flush1");
+        Histogram.Timer flush1 =
+            perfmarkWriteQueueDuration.labels("WriteQueue.flush1").startTimer();
         Histogram.Timer channelFlushTimer =
             writeQueueChannelFlushDuration.labels("flush1").startTimer();
         Record flushRecord = new Record("flush1");
@@ -223,10 +237,12 @@ class WriteQueue {
           flushRecord.end();
           batch.add(flushRecord);
           PerfMark.stopTask("WriteQueue.flush1");
+          flush1.observeDuration();
         }
       }
     } finally {
       PerfMark.stopTask("WriteQueue.periodicFlush");
+      periodicFlush.observeDuration();
       flushTimer.observeDuration();
       if (System.nanoTime() - start > 50_000_000) {
         String msg = "Found slow batch. WriteQueue.flush: " + batch;

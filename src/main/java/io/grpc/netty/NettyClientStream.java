@@ -45,17 +45,16 @@ import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.util.AsciiString;
 import io.perfmark.PerfMark;
 import io.perfmark.Tag;
+import io.prometheus.client.Histogram;
 import javax.annotation.Nullable;
 
-/**
- * Client stream for a Netty transport. Must only be called from the sending application
- * thread.
- */
+/** Client stream for a Netty transport. Must only be called from the sending application thread. */
 class NettyClientStream extends AbstractClientStream {
   private static final InternalMethodDescriptor methodDescriptorAccessor =
       new InternalMethodDescriptor(
           NettyClientTransport.class.getName().contains("grpc.netty.shaded")
-              ? InternalKnownTransport.NETTY_SHADED : InternalKnownTransport.NETTY);
+              ? InternalKnownTransport.NETTY_SHADED
+              : InternalKnownTransport.NETTY);
 
   private final Sink sink = new Sink();
   private final TransportState state;
@@ -64,6 +63,13 @@ class NettyClientStream extends AbstractClientStream {
   private AsciiString authority;
   private final AsciiString scheme;
   private final AsciiString userAgent;
+
+  public static final Histogram perfmarkNettyClientStreamDuration =
+      Histogram.build()
+          .name("perfmark_netty_client_stream_duration_seconds")
+          .help("perfmark_netty_client_stream_duration_seconds")
+          .labelNames("type")
+          .register();
 
   NettyClientStream(
       TransportState state,
@@ -117,10 +123,15 @@ class NettyClientStream extends AbstractClientStream {
     @Override
     public void writeHeaders(Metadata headers, byte[] requestPayload) {
       PerfMark.startTask("NettyClientStream$Sink.writeHeaders");
+      Histogram.Timer writeHeaders =
+          perfmarkNettyClientStreamDuration
+              .labels("NettyClientStream$Sink.writeHeaders")
+              .startTimer();
       try {
         writeHeadersInternal(headers, requestPayload);
       } finally {
         PerfMark.stopTask("NettyClientStream$Sink.writeHeaders");
+        writeHeaders.observeDuration();
       }
     }
 
@@ -142,29 +153,35 @@ class NettyClientStream extends AbstractClientStream {
       } else {
         httpMethod = Utils.HTTP_METHOD;
       }
-      Http2Headers http2Headers = Utils.convertClientHeaders(headers, scheme, defaultPath,
-          authority, httpMethod, userAgent);
+      Http2Headers http2Headers =
+          Utils.convertClientHeaders(
+              headers, scheme, defaultPath, authority, httpMethod, userAgent);
 
-      ChannelFutureListener failureListener = new ChannelFutureListener() {
-        @Override
-        public void operationComplete(ChannelFuture future) throws Exception {
-          if (!future.isSuccess()) {
-            // Stream creation failed. Close the stream if not already closed.
-            // When the channel is shutdown, the lifecycle manager has a better view of the failure,
-            // especially before negotiation completes (because the negotiator commonly doesn't
-            // receive the execeptionCaught because NettyClientHandler does not propagate it).
-            Status s = transportState().handler.getLifecycleManager().getShutdownStatus();
-            if (s == null) {
-              s = transportState().statusFromFailedFuture(future);
+      ChannelFutureListener failureListener =
+          new ChannelFutureListener() {
+            @Override
+            public void operationComplete(ChannelFuture future) throws Exception {
+              if (!future.isSuccess()) {
+                // Stream creation failed. Close the stream if not already closed.
+                // When the channel is shutdown, the lifecycle manager has a better view of the
+                // failure,
+                // especially before negotiation completes (because the negotiator commonly doesn't
+                // receive the execeptionCaught because NettyClientHandler does not propagate it).
+                Status s = transportState().handler.getLifecycleManager().getShutdownStatus();
+                if (s == null) {
+                  s = transportState().statusFromFailedFuture(future);
+                }
+                transportState().transportReportStatus(s, true, new Metadata());
+              }
             }
-            transportState().transportReportStatus(s, true, new Metadata());
-          }
-        }
-      };
+          };
       // Write the command requesting the creation of the stream.
-      writeQueue.enqueue(
-          new CreateStreamCommand(http2Headers, transportState(), shouldBeCountedForInUse(), get),
-          !method.getType().clientSendsOneMessage() || get).addListener(failureListener);
+      writeQueue
+          .enqueue(
+              new CreateStreamCommand(
+                  http2Headers, transportState(), shouldBeCountedForInUse(), get),
+              !method.getType().clientSendsOneMessage() || get)
+          .addListener(failureListener);
     }
 
     private void writeFrameInternal(
@@ -176,24 +193,26 @@ class NettyClientStream extends AbstractClientStream {
       if (numBytes > 0) {
         // Add the bytes to outbound flow control.
         onSendingBytes(numBytes);
-        writeQueue.enqueue(new SendGrpcFrameCommand(transportState(), bytebuf, endOfStream), flush)
-            .addListener(new ChannelFutureListener() {
-              @Override
-              public void operationComplete(ChannelFuture future) throws Exception {
-                // If the future succeeds when http2stream is null, the stream has been cancelled
-                // before it began and Netty is purging pending writes from the flow-controller.
-                if (future.isSuccess() && transportState().http2Stream() != null) {
-                  // Remove the bytes from outbound flow control, optionally notifying
-                  // the client that they can send more bytes.
-                  transportState().onSentBytes(numBytes);
-                  NettyClientStream.this.getTransportTracer().reportMessageSent(numMessages);
-                }
-              }
-            });
+        writeQueue
+            .enqueue(new SendGrpcFrameCommand(transportState(), bytebuf, endOfStream), flush)
+            .addListener(
+                new ChannelFutureListener() {
+                  @Override
+                  public void operationComplete(ChannelFuture future) throws Exception {
+                    // If the future succeeds when http2stream is null, the stream has been
+                    // cancelled
+                    // before it began and Netty is purging pending writes from the flow-controller.
+                    if (future.isSuccess() && transportState().http2Stream() != null) {
+                      // Remove the bytes from outbound flow control, optionally notifying
+                      // the client that they can send more bytes.
+                      transportState().onSentBytes(numBytes);
+                      NettyClientStream.this.getTransportTracer().reportMessageSent(numMessages);
+                    }
+                  }
+                });
       } else {
         // The frame is empty and will not impact outbound flow control. Just send it.
-        writeQueue.enqueue(
-            new SendGrpcFrameCommand(transportState(), bytebuf, endOfStream), flush);
+        writeQueue.enqueue(new SendGrpcFrameCommand(transportState(), bytebuf, endOfStream), flush);
       }
     }
 
@@ -201,20 +220,28 @@ class NettyClientStream extends AbstractClientStream {
     public void writeFrame(
         WritableBuffer frame, boolean endOfStream, boolean flush, int numMessages) {
       PerfMark.startTask("NettyClientStream$Sink.writeFrame");
+      Histogram.Timer writeFrame =
+          perfmarkNettyClientStreamDuration
+              .labels("NettyClientStream$Sink.writeFrame")
+              .startTimer();
       try {
         writeFrameInternal(frame, endOfStream, flush, numMessages);
       } finally {
         PerfMark.stopTask("NettyClientStream$Sink.writeFrame");
+        writeFrame.observeDuration();
       }
     }
 
     @Override
     public void cancel(Status status) {
       PerfMark.startTask("NettyClientStream$Sink.cancel");
+      Histogram.Timer cancel =
+          perfmarkNettyClientStreamDuration.labels("NettyClientStream$Sink.cancel").startTimer();
       try {
         writeQueue.enqueue(new CancelClientStreamCommand(transportState(), status), true);
       } finally {
         PerfMark.stopTask("NettyClientStream$Sink.cancel");
+        cancel.observeDuration();
       }
     }
   }
@@ -259,8 +286,8 @@ class NettyClientStream extends AbstractClientStream {
     }
 
     /**
-     * Marks the stream state as if it had never existed.  This can happen if the stream is
-     * cancelled after it is created, but before it has been started.
+     * Marks the stream state as if it had never existed. This can happen if the stream is cancelled
+     * after it is created, but before it has been started.
      */
     void setNonExistent() {
       checkState(this.id == 0, "Id has been previously set: %s", this.id);
@@ -286,9 +313,7 @@ class NettyClientStream extends AbstractClientStream {
       getTransportTracer().reportLocalStreamStarted();
     }
 
-    /**
-     * Gets the underlying Netty {@link Http2Stream} for this stream.
-     */
+    /** Gets the underlying Netty {@link Http2Stream} for this stream. */
     @Nullable
     public Http2Stream http2Stream() {
       return http2Stream;
