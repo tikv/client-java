@@ -137,21 +137,18 @@ class NettyClientHandler extends AbstractNettyHandler {
   public static final Histogram createStreamWriteHeaderDuration =
       Histogram.build()
           .name("grpc_netty_client_stream_write_header_duration_seconds")
-          .labelNames("path")
           .help("Time taken to write headers for a stream in seconds.")
           .register();
 
   public static final Histogram createStreamAddListenerDuration =
       Histogram.build()
           .name("grpc_netty_client_stream_add_listener_duration_seconds")
-          .labelNames("path")
           .help("Time taken to add listener for a stream future in seconds.")
           .register();
 
   public static final Histogram createStreamCreateNewFuture =
       Histogram.build()
           .name("grpc_netty_client_stream_create_future_duration_seconds")
-          .labelNames("path")
           .help("Time taken to create new stream future in seconds.")
           .register();
 
@@ -650,17 +647,17 @@ class NettyClientHandler extends AbstractNettyHandler {
     // Create an intermediate promise so that we can intercept the failure reported back to the
     // application.
     Histogram.Timer createFutureTimer =
-        createStreamCreateNewFuture.labels(headers.path().toString()).startTimer();
+        createStreamCreateNewFuture.startTimer();
     ChannelPromise tempPromise = ctx().newPromise();
     createFutureTimer.observeDuration();
 
     Histogram.Timer writeHeaderTimer =
-        createStreamWriteHeaderDuration.labels(headers.path().toString()).startTimer();
+        createStreamWriteHeaderDuration.startTimer();
     ChannelFuture future = encoder().writeHeaders(ctx(), streamId, headers, 0, isGet, tempPromise);
     writeHeaderTimer.observeDuration();
 
     Histogram.Timer addListenerTimer =
-        createStreamAddListenerDuration.labels(headers.path().toString()).startTimer();
+        createStreamAddListenerDuration.startTimer();
     future.addListener(
         new ChannelFutureListener() {
           @Override
