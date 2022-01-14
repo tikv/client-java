@@ -96,85 +96,87 @@ public class ClientTracingInterceptor implements ClientInterceptor {
       }
     }
 
-    ForwardingClientCall.SimpleForwardingClientCall result =  new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
-        next.newCall(method, callOptions)) {
+    ForwardingClientCall.SimpleForwardingClientCall result =
+        new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
+            next.newCall(method, callOptions)) {
 
-      private void end() {
-        slowLog.log();
-      }
+          private void end() {
+            slowLog.log();
+          }
 
-      @Override
-      public void start(Listener<RespT> responseListener, Metadata headers) {
-        SlowLogSpan span1 = slowLog.start("Started call");
-        Listener<RespT> tracingResponseListener =
-            new ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT>(
-                responseListener) {
+          @Override
+          public void start(Listener<RespT> responseListener, Metadata headers) {
+            SlowLogSpan span1 = slowLog.start("Started call");
+            Listener<RespT> tracingResponseListener =
+                new ForwardingClientCallListener.SimpleForwardingClientCallListener<RespT>(
+                    responseListener) {
 
-              @Override
-              public void onHeaders(Metadata headers) {
-                SlowLogSpan span = slowLog.start("Response headers received：" + headers.toString());
-                delegate().onHeaders(headers);
-                span.end();
-              }
+                  @Override
+                  public void onHeaders(Metadata headers) {
+                    SlowLogSpan span =
+                        slowLog.start("Response headers received：" + headers.toString());
+                    delegate().onHeaders(headers);
+                    span.end();
+                  }
 
-              @Override
-              public void onMessage(RespT message) {
-                SlowLogSpan span = slowLog.start("Response received");
-                delegate().onMessage(message);
-                span.end();
-              }
+                  @Override
+                  public void onMessage(RespT message) {
+                    SlowLogSpan span = slowLog.start("Response received");
+                    delegate().onMessage(message);
+                    span.end();
+                  }
 
-              @Override
-              public void onClose(Status status, Metadata trailers) {
-                SlowLogSpan span = null;
-                if (status.getCode().value() == 0) {
-                  span = slowLog.start("Call closed");
-                } else {
-                  span = slowLog.start("Call failed: " + status.getDescription());
-                }
-                delegate().onClose(status, trailers);
-                span.end();
-                end();
-              }
-            };
-        delegate().start(tracingResponseListener, headers);
-        span1.end();
-      }
+                  @Override
+                  public void onClose(Status status, Metadata trailers) {
+                    SlowLogSpan span = null;
+                    if (status.getCode().value() == 0) {
+                      span = slowLog.start("Call closed");
+                    } else {
+                      span = slowLog.start("Call failed: " + status.getDescription());
+                    }
+                    delegate().onClose(status, trailers);
+                    span.end();
+                    end();
+                  }
+                };
+            delegate().start(tracingResponseListener, headers);
+            span1.end();
+          }
 
-      @Override
-      public void cancel(@Nullable String message, @Nullable Throwable cause) {
-        String errorMessage;
-        if (message == null) {
-          errorMessage = "Error";
-        } else {
-          errorMessage = message;
-        }
-        SlowLogSpan span = null;
-        if (cause == null) {
-          span = slowLog.start(errorMessage);
-        } else {
-          span = slowLog.start(errorMessage + cause.getMessage());
-        }
-        delegate().cancel(message, cause);
-        span.end();
-        end();
-      }
+          @Override
+          public void cancel(@Nullable String message, @Nullable Throwable cause) {
+            String errorMessage;
+            if (message == null) {
+              errorMessage = "Error";
+            } else {
+              errorMessage = message;
+            }
+            SlowLogSpan span = null;
+            if (cause == null) {
+              span = slowLog.start(errorMessage);
+            } else {
+              span = slowLog.start(errorMessage + cause.getMessage());
+            }
+            delegate().cancel(message, cause);
+            span.end();
+            end();
+          }
 
-      @Override
-      public void halfClose() {
-        SlowLogSpan span = slowLog.start("Finished sending messages");
-        delegate().halfClose();
-        span.end();
-        end();
-      }
+          @Override
+          public void halfClose() {
+            SlowLogSpan span = slowLog.start("Finished sending messages");
+            delegate().halfClose();
+            span.end();
+            end();
+          }
 
-      @Override
-      public void sendMessage(ReqT message) {
-        SlowLogSpan span = slowLog.start("Message sent");
-        delegate().sendMessage(message);
-        span.end();
-      }
-    };
+          @Override
+          public void sendMessage(ReqT message) {
+            SlowLogSpan span = slowLog.start("Message sent");
+            delegate().sendMessage(message);
+            span.end();
+          }
+        };
 
     span.end();
     return result;

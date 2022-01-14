@@ -21,9 +21,9 @@ import io.grpc.ManagedChannelBuilder;
 import java.net.URI;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import org.tikv.grpc.ClientTracingInterceptor;
 import org.tikv.common.HostMapping;
 import org.tikv.common.pd.PDUtils;
+import org.tikv.grpc.ClientTracingInterceptor;
 
 public class ChannelFactory implements AutoCloseable {
   private final int maxFrameSize;
