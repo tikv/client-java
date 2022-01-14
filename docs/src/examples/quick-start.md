@@ -82,14 +82,14 @@ import org.tikv.raw.RawKVClient;
 
 public class Main {
   public static void main() {
-    // You MUST create a raw configuration if you are using RawKVClient.
     String pdAddr = "127.0.0.1:2379"
+    // You MUST create a raw configuration if you are using RawKVClient.
     TiConfiguration conf = TiConfiguration.createRawDefault(pdAddr);
     try (TiSession session = TiSession.create(conf)) {
       try (RawKVClient client = session.createRawClient()) {
-				client.put(ByteString.copyFromUtf8("Hello"), ByteString.copyFromUtf8("World"));
-				Optional<ByteString> value = client.get(ByteString.copyFromUtf8("Hello"));
-				System.out.println(value.get());
+        client.put(ByteString.copyFromUtf8("Hello"), ByteString.copyFromUtf8("World"));
+        Optional<ByteString> value = client.get(ByteString.copyFromUtf8("Hello"));
+        System.out.println(value.get());
       }
     }
   }
