@@ -92,6 +92,13 @@ import javax.annotation.Nullable;
  */
 class NettyClientHandler extends AbstractNettyHandler {
 
+  public static final Histogram perfmarkNettyClientHandlerDuration =
+      Histogram.build()
+          .name("perfmark_netty_client_handler_duration_seconds")
+          .help("perfmark_netty_client_handler_duration_seconds")
+          .labelNames("type")
+          .register();
+
   private static final Logger logger = Logger.getLogger(NettyClientHandler.class.getName());
 
   /**
@@ -628,12 +635,15 @@ class NettyClientHandler extends AbstractNettyHandler {
     stream.setId(streamId);
 
     PerfMark.startTask("NettyClientHandler.createStream", stream.tag());
+    Histogram.Timer createStream =
+        perfmarkNettyClientHandlerDuration.labels("NettyClientHandler.createStream").startTimer();
     PerfMark.linkIn(command.getLink());
     try {
       createStreamTraced(
           streamId, stream, headers, command.isGet(), command.shouldBeCountedForInUse(), promise);
     } finally {
       PerfMark.stopTask("NettyClientHandler.createStream", stream.tag());
+      createStream.observeDuration();
     }
   }
 
@@ -710,6 +720,8 @@ class NettyClientHandler extends AbstractNettyHandler {
       ChannelHandlerContext ctx, CancelClientStreamCommand cmd, ChannelPromise promise) {
     NettyClientStream.TransportState stream = cmd.stream();
     PerfMark.startTask("NettyClientHandler.cancelStream", stream.tag());
+    Histogram.Timer cancelStream =
+        perfmarkNettyClientHandlerDuration.labels("NettyClientHandler.cancelStream").startTimer();
     PerfMark.linkIn(cmd.getLink());
     try {
       Status reason = cmd.reason();
@@ -723,6 +735,7 @@ class NettyClientHandler extends AbstractNettyHandler {
       }
     } finally {
       PerfMark.stopTask("NettyClientHandler.cancelStream", stream.tag());
+      cancelStream.observeDuration();
     }
   }
 
@@ -730,6 +743,8 @@ class NettyClientHandler extends AbstractNettyHandler {
   private void sendGrpcFrame(
       ChannelHandlerContext ctx, SendGrpcFrameCommand cmd, ChannelPromise promise) {
     PerfMark.startTask("NettyClientHandler.sendGrpcFrame", cmd.stream().tag());
+    Histogram.Timer sendGrpcFrame =
+        perfmarkNettyClientHandlerDuration.labels("NettyClientHandler.sendGrpcFrame").startTimer();
     PerfMark.linkIn(cmd.getLink());
     try {
       // Call the base class to write the HTTP/2 DATA frame.
@@ -737,17 +752,21 @@ class NettyClientHandler extends AbstractNettyHandler {
       encoder().writeData(ctx, cmd.stream().id(), cmd.content(), 0, cmd.endStream(), promise);
     } finally {
       PerfMark.stopTask("NettyClientHandler.sendGrpcFrame", cmd.stream().tag());
+      sendGrpcFrame.observeDuration();
     }
   }
 
   private void sendPingFrame(
       ChannelHandlerContext ctx, SendPingCommand msg, ChannelPromise promise) {
     PerfMark.startTask("NettyClientHandler.sendPingFrame");
+    Histogram.Timer sendPingFrame =
+        perfmarkNettyClientHandlerDuration.labels("NettyClientHandler.sendPingFrame").startTimer();
     PerfMark.linkIn(msg.getLink());
     try {
       sendPingFrameTraced(ctx, msg, promise);
     } finally {
       PerfMark.stopTask("NettyClientHandler.sendPingFrame");
+      sendPingFrame.observeDuration();
     }
   }
 
@@ -834,6 +853,10 @@ class NettyClientHandler extends AbstractNettyHandler {
                 NettyClientStream.TransportState clientStream = clientStream(stream);
                 Tag tag = clientStream != null ? clientStream.tag() : PerfMark.createTag();
                 PerfMark.startTask("NettyClientHandler.forcefulClose", tag);
+                Histogram.Timer forcefulClose =
+                    perfmarkNettyClientHandlerDuration
+                        .labels("NettyClientHandler.forcefulClose")
+                        .startTimer();
                 PerfMark.linkIn(msg.getLink());
                 try {
                   if (clientStream != null) {
@@ -844,6 +867,7 @@ class NettyClientHandler extends AbstractNettyHandler {
                   return true;
                 } finally {
                   PerfMark.stopTask("NettyClientHandler.forcefulClose", tag);
+                  forcefulClose.observeDuration();
                 }
               }
             });
