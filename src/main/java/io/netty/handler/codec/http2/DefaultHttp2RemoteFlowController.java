@@ -57,7 +57,7 @@ public class DefaultHttp2RemoteFlowController implements Http2RemoteFlowControll
 
   public static final Histogram byteDistributedDuration =
       Histogram.build()
-          .name("http2_byte_distributed_duration_seconds")
+          .name("netty_http2_byte_distributed_duration_seconds")
           .help("The duration of byte distributed to streams.")
           .register();
 

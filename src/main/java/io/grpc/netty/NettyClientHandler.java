@@ -646,18 +646,15 @@ class NettyClientHandler extends AbstractNettyHandler {
       final ChannelPromise promise) {
     // Create an intermediate promise so that we can intercept the failure reported back to the
     // application.
-    Histogram.Timer createFutureTimer =
-        createStreamCreateNewFuture.startTimer();
+    Histogram.Timer createFutureTimer = createStreamCreateNewFuture.startTimer();
     ChannelPromise tempPromise = ctx().newPromise();
     createFutureTimer.observeDuration();
 
-    Histogram.Timer writeHeaderTimer =
-        createStreamWriteHeaderDuration.startTimer();
+    Histogram.Timer writeHeaderTimer = createStreamWriteHeaderDuration.startTimer();
     ChannelFuture future = encoder().writeHeaders(ctx(), streamId, headers, 0, isGet, tempPromise);
     writeHeaderTimer.observeDuration();
 
-    Histogram.Timer addListenerTimer =
-        createStreamAddListenerDuration.startTimer();
+    Histogram.Timer addListenerTimer = createStreamAddListenerDuration.startTimer();
     future.addListener(
         new ChannelFutureListener() {
           @Override
