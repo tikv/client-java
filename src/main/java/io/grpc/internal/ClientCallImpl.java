@@ -47,6 +47,7 @@ import io.grpc.MethodDescriptor;
 import io.grpc.MethodDescriptor.MethodType;
 import io.grpc.Status;
 import io.grpc.internal.ManagedChannelServiceConfig.MethodInfo;
+import io.grpc.netty.WriteQueue;
 import io.perfmark.Link;
 import io.perfmark.PerfMark;
 import io.perfmark.Tag;
@@ -71,6 +72,7 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
           .name("perfmark_client_call_impl_duration_seconds")
           .help("perfmark_client_call_impl_duration_seconds")
           .labelNames("type")
+          .buckets(WriteQueue.durationBuckets)
           .register();
 
   private static final Logger log = Logger.getLogger(ClientCallImpl.class.getName());
