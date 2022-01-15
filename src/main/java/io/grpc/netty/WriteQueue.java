@@ -36,6 +36,16 @@ import org.apache.commons.lang3.tuple.Pair;
 
 /** A queue of pending writes to a {@link Channel} that is flushed as a single unit. */
 class WriteQueue {
+  public static final double[] durationBuckets =
+      new double[] {
+        0.001D, 0.002D, 0.003D, 0.004D, 0.005D,
+        0.008D, 0.010D, 0.012D, 0.015D, 0.020D,
+        0.025D, 0.030D, 0.035D, 0.040D, 0.045D,
+        0.050D, 0.060D, 0.07D, 0.080D, 0.090D,
+        0.10D, 0.120D, 0.150D, 0.170D, 0.200D,
+        0.4D, 0.5D, 0.6D, 0.7D, 0.8D,
+        1D, 2.5D, 5D, 7.5D, 10D,
+      };
 
   // Dequeue in chunks, so we don't have to acquire the queue's log too often.
   @VisibleForTesting static final int DEQUE_CHUNK_SIZE = 128;
@@ -56,24 +66,28 @@ class WriteQueue {
 
   public static final Histogram writeQueuePendingDuration =
       Histogram.build()
+          .buckets(durationBuckets)
           .name("grpc_netty_write_queue_pending_duration_ms")
           .help("Pending duration of a task in the write queue.")
           .register();
 
   public static final Histogram writeQueueWaitBatchDuration =
       Histogram.build()
+          .buckets(durationBuckets)
           .name("grpc_netty_write_queue_wait_batch_duration_seconds")
           .help("Duration of waiting a batch filled in the write queue.")
           .register();
 
   public static final Histogram writeQueueBatchSize =
       Histogram.build()
+          .buckets(durationBuckets)
           .name("grpc_netty_write_queue_batch_size")
           .help("Number of tasks in a batch in the write queue.")
           .register();
 
   public static final Histogram writeQueueCmdRunDuration =
       Histogram.build()
+          .buckets(durationBuckets)
           .name("grpc_netty_write_queue_cmd_run_duration_seconds")
           .help("Duration of a task execution in the write queue.")
           .labelNames("type")
@@ -81,6 +95,7 @@ class WriteQueue {
 
   public static final Histogram writeQueueChannelFlushDuration =
       Histogram.build()
+          .buckets(durationBuckets)
           .name("grpc_netty_write_queue_channel_flush_duration_seconds")
           .help("Duration of a channel flush in the write queue.")
           .labelNames("phase")
@@ -88,12 +103,14 @@ class WriteQueue {
 
   public static final Histogram writeQueueFlushDuration =
       Histogram.build()
+          .buckets(durationBuckets)
           .name("grpc_netty_write_queue_flush_duration_seconds")
           .help("Duration of a flush of the write queue.")
           .register();
 
   public static final Histogram perfmarkWriteQueueDuration =
       Histogram.build()
+          .buckets(durationBuckets)
           .name("perfmark_write_queue_duration_seconds")
           .help("perfmark_write_queue_duration_seconds")
           .labelNames("type")
@@ -185,8 +202,7 @@ class WriteQueue {
 
         String cmdName = cmd.getClass().getSimpleName();
         Record cmdRecord = new Record(cmdName);
-        Histogram.Timer cmdTimer =
-            writeQueueCmdRunDuration.labels(cmdName).startTimer();
+        Histogram.Timer cmdTimer = writeQueueCmdRunDuration.labels(cmdName).startTimer();
 
         // Run the command
         cmd.run(channel);
