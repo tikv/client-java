@@ -183,7 +183,7 @@ class WriteQueue {
         QueuedCommand cmd = item.getLeft();
         writeQueuePendingDuration.observe((System.nanoTime() - item.getRight()) / 1_000_000.0);
 
-        Record cmdRecord = new Record(cmd.toString());
+        Record cmdRecord = new Record(cmd.getClass().getSimpleName());
         Histogram.Timer cmdTimer =
             writeQueueCmdRunDuration.labels(cmd.getClass().getSimpleName()).startTimer();
 
@@ -338,6 +338,7 @@ class WriteQueue {
     long end;
     long durationMS;
     String name;
+    static ThreadLocal<StringBuilder> builder = ThreadLocal.withInitial(() -> new StringBuilder());
 
     public Record(String name) {
       this.name = name;
@@ -350,17 +351,18 @@ class WriteQueue {
     }
 
     public String toString() {
-      return "Record{"
-          + "start="
-          + start
-          + ", end="
-          + end
-          + ", durationMS="
-          + durationMS
-          + ", name='"
-          + name
-          + '\''
-          + '}';
+      StringBuilder sb = builder.get();
+      sb.setLength(0);
+      sb.append("Record{start=");
+      sb.append(start);
+      sb.append(", end=");
+      sb.append(end);
+      sb.append(", durationMS=");
+      sb.append(durationMS);
+      sb.append(", name='");
+      sb.append(name);
+      sb.append("'}");
+      return sb.toString();
     }
   }
 }
