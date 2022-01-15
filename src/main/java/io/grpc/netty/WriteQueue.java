@@ -36,6 +36,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 /** A queue of pending writes to a {@link Channel} that is flushed as a single unit. */
 class WriteQueue {
+
   public static final double[] durationBuckets =
       new double[] {
         0.001D, 0.002D, 0.003D, 0.004D, 0.005D,
@@ -68,6 +69,7 @@ class WriteQueue {
       Histogram.build()
           .buckets(durationBuckets)
           .name("grpc_netty_write_queue_pending_duration_ms")
+          .labelNames("type")
           .help("Pending duration of a task in the write queue.")
           .register();
 
@@ -198,9 +200,11 @@ class WriteQueue {
       Histogram.Timer waitBatchTimer = writeQueueWaitBatchDuration.startTimer();
       while ((item = queue.poll()) != null) {
         QueuedCommand cmd = item.getLeft();
-        writeQueuePendingDuration.observe((System.nanoTime() - item.getRight()) / 1_000_000.0);
-
         String cmdName = cmd.getClass().getSimpleName();
+        writeQueuePendingDuration
+            .labels(cmdName)
+            .observe((System.nanoTime() - item.getRight()) / 1_000_000.0);
+
         Record cmdRecord = new Record(cmdName);
         Histogram.Timer cmdTimer = writeQueueCmdRunDuration.labels(cmdName).startTimer();
 
@@ -213,8 +217,8 @@ class WriteQueue {
         batch.add(cmdRecord);
         if (++i == DEQUE_CHUNK_SIZE) {
           waitBatchTimer.observeDuration();
-          waitBatchTimer = writeQueueWaitBatchDuration.startTimer();
           i = 0;
+          waitBatchTimer = writeQueueWaitBatchDuration.startTimer();
           // Flush each chunk so we are releasing buffers periodically. In theory this loop
           // might never end as new events are continuously added to the queue, if we never
           // flushed in that case we would be guaranteed to OOM.
@@ -239,6 +243,7 @@ class WriteQueue {
       }
       // Must flush at least once, even if there were no writes.
       if (i != 0 || !flushedOnce) {
+        waitBatchTimer.observeDuration();
         PerfMark.startTask("WriteQueue.flush1");
         Histogram.Timer flush1 =
             perfmarkWriteQueueDuration.labels("WriteQueue.flush1").startTimer();
@@ -248,7 +253,6 @@ class WriteQueue {
         try {
           channel.flush();
         } finally {
-          waitBatchTimer.observeDuration();
           writeQueueBatchSize.observe(i);
           channelFlushTimer.observeDuration();
           flushRecord.end();

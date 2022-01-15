@@ -214,30 +214,19 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder
 
   @Override
   public void flush(ChannelHandlerContext ctx) {
-    Histogram.Timer writeTimer = flushFlowControlWriteDuration.startTimer();
-    Histogram.Timer flushTimer = flushCtxFlushDuration.startTimer();
-    boolean writeSuccess = false;
-    boolean flushSuccess = false;
     try {
       // Trigger pending writes in the remote flow controller.
+      Histogram.Timer writeTimer = flushFlowControlWriteDuration.startTimer();
       encoder.flowController().writePendingBytes();
       writeTimer.observeDuration();
-      writeSuccess = true;
 
+      Histogram.Timer flushTimer = flushCtxFlushDuration.startTimer();
       ctx.flush();
-      flushSuccess = true;
       flushTimer.observeDuration();
     } catch (Http2Exception e) {
       onError(ctx, true, e);
     } catch (Throwable cause) {
       onError(ctx, true, connectionError(INTERNAL_ERROR, cause, "Error flushing"));
-    } finally {
-      if (!writeSuccess) {
-        writeTimer.observeDuration();
-      }
-      if (!flushSuccess) {
-        flushTimer.observeDuration();
-      }
     }
   }
 
