@@ -31,6 +31,7 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
 import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+import io.grpc.netty.WriteQueue;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
@@ -89,12 +90,14 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder
       Histogram.build()
           .name("netty_http2_flush_flow_control_write_duration_seconds")
           .help("The time it takes to flush the pending bytes via flow control in seconds.")
+          .buckets(WriteQueue.durationBuckets)
           .register();
 
   public static final Histogram flushCtxFlushDuration =
       Histogram.build()
           .name("netty_http2_flush_ctx_flush_duration_seconds")
           .help("The time it takes to ctx flush in seconds.")
+          .buckets(WriteQueue.durationBuckets)
           .register();
 
   protected Http2ConnectionHandler(

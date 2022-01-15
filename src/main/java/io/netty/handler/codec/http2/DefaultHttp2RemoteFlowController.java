@@ -27,6 +27,7 @@ import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 
+import io.grpc.netty.WriteQueue;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.internal.UnstableApi;
 import io.netty.util.internal.logging.InternalLogger;
@@ -59,6 +60,7 @@ public class DefaultHttp2RemoteFlowController implements Http2RemoteFlowControll
       Histogram.build()
           .name("netty_http2_byte_distributed_duration_seconds")
           .help("The duration of byte distributed to streams.")
+          .buckets(WriteQueue.durationBuckets)
           .register();
 
   public DefaultHttp2RemoteFlowController(Http2Connection connection) {

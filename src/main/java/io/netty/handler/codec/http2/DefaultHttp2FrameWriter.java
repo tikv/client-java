@@ -56,6 +56,7 @@ import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 
+import io.grpc.netty.WriteQueue;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -89,6 +90,7 @@ public class DefaultHttp2FrameWriter
       Histogram.build()
           .name("netty_http2_frame_writer_write_header_duration_seconds")
           .help("Time taken to encode a header")
+          .buckets(WriteQueue.durationBuckets)
           .register();
 
   public DefaultHttp2FrameWriter() {

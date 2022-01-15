@@ -35,7 +35,7 @@ import java.util.logging.Logger;
 import org.apache.commons.lang3.tuple.Pair;
 
 /** A queue of pending writes to a {@link Channel} that is flushed as a single unit. */
-class WriteQueue {
+public class WriteQueue {
 
   public static final double[] durationBuckets =
       new double[] {

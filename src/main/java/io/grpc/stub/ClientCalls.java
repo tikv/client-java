@@ -31,6 +31,7 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
+import io.grpc.netty.WriteQueue;
 import io.prometheus.client.Histogram;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -58,6 +59,7 @@ public final class ClientCalls {
       Histogram.build()
           .name("grpc_client_async_unary_request_call_duration_seconds")
           .help("Histogram of time spent in asyncUnaryRequestCall")
+          .buckets(WriteQueue.durationBuckets)
           .labelNames("phase")
           .register();
 

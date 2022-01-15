@@ -91,14 +91,6 @@ import javax.annotation.Nullable;
  * the context of the Netty Channel thread.
  */
 class NettyClientHandler extends AbstractNettyHandler {
-
-  public static final Histogram perfmarkNettyClientHandlerDuration =
-      Histogram.build()
-          .name("perfmark_netty_client_handler_duration_seconds")
-          .help("perfmark_netty_client_handler_duration_seconds")
-          .labelNames("type")
-          .register();
-
   private static final Logger logger = Logger.getLogger(NettyClientHandler.class.getName());
 
   /**
@@ -145,18 +137,29 @@ class NettyClientHandler extends AbstractNettyHandler {
       Histogram.build()
           .name("grpc_netty_client_stream_write_header_duration_seconds")
           .help("Time taken to write headers for a stream in seconds.")
+          .buckets(WriteQueue.durationBuckets)
           .register();
 
   public static final Histogram createStreamAddListenerDuration =
       Histogram.build()
           .name("grpc_netty_client_stream_add_listener_duration_seconds")
           .help("Time taken to add listener for a stream future in seconds.")
+          .buckets(WriteQueue.durationBuckets)
           .register();
 
   public static final Histogram createStreamCreateNewFuture =
       Histogram.build()
           .name("grpc_netty_client_stream_create_future_duration_seconds")
           .help("Time taken to create new stream future in seconds.")
+          .buckets(WriteQueue.durationBuckets)
+          .register();
+
+  public static final Histogram perfmarkNettyClientHandlerDuration =
+      Histogram.build()
+          .name("perfmark_netty_client_handler_duration_seconds")
+          .help("perfmark_netty_client_handler_duration_seconds")
+          .buckets(WriteQueue.durationBuckets)
+          .labelNames("type")
           .register();
 
   static NettyClientHandler newHandler(

@@ -68,6 +68,7 @@ class NettyClientStream extends AbstractClientStream {
       Histogram.build()
           .name("perfmark_netty_client_stream_duration_seconds")
           .help("perfmark_netty_client_stream_duration_seconds")
+          .buckets(WriteQueue.durationBuckets)
           .labelNames("type")
           .register();
 
