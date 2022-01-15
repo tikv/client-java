@@ -183,9 +183,10 @@ class WriteQueue {
         QueuedCommand cmd = item.getLeft();
         writeQueuePendingDuration.observe((System.nanoTime() - item.getRight()) / 1_000_000.0);
 
-        Record cmdRecord = new Record(cmd.getClass().getSimpleName());
+        String cmdName = cmd.getClass().getSimpleName();
+        Record cmdRecord = new Record(cmdName);
         Histogram.Timer cmdTimer =
-            writeQueueCmdRunDuration.labels(cmd.getClass().getSimpleName()).startTimer();
+            writeQueueCmdRunDuration.labels(cmdName).startTimer();
 
         // Run the command
         cmd.run(channel);
