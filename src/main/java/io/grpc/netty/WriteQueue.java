@@ -218,7 +218,6 @@ public class WriteQueue {
         if (++i == DEQUE_CHUNK_SIZE) {
           waitBatchTimer.observeDuration();
           i = 0;
-          waitBatchTimer = writeQueueWaitBatchDuration.startTimer();
           // Flush each chunk so we are releasing buffers periodically. In theory this loop
           // might never end as new events are continuously added to the queue, if we never
           // flushed in that case we would be guaranteed to OOM.
@@ -231,6 +230,7 @@ public class WriteQueue {
           try {
             channel.flush();
           } finally {
+            waitBatchTimer = writeQueueWaitBatchDuration.startTimer();
             writeQueueBatchSize.observe(DEQUE_CHUNK_SIZE);
             channelFlushTimer.observeDuration();
             flushRecord.end();
