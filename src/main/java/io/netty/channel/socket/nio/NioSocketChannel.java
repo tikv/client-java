@@ -398,12 +398,16 @@ public class NioSocketChannel extends AbstractNioByteChannel
     double duration = socketReadTime.observeDuration();
     if (duration > SLOW_IO_THRESHOLD) {
       // read slower than 10ms is strange
-      logger.warn(
-          "[slow io] read {} bytes from fd {} at {} took {} ms",
-          localReadBytes,
-          ChannelPerf.getSocketChannelFD(sc),
-          HistogramUtils.getHistogramTimerStart(socketReadTime),
-          duration);
+      System.out.println(
+          "[slow io] read "
+              + localReadBytes
+              + " bytes from fd "
+              + ChannelPerf.getSocketChannelFD(sc)
+              + " at "
+              + HistogramUtils.getHistogramTimerStart(socketReadTime)
+              + " took "
+              + duration
+              + " ms");
     }
     socketReadBytes.observe(localReadBytes);
     socketReadLeftBytes.observe(attemptedBytes - localReadBytes);
@@ -478,13 +482,18 @@ public class NioSocketChannel extends AbstractNioByteChannel
             double duration = writeTime.observeDuration();
             if (duration > SLOW_IO_THRESHOLD) {
               // read slower than 10ms is strange
-              logger.warn(
-                  "[slow io] write {}/{} bytes to fd {} at {} took {}ms",
-                  attemptedBytes,
-                  localWrittenBytes,
-                  ChannelPerf.getSocketChannelFD(ch),
-                  HistogramUtils.getHistogramTimerStart(writeTime),
-                  duration);
+              System.out.println(
+                  "[slow io] write "
+                      + attemptedBytes
+                      + "/"
+                      + localWrittenBytes
+                      + " bytes to fd "
+                      + ChannelPerf.getSocketChannelFD(ch)
+                      + " at "
+                      + HistogramUtils.getHistogramTimerStart(writeTime)
+                      + " took "
+                      + duration
+                      + "ms");
             }
             socketWrittenBytes.observe(localWrittenBytes);
             if (localWrittenBytes <= 0) {
@@ -511,13 +520,18 @@ public class NioSocketChannel extends AbstractNioByteChannel
             double duration = writeTime.observeDuration();
             if (duration > SLOW_IO_THRESHOLD) {
               // read slower than 10ms is strange
-              logger.warn(
-                  "[slow io] write {}/{} bytes to fd {} at {} took {} ms",
-                  attemptedBytes,
-                  localWrittenBytes,
-                  ChannelPerf.getSocketChannelFD(ch),
-                  HistogramUtils.getHistogramTimerStart(writeTime),
-                  duration);
+              System.out.println(
+                  "[slow io] write "
+                      + attemptedBytes
+                      + "/"
+                      + localWrittenBytes
+                      + " bytes to fd "
+                      + ChannelPerf.getSocketChannelFD(ch)
+                      + " at "
+                      + HistogramUtils.getHistogramTimerStart(writeTime)
+                      + " took "
+                      + duration
+                      + "ms");
             }
             socketWrittenBytes.observe(localWrittenBytes);
             if (localWrittenBytes <= 0) {
