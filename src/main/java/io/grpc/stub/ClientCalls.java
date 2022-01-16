@@ -63,6 +63,13 @@ public final class ClientCalls {
           .labelNames("phase")
           .register();
 
+  public static final Histogram blockingUnaryRequestWaitDuration =
+      Histogram.build()
+          .name("grpc_client_blocking_unary_request_wait_duration_seconds")
+          .help("Histogram of time spent waiting for future in blockingUnaryCall")
+          .buckets(WriteQueue.durationBuckets)
+          .register();
+
   // Prevent instantiation
   private ClientCalls() {}
 
@@ -154,8 +161,10 @@ public final class ClientCalls {
             callOptions
                 .withOption(ClientCalls.STUB_TYPE_OPTION, StubType.BLOCKING)
                 .withExecutor(executor));
+    Histogram.Timer waitTimer = null;
     try {
       ListenableFuture<RespT> responseFuture = futureUnaryCall(call, req);
+      waitTimer = blockingUnaryRequestWaitDuration.startTimer();
       while (!responseFuture.isDone()) {
         try {
           executor.waitAndDrain();
@@ -173,6 +182,9 @@ public final class ClientCalls {
       // Something very bad happened. All bets are off; it may be dangerous to wait for onClose().
       throw cancelThrow(call, e);
     } finally {
+      if (waitTimer != null) {
+        waitTimer.observeDuration();
+      }
       if (interrupt) {
         Thread.currentThread().interrupt();
       }
