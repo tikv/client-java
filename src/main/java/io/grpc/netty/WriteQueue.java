@@ -82,7 +82,6 @@ public class WriteQueue {
 
   public static final Histogram writeQueueBatchSize =
       Histogram.build()
-          .buckets(durationBuckets)
           .name("grpc_netty_write_queue_batch_size")
           .help("Number of tasks in a batch in the write queue.")
           .register();
