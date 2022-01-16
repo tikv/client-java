@@ -1,6 +1,7 @@
-package io.netty.handler.codec.http2;
+package io;
 
 import io.prometheus.client.Histogram;
+import java.lang.reflect.Field;
 
 public class HistogramUtils {
   private static final double[] durationBuckets =
@@ -15,11 +16,19 @@ public class HistogramUtils {
       };
 
   private static final double[] bytesBuckets;
+  private static final Field timerStartField;
 
   static {
     bytesBuckets = new double[30];
     for (int i = 0; i < 30; ++i) {
       bytesBuckets[i] = 1 * Math.pow(1.7, (double) i);
+    }
+
+    try {
+      timerStartField = Histogram.Timer.class.getField("start");
+      timerStartField.setAccessible(true);
+    } catch (Exception ex) {
+      throw new RuntimeException(ex);
     }
   }
 
@@ -29,5 +38,13 @@ public class HistogramUtils {
 
   public static Histogram.Builder buildBytes() {
     return Histogram.build().buckets(bytesBuckets);
+  }
+
+  public static long getHistogramTimerStart(Histogram.Timer timer) {
+    try {
+      return (long) timerStartField.get(timer);
+    } catch (Exception ex) {
+      throw new RuntimeException(ex);
+    }
   }
 }

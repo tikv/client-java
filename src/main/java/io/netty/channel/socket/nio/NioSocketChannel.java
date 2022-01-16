@@ -17,6 +17,7 @@ package io.netty.channel.socket.nio;
 
 import static io.netty.channel.internal.ChannelUtils.MAX_BYTES_PER_GATHERING_WRITE_ATTEMPTED_LOW_THRESHOLD;
 
+import io.HistogramUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelException;
@@ -32,7 +33,6 @@ import io.netty.channel.nio.AbstractNioByteChannel;
 import io.netty.channel.socket.DefaultSocketChannelConfig;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannelConfig;
-import io.netty.handler.codec.http2.HistogramUtils;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.SocketUtils;
@@ -51,6 +51,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import sun.nio.ch.ChannelPerf;
 
 /** {@link io.netty.channel.socket.SocketChannel} which uses NIO selector based implementation. */
 public class NioSocketChannel extends AbstractNioByteChannel
@@ -392,11 +393,17 @@ public class NioSocketChannel extends AbstractNioByteChannel
     int attemptedBytes = byteBuf.writableBytes();
     allocHandle.attemptedBytesRead(attemptedBytes);
     Histogram.Timer socketReadTime = socketReadDuration.startTimer();
-    int localReadBytes = byteBuf.writeBytes(javaChannel(), allocHandle.attemptedBytesRead());
+    SocketChannel sc = javaChannel();
+    int localReadBytes = byteBuf.writeBytes(sc, allocHandle.attemptedBytesRead());
     double duration = socketReadTime.observeDuration();
     if (duration > SLOW_IO_THRESHOLD) {
       // read slower than 10ms is strange
-      logger.warn("read {} bytes took {}ms", localReadBytes, duration);
+      logger.warn(
+          "[slow io] read {} bytes from fd {} at {} took {} ms",
+          localReadBytes,
+          ChannelPerf.getSocketChannelFD(sc),
+          HistogramUtils.getHistogramTimerStart(socketReadTime),
+          duration);
     }
     socketReadBytes.observe(localReadBytes);
     socketReadLeftBytes.observe(attemptedBytes - localReadBytes);
@@ -472,7 +479,12 @@ public class NioSocketChannel extends AbstractNioByteChannel
             if (duration > SLOW_IO_THRESHOLD) {
               // read slower than 10ms is strange
               logger.warn(
-                  "write {}/{} bytes took {}ms", attemptedBytes, localWrittenBytes, duration);
+                  "[slow io] write {}/{} bytes to fd {} at {} took {}ms",
+                  attemptedBytes,
+                  localWrittenBytes,
+                  ChannelPerf.getSocketChannelFD(ch),
+                  HistogramUtils.getHistogramTimerStart(writeTime),
+                  duration);
             }
             socketWrittenBytes.observe(localWrittenBytes);
             if (localWrittenBytes <= 0) {
@@ -500,7 +512,12 @@ public class NioSocketChannel extends AbstractNioByteChannel
             if (duration > SLOW_IO_THRESHOLD) {
               // read slower than 10ms is strange
               logger.warn(
-                  "write {}/{} bytes took {}ms", attemptedBytes, localWrittenBytes, duration);
+                  "[slow io] write {}/{} bytes to fd {} at {} took {} ms",
+                  attemptedBytes,
+                  localWrittenBytes,
+                  ChannelPerf.getSocketChannelFD(ch),
+                  HistogramUtils.getHistogramTimerStart(writeTime),
+                  duration);
             }
             socketWrittenBytes.observe(localWrittenBytes);
             if (localWrittenBytes <= 0) {
