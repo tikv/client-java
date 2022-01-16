@@ -49,7 +49,7 @@ public class WriteQueue {
       };
 
   // Dequeue in chunks, so we don't have to acquire the queue's log too often.
-  @VisibleForTesting static final int DEQUE_CHUNK_SIZE = 128;
+  @VisibleForTesting static final int DEQUE_CHUNK_SIZE = 2;
 
   /** {@link Runnable} used to schedule work onto the tail of the event loop. */
   private final Runnable later =
