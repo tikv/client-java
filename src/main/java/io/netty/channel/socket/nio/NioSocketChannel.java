@@ -55,6 +55,7 @@ import java.util.concurrent.Executor;
 /** {@link io.netty.channel.socket.SocketChannel} which uses NIO selector based implementation. */
 public class NioSocketChannel extends AbstractNioByteChannel
     implements io.netty.channel.socket.SocketChannel {
+  private static final double SLOW_IO_THRESHOLD = 0.01;
   public static final Histogram socketWriteDuration =
       HistogramUtils.buildDuration()
           .name("netty_nio_socket_channel_write_duration_seconds")
@@ -392,7 +393,11 @@ public class NioSocketChannel extends AbstractNioByteChannel
     allocHandle.attemptedBytesRead(attemptedBytes);
     Histogram.Timer socketReadTime = socketReadDuration.startTimer();
     int localReadBytes = byteBuf.writeBytes(javaChannel(), allocHandle.attemptedBytesRead());
-    socketReadTime.observeDuration();
+    double duration = socketReadTime.observeDuration();
+    if (duration > SLOW_IO_THRESHOLD) {
+      // read slower than 10ms is strange
+      logger.warn("read {} bytes took {}ms", localReadBytes, duration);
+    }
     socketReadBytes.observe(localReadBytes);
     socketReadLeftBytes.observe(attemptedBytes - localReadBytes);
     return localReadBytes;
@@ -463,7 +468,12 @@ public class NioSocketChannel extends AbstractNioByteChannel
             socketWriteBytes.observe(attemptedBytes);
             Histogram.Timer writeTime = socketWriteDuration.startTimer();
             final int localWrittenBytes = ch.write(buffer);
-            writeTime.observeDuration();
+            double duration = writeTime.observeDuration();
+            if (duration > SLOW_IO_THRESHOLD) {
+              // read slower than 10ms is strange
+              logger.warn(
+                  "write {}/{} bytes took {}ms", attemptedBytes, localWrittenBytes, duration);
+            }
             socketWrittenBytes.observe(localWrittenBytes);
             if (localWrittenBytes <= 0) {
               incompleteWrite(true);
@@ -486,7 +496,12 @@ public class NioSocketChannel extends AbstractNioByteChannel
             socketWriteBytes.observe(attemptedBytes);
             Histogram.Timer writeTime = socketWriteDuration.startTimer();
             final long localWrittenBytes = ch.write(nioBuffers, 0, nioBufferCnt);
-            writeTime.observeDuration();
+            double duration = writeTime.observeDuration();
+            if (duration > SLOW_IO_THRESHOLD) {
+              // read slower than 10ms is strange
+              logger.warn(
+                  "write {}/{} bytes took {}ms", attemptedBytes, localWrittenBytes, duration);
+            }
             socketWrittenBytes.observe(localWrittenBytes);
             if (localWrittenBytes <= 0) {
               incompleteWrite(true);
