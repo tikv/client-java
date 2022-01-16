@@ -84,8 +84,10 @@ public class Http2OutboundFrameLogger implements Http2FrameWriter {
       int padding,
       boolean endStream,
       ChannelPromise promise) {
+    Histogram.Timer logTimer = writeHeaderLogDuration.startTimer();
     logger.logHeaders(
         OUTBOUND, ctx, streamId, headers, streamDependency, weight, exclusive, padding, endStream);
+    logTimer.observeDuration();
     return writer.writeHeaders(
         ctx, streamId, headers, streamDependency, weight, exclusive, padding, endStream, promise);
   }
