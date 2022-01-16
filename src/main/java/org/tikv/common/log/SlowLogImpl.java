@@ -19,7 +19,6 @@ package org.tikv.common.log;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,7 +31,7 @@ public class SlowLogImpl implements SlowLog {
 
   private static final int MAX_SPAN_SIZE = 1024;
 
-  private final List<SlowLogSpan> slowLogSpans = new ArrayList<>();
+  private final List<SlowLogSpan> slowLogSpans = new ArrayList<>(16);
 
   private final long startMS;
   private final long slowThresholdMS;
@@ -54,8 +53,10 @@ public class SlowLogImpl implements SlowLog {
   @Override
   public synchronized SlowLogSpan start(String name) {
     SlowLogSpan slowLogSpan = new SlowLogSpanImpl(name);
-    if (slowLogSpans.size() < MAX_SPAN_SIZE) {
-      slowLogSpans.add(slowLogSpan);
+    synchronized (slowLogSpans) {
+      if (slowLogSpans.size() < MAX_SPAN_SIZE) {
+        slowLogSpans.add(slowLogSpan);
+      }
     }
     slowLogSpan.start();
     return slowLogSpan;
@@ -72,10 +73,8 @@ public class SlowLogImpl implements SlowLog {
   private String getSlowLogString(long currentMS) {
     JsonObject jsonObject = new JsonObject();
 
-    SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("HH:mm:ss.SSS");
-
-    jsonObject.addProperty("start", DATE_FORMAT.format(startMS));
-    jsonObject.addProperty("end", DATE_FORMAT.format(currentMS));
+    jsonObject.addProperty("start", SlowLogSpanImpl.DATE_FORMAT.get().format(startMS));
+    jsonObject.addProperty("end", SlowLogSpanImpl.DATE_FORMAT.get().format(currentMS));
     jsonObject.addProperty("duration", (currentMS - startMS) + "ms");
 
     for (Map.Entry<String, String> entry : properties.entrySet()) {
@@ -83,8 +82,10 @@ public class SlowLogImpl implements SlowLog {
     }
 
     JsonArray jsonArray = new JsonArray();
-    for (SlowLogSpan slowLogSpan : slowLogSpans) {
-      jsonArray.add(slowLogSpan.toJsonElement());
+    synchronized (slowLogSpans) {
+      for (SlowLogSpan slowLogSpan : slowLogSpans) {
+        jsonArray.add(slowLogSpan.toJsonElement());
+      }
     }
     jsonObject.add("spans", jsonArray);
 

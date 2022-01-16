@@ -25,7 +25,8 @@ public class SlowLogSpanImpl implements SlowLogSpan {
   private final String name;
   private long startMS;
   private long endMS;
-  private SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("HH:mm:ss.SSS");
+  public static ThreadLocal<SimpleDateFormat> DATE_FORMAT =
+      ThreadLocal.withInitial(() -> new SimpleDateFormat("HH:mm:ss.SSS"));
 
   public SlowLogSpanImpl(String name) {
     this.name = name;
@@ -58,14 +59,14 @@ public class SlowLogSpanImpl implements SlowLogSpan {
     if (startMS == 0) {
       return "N/A";
     }
-    return DATE_FORMAT.format(startMS);
+    return DATE_FORMAT.get().format(startMS);
   }
 
   private String getEndString() {
     if (endMS == 0) {
       return "N/A";
     }
-    return DATE_FORMAT.format(endMS);
+    return DATE_FORMAT.get().format(endMS);
   }
 
   private String getDurationString() {
