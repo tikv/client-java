@@ -51,7 +51,6 @@ import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import sun.nio.ch.ChannelPerf;
 
 /** {@link io.netty.channel.socket.SocketChannel} which uses NIO selector based implementation. */
 public class NioSocketChannel extends AbstractNioByteChannel
@@ -394,18 +393,12 @@ public class NioSocketChannel extends AbstractNioByteChannel
     allocHandle.attemptedBytesRead(attemptedBytes);
     Histogram.Timer socketReadTime = socketReadDuration.startTimer();
     SocketChannel sc = javaChannel();
+    long start = System.currentTimeMillis();
     int localReadBytes = byteBuf.writeBytes(sc, allocHandle.attemptedBytesRead());
     double duration = socketReadTime.observeDuration();
     if (duration > SLOW_IO_THRESHOLD) {
       // read slower than 10ms is strange
-      System.out.println(
-          "[slow io] read "
-              + localReadBytes
-              + " bytes at "
-              + HistogramUtils.getHistogramTimerStart(socketReadTime)
-              + " took "
-              + duration
-              + " ms");
+      logger.warn("[slow io] read {} bytes at {} took {} ms", localReadBytes, start, duration);
     }
     socketReadBytes.observe(localReadBytes);
     socketReadLeftBytes.observe(attemptedBytes - localReadBytes);
@@ -476,20 +469,17 @@ public class NioSocketChannel extends AbstractNioByteChannel
             int attemptedBytes = buffer.remaining();
             socketWriteBytes.observe(attemptedBytes);
             Histogram.Timer writeTime = socketWriteDuration.startTimer();
+            long start = System.currentTimeMillis();
             final int localWrittenBytes = ch.write(buffer);
             double duration = writeTime.observeDuration();
             if (duration > SLOW_IO_THRESHOLD) {
               // read slower than 10ms is strange
-              System.out.println(
-                  "[slow io] write "
-                      + attemptedBytes
-                      + "/"
-                      + localWrittenBytes
-                      + " bytes at "
-                      + HistogramUtils.getHistogramTimerStart(writeTime)
-                      + " took "
-                      + duration
-                      + "ms");
+              logger.warn(
+                  "[slow io] write {}/{} bytes at {} took {} ms",
+                  attemptedBytes,
+                  localWrittenBytes,
+                  start,
+                  duration);
             }
             socketWrittenBytes.observe(localWrittenBytes);
             if (localWrittenBytes <= 0) {
@@ -512,20 +502,17 @@ public class NioSocketChannel extends AbstractNioByteChannel
             long attemptedBytes = in.nioBufferSize();
             socketWriteBytes.observe(attemptedBytes);
             Histogram.Timer writeTime = socketWriteDuration.startTimer();
+            long start = System.currentTimeMillis();
             final long localWrittenBytes = ch.write(nioBuffers, 0, nioBufferCnt);
             double duration = writeTime.observeDuration();
             if (duration > SLOW_IO_THRESHOLD) {
               // read slower than 10ms is strange
-              System.out.println(
-                  "[slow io] write "
-                      + attemptedBytes
-                      + "/"
-                      + localWrittenBytes
-                      + " bytes at "
-                      + HistogramUtils.getHistogramTimerStart(writeTime)
-                      + " took "
-                      + duration
-                      + "ms");
+              logger.warn(
+                  "[slow io] write {}/{} bytes at {} took {} ms",
+                  attemptedBytes,
+                  localWrittenBytes,
+                  start,
+                  duration);
             }
             socketWrittenBytes.observe(localWrittenBytes);
             if (localWrittenBytes <= 0) {
