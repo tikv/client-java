@@ -25,7 +25,7 @@ public class HistogramUtils {
     }
 
     try {
-      timerStartField = Histogram.Timer.class.getField("start");
+      timerStartField = Histogram.Timer.class.getDeclaredField("start");
       timerStartField.setAccessible(true);
     } catch (Exception ex) {
       throw new RuntimeException(ex);
