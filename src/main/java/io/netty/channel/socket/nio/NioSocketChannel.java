@@ -39,6 +39,7 @@ import io.netty.util.internal.SuppressJava6Requirement;
 import io.netty.util.internal.UnstableApi;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.prometheus.client.Histogram;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -49,10 +50,48 @@ import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import org.tikv.common.util.HistogramUtils;
 
 /** {@link io.netty.channel.socket.SocketChannel} which uses NIO selector based implementation. */
 public class NioSocketChannel extends AbstractNioByteChannel
     implements io.netty.channel.socket.SocketChannel {
+  public static final Histogram socketWriteDuration =
+      HistogramUtils.buildDuration()
+          .name("netty_nio_socket_channel_write_duration_seconds")
+          .help("Time taken to write data to socket")
+          .register();
+  public static final Histogram socketWriteBytes =
+      HistogramUtils.buildBytes()
+          .name("netty_nio_socket_channel_write_bytes")
+          .help("number of bytes for each write call")
+          .register();
+  public static final Histogram socketWrittenBytes =
+      HistogramUtils.buildBytes()
+          .name("netty_nio_socket_channel_written_bytes")
+          .help("number of bytes actually written for each write call")
+          .register();
+  public static final Histogram socketWriteLeftBytes =
+      HistogramUtils.buildBytes()
+          .name("netty_nio_socket_channel_write_left_bytes")
+          .help("number of bytes not written for each write call")
+          .register();
+  public static final Histogram socketReadDuration =
+      HistogramUtils.buildDuration()
+          .name("netty_nio_socket_channel_read_duration_seconds")
+          .help("Time taken to read data to socket")
+          .register();
+  public static final Histogram socketReadBytes =
+      HistogramUtils.buildBytes()
+          .name("netty_nio_socket_channel_read_bytes")
+          .help("number of bytes for each read call")
+          .register();
+
+  public static final Histogram socketReadLeftBytes =
+      HistogramUtils.buildBytes()
+          .name("netty_nio_socket_channel_read_left_bytes")
+          .help("number of bytes not read for each read call")
+          .register();
+
   private static final InternalLogger logger =
       InternalLoggerFactory.getInstance(NioSocketChannel.class);
   private static final SelectorProvider DEFAULT_SELECTOR_PROVIDER = SelectorProvider.provider();
@@ -349,8 +388,15 @@ public class NioSocketChannel extends AbstractNioByteChannel
   @Override
   protected int doReadBytes(ByteBuf byteBuf) throws Exception {
     final RecvByteBufAllocator.Handle allocHandle = unsafe().recvBufAllocHandle();
-    allocHandle.attemptedBytesRead(byteBuf.writableBytes());
-    return byteBuf.writeBytes(javaChannel(), allocHandle.attemptedBytesRead());
+    int attemptedBytes = byteBuf.writableBytes();
+    allocHandle.attemptedBytesRead(attemptedBytes);
+    Histogram.Timer socketReadTime = socketReadDuration.startTimer();
+    SocketChannel sc = javaChannel();
+    int localReadBytes = byteBuf.writeBytes(sc, allocHandle.attemptedBytesRead());
+    socketReadTime.observeDuration();
+    socketReadBytes.observe(localReadBytes);
+    socketReadLeftBytes.observe(attemptedBytes - localReadBytes);
+    return localReadBytes;
   }
 
   @Override
@@ -415,11 +461,16 @@ public class NioSocketChannel extends AbstractNioByteChannel
             // to check if the total size of all the buffers is non-zero.
             ByteBuffer buffer = nioBuffers[0];
             int attemptedBytes = buffer.remaining();
+            socketWriteBytes.observe(attemptedBytes);
+            Histogram.Timer writeTime = socketWriteDuration.startTimer();
             final int localWrittenBytes = ch.write(buffer);
+            writeTime.observeDuration();
+            socketWrittenBytes.observe(localWrittenBytes);
             if (localWrittenBytes <= 0) {
               incompleteWrite(true);
               return;
             }
+            socketWriteLeftBytes.observe(attemptedBytes - localWrittenBytes);
             adjustMaxBytesPerGatheringWrite(
                 attemptedBytes, localWrittenBytes, maxBytesPerGatheringWrite);
             in.removeBytes(localWrittenBytes);
@@ -433,11 +484,16 @@ public class NioSocketChannel extends AbstractNioByteChannel
             // to check if the total size of all the buffers is non-zero.
             // We limit the max amount to int above so cast is safe
             long attemptedBytes = in.nioBufferSize();
+            socketWriteBytes.observe(attemptedBytes);
+            Histogram.Timer writeTime = socketWriteDuration.startTimer();
             final long localWrittenBytes = ch.write(nioBuffers, 0, nioBufferCnt);
+            writeTime.observeDuration();
+            socketWrittenBytes.observe(localWrittenBytes);
             if (localWrittenBytes <= 0) {
               incompleteWrite(true);
               return;
             }
+            socketWriteLeftBytes.observe(attemptedBytes - localWrittenBytes);
             // Casting to int is safe because we limit the total amount of data in the nioBuffers to
             // int above.
             adjustMaxBytesPerGatheringWrite(
