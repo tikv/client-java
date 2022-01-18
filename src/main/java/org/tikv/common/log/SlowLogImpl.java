@@ -32,8 +32,6 @@ public class SlowLogImpl implements SlowLog {
 
   private static final int MAX_SPAN_SIZE = 1024;
 
-  public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("HH:mm:ss.SSS");
-
   private final List<SlowLogSpan> slowLogSpans = new ArrayList<>();
   private Throwable error = null;
 
@@ -85,10 +83,11 @@ public class SlowLogImpl implements SlowLog {
   }
 
   private String getSlowLogString(long currentMS) {
+    SimpleDateFormat dateFormat = getSimpleDateFormat();
     JsonObject jsonObject = new JsonObject();
 
-    jsonObject.addProperty("start", DATE_FORMAT.format(startMS));
-    jsonObject.addProperty("end", DATE_FORMAT.format(currentMS));
+    jsonObject.addProperty("start", dateFormat.format(startMS));
+    jsonObject.addProperty("end", dateFormat.format(currentMS));
     jsonObject.addProperty("duration", (currentMS - startMS) + "ms");
     if (error != null) {
       jsonObject.addProperty("error", error.getMessage());
@@ -105,5 +104,9 @@ public class SlowLogImpl implements SlowLog {
     jsonObject.add("spans", jsonArray);
 
     return jsonObject.toString();
+  }
+
+  public static SimpleDateFormat getSimpleDateFormat() {
+    return new SimpleDateFormat("HH:mm:ss.SSS");
   }
 }

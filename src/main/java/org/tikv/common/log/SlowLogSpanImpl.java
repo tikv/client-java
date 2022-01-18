@@ -17,10 +17,11 @@
 
 package org.tikv.common.log;
 
-import static org.tikv.common.log.SlowLogImpl.DATE_FORMAT;
+import static org.tikv.common.log.SlowLogImpl.getSimpleDateFormat;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.text.SimpleDateFormat;
 
 public class SlowLogSpanImpl implements SlowLogSpan {
   private final String name;
@@ -60,27 +61,28 @@ public class SlowLogSpanImpl implements SlowLogSpan {
 
   @Override
   public JsonElement toJsonElement() {
+    SimpleDateFormat simpleDateFormat = getSimpleDateFormat();
     JsonObject jsonObject = new JsonObject();
     jsonObject.addProperty("name", name);
-    jsonObject.addProperty("start", getStartString());
-    jsonObject.addProperty("end", getEndString());
+    jsonObject.addProperty("start", getStartString(simpleDateFormat));
+    jsonObject.addProperty("end", getEndString(simpleDateFormat));
     jsonObject.addProperty("duration", getDurationString());
 
     return jsonObject;
   }
 
-  private String getStartString() {
+  private String getStartString(SimpleDateFormat simpleDateFormat) {
     if (startMS == 0) {
       return "N/A";
     }
-    return DATE_FORMAT.format(startMS);
+    return simpleDateFormat.format(startMS);
   }
 
-  private String getEndString() {
+  private String getEndString(SimpleDateFormat simpleDateFormat) {
     if (endMS == 0) {
       return "N/A";
     }
-    return DATE_FORMAT.format(endMS);
+    return simpleDateFormat.format(endMS);
   }
 
   private String getDurationString() {
