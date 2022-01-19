@@ -23,9 +23,6 @@ public class SlowLogEmptyImpl implements SlowLog {
   private SlowLogEmptyImpl() {}
 
   @Override
-  public void addProperty(String key, String value) {}
-
-  @Override
   public SlowLogSpan start(String name) {
     return SlowLogSpanEmptyImpl.INSTANCE;
   }

@@ -18,8 +18,6 @@
 package org.tikv.common.log;
 
 public interface SlowLog {
-  void addProperty(String key, String value);
-
   SlowLogSpan start(String name);
 
   void setError(Throwable err);

@@ -19,11 +19,8 @@ package org.tikv.common.log;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,19 +40,10 @@ public class SlowLogImpl implements SlowLog {
 
   private final long slowThresholdMS;
 
-  /** Key-Value pairs which will be logged, e.g. function name, key, region, etc. */
-  private final Map<String, String> properties;
-
-  public SlowLogImpl(long slowThresholdMS, Map<String, String> properties) {
+  public SlowLogImpl(long slowThresholdMS) {
     this.startMS = System.currentTimeMillis();
     this.startNS = System.nanoTime();
     this.slowThresholdMS = slowThresholdMS;
-    this.properties = new HashMap<>(properties);
-  }
-
-  @Override
-  public void addProperty(String key, String value) {
-    this.properties.put(key, value);
   }
 
   @Override
@@ -76,25 +64,17 @@ public class SlowLogImpl implements SlowLog {
   @Override
   public void log() {
     long currentNS = System.nanoTime();
-    long currentMS = startMS + (currentNS - startNS) / 1_000_000;
-    if (error != null || (slowThresholdMS >= 0 && currentMS - startMS > slowThresholdMS)) {
-      logger.warn("SlowLog:" + getSlowLogString(currentMS));
+    long durationMS = (currentNS - startNS) / 1_000_000;
+    if (error != null || (slowThresholdMS >= 0 && durationMS > slowThresholdMS)) {
+      logger.warn("SlowLog:" + getSlowLogString());
     }
   }
 
-  private String getSlowLogString(long currentMS) {
-    SimpleDateFormat dateFormat = getSimpleDateFormat();
+  private String getSlowLogString() {
     JsonObject jsonObject = new JsonObject();
 
-    jsonObject.addProperty("start", dateFormat.format(startMS));
-    jsonObject.addProperty("end", dateFormat.format(currentMS));
-    jsonObject.addProperty("duration", (currentMS - startMS) + "ms");
     if (error != null) {
       jsonObject.addProperty("error", error.getMessage());
-    }
-
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      jsonObject.addProperty(entry.getKey(), entry.getValue());
     }
 
     JsonArray jsonArray = new JsonArray();
@@ -104,9 +84,5 @@ public class SlowLogImpl implements SlowLog {
     jsonObject.add("spans", jsonArray);
 
     return jsonObject.toString();
-  }
-
-  public static SimpleDateFormat getSimpleDateFormat() {
-    return new SimpleDateFormat("HH:mm:ss.SSS");
   }
 }
