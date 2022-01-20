@@ -23,6 +23,8 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.internal.UnstableApi;
+import io.prometheus.client.Histogram;
+import org.tikv.common.util.HistogramUtils;
 
 /**
  * Decorator around a {@link Http2FrameWriter} that logs all outbound frames before calling the
@@ -32,6 +34,12 @@ import io.netty.util.internal.UnstableApi;
 public class Http2OutboundFrameLogger implements Http2FrameWriter {
   private final Http2FrameWriter writer;
   private final Http2FrameLogger logger;
+
+  public static final Histogram writeHeaderLogDuration =
+      HistogramUtils.buildDuration()
+          .name("netty_http2_write_header_log_duration_seconds")
+          .help("HTTP/2 write header log duration in seconds")
+          .register();
 
   public Http2OutboundFrameLogger(Http2FrameWriter writer, Http2FrameLogger logger) {
     this.writer = checkNotNull(writer, "writer");
@@ -58,7 +66,9 @@ public class Http2OutboundFrameLogger implements Http2FrameWriter {
       int padding,
       boolean endStream,
       ChannelPromise promise) {
+    Histogram.Timer logTimer = writeHeaderLogDuration.startTimer();
     logger.logHeaders(OUTBOUND, ctx, streamId, headers, padding, endStream);
+    logTimer.observeDuration();
     return writer.writeHeaders(ctx, streamId, headers, padding, endStream, promise);
   }
 
@@ -73,8 +83,10 @@ public class Http2OutboundFrameLogger implements Http2FrameWriter {
       int padding,
       boolean endStream,
       ChannelPromise promise) {
+    Histogram.Timer logTimer = writeHeaderLogDuration.startTimer();
     logger.logHeaders(
         OUTBOUND, ctx, streamId, headers, streamDependency, weight, exclusive, padding, endStream);
+    logTimer.observeDuration();
     return writer.writeHeaders(
         ctx, streamId, headers, streamDependency, weight, exclusive, padding, endStream, promise);
   }

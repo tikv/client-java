@@ -48,9 +48,11 @@ import io.netty.util.concurrent.ScheduledFuture;
 import io.netty.util.internal.UnstableApi;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.prometheus.client.Histogram;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.tikv.common.util.HistogramUtils;
 
 /**
  * Provides the default implementation for processing inbound frame events and delegates to a {@link
@@ -83,6 +85,18 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder
   private ChannelFutureListener closeListener;
   private BaseDecoder byteDecoder;
   private long gracefulShutdownTimeoutMillis;
+
+  public static final Histogram flushFlowControlWriteDuration =
+      HistogramUtils.buildDuration()
+          .name("netty_http2_flush_flow_control_write_duration_seconds")
+          .help("The time it takes to flush the pending bytes via flow control in seconds.")
+          .register();
+
+  public static final Histogram flushCtxFlushDuration =
+      HistogramUtils.buildDuration()
+          .name("netty_http2_flush_ctx_flush_duration_seconds")
+          .help("The time it takes to ctx flush in seconds.")
+          .register();
 
   protected Http2ConnectionHandler(
       Http2ConnectionDecoder decoder,
@@ -203,8 +217,13 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder
   public void flush(ChannelHandlerContext ctx) {
     try {
       // Trigger pending writes in the remote flow controller.
+      Histogram.Timer writeTimer = flushFlowControlWriteDuration.startTimer();
       encoder.flowController().writePendingBytes();
+      writeTimer.observeDuration();
+
+      Histogram.Timer flushTimer = flushCtxFlushDuration.startTimer();
       ctx.flush();
+      flushTimer.observeDuration();
     } catch (Http2Exception e) {
       onError(ctx, true, e);
     } catch (Throwable cause) {
