@@ -22,9 +22,9 @@ import static org.tikv.common.ConfigUtils.TIKV_BO_REGION_MISS_BASE_IN_MS;
 import com.google.common.base.Preconditions;
 import io.prometheus.client.Histogram;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
@@ -57,7 +57,7 @@ public class ConcreteBackOffer implements BackOffer {
     Preconditions.checkArgument(deadline >= 0, "Deadline cannot be less than 0.");
     this.maxSleep = maxSleep;
     this.errors = new ArrayList<>();
-    this.backOffFunctionMap = new HashMap<>();
+    this.backOffFunctionMap = new ConcurrentHashMap<>();
     this.deadline = deadline;
     this.slowLog = slowLog;
   }
