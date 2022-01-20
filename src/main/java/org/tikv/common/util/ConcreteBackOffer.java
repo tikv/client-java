@@ -43,8 +43,7 @@ public class ConcreteBackOffer implements BackOffer {
   @VisibleForTesting
   public final Map<BackOffFunction.BackOffFuncType, BackOffFunction> backOffFunctionMap;
 
-  @VisibleForTesting
-  public final List<Exception> errors;
+  @VisibleForTesting public final List<Exception> errors;
   private int totalSleep;
   private final long deadline;
   private final SlowLog slowLog;
