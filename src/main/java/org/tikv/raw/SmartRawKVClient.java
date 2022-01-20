@@ -23,11 +23,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.exception.CircuitBreakerOpenException;
-<<<<<<< HEAD
-=======
 import org.tikv.common.util.HistogramUtils;
-import org.tikv.common.util.Pair;
->>>>>>> 4f0ec583... add metrics inside grpc and netty (#484)
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.service.failsafe.CircuitBreaker;
