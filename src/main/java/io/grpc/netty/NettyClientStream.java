@@ -45,7 +45,9 @@ import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.util.AsciiString;
 import io.perfmark.PerfMark;
 import io.perfmark.Tag;
+import io.prometheus.client.Histogram;
 import javax.annotation.Nullable;
+import org.tikv.common.util.HistogramUtils;
 
 /** Client stream for a Netty transport. Must only be called from the sending application thread. */
 class NettyClientStream extends AbstractClientStream {
@@ -62,6 +64,13 @@ class NettyClientStream extends AbstractClientStream {
   private AsciiString authority;
   private final AsciiString scheme;
   private final AsciiString userAgent;
+
+  public static final Histogram perfmarkNettyClientStreamDuration =
+      HistogramUtils.buildDuration()
+          .name("perfmark_netty_client_stream_duration_seconds")
+          .help("Perfmark netty client stream duration seconds")
+          .labelNames("type")
+          .register();
 
   NettyClientStream(
       TransportState state,
@@ -115,10 +124,15 @@ class NettyClientStream extends AbstractClientStream {
     @Override
     public void writeHeaders(Metadata headers, byte[] requestPayload) {
       PerfMark.startTask("NettyClientStream$Sink.writeHeaders");
+      Histogram.Timer writeHeaders =
+          perfmarkNettyClientStreamDuration
+              .labels("NettyClientStream$Sink.writeHeaders")
+              .startTimer();
       try {
         writeHeadersInternal(headers, requestPayload);
       } finally {
         PerfMark.stopTask("NettyClientStream$Sink.writeHeaders");
+        writeHeaders.observeDuration();
       }
     }
 
@@ -207,20 +221,28 @@ class NettyClientStream extends AbstractClientStream {
     public void writeFrame(
         WritableBuffer frame, boolean endOfStream, boolean flush, int numMessages) {
       PerfMark.startTask("NettyClientStream$Sink.writeFrame");
+      Histogram.Timer writeFrame =
+          perfmarkNettyClientStreamDuration
+              .labels("NettyClientStream$Sink.writeFrame")
+              .startTimer();
       try {
         writeFrameInternal(frame, endOfStream, flush, numMessages);
       } finally {
         PerfMark.stopTask("NettyClientStream$Sink.writeFrame");
+        writeFrame.observeDuration();
       }
     }
 
     @Override
     public void cancel(Status status) {
       PerfMark.startTask("NettyClientStream$Sink.cancel");
+      Histogram.Timer cancel =
+          perfmarkNettyClientStreamDuration.labels("NettyClientStream$Sink.cancel").startTimer();
       try {
         writeQueue.enqueue(new CancelClientStreamCommand(transportState(), status), true);
       } finally {
         PerfMark.stopTask("NettyClientStream$Sink.cancel");
+        cancel.observeDuration();
       }
     }
   }

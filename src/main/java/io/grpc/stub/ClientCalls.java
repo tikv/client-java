@@ -31,6 +31,7 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
+import io.prometheus.client.Histogram;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -43,6 +44,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import org.tikv.common.util.HistogramUtils;
 
 /**
  * Utility functions for processing different call idioms. We have one-to-one correspondence between
@@ -52,6 +54,19 @@ import javax.annotation.Nullable;
 public final class ClientCalls {
 
   private static final Logger logger = Logger.getLogger(ClientCalls.class.getName());
+
+  public static final Histogram asyncUnaryRequestCallDuration =
+      HistogramUtils.buildDuration()
+          .name("grpc_client_async_unary_request_call_duration_seconds")
+          .help("Histogram of time spent in asyncUnaryRequestCall")
+          .labelNames("phase")
+          .register();
+
+  public static final Histogram blockingUnaryRequestWaitDuration =
+      HistogramUtils.buildDuration()
+          .name("grpc_client_blocking_unary_request_wait_duration_seconds")
+          .help("Histogram of time spent waiting for future in blockingUnaryCall")
+          .register();
 
   // Prevent instantiation
   private ClientCalls() {}
@@ -144,8 +159,10 @@ public final class ClientCalls {
             callOptions
                 .withOption(ClientCalls.STUB_TYPE_OPTION, StubType.BLOCKING)
                 .withExecutor(executor));
+    Histogram.Timer waitTimer = null;
     try {
       ListenableFuture<RespT> responseFuture = futureUnaryCall(call, req);
+      waitTimer = blockingUnaryRequestWaitDuration.startTimer();
       while (!responseFuture.isDone()) {
         try {
           executor.waitAndDrain();
@@ -163,6 +180,9 @@ public final class ClientCalls {
       // Something very bad happened. All bets are off; it may be dangerous to wait for onClose().
       throw cancelThrow(call, e);
     } finally {
+      if (waitTimer != null) {
+        waitTimer.observeDuration();
+      }
       if (interrupt) {
         Thread.currentThread().interrupt();
       }
@@ -306,10 +326,20 @@ public final class ClientCalls {
 
   private static <ReqT, RespT> void asyncUnaryRequestCall(
       ClientCall<ReqT, RespT> call, ReqT req, StartableListener<RespT> responseListener) {
+    Histogram.Timer startCallTimer =
+        asyncUnaryRequestCallDuration.labels("start_call").startTimer();
     startCall(call, responseListener);
+    startCallTimer.observeDuration();
     try {
+      Histogram.Timer sendMessageTimer =
+          asyncUnaryRequestCallDuration.labels("send_message").startTimer();
       call.sendMessage(req);
+      sendMessageTimer.observeDuration();
+
+      Histogram.Timer halfCloseTimer =
+          asyncUnaryRequestCallDuration.labels("half_close").startTimer();
       call.halfClose();
+      halfCloseTimer.observeDuration();
     } catch (RuntimeException e) {
       throw cancelThrow(call, e);
     } catch (Error e) {

@@ -24,9 +24,12 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelPromise;
 import io.perfmark.Link;
 import io.perfmark.PerfMark;
+import io.prometheus.client.Histogram;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.commons.lang3.tuple.Pair;
+import org.tikv.common.util.HistogramUtils;
 
 /** A queue of pending writes to a {@link Channel} that is flushed as a single unit. */
 class WriteQueue {
@@ -44,8 +47,55 @@ class WriteQueue {
       };
 
   private final Channel channel;
-  private final Queue<QueuedCommand> queue;
+  private final Queue<Pair<QueuedCommand, Long>> queue;
   private final AtomicBoolean scheduled = new AtomicBoolean();
+
+  public static final Histogram writeQueuePendingDuration =
+      HistogramUtils.buildDuration()
+          .name("grpc_netty_write_queue_pending_duration_ms")
+          .labelNames("type")
+          .help("Pending duration of a task in the write queue.")
+          .register();
+
+  public static final Histogram writeQueueWaitBatchDuration =
+      HistogramUtils.buildDuration()
+          .name("grpc_netty_write_queue_wait_batch_duration_seconds")
+          .help("Duration of waiting a batch filled in the write queue.")
+          .register();
+
+  public static final Histogram writeQueueBatchSize =
+      Histogram.build()
+          .exponentialBuckets(1, 2, 10)
+          .name("grpc_netty_write_queue_batch_size")
+          .help("Number of tasks in a batch in the write queue.")
+          .register();
+
+  public static final Histogram writeQueueCmdRunDuration =
+      HistogramUtils.buildDuration()
+          .name("grpc_netty_write_queue_cmd_run_duration_seconds")
+          .help("Duration of a task execution in the write queue.")
+          .labelNames("type")
+          .register();
+
+  public static final Histogram writeQueueChannelFlushDuration =
+      HistogramUtils.buildDuration()
+          .name("grpc_netty_write_queue_channel_flush_duration_seconds")
+          .help("Duration of a channel flush in the write queue.")
+          .labelNames("phase")
+          .register();
+
+  public static final Histogram writeQueueFlushDuration =
+      HistogramUtils.buildDuration()
+          .name("grpc_netty_write_queue_flush_duration_seconds")
+          .help("Duration of a flush of the write queue.")
+          .register();
+
+  public static final Histogram perfmarkWriteQueueDuration =
+      HistogramUtils.buildDuration()
+          .name("perfmark_write_queue_duration_seconds")
+          .help("Perfmark write queue duration seconds")
+          .labelNames("type")
+          .register();
 
   public WriteQueue(Channel channel) {
     this.channel = Preconditions.checkNotNull(channel, "channel");
@@ -76,7 +126,7 @@ class WriteQueue {
 
     ChannelPromise promise = channel.newPromise();
     command.promise(promise);
-    queue.add(command);
+    queue.add(Pair.of(command, System.nanoTime()));
     if (flush) {
       scheduleFlush();
     }
@@ -89,7 +139,8 @@ class WriteQueue {
    * processed in-order with writes.
    */
   void enqueue(Runnable runnable, boolean flush) {
-    queue.add(new RunnableCommand(runnable));
+    Long now = System.nanoTime();
+    queue.add(Pair.<QueuedCommand, Long>of(new RunnableCommand(runnable), now));
     if (flush) {
       scheduleFlush();
     }
@@ -113,38 +164,75 @@ class WriteQueue {
    * the event loop
    */
   private void flush() {
+    Histogram.Timer flushTimer = writeQueueFlushDuration.startTimer();
     PerfMark.startTask("WriteQueue.periodicFlush");
+    Histogram.Timer periodicFlush =
+        perfmarkWriteQueueDuration.labels("WriteQueue.periodicFlush").startTimer();
+
+    long start = System.nanoTime();
     try {
-      QueuedCommand cmd;
+      Pair<QueuedCommand, Long> item;
       int i = 0;
       boolean flushedOnce = false;
-      while ((cmd = queue.poll()) != null) {
+      Histogram.Timer waitBatchTimer = writeQueueWaitBatchDuration.startTimer();
+      while ((item = queue.poll()) != null) {
+        QueuedCommand cmd = item.getLeft();
+        String cmdName = cmd.getClass().getSimpleName();
+        writeQueuePendingDuration
+            .labels(cmdName)
+            .observe((System.nanoTime() - item.getRight()) / 1_000_000.0);
+
+        Histogram.Timer cmdTimer = writeQueueCmdRunDuration.labels(cmdName).startTimer();
+
+        // Run the command
         cmd.run(channel);
+
+        cmdTimer.observeDuration();
+
         if (++i == DEQUE_CHUNK_SIZE) {
+          waitBatchTimer.observeDuration();
           i = 0;
           // Flush each chunk so we are releasing buffers periodically. In theory this loop
           // might never end as new events are continuously added to the queue, if we never
           // flushed in that case we would be guaranteed to OOM.
           PerfMark.startTask("WriteQueue.flush0");
+          Histogram.Timer flush0 =
+              perfmarkWriteQueueDuration.labels("WriteQueue.flush0").startTimer();
+          Histogram.Timer channelFlushTimer =
+              writeQueueChannelFlushDuration.labels("flush0").startTimer();
           try {
             channel.flush();
           } finally {
+            waitBatchTimer = writeQueueWaitBatchDuration.startTimer();
+            writeQueueBatchSize.observe(DEQUE_CHUNK_SIZE);
+            channelFlushTimer.observeDuration();
             PerfMark.stopTask("WriteQueue.flush0");
+            flush0.observeDuration();
           }
           flushedOnce = true;
         }
       }
       // Must flush at least once, even if there were no writes.
       if (i != 0 || !flushedOnce) {
+        waitBatchTimer.observeDuration();
         PerfMark.startTask("WriteQueue.flush1");
+        Histogram.Timer flush1 =
+            perfmarkWriteQueueDuration.labels("WriteQueue.flush1").startTimer();
+        Histogram.Timer channelFlushTimer =
+            writeQueueChannelFlushDuration.labels("flush1").startTimer();
         try {
           channel.flush();
         } finally {
+          writeQueueBatchSize.observe(i);
+          channelFlushTimer.observeDuration();
           PerfMark.stopTask("WriteQueue.flush1");
+          flush1.observeDuration();
         }
       }
     } finally {
       PerfMark.stopTask("WriteQueue.periodicFlush");
+      periodicFlush.observeDuration();
+      flushTimer.observeDuration();
       // Mark the write as done, if the queue is non-empty after marking trigger a new write.
       scheduled.set(false);
       if (!queue.isEmpty()) {

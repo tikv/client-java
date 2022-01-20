@@ -64,6 +64,7 @@ import org.tikv.common.util.BackOffFunction.BackOffFuncType;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.HistogramUtils;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
@@ -109,7 +110,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private long lastUpdateLeaderTime;
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_pd_get_region_by_requests_latency")
           .help("pd getRegionByKey request latency.")
           .register();
