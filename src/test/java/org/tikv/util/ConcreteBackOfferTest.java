@@ -16,8 +16,7 @@ import org.tikv.common.util.ConcreteBackOffer;
 
 public class ConcreteBackOfferTest {
 
-  private static void ignoreException(Callable<Void> callable)
-      throws Exception {
+  private static void ignoreException(Callable<Void> callable) throws Exception {
     try {
       callable.call();
     } catch (Exception ignored) {
@@ -27,14 +26,16 @@ public class ConcreteBackOfferTest {
   @Test
   public void raceMapTest() throws Exception {
     ConcreteBackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
-    ignoreException(() -> {
-      backOffer.doBackOff(BackOffFuncType.BoRegionMiss, new Exception("first backoff"));
-      return null;
-    });
-    ignoreException(() -> {
-      backOffer.doBackOff(BackOffFuncType.BoTiKVRPC, new Exception("second backoff"));
-      return null;
-    });
+    ignoreException(
+        () -> {
+          backOffer.doBackOff(BackOffFuncType.BoRegionMiss, new Exception("first backoff"));
+          return null;
+        });
+    ignoreException(
+        () -> {
+          backOffer.doBackOff(BackOffFuncType.BoTiKVRPC, new Exception("second backoff"));
+          return null;
+        });
     for (Entry<BackOffFuncType, BackOffFunction> item : backOffer.backOffFunctionMap.entrySet()) {
       backOffer.backOffFunctionMap.remove(item.getKey());
     }
@@ -51,12 +52,15 @@ public class ConcreteBackOfferTest {
     List<Future<?>> tasks = new ArrayList<>();
     for (int i = 0; i < taskCnt; i++) {
       int idx = i;
-      Future<?> task = executorService.submit(() -> {
-        try {
-          backOffer.doBackOff(BackOffFuncType.BoUpdateLeader, new Exception("backoff " + idx));
-        } catch (GrpcException ignored) {
-        }
-      });
+      Future<?> task =
+          executorService.submit(
+              () -> {
+                try {
+                  backOffer.doBackOff(
+                      BackOffFuncType.BoUpdateLeader, new Exception("backoff " + idx));
+                } catch (GrpcException ignored) {
+                }
+              });
       tasks.add(task);
     }
     for (Future<?> task : tasks) {
