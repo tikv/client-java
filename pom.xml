@@ -254,7 +254,7 @@
                     <xmlOutput>true</xmlOutput>
                     <!-- Optional directory to put spotbugs xdoc xml report -->
                     <xmlOutputDirectory>target/site</xmlOutputDirectory>
-                    <includeFilterFile>spotbugs-include.xml</includeFilterFile>
+		    <includeFilterFile>dev/spotbugs-include.xml</includeFilterFile>
                 </configuration>
             </plugin>
             <plugin>
