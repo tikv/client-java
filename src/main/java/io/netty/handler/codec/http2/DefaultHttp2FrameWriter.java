@@ -65,6 +65,8 @@ import io.netty.handler.codec.http2.Http2FrameWriter.Configuration;
 import io.netty.handler.codec.http2.Http2HeadersEncoder.SensitivityDetector;
 import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.UnstableApi;
+import io.prometheus.client.Histogram;
+import org.tikv.common.util.HistogramUtils;
 
 /** A {@link Http2FrameWriter} that supports all frame types defined by the HTTP/2 specification. */
 @UnstableApi
@@ -82,6 +84,12 @@ public class DefaultHttp2FrameWriter
 
   private final Http2HeadersEncoder headersEncoder;
   private int maxFrameSize;
+
+  public static final Histogram writeHeaderDuration =
+      HistogramUtils.buildDuration()
+          .name("netty_http2_frame_writer_write_header_duration_seconds")
+          .help("Time taken to encode a header")
+          .register();
 
   public DefaultHttp2FrameWriter() {
     this(new DefaultHttp2HeadersEncoder());
@@ -549,6 +557,7 @@ public class DefaultHttp2FrameWriter
       short weight,
       boolean exclusive,
       ChannelPromise promise) {
+    Histogram.Timer writeHeaderTimer = writeHeaderDuration.startTimer();
     ByteBuf headerBlock = null;
     SimpleChannelPromiseAggregator promiseAggregator =
         new SimpleChannelPromiseAggregator(promise, ctx.channel(), ctx.executor());
@@ -614,7 +623,9 @@ public class DefaultHttp2FrameWriter
         headerBlock.release();
       }
     }
-    return promiseAggregator.doneAllocatingPromises();
+    ChannelPromise result = promiseAggregator.doneAllocatingPromises();
+    writeHeaderTimer.observeDuration();
+    return result;
   }
 
   /**

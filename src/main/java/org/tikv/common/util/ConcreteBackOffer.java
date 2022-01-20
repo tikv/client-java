@@ -44,7 +44,7 @@ public class ConcreteBackOffer implements BackOffer {
   private final SlowLog slowLog;
 
   public static final Histogram BACKOFF_DURATION =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_backoff_duration")
           .help("backoff duration.")
           .labelNames("type")

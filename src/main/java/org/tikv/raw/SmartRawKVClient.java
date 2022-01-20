@@ -23,6 +23,11 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.exception.CircuitBreakerOpenException;
+<<<<<<< HEAD
+=======
+import org.tikv.common.util.HistogramUtils;
+import org.tikv.common.util.Pair;
+>>>>>>> 4f0ec583... add metrics inside grpc and netty (#484)
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.service.failsafe.CircuitBreaker;
@@ -31,7 +36,7 @@ public class SmartRawKVClient implements RawKVClientBase {
   private static final Logger logger = LoggerFactory.getLogger(SmartRawKVClient.class);
 
   private static final Histogram REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_smart_raw_requests_latency")
           .help("client smart raw request latency.")
           .labelNames("type")

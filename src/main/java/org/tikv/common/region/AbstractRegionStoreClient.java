@@ -38,6 +38,7 @@ import org.tikv.common.exception.GrpcException;
 import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.HistogramUtils;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
@@ -48,13 +49,13 @@ public abstract class AbstractRegionStoreClient
   private static final Logger logger = LoggerFactory.getLogger(AbstractRegionStoreClient.class);
 
   public static final Histogram SEEK_LEADER_STORE_DURATION =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_seek_leader_store_duration")
           .help("seek leader store duration.")
           .register();
 
   public static final Histogram SEEK_PROXY_STORE_DURATION =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_seek_proxy_store_duration")
           .help("seek proxy store duration.")
           .register();
