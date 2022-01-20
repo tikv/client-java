@@ -79,11 +79,13 @@ import io.netty.handler.codec.http2.WeightedFairQueueByteDistributor;
 import io.netty.handler.logging.LogLevel;
 import io.perfmark.PerfMark;
 import io.perfmark.Tag;
+import io.prometheus.client.Histogram;
 import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import org.tikv.common.util.HistogramUtils;
 
 /**
  * Client-side Netty handler for GRPC processing. All event handlers are executed entirely within
@@ -131,6 +133,31 @@ class NettyClientHandler extends AbstractNettyHandler {
   private InternalChannelz.Security securityInfo;
   private Status abruptGoAwayStatus;
   private Status channelInactiveReason;
+
+  public static final Histogram createStreamWriteHeaderDuration =
+      HistogramUtils.buildDuration()
+          .name("grpc_netty_client_stream_write_header_duration_seconds")
+          .help("Time taken to write headers for a stream in seconds.")
+          .register();
+
+  public static final Histogram createStreamAddListenerDuration =
+      HistogramUtils.buildDuration()
+          .name("grpc_netty_client_stream_add_listener_duration_seconds")
+          .help("Time taken to add listener for a stream future in seconds.")
+          .register();
+
+  public static final Histogram createStreamCreateNewFuture =
+      HistogramUtils.buildDuration()
+          .name("grpc_netty_client_stream_create_future_duration_seconds")
+          .help("Time taken to create new stream future in seconds.")
+          .register();
+
+  public static final Histogram perfmarkNettyClientHandlerDuration =
+      HistogramUtils.buildDuration()
+          .name("perfmark_netty_client_handler_duration_seconds")
+          .help("Perfmark netty client handler duration seconds")
+          .labelNames("type")
+          .register();
 
   static NettyClientHandler newHandler(
       ClientTransportLifecycleManager lifecycleManager,
@@ -608,12 +635,15 @@ class NettyClientHandler extends AbstractNettyHandler {
     stream.setId(streamId);
 
     PerfMark.startTask("NettyClientHandler.createStream", stream.tag());
+    Histogram.Timer createStream =
+        perfmarkNettyClientHandlerDuration.labels("NettyClientHandler.createStream").startTimer();
     PerfMark.linkIn(command.getLink());
     try {
       createStreamTraced(
           streamId, stream, headers, command.isGet(), command.shouldBeCountedForInUse(), promise);
     } finally {
       PerfMark.stopTask("NettyClientHandler.createStream", stream.tag());
+      createStream.observeDuration();
     }
   }
 
@@ -626,56 +656,63 @@ class NettyClientHandler extends AbstractNettyHandler {
       final ChannelPromise promise) {
     // Create an intermediate promise so that we can intercept the failure reported back to the
     // application.
+    Histogram.Timer createFutureTimer = createStreamCreateNewFuture.startTimer();
     ChannelPromise tempPromise = ctx().newPromise();
-    encoder()
-        .writeHeaders(ctx(), streamId, headers, 0, isGet, tempPromise)
-        .addListener(
-            new ChannelFutureListener() {
-              @Override
-              public void operationComplete(ChannelFuture future) throws Exception {
-                if (future.isSuccess()) {
-                  // The http2Stream will be null in case a stream buffered in the encoder
-                  // was canceled via RST_STREAM.
-                  Http2Stream http2Stream = connection().stream(streamId);
-                  if (http2Stream != null) {
-                    stream.getStatsTraceContext().clientOutboundHeaders();
-                    http2Stream.setProperty(streamKey, stream);
+    createFutureTimer.observeDuration();
 
-                    // This delays the in-use state until the I/O completes, which technically may
-                    // be later than we would like.
-                    if (shouldBeCountedForInUse) {
-                      inUseState.updateObjectInUse(http2Stream, true);
-                    }
+    Histogram.Timer writeHeaderTimer = createStreamWriteHeaderDuration.startTimer();
+    ChannelFuture future = encoder().writeHeaders(ctx(), streamId, headers, 0, isGet, tempPromise);
+    writeHeaderTimer.observeDuration();
 
-                    // Attach the client stream to the HTTP/2 stream object as user data.
-                    stream.setHttp2Stream(http2Stream);
-                  }
-                  // Otherwise, the stream has been cancelled and Netty is sending a
-                  // RST_STREAM frame which causes it to purge pending writes from the
-                  // flow-controller and delete the http2Stream. The stream listener has already
-                  // been notified of cancellation so there is nothing to do.
+    Histogram.Timer addListenerTimer = createStreamAddListenerDuration.startTimer();
+    future.addListener(
+        new ChannelFutureListener() {
+          @Override
+          public void operationComplete(ChannelFuture future) throws Exception {
+            if (future.isSuccess()) {
+              // The http2Stream will be null in case a stream buffered in the encoder
+              // was canceled via RST_STREAM.
+              Http2Stream http2Stream = connection().stream(streamId);
+              if (http2Stream != null) {
+                stream.getStatsTraceContext().clientOutboundHeaders();
+                http2Stream.setProperty(streamKey, stream);
 
-                  // Just forward on the success status to the original promise.
-                  promise.setSuccess();
-                } else {
-                  final Throwable cause = future.cause();
-                  if (cause instanceof StreamBufferingEncoder.Http2GoAwayException) {
-                    StreamBufferingEncoder.Http2GoAwayException e =
-                        (StreamBufferingEncoder.Http2GoAwayException) cause;
-                    Status status =
-                        statusFromH2Error(
-                            Status.Code.UNAVAILABLE,
-                            "GOAWAY closed buffered stream",
-                            e.errorCode(),
-                            e.debugData());
-                    stream.transportReportStatus(status, RpcProgress.REFUSED, true, new Metadata());
-                    promise.setFailure(status.asRuntimeException());
-                  } else {
-                    promise.setFailure(cause);
-                  }
+                // This delays the in-use state until the I/O completes, which technically may
+                // be later than we would like.
+                if (shouldBeCountedForInUse) {
+                  inUseState.updateObjectInUse(http2Stream, true);
                 }
+
+                // Attach the client stream to the HTTP/2 stream object as user data.
+                stream.setHttp2Stream(http2Stream);
               }
-            });
+              // Otherwise, the stream has been cancelled and Netty is sending a
+              // RST_STREAM frame which causes it to purge pending writes from the
+              // flow-controller and delete the http2Stream. The stream listener has already
+              // been notified of cancellation so there is nothing to do.
+
+              // Just forward on the success status to the original promise.
+              promise.setSuccess();
+            } else {
+              final Throwable cause = future.cause();
+              if (cause instanceof StreamBufferingEncoder.Http2GoAwayException) {
+                StreamBufferingEncoder.Http2GoAwayException e =
+                    (StreamBufferingEncoder.Http2GoAwayException) cause;
+                Status status =
+                    statusFromH2Error(
+                        Status.Code.UNAVAILABLE,
+                        "GOAWAY closed buffered stream",
+                        e.errorCode(),
+                        e.debugData());
+                stream.transportReportStatus(status, RpcProgress.REFUSED, true, new Metadata());
+                promise.setFailure(status.asRuntimeException());
+              } else {
+                promise.setFailure(cause);
+              }
+            }
+          }
+        });
+    addListenerTimer.observeDuration();
   }
 
   /** Cancels this stream. */
@@ -683,6 +720,8 @@ class NettyClientHandler extends AbstractNettyHandler {
       ChannelHandlerContext ctx, CancelClientStreamCommand cmd, ChannelPromise promise) {
     NettyClientStream.TransportState stream = cmd.stream();
     PerfMark.startTask("NettyClientHandler.cancelStream", stream.tag());
+    Histogram.Timer cancelStream =
+        perfmarkNettyClientHandlerDuration.labels("NettyClientHandler.cancelStream").startTimer();
     PerfMark.linkIn(cmd.getLink());
     try {
       Status reason = cmd.reason();
@@ -696,6 +735,7 @@ class NettyClientHandler extends AbstractNettyHandler {
       }
     } finally {
       PerfMark.stopTask("NettyClientHandler.cancelStream", stream.tag());
+      cancelStream.observeDuration();
     }
   }
 
@@ -703,6 +743,8 @@ class NettyClientHandler extends AbstractNettyHandler {
   private void sendGrpcFrame(
       ChannelHandlerContext ctx, SendGrpcFrameCommand cmd, ChannelPromise promise) {
     PerfMark.startTask("NettyClientHandler.sendGrpcFrame", cmd.stream().tag());
+    Histogram.Timer sendGrpcFrame =
+        perfmarkNettyClientHandlerDuration.labels("NettyClientHandler.sendGrpcFrame").startTimer();
     PerfMark.linkIn(cmd.getLink());
     try {
       // Call the base class to write the HTTP/2 DATA frame.
@@ -710,17 +752,21 @@ class NettyClientHandler extends AbstractNettyHandler {
       encoder().writeData(ctx, cmd.stream().id(), cmd.content(), 0, cmd.endStream(), promise);
     } finally {
       PerfMark.stopTask("NettyClientHandler.sendGrpcFrame", cmd.stream().tag());
+      sendGrpcFrame.observeDuration();
     }
   }
 
   private void sendPingFrame(
       ChannelHandlerContext ctx, SendPingCommand msg, ChannelPromise promise) {
     PerfMark.startTask("NettyClientHandler.sendPingFrame");
+    Histogram.Timer sendPingFrame =
+        perfmarkNettyClientHandlerDuration.labels("NettyClientHandler.sendPingFrame").startTimer();
     PerfMark.linkIn(msg.getLink());
     try {
       sendPingFrameTraced(ctx, msg, promise);
     } finally {
       PerfMark.stopTask("NettyClientHandler.sendPingFrame");
+      sendPingFrame.observeDuration();
     }
   }
 
@@ -807,6 +853,10 @@ class NettyClientHandler extends AbstractNettyHandler {
                 NettyClientStream.TransportState clientStream = clientStream(stream);
                 Tag tag = clientStream != null ? clientStream.tag() : PerfMark.createTag();
                 PerfMark.startTask("NettyClientHandler.forcefulClose", tag);
+                Histogram.Timer forcefulClose =
+                    perfmarkNettyClientHandlerDuration
+                        .labels("NettyClientHandler.forcefulClose")
+                        .startTimer();
                 PerfMark.linkIn(msg.getLink());
                 try {
                   if (clientStream != null) {
@@ -817,6 +867,7 @@ class NettyClientHandler extends AbstractNettyHandler {
                   return true;
                 } finally {
                   PerfMark.stopTask("NettyClientHandler.forcefulClose", tag);
+                  forcefulClose.observeDuration();
                 }
               }
             });
