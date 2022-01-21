@@ -39,7 +39,7 @@ public class SlowLogSpanImpl implements SlowLogSpan {
 
   public SlowLogSpanImpl(String name, long requestStartMS, long requestStartInstantNS) {
     this.name = name;
-    this.requestStartUnixNS = requestStartMS * 1000;
+    this.requestStartUnixNS = requestStartMS * 1_000_000;
     this.requestStartInstantNS = requestStartInstantNS;
     this.properties = new HashMap<>();
     this.startInstantNS = 0;
