@@ -169,7 +169,8 @@ public class ConcreteBackOffer implements BackOffer {
 
   public boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType, long maxSleepMs) {
     Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(funcType.name()).startTimer();
-    SlowLogSpan slowLogSpan = getSlowLog().start("backoff " + funcType.name());
+    SlowLogSpan slowLogSpan = getSlowLog().start("backoff");
+    slowLogSpan.addProperty("type", funcType.name());
     BackOffFunction backOffFunction =
         backOffFunctionMap.computeIfAbsent(funcType, this::createBackOffFunc);
 
