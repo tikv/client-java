@@ -74,7 +74,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   private Boolean isV4 = null;
 
   public static final Histogram GRPC_RAW_REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_grpc_raw_requests_latency")
           .help("grpc raw request latency.")
           .labelNames("type")
