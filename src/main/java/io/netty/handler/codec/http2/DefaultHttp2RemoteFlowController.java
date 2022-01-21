@@ -31,8 +31,10 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.internal.UnstableApi;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.prometheus.client.Histogram;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import org.tikv.common.util.HistogramUtils;
 
 /**
  * Basic implementation of {@link Http2RemoteFlowController}.
@@ -53,6 +55,12 @@ public class DefaultHttp2RemoteFlowController implements Http2RemoteFlowControll
   private int initialWindowSize = DEFAULT_WINDOW_SIZE;
   private WritabilityMonitor monitor;
   private ChannelHandlerContext ctx;
+
+  public static final Histogram byteDistributedDuration =
+      HistogramUtils.buildDuration()
+          .name("netty_http2_byte_distributed_duration_seconds")
+          .help("The duration of byte distributed to streams.")
+          .register();
 
   public DefaultHttp2RemoteFlowController(Http2Connection connection) {
     this(connection, (Listener) null);
@@ -629,9 +637,10 @@ public class DefaultHttp2RemoteFlowController implements Http2RemoteFlowControll
         // Make sure we always write at least once, regardless if we have bytesToWrite or not.
         // This ensures that zero-length frames will always be written.
         for (; ; ) {
-          if (!streamByteDistributor.distribute(bytesToWrite, this)
-              || (bytesToWrite = writableBytes()) <= 0
-              || !isChannelWritable0()) {
+          Histogram.Timer distributedTimer = byteDistributedDuration.startTimer();
+          boolean distributed = streamByteDistributor.distribute(bytesToWrite, this);
+          distributedTimer.observeDuration();
+          if (!distributed || (bytesToWrite = writableBytes()) <= 0 || !isChannelWritable0()) {
             break;
           }
         }
