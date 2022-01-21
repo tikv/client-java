@@ -60,7 +60,7 @@ public class RawKVClient implements RawKVClientBase {
   private static final Logger logger = LoggerFactory.getLogger(RawKVClient.class);
 
   public static final Histogram RAW_REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_raw_requests_latency")
           .help("client raw request latency.")
           .labelNames("type")

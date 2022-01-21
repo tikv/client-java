@@ -27,17 +27,18 @@ import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.operation.ErrorHandler;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.HistogramUtils;
 
 public abstract class RetryPolicy<RespT> {
   BackOffer backOffer = ConcreteBackOffer.newCopNextMaxBackOff();
   public static final Histogram GRPC_SINGLE_REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_grpc_single_requests_latency")
           .help("grpc request latency.")
           .labelNames("type")
           .register();
   public static final Histogram CALL_WITH_RETRY_DURATION =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_call_with_retry_duration")
           .help("callWithRetry duration.")
           .labelNames("type")
