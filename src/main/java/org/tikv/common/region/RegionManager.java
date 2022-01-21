@@ -38,6 +38,7 @@ import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.HistogramUtils;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Peer;
@@ -48,12 +49,12 @@ import org.tikv.kvproto.Pdpb;
 public class RegionManager {
   private static final Logger logger = LoggerFactory.getLogger(RegionManager.class);
   public static final Histogram GET_REGION_BY_KEY_REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_get_region_by_requests_latency")
           .help("getRegionByKey request latency.")
           .register();
   public static final Histogram SCAN_REGIONS_REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_scan_regions_request_latency")
           .help("scanRegions request latency.")
           .register();
