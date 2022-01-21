@@ -19,12 +19,14 @@ package org.tikv.common.util;
 
 import static org.tikv.common.ConfigUtils.TIKV_BO_REGION_MISS_BASE_IN_MS;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.prometheus.client.Histogram;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
@@ -37,8 +39,11 @@ import org.tikv.common.log.SlowLogSpan;
 public class ConcreteBackOffer implements BackOffer {
   private static final Logger logger = LoggerFactory.getLogger(ConcreteBackOffer.class);
   private final int maxSleep;
-  private final Map<BackOffFunction.BackOffFuncType, BackOffFunction> backOffFunctionMap;
-  private final List<Exception> errors;
+
+  @VisibleForTesting
+  public final Map<BackOffFunction.BackOffFuncType, BackOffFunction> backOffFunctionMap;
+
+  @VisibleForTesting public final List<Exception> errors;
   private int totalSleep;
   private final long deadline;
   private final SlowLog slowLog;
@@ -56,8 +61,8 @@ public class ConcreteBackOffer implements BackOffer {
     Preconditions.checkArgument(maxSleep >= 0, "Max sleep time cannot be less than 0.");
     Preconditions.checkArgument(deadline >= 0, "Deadline cannot be less than 0.");
     this.maxSleep = maxSleep;
-    this.errors = new ArrayList<>();
-    this.backOffFunctionMap = new HashMap<>();
+    this.errors = Collections.synchronizedList(new ArrayList<>());
+    this.backOffFunctionMap = new ConcurrentHashMap<>();
     this.deadline = deadline;
     this.slowLog = slowLog;
   }
