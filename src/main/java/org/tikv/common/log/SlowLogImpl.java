@@ -63,11 +63,15 @@ public class SlowLogImpl implements SlowLog {
 
   @Override
   public void log() {
-    long currentNS = System.nanoTime();
-    long durationMS = (currentNS - startNS) / 1_000_000;
-    if (error != null || (slowThresholdMS >= 0 && durationMS > slowThresholdMS)) {
+    if (error != null || timeExceeded()) {
       logger.warn("SlowLog:" + getSlowLogString());
     }
+  }
+
+  boolean timeExceeded() {
+    long currentNS = System.nanoTime();
+    long durationMS = (currentNS - startNS) / 1_000_000;
+    return slowThresholdMS >= 0 && durationMS > slowThresholdMS;
   }
 
   private String getSlowLogString() {
