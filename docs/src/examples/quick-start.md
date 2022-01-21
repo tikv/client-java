@@ -76,12 +76,15 @@ To interact with TiKV, we should first create a `TiConfiguration` with PD addres
 For example, if we want to put a `World` in `Hello` key in RawKV, write the following code in `src/main/java/com/example/App.java`.
 
 ```java
+import java.util.Optional;
+
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
+import org.tikv.shade.com.google.protobuf.ByteString;
 
-public class Main {
-  public static void main() {
+public class App {
+  public static void main(String[] args) throws Exception {
     String pdAddr = "127.0.0.1:2379";
     // You MUST create a raw configuration if you are using RawKVClient.
     TiConfiguration conf = TiConfiguration.createRawDefault(pdAddr);
