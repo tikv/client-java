@@ -22,6 +22,8 @@ import static java.lang.Math.max;
 import io.netty.util.internal.LongCounter;
 import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.StringUtil;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Histogram;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +31,21 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
+
+  public static final Counter poolArenaAllocations =
+      Counter.build()
+          .name("netty_buffer_pool_arena_allocations")
+          .help("Number of times a pool arena was allocated")
+          .labelNames("type")
+          .register();
+
+  public static final Histogram poolArenaAllocationsDuration =
+      Histogram.build()
+          .name("netty_buffer_pool_arena_allocations_duration_seconds")
+          .help("Duration of a pool arena allocation")
+          .labelNames("type")
+          .register();
+
   static final boolean HAS_UNSAFE = PlatformDependent.hasUnsafe();
 
   enum SizeClass {
@@ -136,13 +153,25 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
     final int sizeIdx = size2SizeIdx(reqCapacity);
 
     if (sizeIdx <= smallMaxSizeIdx) {
+      Histogram.Timer smallAllocationTimer =
+          poolArenaAllocationsDuration.labels("small").startTimer();
       tcacheAllocateSmall(cache, buf, reqCapacity, sizeIdx);
+      smallAllocationTimer.observeDuration();
+      poolArenaAllocations.labels("small").inc();
     } else if (sizeIdx < nSizes) {
+      Histogram.Timer normalAllocationTimer =
+          poolArenaAllocationsDuration.labels("normal").startTimer();
       tcacheAllocateNormal(cache, buf, reqCapacity, sizeIdx);
+      normalAllocationTimer.observeDuration();
+      poolArenaAllocations.labels("normal").inc();
     } else {
+      Histogram.Timer hugeAllocationTimer =
+          poolArenaAllocationsDuration.labels("huge").startTimer();
       int normCapacity = directMemoryCacheAlignment > 0 ? normalizeSize(reqCapacity) : reqCapacity;
       // Huge allocations are never served via the cache so just call allocateHuge
       allocateHuge(buf, normCapacity);
+      hugeAllocationTimer.observeDuration();
+      poolArenaAllocations.labels("huge").inc();
     }
   }
 
