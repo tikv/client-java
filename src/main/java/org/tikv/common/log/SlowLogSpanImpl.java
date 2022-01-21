@@ -68,11 +68,13 @@ public class SlowLogSpanImpl implements SlowLogSpan {
     jsonObject.addProperty("begin_unix_ns", getStartUnixNS());
     jsonObject.addProperty("duration_ns", getDurationNS());
 
-    JsonObject propertiesObject = new JsonObject();
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      propertiesObject.addProperty(entry.getKey(), entry.getValue());
+    if (!properties.isEmpty()) {
+      JsonObject propertiesObject = new JsonObject();
+      for (Map.Entry<String, String> entry : properties.entrySet()) {
+        propertiesObject.addProperty(entry.getKey(), entry.getValue());
+      }
+      jsonObject.add("properties", propertiesObject);
     }
-    jsonObject.add("properties", propertiesObject);
 
     return jsonObject;
   }
