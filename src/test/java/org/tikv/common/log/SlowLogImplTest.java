@@ -22,14 +22,14 @@ import org.junit.Test;
 
 public class SlowLogImplTest {
 
-    @Test
-    public void testThresholdTime() throws InterruptedException {
-        SlowLogImpl slowLog = new SlowLogImpl(1000);
-        Thread.sleep(1000);
-        Assert.assertTrue(slowLog.timeExceeded());
+  @Test
+  public void testThresholdTime() throws InterruptedException {
+    SlowLogImpl slowLog = new SlowLogImpl(1000);
+    Thread.sleep(1000);
+    Assert.assertTrue(slowLog.timeExceeded());
 
-        slowLog = new SlowLogImpl(1000);
-        Thread.sleep(500);
-        Assert.assertFalse(slowLog.timeExceeded());
-    }
+    slowLog = new SlowLogImpl(1000);
+    Thread.sleep(500);
+    Assert.assertFalse(slowLog.timeExceeded());
+  }
 }
