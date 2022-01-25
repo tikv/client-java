@@ -71,7 +71,11 @@ public class SlowLogImpl implements SlowLog {
   boolean timeExceeded() {
     long currentNS = System.nanoTime();
     long durationMS = (currentNS - startNS) / 1_000_000;
-    return slowThresholdMS >= 0 && durationMS > slowThresholdMS;
+    if (slowThresholdMS >= 0 && durationMS > slowThresholdMS) {
+      logger.warn("A slow request spent " + durationMS + "ms");
+      return true;
+    }
+    return false;
   }
 
   private String getSlowLogString() {
