@@ -28,6 +28,11 @@ public class SlowLogEmptyImpl implements SlowLog {
   }
 
   @Override
+  public long getTraceId() {
+    return 0;
+  }
+
+  @Override
   public void setError(Throwable err) {}
 
   @Override

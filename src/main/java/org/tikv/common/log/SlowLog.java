@@ -20,6 +20,8 @@ package org.tikv.common.log;
 public interface SlowLog {
   SlowLogSpan start(String name);
 
+  long getTraceId();
+
   void setError(Throwable err);
 
   void log();

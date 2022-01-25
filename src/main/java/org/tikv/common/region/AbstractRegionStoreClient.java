@@ -42,6 +42,7 @@ import org.tikv.common.util.HistogramUtils;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
+import tracepb.Tracepb;
 
 public abstract class AbstractRegionStoreClient
     extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvFutureStub>
@@ -152,12 +153,23 @@ public abstract class AbstractRegionStoreClient
     return false;
   }
 
-  protected Kvrpcpb.Context makeContext(TiStoreType storeType) {
-    return region.getReplicaContext(java.util.Collections.emptySet(), storeType);
+  private Kvrpcpb.Context addTraceId(Kvrpcpb.Context context, long traceId) {
+    return Kvrpcpb.Context.newBuilder(context)
+        .setTraceContext(
+            Tracepb.TraceContext.newBuilder()
+                .setRemoteParentSpans(0, Tracepb.RemoteParentSpan.newBuilder().setTraceId(traceId)))
+        .build();
   }
 
-  protected Kvrpcpb.Context makeContext(Set<Long> resolvedLocks, TiStoreType storeType) {
-    return region.getReplicaContext(resolvedLocks, storeType);
+  protected Kvrpcpb.Context makeContext(TiStoreType storeType, long traceId) {
+    Kvrpcpb.Context context = region.getReplicaContext(java.util.Collections.emptySet(), storeType);
+    return addTraceId(context, traceId);
+  }
+
+  protected Kvrpcpb.Context makeContext(
+      Set<Long> resolvedLocks, TiStoreType storeType, long traceId) {
+    Kvrpcpb.Context context = region.getReplicaContext(resolvedLocks, storeType);
+    return addTraceId(context, traceId);
   }
 
   private void updateClientStub() {

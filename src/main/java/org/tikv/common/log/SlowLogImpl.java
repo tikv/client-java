@@ -21,6 +21,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,8 @@ public class SlowLogImpl implements SlowLog {
   private static final Logger logger = LoggerFactory.getLogger(SlowLogImpl.class);
 
   private static final int MAX_SPAN_SIZE = 1024;
+
+  private static final Random random = new Random();
 
   private final List<SlowLogSpan> slowLogSpans = new ArrayList<>();
   private Throwable error = null;
@@ -40,10 +43,13 @@ public class SlowLogImpl implements SlowLog {
 
   private final long slowThresholdMS;
 
+  private final long traceId;
+
   public SlowLogImpl(long slowThresholdMS) {
     this.startMS = System.currentTimeMillis();
     this.startNS = System.nanoTime();
     this.slowThresholdMS = slowThresholdMS;
+    traceId = random.nextLong();
   }
 
   @Override
@@ -54,6 +60,11 @@ public class SlowLogImpl implements SlowLog {
     }
     slowLogSpan.start();
     return slowLogSpan;
+  }
+
+  @Override
+  public long getTraceId() {
+    return traceId;
   }
 
   @Override
@@ -84,6 +95,8 @@ public class SlowLogImpl implements SlowLog {
     if (error != null) {
       jsonObject.addProperty("error", error.getMessage());
     }
+
+    jsonObject.addProperty("trace_id", traceId);
 
     JsonArray jsonArray = new JsonArray();
     for (SlowLogSpan slowLogSpan : slowLogSpans) {
