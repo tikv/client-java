@@ -539,39 +539,6 @@
                     <autoReleaseAfterClose>true</autoReleaseAfterClose>
                 </configuration>
             </plugin>
-<<<<<<< HEAD
-=======
-            <plugin>
-                <groupId>io.github.git-commit-id</groupId>
-                <artifactId>git-commit-id-maven-plugin</artifactId>
-                <version>4.9.9</version>
-                <executions>
-                    <execution>
-                        <id>get-the-git-infos</id>
-                        <goals>
-                            <goal>revision</goal>
-                        </goals>
-                        <phase>initialize</phase>
-                    </execution>
-                    <execution>
-                        <id>validate-the-git-infos</id>
-                        <goals>
-                            <goal>validateRevision</goal>
-                        </goals>
-                        <phase>package</phase>
-                    </execution>
-                </executions>
-                <configuration>
-                    <verbose>true</verbose>
-                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
-                    <generateGitPropertiesFilename>${project.build.outputDirectory}/git.properties</generateGitPropertiesFilename>
-                    <includeOnlyProperties>
-                        <includeOnlyProperty>^git.build.(time|version)$</includeOnlyProperty>
-                        <includeOnlyProperty>^git.commit.id.(abbrev|full)$</includeOnlyProperty>
-                    </includeOnlyProperties>
-                    <commitIdGenerationMode>full</commitIdGenerationMode>
-                </configuration>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -580,7 +547,6 @@
                     <forkMode>always</forkMode>
                 </configuration>
             </plugin>
->>>>>>> 6a6967a36... let JVM ClassLoader load gRPC error related classes during warmup (#496)
         </plugins>
     </build>
 </project>

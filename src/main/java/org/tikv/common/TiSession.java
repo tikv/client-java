@@ -39,11 +39,7 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
-<<<<<<< HEAD
-=======
 import org.tikv.kvproto.Errorpb;
-import org.tikv.kvproto.ImportSstpb;
->>>>>>> 6a6967a36... let JVM ClassLoader load gRPC error related classes during warmup (#496)
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
 import org.tikv.raw.RawKVClient;
