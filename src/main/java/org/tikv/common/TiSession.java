@@ -39,6 +39,7 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
 import org.tikv.common.util.*;
+import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
 import org.tikv.raw.RawKVClient;
@@ -99,6 +100,13 @@ public class TiSession implements AutoCloseable {
     BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
 
     try {
+      // let JVM ClassLoader load gRPC error related classes
+      // this operation may cost 100ms
+      Errorpb.Error.newBuilder()
+          .setNotLeader(Errorpb.NotLeader.newBuilder().build())
+          .build()
+          .toString();
+
       this.client = getPDClient();
       this.regionManager = getRegionManager();
       List<Metapb.Store> stores = this.client.getAllStores(backOffer);
