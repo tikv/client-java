@@ -160,7 +160,7 @@ public abstract class AbstractRegionStoreClient
         .setTraceContext(
             Tracepb.TraceContext.newBuilder()
                 .setDurationThresholdMs((int) slowLog.getThresholdMS())
-                .setRemoteParentSpans(0, Tracepb.RemoteParentSpan.newBuilder().setTraceId(traceId)))
+                .addRemoteParentSpans(Tracepb.RemoteParentSpan.newBuilder().setTraceId(traceId)))
         .build();
   }
 
