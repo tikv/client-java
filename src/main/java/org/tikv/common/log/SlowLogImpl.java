@@ -68,6 +68,11 @@ public class SlowLogImpl implements SlowLog {
   }
 
   @Override
+  public long getThresholdMS() {
+    return slowThresholdMS;
+  }
+
+  @Override
   public void setError(Throwable err) {
     this.error = err;
   }

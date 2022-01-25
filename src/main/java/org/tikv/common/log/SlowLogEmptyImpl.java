@@ -33,6 +33,11 @@ public class SlowLogEmptyImpl implements SlowLog {
   }
 
   @Override
+  public long getThresholdMS() {
+    return 0;
+  }
+
+  @Override
   public void setError(Throwable err) {}
 
   @Override

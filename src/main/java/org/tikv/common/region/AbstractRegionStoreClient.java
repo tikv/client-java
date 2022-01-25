@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.log.SlowLog;
 import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
@@ -42,7 +43,7 @@ import org.tikv.common.util.HistogramUtils;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
-import tracepb.Tracepb;
+import org.tikv.kvproto.Tracepb;
 
 public abstract class AbstractRegionStoreClient
     extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvFutureStub>
@@ -153,23 +154,25 @@ public abstract class AbstractRegionStoreClient
     return false;
   }
 
-  private Kvrpcpb.Context addTraceId(Kvrpcpb.Context context, long traceId) {
+  private Kvrpcpb.Context addTraceId(Kvrpcpb.Context context, SlowLog slowLog) {
+    long traceId = slowLog.getTraceId();
     return Kvrpcpb.Context.newBuilder(context)
         .setTraceContext(
             Tracepb.TraceContext.newBuilder()
+                .setDurationThresholdMs((int) slowLog.getThresholdMS())
                 .setRemoteParentSpans(0, Tracepb.RemoteParentSpan.newBuilder().setTraceId(traceId)))
         .build();
   }
 
-  protected Kvrpcpb.Context makeContext(TiStoreType storeType, long traceId) {
+  protected Kvrpcpb.Context makeContext(TiStoreType storeType, SlowLog slowLog) {
     Kvrpcpb.Context context = region.getReplicaContext(java.util.Collections.emptySet(), storeType);
-    return addTraceId(context, traceId);
+    return addTraceId(context, slowLog);
   }
 
   protected Kvrpcpb.Context makeContext(
-      Set<Long> resolvedLocks, TiStoreType storeType, long traceId) {
+      Set<Long> resolvedLocks, TiStoreType storeType, SlowLog slowLog) {
     Kvrpcpb.Context context = region.getReplicaContext(resolvedLocks, storeType);
-    return addTraceId(context, traceId);
+    return addTraceId(context, slowLog);
   }
 
   private void updateClientStub() {

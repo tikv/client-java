@@ -38,6 +38,7 @@ import org.tikv.common.StoreVersion;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.Version;
 import org.tikv.common.exception.*;
+import org.tikv.common.log.SlowLogEmptyImpl;
 import org.tikv.common.operation.KVErrorHandler;
 import org.tikv.common.operation.RegionErrorHandler;
 import org.tikv.common.streaming.StreamingResponse;
@@ -169,11 +170,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   public ByteString get(BackOffer backOffer, ByteString key, long version)
       throws TiClientInternalException, KeyException {
     boolean forWrite = false;
-    long traceId = backOffer.getSlowLog().getTraceId();
     Supplier<GetRequest> factory =
         () ->
             GetRequest.newBuilder()
-                .setContext(makeContext(getResolvedLocks(version), this.storeType, traceId))
+                .setContext(
+                    makeContext(getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
                 .setKey(key)
                 .setVersion(version)
                 .build();
@@ -215,11 +216,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public List<KvPair> batchGet(BackOffer backOffer, Iterable<ByteString> keys, long version) {
     boolean forWrite = false;
-    long traceId = backOffer.getSlowLog().getTraceId();
     Supplier<BatchGetRequest> request =
         () ->
             BatchGetRequest.newBuilder()
-                .setContext(makeContext(getResolvedLocks(version), this.storeType, traceId))
+                .setContext(
+                    makeContext(getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
                 .addAllKeys(keys)
                 .setVersion(version)
                 .build();
@@ -279,11 +280,12 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       // we should refresh region
       region = regionManager.getRegionByKey(startKey, backOffer);
 
-      long traceId = backOffer.getSlowLog().getTraceId();
       Supplier<ScanRequest> request =
           () ->
               ScanRequest.newBuilder()
-                  .setContext(makeContext(getResolvedLocks(version), this.storeType, traceId))
+                  .setContext(
+                      makeContext(
+                          getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
                   .setStartKey(startKey)
                   .setVersion(version)
                   .setKeyOnly(keyOnly)
@@ -380,13 +382,12 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       boolean skipConstraintCheck)
       throws TiClientInternalException, KeyException, RegionException {
     boolean forWrite = true;
-    long traceId = bo.getSlowLog().getTraceId();
     while (true) {
       Supplier<PrewriteRequest> factory =
           () ->
               getIsV4()
                   ? PrewriteRequest.newBuilder()
-                      .setContext(makeContext(storeType, traceId))
+                      .setContext(makeContext(storeType, bo.getSlowLog()))
                       .setStartVersion(startTs)
                       .setPrimaryLock(primaryLock)
                       .addAllMutations(mutations)
@@ -396,7 +397,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                       .setTxnSize(16)
                       .build()
                   : PrewriteRequest.newBuilder()
-                      .setContext(makeContext(storeType, traceId))
+                      .setContext(makeContext(storeType, bo.getSlowLog()))
                       .setStartVersion(startTs)
                       .setPrimaryLock(primaryLock)
                       .addAllMutations(mutations)
@@ -472,12 +473,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   /** TXN Heart Beat: update primary key ttl */
   public void txnHeartBeat(BackOffer bo, ByteString primaryLock, long startTs, long ttl) {
     boolean forWrite = false;
-    long traceId = bo.getSlowLog().getTraceId();
     while (true) {
       Supplier<TxnHeartBeatRequest> factory =
           () ->
               TxnHeartBeatRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, bo.getSlowLog()))
                   .setStartVersion(startTs)
                   .setPrimaryLock(primaryLock)
                   .setAdviseLockTtl(ttl)
@@ -529,14 +529,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   public void commit(BackOffer backOffer, Iterable<ByteString> keys, long startTs, long commitTs)
       throws KeyException {
     boolean forWrite = true;
-    long traceId = backOffer.getSlowLog().getTraceId();
     Supplier<CommitRequest> factory =
         () ->
             CommitRequest.newBuilder()
                 .setStartVersion(startTs)
                 .setCommitVersion(commitTs)
                 .addAllKeys(keys)
-                .setContext(makeContext(storeType, traceId))
+                .setContext(makeContext(storeType, backOffer.getSlowLog()))
                 .build();
     KVErrorHandler<CommitResponse> handler =
         new KVErrorHandler<>(
@@ -594,11 +593,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throw new IllegalArgumentException("Invalid coprocessor argument!");
     }
 
-    long traceId = backOffer.getSlowLog().getTraceId();
     Supplier<Coprocessor.Request> reqToSend =
         () ->
             Coprocessor.Request.newBuilder()
-                .setContext(makeContext(getResolvedLocks(startTs), this.storeType, traceId))
+                .setContext(
+                    makeContext(getResolvedLocks(startTs), this.storeType, backOffer.getSlowLog()))
                 .setTp(REQ_TYPE_DAG.getValue())
                 .setStartTs(startTs)
                 .setData(req.toByteString())
@@ -721,7 +720,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Supplier<Coprocessor.Request> reqToSend =
         () ->
             Coprocessor.Request.newBuilder()
-                .setContext(makeContext(getResolvedLocks(startTs), this.storeType, 0))
+                .setContext(
+                    makeContext(
+                        getResolvedLocks(startTs), this.storeType, SlowLogEmptyImpl.INSTANCE))
                 // TODO: If no executors...?
                 .setTp(REQ_TYPE_DAG.getValue())
                 .setData(req.toByteString())
@@ -759,7 +760,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Supplier<SplitRegionRequest> request =
         () ->
             SplitRegionRequest.newBuilder()
-                .setContext(makeContext(storeType, 0))
+                .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
                 .addAllSplitKeys(splitKeys)
                 .setIsRawKv(conf.isRawKVMode())
                 .build();
@@ -800,11 +801,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get").startTimer();
     try {
-      long traceId = backOffer.getSlowLog().getTraceId();
       Supplier<RawGetRequest> factory =
           () ->
               RawGetRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, backOffer.getSlowLog()))
                   .setKey(key)
                   .build();
       RegionErrorHandler<RawGetResponse> handler =
@@ -840,11 +840,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get_key_ttl").startTimer();
     try {
-      long traceId = backOffer.getSlowLog().getTraceId();
       Supplier<RawGetKeyTTLRequest> factory =
           () ->
               RawGetKeyTTLRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, backOffer.getSlowLog()))
                   .setKey(key)
                   .build();
       RegionErrorHandler<RawGetKeyTTLResponse> handler =
@@ -880,11 +879,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete").startTimer();
     try {
-      long traceId = backOffer.getSlowLog().getTraceId();
       Supplier<RawDeleteRequest> factory =
           () ->
               RawDeleteRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, backOffer.getSlowLog()))
                   .setKey(key)
                   .setForCas(atomicForCAS)
                   .build();
@@ -919,11 +917,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put").startTimer();
     try {
-      long traceId = backOffer.getSlowLog().getTraceId();
       Supplier<RawPutRequest> factory =
           () ->
               RawPutRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, backOffer.getSlowLog()))
                   .setKey(key)
                   .setValue(value)
                   .setTtl(ttl)
@@ -964,11 +961,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put_if_absent").startTimer();
     try {
-      long traceId = backOffer.getSlowLog().getTraceId();
       Supplier<RawCASRequest> factory =
           () ->
               RawCASRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, backOffer.getSlowLog()))
                   .setKey(key)
                   .setValue(value)
                   .setPreviousValue(prevValue.orElse(ByteString.EMPTY))
@@ -1018,11 +1014,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       if (keys.isEmpty()) {
         return new ArrayList<>();
       }
-      long traceId = backoffer.getSlowLog().getTraceId();
       Supplier<RawBatchGetRequest> factory =
           () ->
               RawBatchGetRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, backoffer.getSlowLog()))
                   .addAllKeys(keys)
                   .build();
       RegionErrorHandler<RawBatchGetResponse> handler =
@@ -1055,11 +1050,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       if (kvPairs.isEmpty()) {
         return;
       }
-      long traceId = backOffer.getSlowLog().getTraceId();
       Supplier<RawBatchPutRequest> factory =
           () ->
               RawBatchPutRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, backOffer.getSlowLog()))
                   .addAllPairs(kvPairs)
                   .setTtl(ttl)
                   .addTtls(ttl)
@@ -1109,11 +1103,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       if (keys.isEmpty()) {
         return;
       }
-      long traceId = backoffer.getSlowLog().getTraceId();
       Supplier<RawBatchDeleteRequest> factory =
           () ->
               RawBatchDeleteRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, backoffer.getSlowLog()))
                   .addAllKeys(keys)
                   .setForCas(atomicForCAS)
                   .build();
@@ -1155,11 +1148,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_scan").startTimer();
     try {
-      long traceId = backOffer.getSlowLog().getTraceId();
       Supplier<RawScanRequest> factory =
           () ->
               RawScanRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, backOffer.getSlowLog()))
                   .setStartKey(key)
                   .setKeyOnly(keyOnly)
                   .setLimit(limit)
@@ -1202,11 +1194,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete_range").startTimer();
     try {
-      long traceId = backOffer.getSlowLog().getTraceId();
       Supplier<RawDeleteRangeRequest> factory =
           () ->
               RawDeleteRangeRequest.newBuilder()
-                  .setContext(makeContext(storeType, traceId))
+                  .setContext(makeContext(storeType, backOffer.getSlowLog()))
                   .setStartKey(startKey)
                   .setEndKey(endKey)
                   .build();

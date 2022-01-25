@@ -22,6 +22,8 @@ public interface SlowLog {
 
   long getTraceId();
 
+  long getThresholdMS();
+
   void setError(Throwable err);
 
   void log();
