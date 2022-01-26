@@ -369,6 +369,7 @@ public class TiConfiguration implements Serializable {
   private Integer rawKVBatchWriteSlowLogInMS =
       getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS).orElse(null);
   private int rawKVScanSlowLogInMS = getInt(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
+  private double rawKVServerSlowLogFactor = getDouble(TIKV_RAWKV_SERVER_SLOWLOG_FACTOR, 2.0);
 
   private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
   private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
@@ -995,6 +996,14 @@ public class TiConfiguration implements Serializable {
 
   public void setRawKVScanSlowLogInMS(int rawKVScanSlowLogInMS) {
     this.rawKVScanSlowLogInMS = rawKVScanSlowLogInMS;
+  }
+
+  public double getRawKVServerSlowLogFactor() {
+    return rawKVServerSlowLogFactor;
+  }
+
+  public void setRawKVServerSlowLogFactor(double rawKVServerSlowLogFactor) {
+    this.rawKVServerSlowLogFactor = rawKVServerSlowLogFactor;
   }
 
   public boolean isCircuitBreakEnable() {
