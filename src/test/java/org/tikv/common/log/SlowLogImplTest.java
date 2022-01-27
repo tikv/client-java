@@ -17,6 +17,8 @@
 
 package org.tikv.common.log;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -31,5 +33,20 @@ public class SlowLogImplTest {
     slowLog = new SlowLogImpl(1000);
     Thread.sleep(500);
     Assert.assertFalse(slowLog.timeExceeded());
+  }
+
+  @Test
+  public void testSlowLogJson() throws InterruptedException {
+    SlowLogImpl slowLog = new SlowLogImpl(1);
+    SlowLogSpan span = slowLog.start("method1");
+    Thread.sleep(500);
+    span.end();
+    JsonObject object = slowLog.getSlowLogJson();
+
+    JsonArray spans = object.get("spans").getAsJsonArray();
+    Assert.assertEquals(1, spans.size());
+    JsonObject spanObject = spans.get(0).getAsJsonObject();
+    Assert.assertEquals("method1", spanObject.get("event").getAsString());
+    Assert.assertTrue(spanObject.get("duration_ns").getAsLong() > 500_000_000);
   }
 }

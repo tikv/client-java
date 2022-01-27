@@ -80,7 +80,7 @@ public class SlowLogImpl implements SlowLog {
   @Override
   public void log() {
     if (error != null || timeExceeded()) {
-      logger.warn("SlowLog:" + getSlowLogString());
+      logger.warn("SlowLog:" + getSlowLogJson());
     }
   }
 
@@ -94,7 +94,7 @@ public class SlowLogImpl implements SlowLog {
     return false;
   }
 
-  private String getSlowLogString() {
+  JsonObject getSlowLogJson() {
     JsonObject jsonObject = new JsonObject();
 
     if (error != null) {
@@ -109,6 +109,6 @@ public class SlowLogImpl implements SlowLog {
     }
     jsonObject.add("spans", jsonArray);
 
-    return jsonObject.toString();
+    return jsonObject;
   }
 }
