@@ -85,7 +85,7 @@ public class SlowLogSpanImpl implements SlowLogSpan {
 
   private long getDurationNS() {
     if (startInstantNS == 0 || endInstantNS == 0) {
-      return 0;
+      return -1;
     }
     return endInstantNS - startInstantNS;
   }
