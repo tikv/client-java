@@ -2,7 +2,7 @@
 
 ## BackOffer
 
-The sleep and timeout mechanism is controlled by a BackOffer object, which is created one per RawKVClient method. The BeckOffer will decide how much time the next sleep will spend, and whether enough time is spent and no more retry should be applied.
+The retry and timeout mechanism for a request is controlled by a `BackOffer` object, which is created one per `RawKVClient` method. The `BackOffer` will decide how much time the next sleep and retry should spend, and whether to timeout the request if not enough time is left for retrying the request.
 If we need a back off sleep, we call backOffer.doBackOff(funcType, exception), and the current thread will sleep for a decided time. If the current operation will timeout after sleep, the doBackOff simply throw an exception to abort the operation.
 
 ## callWithRetry
