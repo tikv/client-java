@@ -19,6 +19,7 @@ package org.tikv.common.log;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -49,7 +50,7 @@ public class SlowLogImpl implements SlowLog {
     this.startMS = System.currentTimeMillis();
     this.startNS = System.nanoTime();
     this.slowThresholdMS = slowThresholdMS;
-    traceId = random.nextLong();
+    this.traceId = random.nextLong();
   }
 
   @Override
@@ -101,7 +102,7 @@ public class SlowLogImpl implements SlowLog {
       jsonObject.addProperty("error", error.getMessage());
     }
 
-    jsonObject.addProperty("trace_id", traceId);
+    jsonObject.addProperty("trace_id", toUnsignedBigInteger(traceId));
 
     JsonArray jsonArray = new JsonArray();
     for (SlowLogSpan slowLogSpan : slowLogSpans) {
@@ -110,5 +111,19 @@ public class SlowLogImpl implements SlowLog {
     jsonObject.add("spans", jsonArray);
 
     return jsonObject;
+  }
+
+  /** (Copied from openjdk) Return a BigInteger equal to the unsigned value of the argument. */
+  private static BigInteger toUnsignedBigInteger(long i) {
+    if (i >= 0L) return BigInteger.valueOf(i);
+    else {
+      int upper = (int) (i >>> 32);
+      int lower = (int) i;
+
+      // return (upper << 32) + lower
+      return (BigInteger.valueOf(Integer.toUnsignedLong(upper)))
+          .shiftLeft(32)
+          .add(BigInteger.valueOf(Integer.toUnsignedLong(lower)));
+    }
   }
 }
