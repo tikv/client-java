@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.region.RegionErrorReceiver;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
@@ -75,8 +76,13 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
         // backOff strategy to wait, fetch new region and re-split key range.
         // onNotLeader is only needed when updateLeader succeeds, thus switch
         // to a new store address.
+        SlowLogSpan span1 = backOffer.getSlowLog().start("updateLeader");
         TiRegion newRegion = this.regionManager.updateLeader(recv.getRegion(), newStoreId);
+        span1.end();
+
+        SlowLogSpan span2 = backOffer.getSlowLog().start("onNotLeader");
         retry = newRegion != null && recv.onNotLeader(newRegion, backOffer);
+        span2.end();
 
         backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
       } else {
@@ -92,7 +98,13 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
         this.regionManager.invalidateRegion(recv.getRegion());
       }
 
-      backOffer.doBackOff(backOffFuncType, new GrpcException(error.toString()));
+      SlowLogSpan span3 = backOffer.getSlowLog().start("error.toString");
+      String errStr = error.toString();
+      span3.end();
+
+      SlowLogSpan span4 = backOffer.getSlowLog().start("backOffer.doBackOff");
+      backOffer.doBackOff(backOffFuncType, new GrpcException(errStr));
+      span4.end();
 
       return retry;
     } else if (error.hasStoreNotMatch()) {
