@@ -20,6 +20,7 @@ package org.tikv.common.log;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.math.BigInteger;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -89,7 +90,11 @@ public class SlowLogImpl implements SlowLog {
     long currentNS = System.nanoTime();
     long durationMS = (currentNS - startNS) / 1_000_000;
     if (slowThresholdMS >= 0 && durationMS > slowThresholdMS) {
-      logger.warn("A slow request spent " + durationMS + "ms");
+      SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
+      logger.warn(
+          String.format(
+              "A slow request spent %s ms. start=%s, end=%s",
+              durationMS, dateFormat.format(startMS), dateFormat.format(startMS + durationMS)));
       return true;
     }
     return false;
