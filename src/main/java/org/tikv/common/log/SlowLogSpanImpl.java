@@ -65,8 +65,8 @@ public class SlowLogSpanImpl implements SlowLogSpan {
   public JsonElement toJsonElement() {
     JsonObject jsonObject = new JsonObject();
     jsonObject.addProperty("event", name);
-    jsonObject.addProperty("begin_unix_ns", getStartUnixNS());
-    jsonObject.addProperty("duration_ns", getDurationNS());
+    jsonObject.addProperty("begin_unix_ms", getStartUnixNS() / 1_000_000);
+    jsonObject.addProperty("duration_ms", getDurationNS() / 1_000_000);
 
     if (!properties.isEmpty()) {
       JsonObject propertiesObject = new JsonObject();
