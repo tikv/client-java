@@ -160,7 +160,7 @@ public abstract class AbstractRegionStoreClient
         .setTraceContext(
             Tracepb.TraceContext.newBuilder()
                 .setDurationThresholdMs(
-                    (int) (slowLog.getThresholdMS() / conf.getRawKVServerSlowLogFactor()))
+                    (int) (slowLog.getThresholdMS() * conf.getRawKVServerSlowLogFactor()))
                 .addRemoteParentSpans(Tracepb.RemoteParentSpan.newBuilder().setTraceId(traceId)))
         .build();
   }
