@@ -82,6 +82,16 @@
 
     <dependencies>
         <dependency>
+            <groupId>io.perfmark</groupId>
+            <artifactId>perfmark-api</artifactId>
+            <version>0.24.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.perfmark</groupId>
+            <artifactId>perfmark-traceviewer</artifactId>
+            <version>0.24.0</version>
+        </dependency>
+        <dependency>
             <groupId>org.rocksdb</groupId>
             <artifactId>rocksdbjni</artifactId>
             <version>${rocksdb.version}</version>
@@ -609,6 +619,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.0.0-M5</version>
+                <configuration>
+                    <forkMode>always</forkMode>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

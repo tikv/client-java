@@ -23,4 +23,6 @@ header:
     - '**/*.pem'
     - '**/*.crt'
     - '**/*.g4'
+    - 'src/main/java/io/grpc/'
+    - 'src/main/java/io/netty/'
   comment: on-failure
