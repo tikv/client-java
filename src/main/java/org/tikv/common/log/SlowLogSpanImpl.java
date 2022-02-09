@@ -19,7 +19,6 @@ package org.tikv.common.log;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.Map;
