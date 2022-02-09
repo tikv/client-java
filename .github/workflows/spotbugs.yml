@@ -14,7 +14,8 @@ jobs:
           distribution: 'adopt'
 
       - name: Run spotbugs
-        run: |
-          if ! mvn -B verify spotbugs:check -Dmaven.test.skip=true; then
-            echo "::warning title=Violations detected"
-          fi
+        id: spotbugs
+        run: mvn -B verify spotbugs:check -Dmaven.test.skip=true; then
+      - name: Check spotbugs result
+        if: steps.spotbugs.output.exit_code != 0
+        run: echo "::warning spotbugs found violations"
