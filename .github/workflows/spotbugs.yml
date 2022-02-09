@@ -6,19 +6,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up JDK 1.8
-      uses: actions/setup-java@v1
-      with:
-        java-version: 1.8
-    - uses: actions/cache@v1
-      with:
-        path: ~/.m2/repository
-        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          ${{ runner.os }}-maven-
-    - name: Build with Maven
-      run: mvn -B verify spotbugs:spotbugs -Dmaven.test.skip=true
-    - uses: jwgmeligmeyling/spotbugs-github-action@master
-      with:
-        path: '**/spotbugsXml.xml'
+      - name: Set up JDK 8
+        uses: actions/setup-java@v2
+        with:
+          java-version: '8'
+          distribution: 'adopt'
+
+      - name: Run spotbugs
+        run: mvn clean spotbugs:check -Dmaven.test.skip=true
