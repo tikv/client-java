@@ -414,6 +414,12 @@ public class TiConfiguration implements Serializable {
     LEADER_AND_FOLLOWER
   }
 
+  public TiConfiguration() {
+    if (rawKVServerSlowLogFactor < 0 || rawKVServerSlowLogFactor > 1) {
+      throw new IllegalArgumentException("rawkv_server_slowlog_factor must be in range [0, 1]");
+    }
+  }
+
   public static TiConfiguration createDefault() {
     return new TiConfiguration();
   }
@@ -1004,7 +1010,7 @@ public class TiConfiguration implements Serializable {
 
   public void setRawKVServerSlowLogFactor(double rawKVServerSlowLogFactor) {
     if (rawKVServerSlowLogFactor < 0 || rawKVServerSlowLogFactor > 1) {
-      throw new IllegalArgumentException("must be in range [0, 1]");
+      throw new IllegalArgumentException("rawkv_server_slowlog_factor must be in range [0, 1]");
     }
     this.rawKVServerSlowLogFactor = rawKVServerSlowLogFactor;
   }
