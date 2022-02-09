@@ -19,6 +19,8 @@ package org.tikv.common.log;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -63,8 +65,10 @@ public class SlowLogSpanImpl implements SlowLogSpan {
 
   @Override
   public JsonElement toJsonElement() {
+    SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
     JsonObject jsonObject = new JsonObject();
     jsonObject.addProperty("event", name);
+    jsonObject.addProperty("begin", dateFormat.format(getStartUnixNS() / 1_000_000));
     jsonObject.addProperty("begin_unix_ms", getStartUnixNS() / 1_000_000);
     jsonObject.addProperty("duration_ms", getDurationNS() / 1_000_000);
 
