@@ -640,6 +640,7 @@
                 <configuration>
                     <includeFilterFile>dev/spotbugs-include.xml</includeFilterFile>
                     <xmlOutput>true</xmlOutput>
+                    <failOnError>false</failOnError>
                 </configuration>
                 <dependencies>
                     <!-- overwrite dependency on spotbugs if you want to specify the version of spotbugs -->
