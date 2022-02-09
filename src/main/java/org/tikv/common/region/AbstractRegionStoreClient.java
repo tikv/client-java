@@ -155,6 +155,10 @@ public abstract class AbstractRegionStoreClient
   }
 
   private Kvrpcpb.Context addTraceId(Kvrpcpb.Context context, SlowLog slowLog) {
+    if (slowLog.getThresholdMS() < 0) {
+      // disable tikv tracing
+      return context;
+    }
     long traceId = slowLog.getTraceId();
     return Kvrpcpb.Context.newBuilder(context)
         .setTraceContext(

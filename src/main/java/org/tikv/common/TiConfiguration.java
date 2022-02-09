@@ -1003,6 +1003,9 @@ public class TiConfiguration implements Serializable {
   }
 
   public void setRawKVServerSlowLogFactor(double rawKVServerSlowLogFactor) {
+    if (rawKVServerSlowLogFactor < 0 || rawKVServerSlowLogFactor > 1) {
+      throw new IllegalArgumentException("must be in range [0, 1]");
+    }
     this.rawKVServerSlowLogFactor = rawKVServerSlowLogFactor;
   }
 
