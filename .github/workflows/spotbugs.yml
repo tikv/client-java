@@ -15,4 +15,4 @@ jobs:
 
       - name: Run spotbugs
         id: spotbugs
-        run: mvn -B verify spotbugs:check -Dmaven.test.skip=true; then
+        run: mvn -B verify spotbugs:check -Dmaven.test.skip=true
