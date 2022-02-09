@@ -50,4 +50,11 @@ public class SlowLogImplTest {
     Assert.assertEquals("method1", spanObject.get("event").getAsString());
     Assert.assertTrue(spanObject.get("duration_ms").getAsLong() > 500);
   }
+
+  @Test
+  public void testUnsignedLong() {
+    Assert.assertEquals("12345", SlowLogImpl.toUnsignedBigInteger(12345L).toString());
+    Assert.assertEquals("18446744073709551615", SlowLogImpl.toUnsignedBigInteger(-1L).toString());
+    Assert.assertEquals("18446744073709551614", SlowLogImpl.toUnsignedBigInteger(-2L).toString());
+  }
 }

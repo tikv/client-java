@@ -119,17 +119,13 @@ public class SlowLogImpl implements SlowLog {
     return jsonObject;
   }
 
-  /** (Copied from openjdk) Return a BigInteger equal to the unsigned value of the argument. */
-  private static BigInteger toUnsignedBigInteger(long i) {
-    if (i >= 0L) return BigInteger.valueOf(i);
-    else {
-      int upper = (int) (i >>> 32);
-      int lower = (int) i;
+  static BigInteger toUnsignedBigInteger(long i) {
+    if (i >= 0) {
+      return BigInteger.valueOf(i);
+    } else {
+      long withoutSign = i & ~(1L << 63);
 
-      // return (upper << 32) + lower
-      return (BigInteger.valueOf(Integer.toUnsignedLong(upper)))
-          .shiftLeft(32)
-          .add(BigInteger.valueOf(Integer.toUnsignedLong(lower)));
+      return (BigInteger.valueOf(1)).shiftLeft(63).add(BigInteger.valueOf(withoutSign));
     }
   }
 }
