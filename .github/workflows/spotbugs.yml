@@ -15,7 +15,4 @@ jobs:
 
       - name: Run spotbugs
         id: spotbugs
-        run: |
-            if ! mvn -B verify spotbugs:check -Dmaven.test.skip=true; then
-              echo '::warning title=Found violations::Please check the output log of spotbugs:check'
-            fi
+        run: mvn -B verify spotbugs:check -Dmaven.test.skip=true; then
