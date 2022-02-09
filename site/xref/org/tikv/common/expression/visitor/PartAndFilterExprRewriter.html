@@ -1,0 +1,131 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+<title>PartAndFilterExprRewriter xref</title>
+<link type="text/css" rel="stylesheet" href="../../../../../stylesheet.css" />
+</head>
+<body>
+<div id="overview"><a href="../../../../../../apidocs/org/tikv/common/expression/visitor/PartAndFilterExprRewriter.html">View Javadoc</a></div><pre>
+<a class="jxr_linenumber" name="L1" href="#L1">1</a>   <em class="jxr_comment">/*</em>
+<a class="jxr_linenumber" name="L2" href="#L2">2</a>   <em class="jxr_comment"> * Copyright 2021 TiKV Project Authors.</em>
+<a class="jxr_linenumber" name="L3" href="#L3">3</a>   <em class="jxr_comment"> *</em>
+<a class="jxr_linenumber" name="L4" href="#L4">4</a>   <em class="jxr_comment"> * Licensed under the Apache License, Version 2.0 (the "License");</em>
+<a class="jxr_linenumber" name="L5" href="#L5">5</a>   <em class="jxr_comment"> * you may not use this file except in compliance with the License.</em>
+<a class="jxr_linenumber" name="L6" href="#L6">6</a>   <em class="jxr_comment"> * You may obtain a copy of the License at</em>
+<a class="jxr_linenumber" name="L7" href="#L7">7</a>   <em class="jxr_comment"> *</em>
+<a class="jxr_linenumber" name="L8" href="#L8">8</a>   <em class="jxr_comment"> * <a href="http://www.apache.org/licenses/LICENSE-2.0" target="alexandria_uri">http://www.apache.org/licenses/LICENSE-2.0</a></em>
+<a class="jxr_linenumber" name="L9" href="#L9">9</a>   <em class="jxr_comment"> *</em>
+<a class="jxr_linenumber" name="L10" href="#L10">10</a>  <em class="jxr_comment"> * Unless required by applicable law or agreed to in writing, software</em>
+<a class="jxr_linenumber" name="L11" href="#L11">11</a>  <em class="jxr_comment"> * distributed under the License is distributed on an "AS IS" BASIS,</em>
+<a class="jxr_linenumber" name="L12" href="#L12">12</a>  <em class="jxr_comment"> * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</em>
+<a class="jxr_linenumber" name="L13" href="#L13">13</a>  <em class="jxr_comment"> * See the License for the specific language governing permissions and</em>
+<a class="jxr_linenumber" name="L14" href="#L14">14</a>  <em class="jxr_comment"> * limitations under the License.</em>
+<a class="jxr_linenumber" name="L15" href="#L15">15</a>  <em class="jxr_comment"> *</em>
+<a class="jxr_linenumber" name="L16" href="#L16">16</a>  <em class="jxr_comment"> */</em>
+<a class="jxr_linenumber" name="L17" href="#L17">17</a>  
+<a class="jxr_linenumber" name="L18" href="#L18">18</a>  <strong class="jxr_keyword">package</strong> org.tikv.common.expression.visitor;
+<a class="jxr_linenumber" name="L19" href="#L19">19</a>  
+<a class="jxr_linenumber" name="L20" href="#L20">20</a>  <strong class="jxr_keyword">import</strong> java.util.Objects;
+<a class="jxr_linenumber" name="L21" href="#L21">21</a>  <strong class="jxr_keyword">import</strong> java.util.Set;
+<a class="jxr_linenumber" name="L22" href="#L22">22</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.expression.*;
+<a class="jxr_linenumber" name="L23" href="#L23">23</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.expression.ComparisonBinaryExpression.NormalizedPredicate;
+<a class="jxr_linenumber" name="L24" href="#L24">24</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.expression.FuncCallExpr.Type;
+<a class="jxr_linenumber" name="L25" href="#L25">25</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.predicates.PredicateUtils;
+<a class="jxr_linenumber" name="L26" href="#L26">26</a>  
+<a class="jxr_linenumber" name="L27" href="#L27">27</a>  <em class="jxr_javadoccomment">/**</em>
+<a class="jxr_linenumber" name="L28" href="#L28">28</a>  <em class="jxr_javadoccomment"> * PartAndFilterExprRewriter takes partition expression as an input. Rewriting rule is based on the</em>
+<a class="jxr_linenumber" name="L29" href="#L29">29</a>  <em class="jxr_javadoccomment"> * type of partition expression. 1. If partition expression is a columnRef, no rewriting will be</em>
+<a class="jxr_linenumber" name="L30" href="#L30">30</a>  <em class="jxr_javadoccomment"> * performed. 2. If partition expression is year and the expression to be rewritten in the form of y</em>
+<a class="jxr_linenumber" name="L31" href="#L31">31</a>  <em class="jxr_javadoccomment"> * &amp;lt; '1995-10-10' then its right hand child will be replaced with "1995". 3. If partition</em>
+<a class="jxr_linenumber" name="L32" href="#L32">32</a>  <em class="jxr_javadoccomment"> * expression is year and the expression to be rewritten in the form of year(y) &amp;lt; '1995' then its</em>
+<a class="jxr_linenumber" name="L33" href="#L33">33</a>  <em class="jxr_javadoccomment"> * left hand child will be replaced with y.</em>
+<a class="jxr_linenumber" name="L34" href="#L34">34</a>  <em class="jxr_javadoccomment"> */</em>
+<a class="jxr_linenumber" name="L35" href="#L35">35</a>  <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">class</strong> <a name="PartAndFilterExprRewriter" href="../../../../../org/tikv/common/expression/visitor/PartAndFilterExprRewriter.html#PartAndFilterExprRewriter">PartAndFilterExprRewriter</a> <strong class="jxr_keyword">extends</strong> DefaultVisitor&lt;Expression, Void&gt; {
+<a class="jxr_linenumber" name="L36" href="#L36">36</a>    <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> partExpr;
+<a class="jxr_linenumber" name="L37" href="#L37">37</a>    <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> Set&lt;ColumnRef&gt; columnRefs;
+<a class="jxr_linenumber" name="L38" href="#L38">38</a>  
+<a class="jxr_linenumber" name="L39" href="#L39">39</a>    <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">boolean</strong> unsupportedPartFnFound;
+<a class="jxr_linenumber" name="L40" href="#L40">40</a>  
+<a class="jxr_linenumber" name="L41" href="#L41">41</a>    <strong class="jxr_keyword">public</strong> <a name="PartAndFilterExprRewriter" href="../../../../../org/tikv/common/expression/visitor/PartAndFilterExprRewriter.html#PartAndFilterExprRewriter">PartAndFilterExprRewriter</a>(<a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> partExpr) {
+<a class="jxr_linenumber" name="L42" href="#L42">42</a>      Objects.requireNonNull(partExpr, <span class="jxr_string">"partition expression cannot be null"</span>);
+<a class="jxr_linenumber" name="L43" href="#L43">43</a>      <strong class="jxr_keyword">this</strong>.partExpr = partExpr;
+<a class="jxr_linenumber" name="L44" href="#L44">44</a>      <strong class="jxr_keyword">this</strong>.columnRefs = PredicateUtils.extractColumnRefFromExpression(partExpr);
+<a class="jxr_linenumber" name="L45" href="#L45">45</a>    }
+<a class="jxr_linenumber" name="L46" href="#L46">46</a>  
+<a class="jxr_linenumber" name="L47" href="#L47">47</a>    <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">boolean</strong> isYear() {
+<a class="jxr_linenumber" name="L48" href="#L48">48</a>      <strong class="jxr_keyword">return</strong> partExpr instanceof <a name="FuncCallExpr" href="../../../../../org/tikv/common/expression/FuncCallExpr.html#FuncCallExpr">FuncCallExpr</a> &amp;&amp; ((<a name="FuncCallExpr" href="../../../../../org/tikv/common/expression/FuncCallExpr.html#FuncCallExpr">FuncCallExpr</a>) partExpr).getFuncTp() == Type.YEAR;
+<a class="jxr_linenumber" name="L49" href="#L49">49</a>    }
+<a class="jxr_linenumber" name="L50" href="#L50">50</a>  
+<a class="jxr_linenumber" name="L51" href="#L51">51</a>    <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">boolean</strong> isColumnRef() {
+<a class="jxr_linenumber" name="L52" href="#L52">52</a>      <strong class="jxr_keyword">return</strong> partExpr instanceof ColumnRef;
+<a class="jxr_linenumber" name="L53" href="#L53">53</a>    }
+<a class="jxr_linenumber" name="L54" href="#L54">54</a>  
+<a class="jxr_linenumber" name="L55" href="#L55">55</a>    @Override
+<a class="jxr_linenumber" name="L56" href="#L56">56</a>    <strong class="jxr_keyword">protected</strong> <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> process(<a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> node, Void context) {
+<a class="jxr_linenumber" name="L57" href="#L57">57</a>      <strong class="jxr_keyword">for</strong> (<a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> expr : node.getChildren()) {
+<a class="jxr_linenumber" name="L58" href="#L58">58</a>        expr.accept(<strong class="jxr_keyword">this</strong>, context);
+<a class="jxr_linenumber" name="L59" href="#L59">59</a>      }
+<a class="jxr_linenumber" name="L60" href="#L60">60</a>      <strong class="jxr_keyword">return</strong> node;
+<a class="jxr_linenumber" name="L61" href="#L61">61</a>    }
+<a class="jxr_linenumber" name="L62" href="#L62">62</a>  
+<a class="jxr_linenumber" name="L63" href="#L63">63</a>    <strong class="jxr_keyword">public</strong> <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> visit(<a name="LogicalBinaryExpression" href="../../../../../org/tikv/common/expression/LogicalBinaryExpression.html#LogicalBinaryExpression">LogicalBinaryExpression</a> node, Void context) {
+<a class="jxr_linenumber" name="L64" href="#L64">64</a>      <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> left = node.getLeft().accept(<strong class="jxr_keyword">this</strong>, <strong class="jxr_keyword">null</strong>);
+<a class="jxr_linenumber" name="L65" href="#L65">65</a>      <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> right = node.getRight().accept(<strong class="jxr_keyword">this</strong>, <strong class="jxr_keyword">null</strong>);
+<a class="jxr_linenumber" name="L66" href="#L66">66</a>      <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">new</strong> <a name="LogicalBinaryExpression" href="../../../../../org/tikv/common/expression/LogicalBinaryExpression.html#LogicalBinaryExpression">LogicalBinaryExpression</a>(node.getCompType(), left, right);
+<a class="jxr_linenumber" name="L67" href="#L67">67</a>    }
+<a class="jxr_linenumber" name="L68" href="#L68">68</a>  
+<a class="jxr_linenumber" name="L69" href="#L69">69</a>    @Override
+<a class="jxr_linenumber" name="L70" href="#L70">70</a>    <strong class="jxr_keyword">public</strong> <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> visit(<a name="FuncCallExpr" href="../../../../../org/tikv/common/expression/FuncCallExpr.html#FuncCallExpr">FuncCallExpr</a> node, Void context) {
+<a class="jxr_linenumber" name="L71" href="#L71">71</a>      <strong class="jxr_keyword">if</strong> (node.getFuncTp() == Type.YEAR) {
+<a class="jxr_linenumber" name="L72" href="#L72">72</a>        <strong class="jxr_keyword">return</strong> node.getExpression();
+<a class="jxr_linenumber" name="L73" href="#L73">73</a>      }
+<a class="jxr_linenumber" name="L74" href="#L74">74</a>      <em class="jxr_comment">// other's is not supported right now.</em>
+<a class="jxr_linenumber" name="L75" href="#L75">75</a>      <em class="jxr_comment">// TODO: when adding new type in FuncCallExpr, please also modify here</em>
+<a class="jxr_linenumber" name="L76" href="#L76">76</a>      <em class="jxr_comment">// accordingly.</em>
+<a class="jxr_linenumber" name="L77" href="#L77">77</a>      <strong class="jxr_keyword">return</strong> node;
+<a class="jxr_linenumber" name="L78" href="#L78">78</a>    }
+<a class="jxr_linenumber" name="L79" href="#L79">79</a>  
+<a class="jxr_linenumber" name="L80" href="#L80">80</a>    @Override
+<a class="jxr_linenumber" name="L81" href="#L81">81</a>    <strong class="jxr_keyword">public</strong> <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> visit(<a name="Constant" href="../../../../../org/tikv/common/expression/Constant.html#Constant">Constant</a> node, Void context) {
+<a class="jxr_linenumber" name="L82" href="#L82">82</a>      <strong class="jxr_keyword">return</strong> node;
+<a class="jxr_linenumber" name="L83" href="#L83">83</a>    }
+<a class="jxr_linenumber" name="L84" href="#L84">84</a>  
+<a class="jxr_linenumber" name="L85" href="#L85">85</a>    @Override
+<a class="jxr_linenumber" name="L86" href="#L86">86</a>    <strong class="jxr_keyword">public</strong> <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> visit(<a name="ComparisonBinaryExpression" href="../../../../../org/tikv/common/expression/ComparisonBinaryExpression.html#ComparisonBinaryExpression">ComparisonBinaryExpression</a> node, Void context) {
+<a class="jxr_linenumber" name="L87" href="#L87">87</a>      NormalizedPredicate predicate = node.normalize();
+<a class="jxr_linenumber" name="L88" href="#L88">88</a>      <em class="jxr_comment">// predicate maybe null if node's left or right does not have a column ref or a constant.</em>
+<a class="jxr_linenumber" name="L89" href="#L89">89</a>      <strong class="jxr_keyword">if</strong> (predicate != <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L90" href="#L90">90</a>        <strong class="jxr_keyword">if</strong> (!columnRefs.contains(predicate.getColumnRef())) {
+<a class="jxr_linenumber" name="L91" href="#L91">91</a>          <strong class="jxr_keyword">return</strong> node;
+<a class="jxr_linenumber" name="L92" href="#L92">92</a>        }
+<a class="jxr_linenumber" name="L93" href="#L93">93</a>        <em class="jxr_comment">// we only support year for now.</em>
+<a class="jxr_linenumber" name="L94" href="#L94">94</a>        <strong class="jxr_keyword">if</strong> (isYear()) {
+<a class="jxr_linenumber" name="L95" href="#L95">95</a>          <a name="FuncCallExpr" href="../../../../../org/tikv/common/expression/FuncCallExpr.html#FuncCallExpr">FuncCallExpr</a> year = <strong class="jxr_keyword">new</strong> <a name="FuncCallExpr" href="../../../../../org/tikv/common/expression/FuncCallExpr.html#FuncCallExpr">FuncCallExpr</a>(predicate.getValue(), Type.YEAR);
+<a class="jxr_linenumber" name="L96" href="#L96">96</a>          <a name="Constant" href="../../../../../org/tikv/common/expression/Constant.html#Constant">Constant</a> newLiteral = year.eval(predicate.getValue());
+<a class="jxr_linenumber" name="L97" href="#L97">97</a>          <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">new</strong> <a name="ComparisonBinaryExpression" href="../../../../../org/tikv/common/expression/ComparisonBinaryExpression.html#ComparisonBinaryExpression">ComparisonBinaryExpression</a>(node.getComparisonType(), node.getLeft(), newLiteral);
+<a class="jxr_linenumber" name="L98" href="#L98">98</a>        } <strong class="jxr_keyword">else</strong> <strong class="jxr_keyword">if</strong> (isColumnRef()) {
+<a class="jxr_linenumber" name="L99" href="#L99">99</a>          <strong class="jxr_keyword">return</strong> node;
+<a class="jxr_linenumber" name="L100" href="#L100">100</a>       }
+<a class="jxr_linenumber" name="L101" href="#L101">101</a>       unsupportedPartFnFound = <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L102" href="#L102">102</a>       <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L103" href="#L103">103</a>     }
+<a class="jxr_linenumber" name="L104" href="#L104">104</a> 
+<a class="jxr_linenumber" name="L105" href="#L105">105</a>     <em class="jxr_comment">// when we find a node in form like [year(y) &lt; 1995], we need rewrite the left child.</em>
+<a class="jxr_linenumber" name="L106" href="#L106">106</a>     <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> left = node.getLeft().accept(<strong class="jxr_keyword">this</strong>, <strong class="jxr_keyword">null</strong>);
+<a class="jxr_linenumber" name="L107" href="#L107">107</a>     <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> right = node.getRight().accept(<strong class="jxr_keyword">this</strong>, <strong class="jxr_keyword">null</strong>);
+<a class="jxr_linenumber" name="L108" href="#L108">108</a>     <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">new</strong> <a name="ComparisonBinaryExpression" href="../../../../../org/tikv/common/expression/ComparisonBinaryExpression.html#ComparisonBinaryExpression">ComparisonBinaryExpression</a>(node.getComparisonType(), left, right);
+<a class="jxr_linenumber" name="L109" href="#L109">109</a>   }
+<a class="jxr_linenumber" name="L110" href="#L110">110</a> 
+<a class="jxr_linenumber" name="L111" href="#L111">111</a>   <strong class="jxr_keyword">public</strong> <a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> rewrite(<a name="Expression" href="../../../../../org/tikv/common/expression/Expression.html#Expression">Expression</a> target) {
+<a class="jxr_linenumber" name="L112" href="#L112">112</a>     <strong class="jxr_keyword">return</strong> target.accept(<strong class="jxr_keyword">this</strong>, <strong class="jxr_keyword">null</strong>);
+<a class="jxr_linenumber" name="L113" href="#L113">113</a>   }
+<a class="jxr_linenumber" name="L114" href="#L114">114</a> 
+<a class="jxr_linenumber" name="L115" href="#L115">115</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">boolean</strong> isUnsupportedPartFnFound() {
+<a class="jxr_linenumber" name="L116" href="#L116">116</a>     <strong class="jxr_keyword">return</strong> unsupportedPartFnFound;
+<a class="jxr_linenumber" name="L117" href="#L117">117</a>   }
+<a class="jxr_linenumber" name="L118" href="#L118">118</a> }
+</pre>
+<hr/>
+<div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>
+</body>
+</html>
