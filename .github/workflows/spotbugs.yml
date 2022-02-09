@@ -15,7 +15,7 @@ jobs:
 
       - name: Run spotbugs
         id: spotbugs
-        run: mvn -B verify spotbugs:check -Dmaven.test.skip=true
-      - name: Check spotbugs result
-        if: steps.spotbugs.output.exit_code != 0
-        run: echo "::warning spotbugs found violations"
+        run: |
+            if ! mvn -B verify spotbugs:check -Dmaven.test.skip=true; then
+              echo '::warning title=Found violations::Please check the output log of spotbugs:check'
+            fi
