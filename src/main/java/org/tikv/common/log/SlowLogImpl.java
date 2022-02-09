@@ -47,6 +47,8 @@ public class SlowLogImpl implements SlowLog {
 
   private final long traceId;
 
+  private long durationMS;
+
   public SlowLogImpl(long slowThresholdMS) {
     this.startMS = System.currentTimeMillis();
     this.startNS = System.nanoTime();
@@ -82,22 +84,21 @@ public class SlowLogImpl implements SlowLog {
   @Override
   public void log() {
     if (error != null || timeExceeded()) {
-      logger.warn("SlowLog:" + getSlowLogJson());
+      SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
+      logger.warn(
+          String.format(
+              "A request spent %s ms. start=%s, end=%s, SlowLog:%s",
+              durationMS,
+              dateFormat.format(startMS),
+              dateFormat.format(startMS + durationMS),
+              getSlowLogJson().toString()));
     }
   }
 
   boolean timeExceeded() {
     long currentNS = System.nanoTime();
-    long durationMS = (currentNS - startNS) / 1_000_000;
-    if (slowThresholdMS >= 0 && durationMS > slowThresholdMS) {
-      SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
-      logger.warn(
-          String.format(
-              "A slow request spent %s ms. start=%s, end=%s",
-              durationMS, dateFormat.format(startMS), dateFormat.format(startMS + durationMS)));
-      return true;
-    }
-    return false;
+    durationMS = (currentNS - startNS) / 1_000_000;
+    return slowThresholdMS >= 0 && durationMS > slowThresholdMS;
   }
 
   JsonObject getSlowLogJson() {
