@@ -14,4 +14,4 @@ jobs:
           distribution: 'adopt'
 
       - name: Run spotbugs
-        run: mvn clean spotbugs:check -Dmaven.test.skip=true
+        run: mvn -B verify spotbugs:check -Dmaven.test.skip=true
