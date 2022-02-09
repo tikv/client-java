@@ -104,11 +104,11 @@ public class SlowLogImpl implements SlowLog {
   JsonObject getSlowLogJson() {
     JsonObject jsonObject = new JsonObject();
 
+    jsonObject.addProperty("trace_id", toUnsignedBigInteger(traceId));
+
     if (error != null) {
       jsonObject.addProperty("error", error.getMessage());
     }
-
-    jsonObject.addProperty("trace_id", toUnsignedBigInteger(traceId));
 
     JsonArray jsonArray = new JsonArray();
     for (SlowLogSpan slowLogSpan : slowLogSpans) {
