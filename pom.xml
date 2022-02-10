@@ -453,6 +453,7 @@
                     </filesets>
                 </configuration>
             </plugin>
+            <!--- Needs to shade Protobuf 3 since other projects might use other version -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
