@@ -27,7 +27,7 @@ public class SlowLogImplTest {
   @Test
   public void testThresholdTime() throws InterruptedException {
     SlowLogImpl slowLog = new SlowLogImpl(1000);
-    Thread.sleep(1000);
+    Thread.sleep(1100);
     Assert.assertTrue(slowLog.timeExceeded());
 
     slowLog = new SlowLogImpl(1000);
@@ -42,13 +42,12 @@ public class SlowLogImplTest {
     Thread.sleep(500);
     span.end();
     JsonObject object = slowLog.getSlowLogJson();
-    System.out.println(object);
 
     JsonArray spans = object.get("spans").getAsJsonArray();
     Assert.assertEquals(1, spans.size());
     JsonObject spanObject = spans.get(0).getAsJsonObject();
     Assert.assertEquals("method1", spanObject.get("event").getAsString());
-    Assert.assertTrue(spanObject.get("duration_ms").getAsLong() > 500);
+    Assert.assertTrue(spanObject.get("duration_ms").getAsLong() >= 500);
   }
 
   @Test
