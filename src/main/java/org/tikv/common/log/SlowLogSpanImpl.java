@@ -68,7 +68,6 @@ public class SlowLogSpanImpl implements SlowLogSpan {
     JsonObject jsonObject = new JsonObject();
     jsonObject.addProperty("event", name);
     jsonObject.addProperty("begin", dateFormat.format(getStartUnixNS() / 1_000_000));
-    jsonObject.addProperty("begin_unix_ms", getStartUnixNS() / 1_000_000);
     jsonObject.addProperty("duration_ms", getDurationNS() / 1_000_000);
 
     if (!properties.isEmpty()) {
