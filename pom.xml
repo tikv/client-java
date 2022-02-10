@@ -257,6 +257,14 @@
     <reporting>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <skip>${javadoc.skip}</skip>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <version>4.5.2.0</version>
@@ -445,27 +453,6 @@
                     </filesets>
                 </configuration>
             </plugin>
-            <!-- Javadoc Plug-in -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.0.1</version>
-                <configuration>
-                    <skip>${javadoc.skip}</skip>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>attach-javadocs</id>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                        <configuration> <!-- add this to disable checking -->
-                            <additionalparam>-Xdoclint:none</additionalparam>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <!--- Needs to shade Protobuf 3 since other projects might use other version -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
