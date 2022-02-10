@@ -369,6 +369,7 @@ public class TiConfiguration implements Serializable {
   private Integer rawKVBatchWriteSlowLogInMS =
       getIntOption(TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS).orElse(null);
   private int rawKVScanSlowLogInMS = getInt(TIKV_RAWKV_SCAN_SLOWLOG_IN_MS);
+  private double rawKVServerSlowLogFactor = getDouble(TIKV_RAWKV_SERVER_SLOWLOG_FACTOR, 0.5);
 
   private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
   private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
@@ -411,6 +412,12 @@ public class TiConfiguration implements Serializable {
     LEADER,
     FOLLOWER,
     LEADER_AND_FOLLOWER
+  }
+
+  public TiConfiguration() {
+    if (rawKVServerSlowLogFactor < 0 || rawKVServerSlowLogFactor > 1) {
+      throw new IllegalArgumentException("rawkv_server_slowlog_factor must be in range [0, 1]");
+    }
   }
 
   public static TiConfiguration createDefault() {
@@ -995,6 +1002,17 @@ public class TiConfiguration implements Serializable {
 
   public void setRawKVScanSlowLogInMS(int rawKVScanSlowLogInMS) {
     this.rawKVScanSlowLogInMS = rawKVScanSlowLogInMS;
+  }
+
+  public double getRawKVServerSlowLogFactor() {
+    return rawKVServerSlowLogFactor;
+  }
+
+  public void setRawKVServerSlowLogFactor(double rawKVServerSlowLogFactor) {
+    if (rawKVServerSlowLogFactor < 0 || rawKVServerSlowLogFactor > 1) {
+      throw new IllegalArgumentException("rawkv_server_slowlog_factor must be in range [0, 1]");
+    }
+    this.rawKVServerSlowLogFactor = rawKVServerSlowLogFactor;
   }
 
   public boolean isCircuitBreakEnable() {
