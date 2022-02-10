@@ -76,8 +76,6 @@ To interact with TiKV, we should first create a `TiConfiguration` with PD addres
 For example, if we want to put a `World` in `Hello` key in RawKV, write the following code in `src/main/java/com/example/App.java`.
 
 ```java
-import java.util.Optional;
-
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
@@ -91,8 +89,8 @@ public class App {
     try (TiSession session = TiSession.create(conf)) {
       try (RawKVClient client = session.createRawClient()) {
         client.put(ByteString.copyFromUtf8("Hello"), ByteString.copyFromUtf8("World"));
-        Optional<ByteString> value = client.get(ByteString.copyFromUtf8("Hello"));
-        System.out.println(value.get());
+        ByteString value = client.get(ByteString.copyFromUtf8("Hello"));
+        System.out.println(value);
       }
     }
   }
