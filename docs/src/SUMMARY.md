@@ -26,3 +26,4 @@
     - [Region Cache](./architecture/region-cache.md)
 
 - [Contribution Guide](./contribution/introduction.md)
+    - [Bug Severity Guidelines](./contribution/bug-severity-guide.md)
