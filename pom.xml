@@ -77,7 +77,6 @@
         <proto.folder>${basedir}/proto</proto.folder>
         <gpg.keyname>fake gpg key name</gpg.keyname>
         <gpg.skip>true</gpg.skip>
-        <javadoc.skip>true</javadoc.skip>
     </properties>
 
     <dependencies>
@@ -260,9 +259,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.3.1</version>
-                <configuration>
-                    <skip>${javadoc.skip}</skip>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
