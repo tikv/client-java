@@ -36,6 +36,7 @@ import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.*;
 import org.tikv.common.util.*;
+import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
@@ -168,6 +169,13 @@ public class TiSession implements AutoCloseable {
     long warmUpStartTime = System.nanoTime();
     BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
     try {
+      // let JVM ClassLoader load gRPC error related classes
+      // this operation may cost 100ms
+      Errorpb.Error.newBuilder()
+          .setNotLeader(Errorpb.NotLeader.newBuilder().build())
+          .build()
+          .toString();
+
       this.client = getPDClient();
       this.regionManager = getRegionManager();
       List<Metapb.Store> stores = this.client.getAllStores(backOffer);
