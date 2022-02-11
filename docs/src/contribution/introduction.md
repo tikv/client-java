@@ -1,11 +1,18 @@
+# Contribution Guide
 
-## How to build
+## Build the package
 
 ```
 mvn clean package -Dmaven.test.skip=true
 ```
 
-## How to run test
+## Install the package to local maven repository
+
+```
+mvn clean install -Dmaven.test.skip=true
+```
+
+## Run tests
 
 ```
 export RAWKV_PD_ADDRESSES=127.0.0.1:2379
