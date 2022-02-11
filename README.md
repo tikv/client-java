@@ -51,8 +51,9 @@ Find more demo in [KVRawClientTest](https://github.com/birdstorm/KVRawClientTest
 See [Java Client Documents](/docs/README.md) for references about how to config and monitor Java Client.
 
 A [Maven site](https://tikv.github.io/client-java/site) is also available. It includes:
-1. [API reference](https://tikv.github.io/client-java/site/xref/index.html) 
+1. [API reference](https://tikv.github.io/client-java/site/apidocs/index.html) 
 2. [Spotbugs Reports](https://tikv.github.io/client-java/site/spotbugs.html)
+3. [Source Code Xref](https://tikv.github.io/client-java/site/xref/index.html)
 
 ## Community
 
