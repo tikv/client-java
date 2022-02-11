@@ -18,9 +18,11 @@
 package org.tikv.common.log;
 
 public interface SlowLog {
-  void addProperty(String key, String value);
-
   SlowLogSpan start(String name);
+
+  long getTraceId();
+
+  long getThresholdMS();
 
   void setError(Throwable err);
 
