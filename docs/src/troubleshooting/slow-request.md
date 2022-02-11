@@ -5,7 +5,7 @@ If a request take too much time, we can collect the detailed time spend in each 
 <!-- wrap text in the code block -->
 <pre>
 <code class="hljs" style="white-space: pre-wrap;">
-22/01/07 16:16:07 WARN log.SlowLogImpl: SlowLog:{"start":"16:16:07.613","end":"16:16:07.618","duration":"5ms","func":"get","region":"{Region[6] ConfVer[5] Version[2] Store[4] KeyRange[]:[t\\200\\000\\000\\000\\000\\000\\000\\377\\005\\000\\000\\000\\000\\000\\000\\000\\370]}","key":"k1","spans":[{"name":"getRegionByKey","start":"16:16:07.613","end":"16:16:07.613","duration":"0ms"},{"name":"callWithRetry tikvpb.Tikv/RawGet","start":"16:16:07.613","end":"16:16:07.617","duration":"4ms"},{"name":"gRPC tikvpb.Tikv/RawGet","start":"16:16:07.613","end":"16:16:07.617","duration":"4ms"}]}
+2022-02-11 11:07:56 WARN  SlowLogImpl:88 - A request spent 55 ms. start=11:07:56.938, end=11:07:56.993, SlowLog:{"trace_id":4361090673996453790,"spans":[{"event":"put","begin":"11:07:56.938","duration_ms":55,"properties":{"region":"{Region[2] ConfVer[5] Version[60] Store[1] KeyRange[]:[]}","key":"Hello"}},{"event":"getRegionByKey","begin":"11:07:56.938","duration_ms":0},{"event":"callWithRetry","begin":"11:07:56.943","duration_ms":49,"properties":{"method":"tikvpb.Tikv/RawPut"}},{"event":"gRPC","begin":"11:07:56.943","duration_ms":49,"properties":{"method":"tikvpb.Tikv/RawPut"}}]}
 </code>
 </pre>
 
