@@ -27,6 +27,9 @@ public class SlowLogSpanEmptyImpl implements SlowLogSpan {
   private SlowLogSpanEmptyImpl() {}
 
   @Override
+  public void addProperty(String key, String value) {}
+
+  @Override
   public void start() {}
 
   @Override

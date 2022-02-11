@@ -90,6 +90,7 @@ public class ConfigUtils {
   public static final String TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS =
       "tikv.rawkv.batch_write_slowlog_in_ms";
   public static final String TIKV_RAWKV_SCAN_SLOWLOG_IN_MS = "tikv.rawkv.scan_slowlog_in_ms";
+  public static final String TIKV_RAWKV_SERVER_SLOWLOG_FACTOR = "tikv.rawkv.server_slowlog_factor";
 
   public static final String TIKV_TLS_ENABLE = "tikv.tls_enable";
   public static final String TIKV_TRUST_CERT_COLLECTION = "tikv.trust_cert_collection";
