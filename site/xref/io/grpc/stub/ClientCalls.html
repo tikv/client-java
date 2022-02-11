@@ -747,60 +747,70 @@
 <a class="jxr_linenumber" name="L739" href="#L739">739</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> Logger log = Logger.getLogger(ThreadlessExecutor.<strong class="jxr_keyword">class</strong>.getName());
 <a class="jxr_linenumber" name="L740" href="#L740">740</a> 
 <a class="jxr_linenumber" name="L741" href="#L741">741</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">volatile</strong> Thread waiter;
-<a class="jxr_linenumber" name="L742" href="#L742">742</a> 
-<a class="jxr_linenumber" name="L743" href="#L743">743</a>     <em class="jxr_comment">// Non private to avoid synthetic class</em>
-<a class="jxr_linenumber" name="L744" href="#L744">744</a>     ThreadlessExecutor() {}
-<a class="jxr_linenumber" name="L745" href="#L745">745</a> 
-<a class="jxr_linenumber" name="L746" href="#L746">746</a>     <em class="jxr_javadoccomment">/**</em>
-<a class="jxr_linenumber" name="L747" href="#L747">747</a> <em class="jxr_javadoccomment">     * Waits until there is a Runnable, then executes it and all queued Runnables after it. Must</em>
-<a class="jxr_linenumber" name="L748" href="#L748">748</a> <em class="jxr_javadoccomment">     * only be called by one thread at a time.</em>
-<a class="jxr_linenumber" name="L749" href="#L749">749</a> <em class="jxr_javadoccomment">     */</em>
-<a class="jxr_linenumber" name="L750" href="#L750">750</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> waitAndDrain() <strong class="jxr_keyword">throws</strong> InterruptedException {
-<a class="jxr_linenumber" name="L751" href="#L751">751</a>       throwIfInterrupted();
-<a class="jxr_linenumber" name="L752" href="#L752">752</a>       Runnable runnable = poll();
-<a class="jxr_linenumber" name="L753" href="#L753">753</a>       <strong class="jxr_keyword">if</strong> (runnable == <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L754" href="#L754">754</a>         waiter = Thread.currentThread();
-<a class="jxr_linenumber" name="L755" href="#L755">755</a>         <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L756" href="#L756">756</a>           <strong class="jxr_keyword">while</strong> ((runnable = poll()) == <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L757" href="#L757">757</a>             LockSupport.park(<strong class="jxr_keyword">this</strong>);
-<a class="jxr_linenumber" name="L758" href="#L758">758</a>             throwIfInterrupted();
-<a class="jxr_linenumber" name="L759" href="#L759">759</a>           }
-<a class="jxr_linenumber" name="L760" href="#L760">760</a>         } <strong class="jxr_keyword">finally</strong> {
-<a class="jxr_linenumber" name="L761" href="#L761">761</a>           waiter = <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L762" href="#L762">762</a>         }
-<a class="jxr_linenumber" name="L763" href="#L763">763</a>       }
-<a class="jxr_linenumber" name="L764" href="#L764">764</a>       <strong class="jxr_keyword">do</strong> {
-<a class="jxr_linenumber" name="L765" href="#L765">765</a>         <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L766" href="#L766">766</a>           runnable.run();
-<a class="jxr_linenumber" name="L767" href="#L767">767</a>         } <strong class="jxr_keyword">catch</strong> (Throwable t) {
-<a class="jxr_linenumber" name="L768" href="#L768">768</a>           log.log(Level.WARNING, <span class="jxr_string">"Runnable threw exception"</span>, t);
-<a class="jxr_linenumber" name="L769" href="#L769">769</a>         }
-<a class="jxr_linenumber" name="L770" href="#L770">770</a>       } <strong class="jxr_keyword">while</strong> ((runnable = poll()) != <strong class="jxr_keyword">null</strong>);
-<a class="jxr_linenumber" name="L771" href="#L771">771</a>     }
-<a class="jxr_linenumber" name="L772" href="#L772">772</a> 
-<a class="jxr_linenumber" name="L773" href="#L773">773</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">void</strong> throwIfInterrupted() <strong class="jxr_keyword">throws</strong> InterruptedException {
-<a class="jxr_linenumber" name="L774" href="#L774">774</a>       <strong class="jxr_keyword">if</strong> (Thread.interrupted()) {
-<a class="jxr_linenumber" name="L775" href="#L775">775</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> InterruptedException();
-<a class="jxr_linenumber" name="L776" href="#L776">776</a>       }
-<a class="jxr_linenumber" name="L777" href="#L777">777</a>     }
-<a class="jxr_linenumber" name="L778" href="#L778">778</a> 
-<a class="jxr_linenumber" name="L779" href="#L779">779</a>     @Override
-<a class="jxr_linenumber" name="L780" href="#L780">780</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> execute(Runnable runnable) {
-<a class="jxr_linenumber" name="L781" href="#L781">781</a>       add(runnable);
-<a class="jxr_linenumber" name="L782" href="#L782">782</a>       LockSupport.unpark(waiter); <em class="jxr_comment">// no-op if null</em>
-<a class="jxr_linenumber" name="L783" href="#L783">783</a>     }
-<a class="jxr_linenumber" name="L784" href="#L784">784</a>   }
-<a class="jxr_linenumber" name="L785" href="#L785">785</a> 
-<a class="jxr_linenumber" name="L786" href="#L786">786</a>   enum StubType {
-<a class="jxr_linenumber" name="L787" href="#L787">787</a>     BLOCKING,
-<a class="jxr_linenumber" name="L788" href="#L788">788</a>     FUTURE,
-<a class="jxr_linenumber" name="L789" href="#L789">789</a>     ASYNC
-<a class="jxr_linenumber" name="L790" href="#L790">790</a>   }
-<a class="jxr_linenumber" name="L791" href="#L791">791</a> 
-<a class="jxr_linenumber" name="L792" href="#L792">792</a>   <em class="jxr_javadoccomment">/** Internal {@link CallOptions.Key} to indicate stub types. */</em>
-<a class="jxr_linenumber" name="L793" href="#L793">793</a>   <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> CallOptions.Key&lt;StubType&gt; STUB_TYPE_OPTION =
-<a class="jxr_linenumber" name="L794" href="#L794">794</a>       CallOptions.Key.create(<span class="jxr_string">"internal-stub-type"</span>);
-<a class="jxr_linenumber" name="L795" href="#L795">795</a> }
+<a class="jxr_linenumber" name="L742" href="#L742">742</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> Histogram lockDuration =
+<a class="jxr_linenumber" name="L743" href="#L743">743</a>         HistogramUtils.buildDuration()
+<a class="jxr_linenumber" name="L744" href="#L744">744</a>             .name(<span class="jxr_string">"grpc_client_executor_lock_duration_seconds"</span>)
+<a class="jxr_linenumber" name="L745" href="#L745">745</a>             .help(<span class="jxr_string">"Histogram of time spent in ThreadlessExecutor lock"</span>)
+<a class="jxr_linenumber" name="L746" href="#L746">746</a>             .labelNames(<span class="jxr_string">"phase"</span>)
+<a class="jxr_linenumber" name="L747" href="#L747">747</a>             .register();
+<a class="jxr_linenumber" name="L748" href="#L748">748</a> 
+<a class="jxr_linenumber" name="L749" href="#L749">749</a>     <em class="jxr_comment">// Non private to avoid synthetic class</em>
+<a class="jxr_linenumber" name="L750" href="#L750">750</a>     ThreadlessExecutor() {}
+<a class="jxr_linenumber" name="L751" href="#L751">751</a> 
+<a class="jxr_linenumber" name="L752" href="#L752">752</a>     <em class="jxr_javadoccomment">/**</em>
+<a class="jxr_linenumber" name="L753" href="#L753">753</a> <em class="jxr_javadoccomment">     * Waits until there is a Runnable, then executes it and all queued Runnables after it. Must</em>
+<a class="jxr_linenumber" name="L754" href="#L754">754</a> <em class="jxr_javadoccomment">     * only be called by one thread at a time.</em>
+<a class="jxr_linenumber" name="L755" href="#L755">755</a> <em class="jxr_javadoccomment">     */</em>
+<a class="jxr_linenumber" name="L756" href="#L756">756</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> waitAndDrain() <strong class="jxr_keyword">throws</strong> InterruptedException {
+<a class="jxr_linenumber" name="L757" href="#L757">757</a>       throwIfInterrupted();
+<a class="jxr_linenumber" name="L758" href="#L758">758</a>       Runnable runnable = poll();
+<a class="jxr_linenumber" name="L759" href="#L759">759</a>       <strong class="jxr_keyword">if</strong> (runnable == <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L760" href="#L760">760</a>         waiter = Thread.currentThread();
+<a class="jxr_linenumber" name="L761" href="#L761">761</a>         <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L762" href="#L762">762</a>           Histogram.Timer parkTimer = lockDuration.labels(<span class="jxr_string">"park"</span>).startTimer();
+<a class="jxr_linenumber" name="L763" href="#L763">763</a>           <strong class="jxr_keyword">while</strong> ((runnable = poll()) == <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L764" href="#L764">764</a>             LockSupport.park(<strong class="jxr_keyword">this</strong>);
+<a class="jxr_linenumber" name="L765" href="#L765">765</a>             throwIfInterrupted();
+<a class="jxr_linenumber" name="L766" href="#L766">766</a>           }
+<a class="jxr_linenumber" name="L767" href="#L767">767</a>           parkTimer.observeDuration();
+<a class="jxr_linenumber" name="L768" href="#L768">768</a>         } <strong class="jxr_keyword">finally</strong> {
+<a class="jxr_linenumber" name="L769" href="#L769">769</a>           waiter = <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L770" href="#L770">770</a>         }
+<a class="jxr_linenumber" name="L771" href="#L771">771</a>       }
+<a class="jxr_linenumber" name="L772" href="#L772">772</a>       <strong class="jxr_keyword">do</strong> {
+<a class="jxr_linenumber" name="L773" href="#L773">773</a>         <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L774" href="#L774">774</a>           runnable.run();
+<a class="jxr_linenumber" name="L775" href="#L775">775</a>         } <strong class="jxr_keyword">catch</strong> (Throwable t) {
+<a class="jxr_linenumber" name="L776" href="#L776">776</a>           log.log(Level.WARNING, <span class="jxr_string">"Runnable threw exception"</span>, t);
+<a class="jxr_linenumber" name="L777" href="#L777">777</a>         }
+<a class="jxr_linenumber" name="L778" href="#L778">778</a>       } <strong class="jxr_keyword">while</strong> ((runnable = poll()) != <strong class="jxr_keyword">null</strong>);
+<a class="jxr_linenumber" name="L779" href="#L779">779</a>     }
+<a class="jxr_linenumber" name="L780" href="#L780">780</a> 
+<a class="jxr_linenumber" name="L781" href="#L781">781</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">void</strong> throwIfInterrupted() <strong class="jxr_keyword">throws</strong> InterruptedException {
+<a class="jxr_linenumber" name="L782" href="#L782">782</a>       <strong class="jxr_keyword">if</strong> (Thread.interrupted()) {
+<a class="jxr_linenumber" name="L783" href="#L783">783</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> InterruptedException();
+<a class="jxr_linenumber" name="L784" href="#L784">784</a>       }
+<a class="jxr_linenumber" name="L785" href="#L785">785</a>     }
+<a class="jxr_linenumber" name="L786" href="#L786">786</a> 
+<a class="jxr_linenumber" name="L787" href="#L787">787</a>     @Override
+<a class="jxr_linenumber" name="L788" href="#L788">788</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> execute(Runnable runnable) {
+<a class="jxr_linenumber" name="L789" href="#L789">789</a>       add(runnable);
+<a class="jxr_linenumber" name="L790" href="#L790">790</a>       Histogram.Timer unparkTimer = lockDuration.labels(<span class="jxr_string">"unpark"</span>).startTimer();
+<a class="jxr_linenumber" name="L791" href="#L791">791</a>       LockSupport.unpark(waiter); <em class="jxr_comment">// no-op if null</em>
+<a class="jxr_linenumber" name="L792" href="#L792">792</a>       unparkTimer.observeDuration();
+<a class="jxr_linenumber" name="L793" href="#L793">793</a>     }
+<a class="jxr_linenumber" name="L794" href="#L794">794</a>   }
+<a class="jxr_linenumber" name="L795" href="#L795">795</a> 
+<a class="jxr_linenumber" name="L796" href="#L796">796</a>   enum StubType {
+<a class="jxr_linenumber" name="L797" href="#L797">797</a>     BLOCKING,
+<a class="jxr_linenumber" name="L798" href="#L798">798</a>     FUTURE,
+<a class="jxr_linenumber" name="L799" href="#L799">799</a>     ASYNC
+<a class="jxr_linenumber" name="L800" href="#L800">800</a>   }
+<a class="jxr_linenumber" name="L801" href="#L801">801</a> 
+<a class="jxr_linenumber" name="L802" href="#L802">802</a>   <em class="jxr_javadoccomment">/** Internal {@link CallOptions.Key} to indicate stub types. */</em>
+<a class="jxr_linenumber" name="L803" href="#L803">803</a>   <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> CallOptions.Key&lt;StubType&gt; STUB_TYPE_OPTION =
+<a class="jxr_linenumber" name="L804" href="#L804">804</a>       CallOptions.Key.create(<span class="jxr_string">"internal-stub-type"</span>);
+<a class="jxr_linenumber" name="L805" href="#L805">805</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>
