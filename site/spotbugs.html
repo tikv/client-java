@@ -740,25 +740,25 @@ TiKV Java Client
 <td>org.tikv.common.TiSession.getImporterRegionStoreClientBuilder() uses the same code for two branches</td>
 <td>STYLE</td>
 <td><a class="externalLink" href="https://spotbugs.readthedocs.io/en/latest/bugDescriptions.html#DB_DUPLICATE_BRANCHES">DB_DUPLICATE_BRANCHES</a></td>
-<td><a href="./xref/org/tikv/common/TiSession.html#L294">294-297</a></td>
+<td><a href="./xref/org/tikv/common/TiSession.html#L296">296-299</a></td>
 <td>Medium</td></tr>
 <tr class="b">
 <td>org.tikv.common.TiSession.getConf() may expose internal representation by returning TiSession.conf</td>
 <td>MALICIOUS_CODE</td>
 <td><a class="externalLink" href="https://spotbugs.readthedocs.io/en/latest/bugDescriptions.html#EI_EXPOSE_REP">EI_EXPOSE_REP</a></td>
-<td><a href="./xref/org/tikv/common/TiSession.html#L312">312</a></td>
+<td><a href="./xref/org/tikv/common/TiSession.html#L314">314</a></td>
 <td>Medium</td></tr>
 <tr class="a">
 <td>new org.tikv.common.TiSession(TiConfiguration) may expose internal representation by storing an externally mutable object into TiSession.conf</td>
 <td>MALICIOUS_CODE</td>
 <td><a class="externalLink" href="https://spotbugs.readthedocs.io/en/latest/bugDescriptions.html#EI_EXPOSE_REP2">EI_EXPOSE_REP2</a></td>
-<td><a href="./xref/org/tikv/common/TiSession.html#L106">106</a></td>
+<td><a href="./xref/org/tikv/common/TiSession.html#L108">108</a></td>
 <td>Medium</td></tr>
 <tr class="b">
 <td>org.tikv.common.TiSession.closeAwaitTermination(long) calls Thread.sleep() with a lock held</td>
 <td>MT_CORRECTNESS</td>
 <td><a class="externalLink" href="https://spotbugs.readthedocs.io/en/latest/bugDescriptions.html#SWL_SLEEP_WITH_LOCK_HELD">SWL_SLEEP_WITH_LOCK_HELD</a></td>
-<td><a href="./xref/org/tikv/common/TiSession.html#L699">699</a></td>
+<td><a href="./xref/org/tikv/common/TiSession.html#L701">701</a></td>
 <td>Medium</td></tr></table></div><a name="org.tikv.common.catalog.CatalogTransaction"></a>
 <div class="section">
 <h3><a name="org.tikv.common.catalog.CatalogTransaction"></a>org.tikv.common.catalog.CatalogTransaction</h3>

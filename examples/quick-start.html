@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../examples/quick-start.html" class="active"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../examples/rawkv.html"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="../examples/txnkv.html"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><a href="../examples/bulk-load.html"><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</a></li></ol></li><li class="chapter-item expanded "><a href="../performance/introduction.html"><strong aria-hidden="true">3.</strong> Performance</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../performance/ycsb.html"><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</a></li></ol></li><li class="chapter-item expanded "><a href="../administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="../troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../troubleshooting/slow-request.html"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><a href="../troubleshooting/error-request.html"><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</a></li></ol></li><li class="chapter-item expanded "><a href="../architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="../architecture/availability.html"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><a href="../architecture/observability.html"><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</a></li><li class="chapter-item expanded "><a href="../architecture/region-cache.html"><strong aria-hidden="true">6.4.</strong> Region Cache</a></li></ol></li><li class="chapter-item expanded "><a href="../contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../examples/quick-start.html" class="active"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../examples/rawkv.html"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="../examples/txnkv.html"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</div></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Performance</div></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</div></li></ol></li><li class="chapter-item expanded "><a href="../administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="../troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../troubleshooting/slow-request.html"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</div></li></ol></li><li class="chapter-item expanded "><a href="../architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="../architecture/availability.html"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.4.</strong> Region Cache</div></li></ol></li><li class="chapter-item expanded "><a href="../contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -165,7 +165,91 @@
 
                 <div id="content" class="content">
                     <main>
-                        
+                        <h1 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h1>
+<p>The package is hosted on maven central repository. To build from source, refer to the <a href="../contribution/introduction.html">Contribution Guide</a>.</p>
+<h2 id="create-a-maven-project"><a class="header" href="#create-a-maven-project">Create a maven project</a></h2>
+<p>First download <a href="https://maven.apache.org/download.html">maven</a> and follow the <a href="https://maven.apache.org/install.html">installation instructoins</a>. Then <code>mvn</code> command should be available in the <code>$PATH</code>.</p>
+<p>create a maven project by following command:</p>
+<pre><code>mvn archetype:generate -DgroupId=com.example -DartifactId=java-client-example -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+cd java-client-example
+</code></pre>
+<h2 id="add-dependency"><a class="header" href="#add-dependency">Add dependency</a></h2>
+<p>Add maven dependency to <code>pom.xml</code>.</p>
+<pre><code class="language-xml">&lt;dependency&gt;
+  &lt;groupId&gt;org.tikv&lt;/groupId&gt;
+  &lt;artifactId&gt;tikv-client-java&lt;/artifactId&gt;
+  &lt;version&gt;3.1.0&lt;/version&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;org.slf4j&lt;/groupId&gt;
+  &lt;artifactId&gt;slf4j-log4j12&lt;/artifactId&gt;
+  &lt;version&gt;1.7.32&lt;/version&gt;
+&lt;/dependency&gt;
+</code></pre>
+<p>Now <code>pom.xml</code> should look like this:</p>
+<pre><code class="language-xml">&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+  xsi:schemaLocation=&quot;http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd&quot;&gt;
+  &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+  &lt;groupId&gt;com.example&lt;/groupId&gt;
+  &lt;artifactId&gt;java-project&lt;/artifactId&gt;
+  &lt;packaging&gt;jar&lt;/packaging&gt;
+  &lt;version&gt;1.0-SNAPSHOT&lt;/version&gt;
+  &lt;name&gt;java-project&lt;/name&gt;
+  &lt;url&gt;http://maven.apache.org&lt;/url&gt;
+  &lt;properties&gt;
+    &lt;maven.compiler.source&gt;1.8&lt;/maven.compiler.source&gt;
+    &lt;maven.compiler.target&gt;1.8&lt;/maven.compiler.target&gt;
+  &lt;/properties&gt;
+  &lt;dependencies&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;junit&lt;/groupId&gt;
+      &lt;artifactId&gt;junit&lt;/artifactId&gt;
+      &lt;version&gt;4.12&lt;/version&gt;
+      &lt;scope&gt;test&lt;/scope&gt;
+    &lt;/dependency&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;org.tikv&lt;/groupId&gt;
+      &lt;artifactId&gt;tikv-client-java&lt;/artifactId&gt;
+      &lt;version&gt;3.1.0&lt;/version&gt;
+    &lt;/dependency&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;org.slf4j&lt;/groupId&gt;
+      &lt;artifactId&gt;slf4j-log4j12&lt;/artifactId&gt;
+      &lt;version&gt;1.7.32&lt;/version&gt;
+    &lt;/dependency&gt;
+  &lt;/dependencies&gt;
+&lt;/project&gt;
+</code></pre>
+<h2 id="writing-code"><a class="header" href="#writing-code">Writing code</a></h2>
+<p>To interact with TiKV, we should first create a <code>TiConfiguration</code> with PD address, create a <code>TiSession</code> using <code>TiSession.create</code>, and then create a client.
+For example, if we want to put a <code>World</code> in <code>Hello</code> key in RawKV, write the following code in <code>src/main/java/com/example/App.java</code>.</p>
+<pre><code class="language-java">import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
+import org.tikv.raw.RawKVClient;
+import org.tikv.shade.com.google.protobuf.ByteString;
+
+public class App {
+  public static void main(String[] args) throws Exception {
+    String pdAddr = &quot;127.0.0.1:2379&quot;;
+    // You MUST create a raw configuration if you are using RawKVClient.
+    TiConfiguration conf = TiConfiguration.createRawDefault(pdAddr);
+    try (TiSession session = TiSession.create(conf)) {
+      try (RawKVClient client = session.createRawClient()) {
+        client.put(ByteString.copyFromUtf8(&quot;Hello&quot;), ByteString.copyFromUtf8(&quot;World&quot;));
+        ByteString value = client.get(ByteString.copyFromUtf8(&quot;Hello&quot;));
+        System.out.println(value);
+      }
+    }
+  }
+}
+</code></pre>
+<p>More examples for RawKV and TxnKV are in following chapters.</p>
+<h2 id="running-program"><a class="header" href="#running-program">Running program</a></h2>
+<p>Run following command:</p>
+<pre><code>mvn assembly:assembly -DdescriptorId=jar-with-dependencies
+java -cp target/java-client-example-1.0-SNAPSHOT-jar-with-dependencies.jar com.example.App
+</code></pre>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">

@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../examples/quick-start.html"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../examples/rawkv.html" class="active"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="../examples/txnkv.html"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><a href="../examples/bulk-load.html"><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</a></li></ol></li><li class="chapter-item expanded "><a href="../performance/introduction.html"><strong aria-hidden="true">3.</strong> Performance</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../performance/ycsb.html"><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</a></li></ol></li><li class="chapter-item expanded "><a href="../administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="../troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../troubleshooting/slow-request.html"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><a href="../troubleshooting/error-request.html"><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</a></li></ol></li><li class="chapter-item expanded "><a href="../architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="../architecture/availability.html"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><a href="../architecture/observability.html"><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</a></li><li class="chapter-item expanded "><a href="../architecture/region-cache.html"><strong aria-hidden="true">6.4.</strong> Region Cache</a></li></ol></li><li class="chapter-item expanded "><a href="../contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../examples/quick-start.html"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../examples/rawkv.html" class="active"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="../examples/txnkv.html"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</div></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Performance</div></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</div></li></ol></li><li class="chapter-item expanded "><a href="../administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="../troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../troubleshooting/slow-request.html"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</div></li></ol></li><li class="chapter-item expanded "><a href="../architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="../architecture/availability.html"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.4.</strong> Region Cache</div></li></ol></li><li class="chapter-item expanded "><a href="../contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -165,7 +165,53 @@
 
                 <div id="content" class="content">
                     <main>
-                        
+                        <h1 id="rawkv"><a class="header" href="#rawkv">RawKV</a></h1>
+<p>Below is the basic usages of RawKV. See <a href="https://tikv.github.io/client-java/apidocs/org/tikv/raw/RawKVClient">API document</a> to see a full list of methods available.</p>
+<pre><code class="language-java">import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
+import org.tikv.kvproto.Kvrpcpb;
+import org.tikv.raw.RawKVClient;
+import org.tikv.shade.com.google.protobuf.ByteString;
+
+public class Main {
+  public static void main() {
+    // You MUST create a raw configuration if you are using RawKVClient.
+    TiConfiguration conf = TiConfiguration.createRawDefault(&quot;127.0.0.1:2379&quot;);
+    TiSession session = TiSession.create(conf);
+    RawKVClient client = session.createRawClient();
+
+    // put
+    client.put(ByteString.copyFromUtf8(&quot;k1&quot;), ByteString.copyFromUtf8(&quot;Hello&quot;));
+    client.put(ByteString.copyFromUtf8(&quot;k2&quot;), ByteString.copyFromUtf8(&quot;,&quot;));
+    client.put(ByteString.copyFromUtf8(&quot;k3&quot;), ByteString.copyFromUtf8(&quot;World&quot;));
+    client.put(ByteString.copyFromUtf8(&quot;k4&quot;), ByteString.copyFromUtf8(&quot;!&quot;));
+    client.put(ByteString.copyFromUtf8(&quot;k5&quot;), ByteString.copyFromUtf8(&quot;Raw KV&quot;));
+
+    // get
+    Optional&lt;ByteString&gt; result = client.get(ByteString.copyFromUtf8(&quot;k1&quot;));
+    System.out.println(result.get().toStringUtf8());
+
+    // batch get
+    List&lt;Kvrpcpb.KvPair&gt; list = client.batchGet(new ArrayList&lt;ByteString&gt;() {{
+        add(ByteString.copyFromUtf8(&quot;k1&quot;));
+        add(ByteString.copyFromUtf8(&quot;k3&quot;));
+    }});
+    System.out.println(list);
+
+    // scan
+    list = client.scan(ByteString.copyFromUtf8(&quot;k1&quot;), ByteString.copyFromUtf8(&quot;k6&quot;), 10);
+    System.out.println(list);
+
+    // close
+    client.close();
+    session.close();
+  }
+}
+</code></pre>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">

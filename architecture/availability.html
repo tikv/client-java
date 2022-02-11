@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../examples/quick-start.html"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../examples/rawkv.html"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="../examples/txnkv.html"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><a href="../examples/bulk-load.html"><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</a></li></ol></li><li class="chapter-item expanded "><a href="../performance/introduction.html"><strong aria-hidden="true">3.</strong> Performance</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../performance/ycsb.html"><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</a></li></ol></li><li class="chapter-item expanded "><a href="../administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="../troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../troubleshooting/slow-request.html"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><a href="../troubleshooting/error-request.html"><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</a></li></ol></li><li class="chapter-item expanded "><a href="../architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="../architecture/availability.html" class="active"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><a href="../architecture/observability.html"><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</a></li><li class="chapter-item expanded "><a href="../architecture/region-cache.html"><strong aria-hidden="true">6.4.</strong> Region Cache</a></li></ol></li><li class="chapter-item expanded "><a href="../contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../examples/quick-start.html"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../examples/rawkv.html"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="../examples/txnkv.html"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</div></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Performance</div></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</div></li></ol></li><li class="chapter-item expanded "><a href="../administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="../troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../troubleshooting/slow-request.html"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</div></li></ol></li><li class="chapter-item expanded "><a href="../architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="../architecture/availability.html" class="active"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.4.</strong> Region Cache</div></li></ol></li><li class="chapter-item expanded "><a href="../contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -166,6 +166,41 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="availability-backoff-and-retry-policy"><a class="header" href="#availability-backoff-and-retry-policy">Availability: Backoff and Retry Policy</a></h1>
+<h2 id="backoffer"><a class="header" href="#backoffer">BackOffer</a></h2>
+<p>The retry and timeout mechanism for a request is controlled by a <code>BackOffer</code> object, which is created one per <code>RawKVClient</code> method. The <code>BackOffer</code> will decide how much time the next sleep and retry should spend, and whether to timeout the request if not enough time is left for retrying the request.
+If we need a back off sleep, we call backOffer.doBackOff(funcType, exception), and the current thread will sleep for a decided time. If the current operation will timeout after sleep, the doBackOff simply throw an exception to abort the operation.</p>
+<h2 id="callwithretry"><a class="header" href="#callwithretry">callWithRetry</a></h2>
+<p>RegionStoreClient.callWithRetry inherits from AbstractGRPCClient.callWithRetry. The concrete logic is in RetryPolicy.callWithRetry, which implements a retry mechanism, but the specific retry strategy is determined by the ErrorHandler.
+ErrorHandler’s handler{Request, Response}Error function returns a boolean value indicating whether to retry inside callWithRetry.
+The control flow for callWithRetry is as follows:</p>
+<p><img src="./callWithRetry.jpg" alt="callWithRetry" /></p>
+<p>The error handler is chosen obeying the following table:</p>
+<table><thead><tr><th>gPRC request</th><th>the result</th><th>handler</th></tr></thead><tbody>
+<tr><td>throws exception</td><td>-</td><td>handleRequestError</td></tr>
+<tr><td>no exception</td><td>is null</td><td>handleRequestError</td></tr>
+<tr><td>no exception</td><td>is error</td><td>handleResponseError</td></tr>
+<tr><td>no exception</td><td>normal</td><td>normal return</td></tr>
+</tbody></table>
+<p>The handleRequestError function copes with the following situations:</p>
+<table><thead><tr><th>situation</th><th>retry within callWithRetry</th><th>note</th></tr></thead><tbody>
+<tr><td>invalid store in region manager</td><td>true</td><td>refresh ClientStub</td></tr>
+<tr><td>region has not got multiple copies</td><td>false</td><td></td></tr>
+<tr><td>successfully switched to new leader</td><td>true</td><td></td></tr>
+<tr><td>seekProxyStore</td><td>true if success</td><td>only when <code>tikv.enable_grpc_forward</code> is set</td></tr>
+<tr><td>other</td><td>false</td><td></td></tr>
+</tbody></table>
+<p>The handleResponseError function copes with the following gRPC errors:</p>
+<table><thead><tr><th>error</th><th>retry within callWithRetry</th></tr></thead><tbody>
+<tr><td>NotLeader</td><td>true if leader unchanged</td></tr>
+<tr><td>StoreNotMatch</td><td>false</td></tr>
+<tr><td>EphochNotMatch</td><td>true if region epoch in <code>ctx</code> is ahead of TiKV's</td></tr>
+<tr><td>ServerIsBusy</td><td>true</td></tr>
+<tr><td>StaleCommand</td><td>true</td></tr>
+<tr><td>RaftEntryTooLarge</td><td>throw</td></tr>
+<tr><td>KeyNotInRegion</td><td>throw</td></tr>
+<tr><td>Raft ProposalDropped</td><td>true</td></tr>
+<tr><td>other</td><td>false</td></tr>
+</tbody></table>
 
                     </main>
 
@@ -178,7 +213,7 @@
                         
 
                         
-                            <a rel="next" href="../architecture/observability.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../contribution/introduction.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -196,7 +231,7 @@
                 
 
                 
-                    <a rel="next" href="../architecture/observability.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="../contribution/introduction.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 

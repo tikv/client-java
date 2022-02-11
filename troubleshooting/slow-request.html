@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../examples/quick-start.html"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../examples/rawkv.html"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="../examples/txnkv.html"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><a href="../examples/bulk-load.html"><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</a></li></ol></li><li class="chapter-item expanded "><a href="../performance/introduction.html"><strong aria-hidden="true">3.</strong> Performance</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../performance/ycsb.html"><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</a></li></ol></li><li class="chapter-item expanded "><a href="../administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="../troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../troubleshooting/slow-request.html" class="active"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><a href="../troubleshooting/error-request.html"><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</a></li></ol></li><li class="chapter-item expanded "><a href="../architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="../architecture/availability.html"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><a href="../architecture/observability.html"><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</a></li><li class="chapter-item expanded "><a href="../architecture/region-cache.html"><strong aria-hidden="true">6.4.</strong> Region Cache</a></li></ol></li><li class="chapter-item expanded "><a href="../contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../examples/quick-start.html"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../examples/rawkv.html"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="../examples/txnkv.html"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</div></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Performance</div></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</div></li></ol></li><li class="chapter-item expanded "><a href="../administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="../troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../troubleshooting/slow-request.html" class="active"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</div></li></ol></li><li class="chapter-item expanded "><a href="../architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="../architecture/availability.html"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.4.</strong> Region Cache</div></li></ol></li><li class="chapter-item expanded "><a href="../contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -166,6 +166,28 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="slow-request-diagnosis"><a class="header" href="#slow-request-diagnosis">Slow Request Diagnosis</a></h1>
+<p>If a request take too much time, we can collect the detailed time spend in each component in a “slow log”.</p>
+<!-- wrap text in the code block -->
+<pre>
+<code class="hljs" style="white-space: pre-wrap;">
+2022-02-11 11:07:56 WARN  SlowLogImpl:88 - A request spent 55 ms. start=11:07:56.938, end=11:07:56.993, SlowLog:{"trace_id":4361090673996453790,"spans":[{"event":"put","begin":"11:07:56.938","duration_ms":55,"properties":{"region":"{Region[2] ConfVer[5] Version[60] Store[1] KeyRange[]:[]}","key":"Hello"}},{"event":"getRegionByKey","begin":"11:07:56.938","duration_ms":0},{"event":"callWithRetry","begin":"11:07:56.943","duration_ms":49,"properties":{"method":"tikvpb.Tikv/RawPut"}},{"event":"gRPC","begin":"11:07:56.943","duration_ms":49,"properties":{"method":"tikvpb.Tikv/RawPut"}}]}
+</code>
+</pre>
+<h2 id="slow-log-configurations"><a class="header" href="#slow-log-configurations">Slow log configurations</a></h2>
+<table><thead><tr><th>SlowLog settings</th><th>default value</th></tr></thead><tbody>
+<tr><td>tikv.rawkv.read_slowlog_in_ms</td><td>tikv.grpc.timeout_in_ms * 2</td></tr>
+<tr><td>tikv.rawkv.write_slowlog_in_ms</td><td>tikv.grpc.timeout_in_ms * 2</td></tr>
+<tr><td>tikv.rawkv.batch_read_slowlog_in_ms</td><td>tikv.grpc.timeout_in_ms * 2</td></tr>
+<tr><td>tikv.rawkv.batch_write_slowlog_in_ms</td><td>tikv.grpc.timeout_in_ms * 2</td></tr>
+<tr><td>tikv.rawkv.scan_slowlog_in_ms</td><td>5s</td></tr>
+</tbody></table>
+<p>Each settings can be set by system properties, configuration files or <code>set...</code> method of <code>TiConfiguration</code>.</p>
+<p>System properties can be set by <code>-D</code> parameter of <code>java</code> command.</p>
+<pre><code>java -cp target/java-client-example-1.0-SNAPSHOT-jar-with-dependencies.jar -Dtikv.rawkv.read_slowlog_in_ms=100 com.example.App
+</code></pre>
+<p>Configuration file is <code>src/main/resources/tikv.properties</code> in maven projects.</p>
+<h2 id="visualize-slow-log"><a class="header" href="#visualize-slow-log">Visualize slow log</a></h2>
+<p>TBD</p>
 
                     </main>
 
@@ -178,7 +200,7 @@
                         
 
                         
-                            <a rel="next" href="../troubleshooting/error-request.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../architecture/introduction.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -196,7 +218,7 @@
                 
 
                 
-                    <a rel="next" href="../troubleshooting/error-request.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="../architecture/introduction.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 

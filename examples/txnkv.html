@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../examples/quick-start.html"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../examples/rawkv.html"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="../examples/txnkv.html" class="active"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><a href="../examples/bulk-load.html"><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</a></li></ol></li><li class="chapter-item expanded "><a href="../performance/introduction.html"><strong aria-hidden="true">3.</strong> Performance</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../performance/ycsb.html"><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</a></li></ol></li><li class="chapter-item expanded "><a href="../administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="../troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../troubleshooting/slow-request.html"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><a href="../troubleshooting/error-request.html"><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</a></li></ol></li><li class="chapter-item expanded "><a href="../architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="../architecture/availability.html"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><a href="../architecture/observability.html"><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</a></li><li class="chapter-item expanded "><a href="../architecture/region-cache.html"><strong aria-hidden="true">6.4.</strong> Region Cache</a></li></ol></li><li class="chapter-item expanded "><a href="../contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../examples/quick-start.html"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="../examples/rawkv.html"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="../examples/txnkv.html" class="active"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</div></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Performance</div></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</div></li></ol></li><li class="chapter-item expanded "><a href="../administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="../administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="../troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../troubleshooting/slow-request.html"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</div></li></ol></li><li class="chapter-item expanded "><a href="../architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="../architecture/availability.html"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.4.</strong> Region Cache</div></li></ol></li><li class="chapter-item expanded "><a href="../contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -165,7 +165,70 @@
 
                 <div id="content" class="content">
                     <main>
-                        
+                        <h1 id="txnkv"><a class="header" href="#txnkv">TxnKV</a></h1>
+<p>Below is the basic usages of TxnKV.
+Data should be written into TxnKV using <a href="https://tikv.github.io/client-java/apidocs/org/tikv/txn/TwoPhaseCommitter.html"><code>TwoPhaseCommitter</code></a>, and be read using <a href="https://tikv.github.io/client-java/apidocs/org/tikv/txn/KVClient.html"><code>org.tikv.txn.KVClient</code></a>.</p>
+<pre><code class="language-java">import java.util.Arrays;
+import java.util.List;
+
+import org.tikv.common.BytePairWrapper;
+import org.tikv.common.ByteWrapper;
+import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.kvproto.Kvrpcpb.KvPair;
+import org.tikv.shade.com.google.protobuf.ByteString;
+import org.tikv.txn.KVClient;
+import org.tikv.txn.TwoPhaseCommitter;
+
+public class App {
+    public static void main(String[] args) throws Exception {
+        TiConfiguration conf = TiConfiguration.createDefault(&quot;127.0.0.1:2389&quot;);
+        try (TiSession session = TiSession.create(conf)) {
+            // two-phrase write
+            long startTS = session.getTimestamp().getVersion();
+            try (TwoPhaseCommitter twoPhaseCommitter = new TwoPhaseCommitter(session, startTS)) {
+                BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(1000);
+                byte[] primaryKey = &quot;key1&quot;.getBytes(&quot;UTF-8&quot;);
+                byte[] key2 = &quot;key2&quot;.getBytes(&quot;UTF-8&quot;);
+
+                // first phrase: prewrite
+                twoPhaseCommitter.prewritePrimaryKey(backOffer, primaryKey, &quot;val1&quot;.getBytes(&quot;UTF-8&quot;));
+                List&lt;BytePairWrapper&gt; pairs = Arrays
+                        .asList(new BytePairWrapper(key2, &quot;val2&quot;.getBytes(&quot;UTF-8&quot;)));
+                twoPhaseCommitter.prewriteSecondaryKeys(primaryKey, pairs.iterator(), 1000);
+
+                // second phrase: commit
+                long commitTS = session.getTimestamp().getVersion();
+                twoPhaseCommitter.commitPrimaryKey(backOffer, primaryKey, commitTS);
+                List&lt;ByteWrapper&gt; keys = Arrays.asList(new ByteWrapper(key2));
+                twoPhaseCommitter.commitSecondaryKeys(keys.iterator(), commitTS, 1000);
+            }
+
+            try (KVClient kvClient = session.createKVClient()) {
+                long version = session.getTimestamp().getVersion();
+                ByteString key1 = ByteString.copyFromUtf8(&quot;key1&quot;);
+                ByteString key2 = ByteString.copyFromUtf8(&quot;key2&quot;);
+
+                // get value of a single key
+                ByteString val = kvClient.get(key1, version);
+                System.out.println(val);
+
+                // get value of multiple keys
+                BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(1000);
+                List&lt;KvPair&gt; kvPairs = kvClient.batchGet(backOffer, Arrays.asList(key1, key2), version);
+                System.out.println(kvPairs);
+
+                // get value of a range of keys
+                kvPairs = kvClient.scan(key1, ByteString.copyFromUtf8(&quot;key3&quot;), version);
+                System.out.println(kvPairs);
+            }
+        }
+    }
+}
+</code></pre>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
@@ -177,7 +240,7 @@
                         
 
                         
-                            <a rel="next" href="../examples/bulk-load.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../administration/introduction.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -195,7 +258,7 @@
                 
 
                 
-                    <a rel="next" href="../examples/bulk-load.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="../administration/introduction.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 
