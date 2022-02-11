@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <Match>
+    <Package name="~org\.tikv\.(?!kvproto).*"/>
+    <Not>
+      <Package name="~org\.tikv\.common\.parser.*"/>
+    </Not>
+  </Match>
+</FindBugsFilter>

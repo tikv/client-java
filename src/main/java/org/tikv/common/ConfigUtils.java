@@ -5,12 +5,14 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package org.tikv.common;
@@ -88,6 +90,7 @@ public class ConfigUtils {
   public static final String TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS =
       "tikv.rawkv.batch_write_slowlog_in_ms";
   public static final String TIKV_RAWKV_SCAN_SLOWLOG_IN_MS = "tikv.rawkv.scan_slowlog_in_ms";
+  public static final String TIKV_RAWKV_SERVER_SLOWLOG_FACTOR = "tikv.rawkv.server_slowlog_factor";
 
   public static final String TIKV_TLS_ENABLE = "tikv.tls_enable";
   public static final String TIKV_TRUST_CERT_COLLECTION = "tikv.trust_cert_collection";

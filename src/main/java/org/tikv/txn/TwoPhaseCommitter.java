@@ -51,7 +51,7 @@ import org.tikv.txn.type.BatchKeys;
 import org.tikv.txn.type.ClientRPCResult;
 import org.tikv.txn.type.GroupKeyResult;
 
-public class TwoPhaseCommitter {
+public class TwoPhaseCommitter implements AutoCloseable {
 
   /** buffer spark rdd iterator data into memory */
   private static final int WRITE_BUFFER_SIZE = 32 * 1024;
@@ -101,7 +101,7 @@ public class TwoPhaseCommitter {
         createExecutorService(WRITE_BUFFER_SIZE));
   }
 
-  public TwoPhaseCommitter(
+  TwoPhaseCommitter(
       TiSession session,
       long startTime,
       long lockTTL,

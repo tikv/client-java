@@ -1,16 +1,18 @@
 /*
- * Copyright 2017 TiKV Project Authors.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package org.tikv.common;
@@ -34,6 +36,7 @@ import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.*;
 import org.tikv.common.util.*;
+import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
@@ -164,6 +167,13 @@ public class TiSession implements AutoCloseable {
     long warmUpStartTime = System.nanoTime();
     BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
     try {
+      // let JVM ClassLoader load gRPC error related classes
+      // this operation may cost 100ms
+      Errorpb.Error.newBuilder()
+          .setNotLeader(Errorpb.NotLeader.newBuilder().build())
+          .build()
+          .toString();
+
       this.client = getPDClient();
       this.regionManager = getRegionManager();
       List<Metapb.Store> stores = this.client.getAllStores(backOffer);

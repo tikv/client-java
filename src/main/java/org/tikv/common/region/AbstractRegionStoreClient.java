@@ -1,15 +1,15 @@
 /*
- *
- * Copyright 2019 TiKV Project Authors.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
@@ -35,12 +35,15 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.log.SlowLog;
 import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.HistogramUtils;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
+import org.tikv.kvproto.Tracepb;
 
 public abstract class AbstractRegionStoreClient
     extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvFutureStub>
@@ -48,13 +51,13 @@ public abstract class AbstractRegionStoreClient
   private static final Logger logger = LoggerFactory.getLogger(AbstractRegionStoreClient.class);
 
   public static final Histogram SEEK_LEADER_STORE_DURATION =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_seek_leader_store_duration")
           .help("seek leader store duration.")
           .register();
 
   public static final Histogram SEEK_PROXY_STORE_DURATION =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_seek_proxy_store_duration")
           .help("seek proxy store duration.")
           .register();
@@ -151,12 +154,30 @@ public abstract class AbstractRegionStoreClient
     return false;
   }
 
-  protected Kvrpcpb.Context makeContext(TiStoreType storeType) {
-    return region.getReplicaContext(java.util.Collections.emptySet(), storeType);
+  private Kvrpcpb.Context addTraceId(Kvrpcpb.Context context, SlowLog slowLog) {
+    if (slowLog.getThresholdMS() < 0) {
+      // disable tikv tracing
+      return context;
+    }
+    long traceId = slowLog.getTraceId();
+    return Kvrpcpb.Context.newBuilder(context)
+        .setTraceContext(
+            Tracepb.TraceContext.newBuilder()
+                .setDurationThresholdMs(
+                    (int) (slowLog.getThresholdMS() * conf.getRawKVServerSlowLogFactor()))
+                .addRemoteParentSpans(Tracepb.RemoteParentSpan.newBuilder().setTraceId(traceId)))
+        .build();
   }
 
-  protected Kvrpcpb.Context makeContext(Set<Long> resolvedLocks, TiStoreType storeType) {
-    return region.getReplicaContext(resolvedLocks, storeType);
+  protected Kvrpcpb.Context makeContext(TiStoreType storeType, SlowLog slowLog) {
+    Kvrpcpb.Context context = region.getReplicaContext(java.util.Collections.emptySet(), storeType);
+    return addTraceId(context, slowLog);
+  }
+
+  protected Kvrpcpb.Context makeContext(
+      Set<Long> resolvedLocks, TiStoreType storeType, SlowLog slowLog) {
+    Kvrpcpb.Context context = region.getReplicaContext(resolvedLocks, storeType);
+    return addTraceId(context, slowLog);
   }
 
   private void updateClientStub() {

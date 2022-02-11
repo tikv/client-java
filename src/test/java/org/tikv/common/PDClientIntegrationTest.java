@@ -21,11 +21,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.After;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.tikv.BaseRawKVTest;
 
 public class PDClientIntegrationTest extends BaseRawKVTest {
+
   private TiSession session;
 
   @Before
@@ -44,6 +46,7 @@ public class PDClientIntegrationTest extends BaseRawKVTest {
 
   @Test
   public void testPauseCheck() throws Exception {
+    Assume.assumeTrue(tikvVersionNewerThan("v5.3.0"));
     try (PDClient client = session.getPDClient()) {
       PDChecker checker = PDChecker.Merge;
       for (int i = 0; i < 2; i++) {

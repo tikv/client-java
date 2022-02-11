@@ -13,3 +13,4 @@ test:
 
 clean:
 	mvn clean
+	rm -rf target tipb raft-rs kvproto

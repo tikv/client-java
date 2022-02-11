@@ -1,15 +1,15 @@
 /*
- *
- * Copyright 2017 TiKV Project Authors.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
@@ -38,6 +38,7 @@ import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.HistogramUtils;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Peer;
@@ -48,12 +49,12 @@ import org.tikv.kvproto.Pdpb;
 public class RegionManager {
   private static final Logger logger = LoggerFactory.getLogger(RegionManager.class);
   public static final Histogram GET_REGION_BY_KEY_REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_get_region_by_requests_latency")
           .help("getRegionByKey request latency.")
           .register();
   public static final Histogram SCAN_REGIONS_REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_scan_regions_request_latency")
           .help("scanRegions request latency.")
           .register();

@@ -67,7 +67,7 @@
         <slf4j.version>1.7.16</slf4j.version>
         <grpc.version>1.38.0</grpc.version>
         <netty.tcnative.version>2.0.34.Final</netty.tcnative.version>
-        <gson.version>2.8.5</gson.version>
+        <gson.version>2.8.9</gson.version>
         <powermock.version>1.6.6</powermock.version>
         <jackson.version>2.12.3</jackson.version>
         <trove4j.version>3.0.1</trove4j.version>
@@ -81,6 +81,16 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>io.perfmark</groupId>
+            <artifactId>perfmark-api</artifactId>
+            <version>0.24.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.perfmark</groupId>
+            <artifactId>perfmark-traceviewer</artifactId>
+            <version>0.24.0</version>
+        </dependency>
         <dependency>
             <groupId>org.rocksdb</groupId>
             <artifactId>rocksdbjni</artifactId>
@@ -243,6 +253,29 @@
             <version>0.10.0</version>
         </dependency>
     </dependencies>
+
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.5.2.0</version>
+                <configuration>
+                    <xmlOutput>true</xmlOutput>
+                    <!-- Optional directory to put spotbugs xdoc xml report -->
+                    <xmlOutputDirectory>target/site</xmlOutputDirectory>
+		    <includeFilterFile>dev/spotbugs-include.xml</includeFilterFile>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jxr-plugin</artifactId>
+                <version>3.1.1</version>
+            </plugin>
+        </plugins>
+    </reporting>
+
+
     <build>
         <resources>
             <resource>
@@ -548,7 +581,7 @@
                 <configuration>
                     <serverId>ossrh</serverId>
                     <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                    <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
                 </configuration>
             </plugin>
             <plugin>
@@ -581,6 +614,37 @@
                     </includeOnlyProperties>
                     <commitIdGenerationMode>full</commitIdGenerationMode>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0-M5</version>
+                <configuration>
+                    <forkMode>always</forkMode>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-site-plugin</artifactId>
+                <version>3.7.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-project-info-reports-plugin</artifactId>
+                <version>3.0.0</version>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.5.2.0</version>
+                <dependencies>
+                    <!-- overwrite dependency on spotbugs if you want to specify the version of spotbugs -->
+                    <dependency>
+                        <groupId>com.github.spotbugs</groupId>
+                        <artifactId>spotbugs</artifactId>
+                        <version>4.5.3</version>
+                    </dependency>
+                </dependencies>
             </plugin>
         </plugins>
     </build>
