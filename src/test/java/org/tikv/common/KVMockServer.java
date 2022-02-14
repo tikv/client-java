@@ -29,7 +29,12 @@ import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.TiRegion;
@@ -48,6 +53,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   private int port;
   private Server server;
   private TiRegion region;
+  private State state = State.Normal;
   private final TreeMap<Key, ByteString> dataMap = new TreeMap<>();
   private final Map<ByteString, Integer> errorMap = new HashMap<>();
 
@@ -63,6 +69,19 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   public static final int STALE_COMMAND = 8;
   public static final int STORE_NOT_MATCH = 9;
   public static final int RAFT_ENTRY_TOO_LARGE = 10;
+
+  public enum State {
+    Normal,
+    Fail
+  }
+
+  public void setState(State state) {
+    this.state = state;
+  }
+
+  public State getState() {
+    return state;
+  }
 
   public int getPort() {
     return port;
@@ -106,6 +125,11 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       org.tikv.kvproto.Kvrpcpb.RawGetRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawGetResponse> responseObserver) {
     try {
+      switch (state) {
+        case Fail:
+          throw new Exception(State.Fail.toString());
+        default:
+      }
       verifyContext(request.getContext());
       ByteString key = request.getKey();
 
@@ -125,7 +149,9 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     }
   }
 
-  /** */
+  /**
+   *
+   */
   public void rawPut(
       org.tikv.kvproto.Kvrpcpb.RawPutRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawPutResponse> responseObserver) {
@@ -139,7 +165,6 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       if (errorCode != null) {
         setErrorInfo(errorCode, errBuilder);
         builder.setRegionError(errBuilder.build());
-        // builder.setError("");
       }
       responseObserver.onNext(builder.build());
       responseObserver.onCompleted();
@@ -168,7 +193,9 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     }
   }
 
-  /** */
+  /**
+   *
+   */
   public void rawDelete(
       org.tikv.kvproto.Kvrpcpb.RawDeleteRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawDeleteResponse> responseObserver) {
@@ -349,14 +376,19 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   }
 
   public int start(TiRegion region) throws IOException {
+    int port;
     try (ServerSocket s = new ServerSocket(0)) {
       port = s.getLocalPort();
     }
-    server = ServerBuilder.forPort(port).addService(this).build().start();
+    start(region, port);
+    return port;
+  }
 
+  public void start(TiRegion region, int port) throws IOException {
+    this.port = port;
+    server = ServerBuilder.forPort(port).addService(this).build().start();
     this.region = region;
     Runtime.getRuntime().addShutdownHook(new Thread(KVMockServer.this::stop));
-    return port;
   }
 
   public void stop() {

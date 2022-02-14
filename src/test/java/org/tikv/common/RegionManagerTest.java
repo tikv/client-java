@@ -40,8 +40,8 @@ public class RegionManagerTest extends PDMockServerTest {
 
   @Before
   @Override
-  public void setUp() throws IOException {
-    super.setUp();
+  public void setup() throws IOException {
+    super.setup();
     mgr = session.getRegionManager();
   }
 
@@ -64,9 +64,9 @@ public class RegionManagerTest extends PDMockServerTest {
     int ver = 1027;
     long regionId = 233;
     String testAddress = "127.0.0.1";
-    pdServer.addGetRegionResp(
+    leader.addGetRegionResp(
         GrpcUtils.makeGetRegionResponse(
-            pdServer.getClusterId(),
+            leader.getClusterId(),
             GrpcUtils.makeRegion(
                 regionId,
                 GrpcUtils.encodeKey(startKey.toByteArray()),
@@ -75,9 +75,9 @@ public class RegionManagerTest extends PDMockServerTest {
                 GrpcUtils.makePeer(1, 10),
                 GrpcUtils.makePeer(2, 20))));
     for (long id : new long[] {10, 20}) {
-      pdServer.addGetStoreResp(
+      leader.addGetStoreResp(
           GrpcUtils.makeGetStoreResponse(
-              pdServer.getClusterId(),
+              leader.getClusterId(),
               GrpcUtils.makeStore(
                   id,
                   testAddress,
@@ -103,9 +103,9 @@ public class RegionManagerTest extends PDMockServerTest {
     int confVer = 1026;
     int ver = 1027;
     long regionId = 233;
-    pdServer.addGetRegionResp(
+    leader.addGetRegionResp(
         GrpcUtils.makeGetRegionResponse(
-            pdServer.getClusterId(),
+            leader.getClusterId(),
             GrpcUtils.makeRegion(
                 regionId,
                 GrpcUtils.encodeKey(startKey.toByteArray()),
@@ -114,9 +114,9 @@ public class RegionManagerTest extends PDMockServerTest {
                 GrpcUtils.makePeer(storeId, 10),
                 GrpcUtils.makePeer(storeId + 1, 20))));
     for (long id : new long[] {10, 20}) {
-      pdServer.addGetStoreResp(
+      leader.addGetStoreResp(
           GrpcUtils.makeGetStoreResponse(
-              pdServer.getClusterId(),
+              leader.getClusterId(),
               GrpcUtils.makeStore(
                   id,
                   testAddress,
@@ -134,9 +134,9 @@ public class RegionManagerTest extends PDMockServerTest {
   public void getStoreById() {
     long storeId = 234;
     String testAddress = "testAddress";
-    pdServer.addGetStoreResp(
+    leader.addGetStoreResp(
         GrpcUtils.makeGetStoreResponse(
-            pdServer.getClusterId(),
+            leader.getClusterId(),
             GrpcUtils.makeStore(
                 storeId,
                 testAddress,
@@ -146,9 +146,9 @@ public class RegionManagerTest extends PDMockServerTest {
     TiStore store = mgr.getStoreById(storeId);
     assertEquals(store.getStore().getId(), storeId);
 
-    pdServer.addGetStoreResp(
+    leader.addGetStoreResp(
         GrpcUtils.makeGetStoreResponse(
-            pdServer.getClusterId(),
+            leader.getClusterId(),
             GrpcUtils.makeStore(
                 storeId + 1,
                 testAddress,

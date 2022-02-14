@@ -26,10 +26,22 @@ import java.net.ServerSocket;
 import java.util.Deque;
 import java.util.Optional;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.stream.Stream;
 import org.tikv.kvproto.PDGrpc;
-import org.tikv.kvproto.Pdpb.*;
+import org.tikv.kvproto.Pdpb.GetAllStoresRequest;
+import org.tikv.kvproto.Pdpb.GetAllStoresResponse;
+import org.tikv.kvproto.Pdpb.GetMembersRequest;
+import org.tikv.kvproto.Pdpb.GetMembersResponse;
+import org.tikv.kvproto.Pdpb.GetRegionByIDRequest;
+import org.tikv.kvproto.Pdpb.GetRegionRequest;
+import org.tikv.kvproto.Pdpb.GetRegionResponse;
+import org.tikv.kvproto.Pdpb.GetStoreRequest;
+import org.tikv.kvproto.Pdpb.GetStoreResponse;
+import org.tikv.kvproto.Pdpb.TsoRequest;
+import org.tikv.kvproto.Pdpb.TsoResponse;
 
 public class PDMockServer extends PDGrpc.PDImplBase {
+
   public int port;
   private long clusterId;
 
@@ -59,10 +71,12 @@ public class PDMockServer extends PDGrpc.PDImplBase {
       private int logical = 0;
 
       @Override
-      public void onNext(TsoRequest value) {}
+      public void onNext(TsoRequest value) {
+      }
 
       @Override
-      public void onError(Throwable t) {}
+      public void onError(Throwable t) {
+      }
 
       @Override
       public void onCompleted() {
@@ -110,6 +124,7 @@ public class PDMockServer extends PDGrpc.PDImplBase {
 
   private final Deque<Optional<GetStoreResponse>> getStoreResp = new LinkedBlockingDeque<>();
 
+  @Override
   public void getStore(GetStoreRequest request, StreamObserver<GetStoreResponse> resp) {
     try {
       resp.onNext(getStoreResp.removeFirst().get());
@@ -120,10 +135,16 @@ public class PDMockServer extends PDGrpc.PDImplBase {
   }
 
   public void start(long clusterId) throws IOException {
+    int port;
     try (ServerSocket s = new ServerSocket(0)) {
       port = s.getLocalPort();
     }
+    start(clusterId, port);
+  }
+
+  public void start(long clusterId, int port) throws IOException {
     this.clusterId = clusterId;
+    this.port = port;
     server = ServerBuilder.forPort(port).addService(this).build().start();
 
     Runtime.getRuntime().addShutdownHook(new Thread(PDMockServer.this::stop));

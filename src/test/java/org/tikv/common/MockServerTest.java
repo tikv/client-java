@@ -35,8 +35,8 @@ public class MockServerTest extends PDMockServerTest {
 
   @Before
   @Override
-  public void setUp() throws IOException {
-    super.setUp();
+  public void setup() throws IOException {
+    super.setup();
 
     Metapb.Region r =
         Metapb.Region.newBuilder()
@@ -62,9 +62,9 @@ public class MockServerTest extends PDMockServerTest {
             r.getPeers(0),
             r.getPeersList(),
             s.stream().map(TiStore::new).collect(Collectors.toList()));
-    pdServer.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
+    leader.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
     for (Metapb.Store store : s) {
-      pdServer.addGetStoreResp(Pdpb.GetStoreResponse.newBuilder().setStore(store).build());
+      leader.addGetStoreResp(Pdpb.GetStoreResponse.newBuilder().setStore(store).build());
     }
     server = new KVMockServer();
     port = server.start(region);
