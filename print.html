@@ -97,7 +97,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="examples/quick-start.html"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="examples/rawkv.html"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="examples/txnkv.html"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</div></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Performance</div></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</div></li></ol></li><li class="chapter-item expanded "><a href="administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="troubleshooting/slow-request.html"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</div></li></ol></li><li class="chapter-item expanded "><a href="architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="architecture/availability.html"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.4.</strong> Region Cache</div></li></ol></li><li class="chapter-item expanded "><a href="contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction/introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="examples/introduction.html"><strong aria-hidden="true">2.</strong> Start With Examples</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="examples/quick-start.html"><strong aria-hidden="true">2.1.</strong> Quick Start</a></li><li class="chapter-item expanded "><a href="examples/rawkv.html"><strong aria-hidden="true">2.2.</strong> Interact with TiKV RawKV API</a></li><li class="chapter-item expanded "><a href="examples/txnkv.html"><strong aria-hidden="true">2.3.</strong> Interact with TiKV TxnKV API</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> TiKV RawKV Bulk Load</div></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Performance</div></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">3.1.</strong> YCSB Benchmarks</div></li></ol></li><li class="chapter-item expanded "><a href="administration/introduction.html"><strong aria-hidden="true">4.</strong> Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="administration/configuration.html"><strong aria-hidden="true">4.1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="administration/monitoring.html"><strong aria-hidden="true">4.2.</strong> Monitoring</a></li></ol></li><li class="chapter-item expanded "><a href="troubleshooting/introduction.html"><strong aria-hidden="true">5.</strong> Troubleshooting</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="troubleshooting/slow-request.html"><strong aria-hidden="true">5.1.</strong> Slow Request Diagnosis</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.2.</strong> Error Request Diagnosis</div></li></ol></li><li class="chapter-item expanded "><a href="architecture/introduction.html"><strong aria-hidden="true">6.</strong> Architecture and Internals</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="architecture/request-lifecycle.html"><strong aria-hidden="true">6.1.</strong> The Lifecycle of A Request</a></li><li class="chapter-item expanded "><a href="architecture/availability.html"><strong aria-hidden="true">6.2.</strong> Backoff and Retry Policy</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.3.</strong> Slow Log and Metrics</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.4.</strong> Region Cache</div></li></ol></li><li class="chapter-item expanded "><a href="contribution/introduction.html"><strong aria-hidden="true">7.</strong> Contribution Guide</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="contribution/bug-severity-guide.html"><strong aria-hidden="true">7.1.</strong> Bug Severity Guidelines</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -615,6 +615,46 @@ The control flow for callWithRetry is as follows:</p>
 export TXNKV_PD_ADDRESSES=127.0.0.1:2379
 mvn clean test
 </code></pre>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h2 id="bug-severity-guidelines"><a class="header" href="#bug-severity-guidelines">Bug Severity Guidelines</a></h2>
+<p>This is a <strong>working-in-progress</strong> guide about determining defects severity on
+TiKV Java Client according to the impact on the online service. The higher
+effect the defect has on the overall functionality or performance, the higher
+the severity is. There are 4 severity levels:</p>
+<ol>
+<li>Critical</li>
+<li>Major</li>
+<li>Moderate</li>
+<li>Minor</li>
+</ol>
+<p>Each severity is described with examples in the remaining contents.</p>
+<h3 id="critical-defects"><a class="header" href="#critical-defects">Critical Defects</a></h3>
+<p>A defect that affects critical data or functionality and leaves users
+with no workaround is classified as a critical defect. These defects are
+labeled with <code>type/bug</code> and <code>severity/critical</code>, can be found
+<a href="https://github.com/tikv/client-java/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3Aseverity%2Fcritical">here</a></p>
+<p>Guideline 1. A defect that breaks the API definition is regarded as critical.
+For example:</p>
+<ul>
+<li><a href="https://github.com/tikv/client-java/issues/412">client-java/issues/412</a>
+in this defect, gRPC timeout is not set for certain requests, which causes the
+requests can not be terminated as expected when the processing time is too long.</li>
+</ul>
+<h3 id="major-defects"><a class="header" href="#major-defects">Major Defects</a></h3>
+<p>A defect that affects critical data or functionality and forces users to employ
+a workaround is classified as a major defect. These defects are labeled with
+<code>type/bug</code> and <code>severity/major</code>, can be found
+<a href="https://github.com/tikv/client-java/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3Aseverity%2Fmajor">here</a></p>
+<h3 id="moderate-defects"><a class="header" href="#moderate-defects">Moderate Defects</a></h3>
+<p>A defect that affects non-critical data or functionality and forces users to
+employ a workaround is classified as moderate defect. These defects are labeled
+with <code>type/bug</code> and <code>severity/moderate</code>, can be found
+<a href="https://github.com/tikv/client-java/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3Aseverity%2Fmoderate">here</a></p>
+<h3 id="minor-defects"><a class="header" href="#minor-defects">Minor Defects</a></h3>
+<p>A defect that does not affect data or functionality. It does not even need a
+workaround. It does not impact productivity or efficiency. It is merely an
+inconvenience. These defects are labeled with <code>type/bug</code> and <code>severity/minor</code>,
+can be found
+<a href="https://github.com/tikv/client-java/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3Aseverity%2Fminor">here</a></p>
 
                     </main>
 
