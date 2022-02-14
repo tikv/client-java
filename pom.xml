@@ -77,7 +77,6 @@
         <proto.folder>${basedir}/proto</proto.folder>
         <gpg.keyname>fake gpg key name</gpg.keyname>
         <gpg.skip>true</gpg.skip>
-        <javadoc.skip>true</javadoc.skip>
     </properties>
 
     <dependencies>
@@ -256,6 +255,11 @@
 
     <reporting>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.3.1</version>
+            </plugin>
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
@@ -444,26 +448,6 @@
                         </fileset>
                     </filesets>
                 </configuration>
-            </plugin>
-            <!-- Javadoc Plug-in -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.0.1</version>
-                <configuration>
-                    <skip>${javadoc.skip}</skip>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>attach-javadocs</id>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                        <configuration> <!-- add this to disable checking -->
-                            <additionalparam>-Xdoclint:none</additionalparam>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
             <!--- Needs to shade Protobuf 3 since other projects might use other version -->
             <plugin>
