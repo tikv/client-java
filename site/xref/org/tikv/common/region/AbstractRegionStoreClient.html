@@ -344,7 +344,7 @@
 <a class="jxr_linenumber" name="L336" href="#L336">336</a>       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
 <a class="jxr_linenumber" name="L337" href="#L337">337</a>       Kvrpcpb.RawGetRequest rawGetRequest =
 <a class="jxr_linenumber" name="L338" href="#L338">338</a>           Kvrpcpb.RawGetRequest.newBuilder()
-<a class="jxr_linenumber" name="L339" href="#L339">339</a>               .setContext(region.getReplicaContext(peer))
+<a class="jxr_linenumber" name="L339" href="#L339">339</a>               .setContext(region.getReplicaContext(region.getLeader()))
 <a class="jxr_linenumber" name="L340" href="#L340">340</a>               .setKey(key)
 <a class="jxr_linenumber" name="L341" href="#L341">341</a>               .build();
 <a class="jxr_linenumber" name="L342" href="#L342">342</a>       ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task =
