@@ -739,6 +739,12 @@ public final class ClientCalls {
     private static final Logger log = Logger.getLogger(ThreadlessExecutor.class.getName());
 
     private volatile Thread waiter;
+    private static final Histogram lockDuration =
+        HistogramUtils.buildDuration()
+            .name("grpc_client_executor_lock_duration_seconds")
+            .help("Histogram of time spent in ThreadlessExecutor lock")
+            .labelNames("phase")
+            .register();
 
     // Non private to avoid synthetic class
     ThreadlessExecutor() {}
@@ -753,10 +759,12 @@ public final class ClientCalls {
       if (runnable == null) {
         waiter = Thread.currentThread();
         try {
+          Histogram.Timer parkTimer = lockDuration.labels("park").startTimer();
           while ((runnable = poll()) == null) {
             LockSupport.park(this);
             throwIfInterrupted();
           }
+          parkTimer.observeDuration();
         } finally {
           waiter = null;
         }
@@ -779,7 +787,9 @@ public final class ClientCalls {
     @Override
     public void execute(Runnable runnable) {
       add(runnable);
+      Histogram.Timer unparkTimer = lockDuration.labels("unpark").startTimer();
       LockSupport.unpark(waiter); // no-op if null
+      unparkTimer.observeDuration();
     }
   }
 
