@@ -23,7 +23,7 @@ def call(ghprbActualCommit, ghprbPullId, ghprbPullTitle, ghprbPullLink, ghprbPul
                 stage('Format') {
                     dir("/home/jenkins/agent/git/client-java") {
                         sh """
-                        mvn com.coveo:fmt-maven-plugin:format
+                        ./dev/javafmt
                         git diff --quiet
                         formatted="\$?"
                         if [[ "\${formatted}" -eq 1 ]]
