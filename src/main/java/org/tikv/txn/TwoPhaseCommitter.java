@@ -1,16 +1,18 @@
 /*
- * Copyright 2020 PingCAP, Inc.
+ * Copyright 2020 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package org.tikv.txn;
@@ -49,7 +51,7 @@ import org.tikv.txn.type.BatchKeys;
 import org.tikv.txn.type.ClientRPCResult;
 import org.tikv.txn.type.GroupKeyResult;
 
-public class TwoPhaseCommitter {
+public class TwoPhaseCommitter implements AutoCloseable {
 
   /** buffer spark rdd iterator data into memory */
   private static final int WRITE_BUFFER_SIZE = 32 * 1024;
@@ -99,7 +101,7 @@ public class TwoPhaseCommitter {
         createExecutorService(WRITE_BUFFER_SIZE));
   }
 
-  public TwoPhaseCommitter(
+  TwoPhaseCommitter(
       TiSession session,
       long startTime,
       long lockTTL,
@@ -140,7 +142,6 @@ public class TwoPhaseCommitter {
    * @param backOffer
    * @param primaryKey
    * @param value
-   * @return
    */
   public void prewritePrimaryKey(BackOffer backOffer, byte[] primaryKey, byte[] value)
       throws TiBatchWriteException {
@@ -196,7 +197,6 @@ public class TwoPhaseCommitter {
    *
    * @param backOffer
    * @param key
-   * @return
    */
   public void commitPrimaryKey(BackOffer backOffer, byte[] key, long commitTs)
       throws TiBatchWriteException {
@@ -236,7 +236,6 @@ public class TwoPhaseCommitter {
    *
    * @param primaryKey
    * @param pairs
-   * @return
    */
   public void prewriteSecondaryKeys(
       byte[] primaryKey, Iterator<BytePairWrapper> pairs, int maxBackOfferMS)
@@ -499,7 +498,6 @@ public class TwoPhaseCommitter {
    *
    * @param keys
    * @param commitTs
-   * @return
    */
   public void commitSecondaryKeys(
       Iterator<org.tikv.common.ByteWrapper> keys, long commitTs, int commitBackOfferMS)

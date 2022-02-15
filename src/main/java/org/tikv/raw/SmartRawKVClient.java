@@ -1,16 +1,18 @@
 /*
- * Copyright 2021 PingCAP, Inc.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package org.tikv.raw;
@@ -23,19 +25,18 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.CircuitBreakerOpenException;
+import org.tikv.common.util.HistogramUtils;
 import org.tikv.common.util.Pair;
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.service.failsafe.CircuitBreaker;
-import org.tikv.service.failsafe.CircuitBreakerImpl;
 
 public class SmartRawKVClient implements RawKVClientBase {
   private static final Logger logger = LoggerFactory.getLogger(SmartRawKVClient.class);
 
   private static final Histogram REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_smart_raw_requests_latency")
           .help("client smart raw request latency.")
           .labelNames("type")
@@ -65,9 +66,9 @@ public class SmartRawKVClient implements RawKVClientBase {
   private final RawKVClientBase client;
   private final CircuitBreaker circuitBreaker;
 
-  public SmartRawKVClient(RawKVClientBase client, TiConfiguration conf) {
+  public SmartRawKVClient(RawKVClientBase client, CircuitBreaker breaker) {
     this.client = client;
-    this.circuitBreaker = new CircuitBreakerImpl(conf);
+    this.circuitBreaker = breaker;
   }
 
   @Override
@@ -260,7 +261,6 @@ public class SmartRawKVClient implements RawKVClientBase {
 
   @Override
   public void close() throws Exception {
-    circuitBreaker.close();
     client.close();
   }
 

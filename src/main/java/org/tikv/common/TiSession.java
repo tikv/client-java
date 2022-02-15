@@ -1,16 +1,18 @@
 /*
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package org.tikv.common;
@@ -34,19 +36,26 @@ import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.*;
 import org.tikv.common.util.*;
+import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
+import org.tikv.kvproto.Pdpb;
 import org.tikv.raw.RawKVClient;
 import org.tikv.raw.SmartRawKVClient;
+import org.tikv.service.failsafe.CircuitBreaker;
+import org.tikv.service.failsafe.CircuitBreakerImpl;
 import org.tikv.txn.KVClient;
 import org.tikv.txn.TxnKVClient;
 
 /**
  * TiSession is the holder for PD Client, Store pdClient and PD Cache All sessions share common
- * region store connection pool but separated PD conn and cache for better concurrency TiSession is
- * thread-safe but it's also recommended to have multiple session avoiding lock contention
+ * region store connection pool but separated PD conn and cache for better concurrency
+ *
+ * <p>TiSession is thread-safe but it's also recommended to have multiple session avoiding lock
+ * contention
  */
 public class TiSession implements AutoCloseable {
+
   private static final Logger logger = LoggerFactory.getLogger(TiSession.class);
   private static final Map<String, TiSession> sessionCachedMap = new HashMap<>();
   private final TiConfiguration conf;
@@ -68,7 +77,28 @@ public class TiSession implements AutoCloseable {
   private volatile boolean isClosed = false;
   private volatile SwitchTiKVModeClient switchTiKVModeClient;
   private final MetricsServer metricsServer;
+  private final CircuitBreaker circuitBreaker;
   private static final int MAX_SPLIT_REGION_STACK_DEPTH = 6;
+
+  static {
+    logger.info("Welcome to TiKV Java Client {}", getVersionInfo());
+  }
+
+  private static class VersionInfo {
+
+    private final String buildVersion;
+    private final String commitHash;
+
+    public VersionInfo(String buildVersion, String commitHash) {
+      this.buildVersion = buildVersion;
+      this.commitHash = commitHash;
+    }
+
+    @Override
+    public String toString() {
+      return buildVersion + "@" + commitHash;
+    }
+  }
 
   public TiSession(TiConfiguration conf) {
     // may throw org.tikv.common.MetricsServer  - http server not up
@@ -76,68 +106,122 @@ public class TiSession implements AutoCloseable {
     this.metricsServer = MetricsServer.getInstance(conf);
 
     this.conf = conf;
-    this.channelFactory =
-        conf.isTlsEnable()
-            ? new ChannelFactory(
+    if (conf.isTlsEnable()) {
+      if (conf.isJksEnable()) {
+        this.channelFactory =
+            new ChannelFactory(
+                conf.getMaxFrameSize(),
+                conf.getKeepaliveTime(),
+                conf.getKeepaliveTimeout(),
+                conf.getIdleTimeout(),
+                conf.getJksKeyPath(),
+                conf.getJksKeyPassword(),
+                conf.getJksTrustPath(),
+                conf.getJksTrustPassword());
+      } else {
+        this.channelFactory =
+            new ChannelFactory(
                 conf.getMaxFrameSize(),
                 conf.getKeepaliveTime(),
                 conf.getKeepaliveTimeout(),
                 conf.getIdleTimeout(),
                 conf.getTrustCertCollectionFile(),
                 conf.getKeyCertChainFile(),
-                conf.getKeyFile())
-            : new ChannelFactory(
-                conf.getMaxFrameSize(),
-                conf.getKeepaliveTime(),
-                conf.getKeepaliveTimeout(),
-                conf.getIdleTimeout());
+                conf.getKeyFile());
+      }
+    } else {
+      this.channelFactory =
+          new ChannelFactory(
+              conf.getMaxFrameSize(),
+              conf.getKeepaliveTime(),
+              conf.getKeepaliveTimeout(),
+              conf.getIdleTimeout());
+    }
 
     this.client = PDClient.createRaw(conf, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
     if (this.enableGrpcForward) {
       logger.info("enable grpc forward for high available");
     }
-    warmUp();
+    if (conf.isWarmUpEnable() && conf.isRawKVMode()) {
+      warmUp();
+    }
+    this.circuitBreaker = new CircuitBreakerImpl(conf);
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
 
-  private synchronized void warmUp() {
-    long warmUpStartTime = System.currentTimeMillis();
+  private static VersionInfo getVersionInfo() {
+    VersionInfo info;
     try {
+      final Properties properties = new Properties();
+      properties.load(TiSession.class.getClassLoader().getResourceAsStream("git.properties"));
+      String version = properties.getProperty("git.build.version");
+      String commitHash = properties.getProperty("git.commit.id.full");
+      info = new VersionInfo(version, commitHash);
+    } catch (Exception e) {
+      logger.info("Fail to read package info: " + e.getMessage());
+      info = new VersionInfo("unknown", "unknown");
+    }
+    return info;
+  }
+
+  private synchronized void warmUp() {
+    long warmUpStartTime = System.nanoTime();
+    BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
+    try {
+      // let JVM ClassLoader load gRPC error related classes
+      // this operation may cost 100ms
+      Errorpb.Error.newBuilder()
+          .setNotLeader(Errorpb.NotLeader.newBuilder().build())
+          .build()
+          .toString();
+
       this.client = getPDClient();
       this.regionManager = getRegionManager();
-      List<Metapb.Store> stores = this.client.getAllStores(ConcreteBackOffer.newGetBackOff());
+      List<Metapb.Store> stores = this.client.getAllStores(backOffer);
       // warm up store cache
       for (Metapb.Store store : stores) {
         this.regionManager.updateStore(
-            null,
-            new TiStore(this.client.getStore(ConcreteBackOffer.newGetBackOff(), store.getId())));
+            null, new TiStore(this.client.getStore(backOffer, store.getId())));
       }
-      ByteString startKey = ByteString.EMPTY;
 
+      // use scan region to load region cache with limit
+      ByteString startKey = ByteString.EMPTY;
       do {
-        TiRegion region = regionManager.getRegionByKey(startKey);
-        startKey = region.getEndKey();
+        List<Pdpb.Region> regions =
+            regionManager.scanRegions(
+                backOffer, startKey, ByteString.EMPTY, conf.getScanRegionsLimit());
+        if (regions == null || regions.isEmpty()) {
+          // something went wrong, but the warm-up process could continue
+          break;
+        }
+        for (Pdpb.Region region : regions) {
+          regionManager.insertRegionToCache(
+              regionManager.createRegion(region.getRegion(), backOffer));
+        }
+        startKey = regions.get(regions.size() - 1).getRegion().getEndKey();
       } while (!startKey.isEmpty());
 
-      RawKVClient rawKVClient = createRawClient();
-      ByteString exampleKey = ByteString.EMPTY;
-      Optional<ByteString> prev = rawKVClient.get(exampleKey);
-      if (prev.isPresent()) {
-        rawKVClient.delete(exampleKey);
-        rawKVClient.putIfAbsent(exampleKey, prev.get());
-        rawKVClient.put(exampleKey, prev.get());
-      } else {
-        rawKVClient.putIfAbsent(exampleKey, ByteString.EMPTY);
-        rawKVClient.put(exampleKey, ByteString.EMPTY);
-        rawKVClient.delete(exampleKey);
+      try (RawKVClient rawKVClient = createRawClient()) {
+        ByteString exampleKey = ByteString.EMPTY;
+        Optional<ByteString> prev = rawKVClient.get(exampleKey);
+        if (prev.isPresent()) {
+          rawKVClient.delete(exampleKey);
+          rawKVClient.putIfAbsent(exampleKey, prev.get());
+          rawKVClient.put(exampleKey, prev.get());
+        } else {
+          rawKVClient.putIfAbsent(exampleKey, ByteString.EMPTY);
+          rawKVClient.put(exampleKey, ByteString.EMPTY);
+          rawKVClient.delete(exampleKey);
+        }
       }
     } catch (Exception e) {
       // ignore error
       logger.info("warm up fails, ignored ", e);
     } finally {
       logger.info(
-          String.format("warm up duration %d ms", System.currentTimeMillis() - warmUpStartTime));
+          String.format(
+              "warm up duration %d ms", (System.nanoTime() - warmUpStartTime) / 1_000_000));
     }
   }
 
@@ -168,7 +252,7 @@ public class TiSession implements AutoCloseable {
 
   public SmartRawKVClient createSmartRawClient() {
     RawKVClient rawKVClient = createRawClient();
-    return new SmartRawKVClient(rawKVClient, getConf());
+    return new SmartRawKVClient(rawKVClient, circuitBreaker);
   }
 
   public KVClient createKVClient() {
@@ -632,6 +716,10 @@ public class TiSession implements AutoCloseable {
 
       if (metricsServer != null) {
         metricsServer.close();
+      }
+
+      if (circuitBreaker != null) {
+        circuitBreaker.close();
       }
     }
 

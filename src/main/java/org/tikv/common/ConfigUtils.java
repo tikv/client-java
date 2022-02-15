@@ -1,16 +1,18 @@
 /*
- * Copyright 2021 PingCAP, Inc.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package org.tikv.common;
@@ -25,6 +27,7 @@ public class ConfigUtils {
   public static final String TIKV_GRPC_TIMEOUT = "tikv.grpc.timeout_in_ms";
   public static final String TIKV_GRPC_INGEST_TIMEOUT = "tikv.grpc.ingest_timeout_in_ms";
   public static final String TIKV_GRPC_FORWARD_TIMEOUT = "tikv.grpc.forward_timeout_in_ms";
+  public static final String TIKV_GRPC_WARM_UP_TIMEOUT = "tikv.grpc.warm_up_timeout_in_ms";
   public static final String TIKV_PD_FIRST_GET_MEMBER_TIMEOUT =
       "tikv.grpc.pd_first_get_member_timeout_in_ms";
   public static final String TIKV_GRPC_SCAN_TIMEOUT = "tikv.grpc.scan_timeout_in_ms";
@@ -87,11 +90,18 @@ public class ConfigUtils {
   public static final String TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS =
       "tikv.rawkv.batch_write_slowlog_in_ms";
   public static final String TIKV_RAWKV_SCAN_SLOWLOG_IN_MS = "tikv.rawkv.scan_slowlog_in_ms";
+  public static final String TIKV_RAWKV_SERVER_SLOWLOG_FACTOR = "tikv.rawkv.server_slowlog_factor";
 
   public static final String TIKV_TLS_ENABLE = "tikv.tls_enable";
   public static final String TIKV_TRUST_CERT_COLLECTION = "tikv.trust_cert_collection";
   public static final String TIKV_KEY_CERT_CHAIN = "tikv.key_cert_chain";
   public static final String TIKV_KEY_FILE = "tikv.key_file";
+
+  public static final String TIKV_USE_JKS = "tikv.use_jks";
+  public static final String TIKV_JKS_KEY_PATH = "tikv.jks.key_path";
+  public static final String TIKV_JKS_KEY_PASSWORD = "tikv.jks.key_password";
+  public static final String TIKV_JKS_TRUST_PATH = "tikv.jks.trust_path";
+  public static final String TIKV_JKS_TRUST_PASSWORD = "tikv.jks.trust_password";
 
   public static final String TiKV_CIRCUIT_BREAK_ENABLE = "tikv.circuit_break.enable";
   public static final String TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS =
@@ -105,11 +115,15 @@ public class ConfigUtils {
   public static final String TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT =
       "tikv.circuit_break.trigger.attempt_request_count";
 
+  public static final String TIKV_SCAN_REGIONS_LIMIT = "tikv.scan_regions_limit";
+
   public static final String TIFLASH_ENABLE = "tiflash.enable";
+  public static final String TIKV_WARM_UP_ENABLE = "tikv.warm_up.enable";
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
   public static final String DEF_TIKV_GRPC_INGEST_TIMEOUT = "200s";
   public static final String DEF_FORWARD_TIMEOUT = "300ms";
+  public static final String DEF_TIKV_GRPC_WARM_UP_TIMEOUT = "5000ms";
   public static final String DEF_TIKV_PD_FIRST_GET_MEMBER_TIMEOUT = "10000ms";
   public static final String DEF_SCAN_TIMEOUT = "20s";
   public static final int DEF_CHECK_HEALTH_TIMEOUT = 100;
@@ -174,7 +188,9 @@ public class ConfigUtils {
   public static final int DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT = 3;
   public static final int DEF_TIKV_GRPC_IDLE_TIMEOUT = 60;
   public static final boolean DEF_TIKV_TLS_ENABLE = false;
+  public static final boolean DEF_TIKV_USE_JKS = false;
   public static final boolean DEF_TIFLASH_ENABLE = false;
+  public static final boolean DEF_TIKV_WARM_UP_ENABLE = true;
 
   public static final boolean DEF_TiKV_CIRCUIT_BREAK_ENABLE = false;
   public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS = 60;
@@ -182,4 +198,6 @@ public class ConfigUtils {
   public static final int DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUST_VOLUMN_THRESHOLD = 10;
   public static final int DEF_TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS = 20;
   public static final int DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT = 10;
+
+  public static final int DEF_TIKV_SCAN_REGIONS_LIMIT = 1000;
 }

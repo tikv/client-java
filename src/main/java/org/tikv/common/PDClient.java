@@ -1,16 +1,18 @@
 /*
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package org.tikv.common;
@@ -73,6 +75,7 @@ import org.tikv.common.util.BackOffFunction.BackOffFuncType;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.HistogramUtils;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
@@ -121,7 +124,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private long lastUpdateLeaderTime;
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_pd_get_region_by_requests_latency")
           .help("pd getRegionByKey request latency.")
           .register();
@@ -339,6 +342,27 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     GetRegionResponse resp =
         callWithRetry(backOffer, PDGrpc.getGetRegionByIDMethod(), request, handler);
     return new Pair<Metapb.Region, Metapb.Peer>(decodeRegion(resp.getRegion()), resp.getLeader());
+  }
+
+  @Override
+  public List<Pdpb.Region> scanRegions(
+      BackOffer backOffer, ByteString startKey, ByteString endKey, int limit) {
+    // no need to backoff because ScanRegions is just for optimization
+    // introduce a warm-up timeout for ScanRegions requests
+    PDGrpc.PDBlockingStub stub =
+        getBlockingStub().withDeadlineAfter(conf.getWarmUpTimeout(), TimeUnit.MILLISECONDS);
+    Pdpb.ScanRegionsRequest request =
+        Pdpb.ScanRegionsRequest.newBuilder()
+            .setHeader(header)
+            .setStartKey(startKey)
+            .setEndKey(endKey)
+            .setLimit(limit)
+            .build();
+    Pdpb.ScanRegionsResponse resp = stub.scanRegions(request);
+    if (resp == null) {
+      return null;
+    }
+    return resp.getRegionsList();
   }
 
   private Supplier<GetStoreRequest> buildGetStoreReq(long storeId) {

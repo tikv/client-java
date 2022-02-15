@@ -1,15 +1,15 @@
 /*
- *
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
@@ -19,12 +19,14 @@ package org.tikv.common.util;
 
 import static org.tikv.common.ConfigUtils.TIKV_BO_REGION_MISS_BASE_IN_MS;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.prometheus.client.Histogram;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
@@ -37,14 +39,17 @@ import org.tikv.common.log.SlowLogSpan;
 public class ConcreteBackOffer implements BackOffer {
   private static final Logger logger = LoggerFactory.getLogger(ConcreteBackOffer.class);
   private final int maxSleep;
-  private final Map<BackOffFunction.BackOffFuncType, BackOffFunction> backOffFunctionMap;
-  private final List<Exception> errors;
+
+  @VisibleForTesting
+  public final Map<BackOffFunction.BackOffFuncType, BackOffFunction> backOffFunctionMap;
+
+  @VisibleForTesting public final List<Exception> errors;
   private int totalSleep;
   private final long deadline;
   private final SlowLog slowLog;
 
   public static final Histogram BACKOFF_DURATION =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_backoff_duration")
           .help("backoff duration.")
           .labelNames("type")
@@ -56,8 +61,8 @@ public class ConcreteBackOffer implements BackOffer {
     Preconditions.checkArgument(maxSleep >= 0, "Max sleep time cannot be less than 0.");
     Preconditions.checkArgument(deadline >= 0, "Deadline cannot be less than 0.");
     this.maxSleep = maxSleep;
-    this.errors = new ArrayList<>();
-    this.backOffFunctionMap = new HashMap<>();
+    this.errors = Collections.synchronizedList(new ArrayList<>());
+    this.backOffFunctionMap = new ConcurrentHashMap<>();
     this.deadline = deadline;
     this.slowLog = slowLog;
   }
@@ -168,8 +173,9 @@ public class ConcreteBackOffer implements BackOffer {
   }
 
   public boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType, long maxSleepMs) {
-    SlowLogSpan slowLogSpan = getSlowLog().start("backoff " + funcType.name());
     Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(funcType.name()).startTimer();
+    SlowLogSpan slowLogSpan = getSlowLog().start("backoff");
+    slowLogSpan.addProperty("type", funcType.name());
     BackOffFunction backOffFunction =
         backOffFunctionMap.computeIfAbsent(funcType, this::createBackOffFunc);
 
@@ -181,6 +187,8 @@ public class ConcreteBackOffer implements BackOffer {
       long currentMs = System.currentTimeMillis();
       if (currentMs + sleep >= deadline) {
         logger.warn(String.format("Deadline %d is exceeded, errors:", deadline));
+        slowLogSpan.end();
+        backOffTimer.observeDuration();
         return false;
       }
     }

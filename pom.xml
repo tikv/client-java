@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
     <groupId>org.tikv</groupId>
     <artifactId>tikv-client-java</artifactId>
     <version>3.2.0-SNAPSHOT</version>
@@ -10,7 +8,6 @@
     <name>TiKV Java Client</name>
     <description>A Java Client for TiKV</description>
     <url>http://github.com/tikv/client-java</url>
-
     <licenses>
         <license>
             <name>Apache 2.0 License</name>
@@ -18,11 +15,9 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
-
     <organization>
         <name>PingCAP</name>
     </organization>
-
     <developers>
         <developer>
             <name>Xiaoyu Ma</name>
@@ -49,13 +44,11 @@
             <organizationUrl>https://www.pingcap.com</organizationUrl>
         </developer>
     </developers>
-
     <scm>
         <connection>scm:git:git://github.com/tikv/client-java.git</connection>
         <developerConnection>scm:git:ssh://github.com:tikv/client-java.git</developerConnection>
         <url>https://github.com/tikv/client-java/tree/master</url>
     </scm>
-
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
@@ -67,7 +60,7 @@
         <slf4j.version>1.7.16</slf4j.version>
         <grpc.version>1.38.0</grpc.version>
         <netty.tcnative.version>2.0.34.Final</netty.tcnative.version>
-        <gson.version>2.8.5</gson.version>
+        <gson.version>2.8.9</gson.version>
         <powermock.version>1.6.6</powermock.version>
         <jackson.version>2.12.3</jackson.version>
         <trove4j.version>3.0.1</trove4j.version>
@@ -77,10 +70,18 @@
         <proto.folder>${basedir}/proto</proto.folder>
         <gpg.keyname>fake gpg key name</gpg.keyname>
         <gpg.skip>true</gpg.skip>
-        <javadoc.skip>true</javadoc.skip>
     </properties>
-
     <dependencies>
+        <dependency>
+            <groupId>io.perfmark</groupId>
+            <artifactId>perfmark-api</artifactId>
+            <version>0.24.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.perfmark</groupId>
+            <artifactId>perfmark-traceviewer</artifactId>
+            <version>0.24.0</version>
+        </dependency>
         <dependency>
             <groupId>org.rocksdb</groupId>
             <artifactId>rocksdbjni</artifactId>
@@ -243,6 +244,31 @@
             <version>0.10.0</version>
         </dependency>
     </dependencies>
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.3.1</version>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.5.2.0</version>
+                <configuration>
+                    <xmlOutput>true</xmlOutput>
+                    <!-- Optional directory to put spotbugs xdoc xml report -->
+                    <xmlOutputDirectory>target/site</xmlOutputDirectory>
+                    <includeFilterFile>dev/spotbugs-include.xml</includeFilterFile>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jxr-plugin</artifactId>
+                <version>3.1.1</version>
+            </plugin>
+        </plugins>
+    </reporting>
     <build>
         <resources>
             <resource>
@@ -337,7 +363,6 @@
                     </execution>
                 </executions>
             </plugin>
-
             <plugin>
                 <groupId>org.xolstice.maven.plugins</groupId>
                 <artifactId>protobuf-maven-plugin</artifactId>
@@ -360,7 +385,6 @@
                     </execution>
                 </executions>
             </plugin>
-
             <!-- Compiler Plug-in -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -411,26 +435,6 @@
                         </fileset>
                     </filesets>
                 </configuration>
-            </plugin>
-            <!-- Javadoc Plug-in -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.0.1</version>
-                <configuration>
-                    <skip>${javadoc.skip}</skip>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>attach-javadocs</id>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                        <configuration> <!-- add this to disable checking -->
-                            <additionalparam>-Xdoclint:none</additionalparam>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
             <!--- Needs to shade Protobuf 3 since other projects might use other version -->
             <plugin>
@@ -548,12 +552,90 @@
                 <configuration>
                     <serverId>ossrh</serverId>
                     <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                    <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>io.github.git-commit-id</groupId>
+                <artifactId>git-commit-id-maven-plugin</artifactId>
+                <version>4.9.9</version>
+                <executions>
+                    <execution>
+                        <id>get-the-git-infos</id>
+                        <goals>
+                            <goal>revision</goal>
+                        </goals>
+                        <phase>initialize</phase>
+                    </execution>
+                    <execution>
+                        <id>validate-the-git-infos</id>
+                        <goals>
+                            <goal>validateRevision</goal>
+                        </goals>
+                        <phase>package</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <verbose>true</verbose>
+                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
+                    <generateGitPropertiesFilename>${project.build.outputDirectory}/git.properties</generateGitPropertiesFilename>
+                    <includeOnlyProperties>
+                        <includeOnlyProperty>^git.build.(time|version)$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.commit.id.(abbrev|full)$</includeOnlyProperty>
+                    </includeOnlyProperties>
+                    <commitIdGenerationMode>full</commitIdGenerationMode>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0-M5</version>
+                <configuration>
+                    <forkMode>always</forkMode>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-site-plugin</artifactId>
+                <version>3.7.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-project-info-reports-plugin</artifactId>
+                <version>3.0.0</version>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.5.2.0</version>
+                <dependencies>
+                    <!-- overwrite dependency on spotbugs if you want to specify the version of spotbugs -->
+                    <dependency>
+                        <groupId>com.github.spotbugs</groupId>
+                        <artifactId>spotbugs</artifactId>
+                        <version>4.5.3</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>au.com.acegi</groupId>
+                <artifactId>xml-format-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>xml-format</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>xml-format</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <indentSize>4</indentSize>
                 </configuration>
             </plugin>
         </plugins>
     </build>
-
     <profiles>
         <profile>
             <id>jdk9plus</id>
@@ -571,5 +653,4 @@
             </dependencies>
         </profile>
     </profiles>
-
 </project>

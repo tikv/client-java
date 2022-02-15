@@ -1,16 +1,18 @@
 /*
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package org.tikv.common.util;
@@ -21,10 +23,14 @@ import io.grpc.netty.NettyChannelBuilder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import java.io.File;
+import java.io.FileInputStream;
 import java.net.URI;
+import java.security.KeyStore;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.TrustManagerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.HostMapping;
@@ -39,6 +45,7 @@ public class ChannelFactory implements AutoCloseable {
   private final int idleTimeout;
   private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
   private final SslContextBuilder sslContextBuilder;
+  private static final String PUB_KEY_INFRA = "PKIX";
 
   public ChannelFactory(
       int maxFrameSize, int keepaliveTime, int keepaliveTimeout, int idleTimeout) {
@@ -63,6 +70,48 @@ public class ChannelFactory implements AutoCloseable {
     this.idleTimeout = idleTimeout;
     this.sslContextBuilder =
         getSslContextBuilder(trustCertCollectionFilePath, keyCertChainFilePath, keyFilePath);
+  }
+
+  public ChannelFactory(
+      int maxFrameSize,
+      int keepaliveTime,
+      int keepaliveTimeout,
+      int idleTimeout,
+      String jksKeyPath,
+      String jksKeyPassword,
+      String jkstrustPath,
+      String jksTrustPassword) {
+    this.maxFrameSize = maxFrameSize;
+    this.keepaliveTime = keepaliveTime;
+    this.keepaliveTimeout = keepaliveTimeout;
+    this.idleTimeout = idleTimeout;
+    this.sslContextBuilder =
+        getSslContextBuilder(jksKeyPath, jksKeyPassword, jkstrustPath, jksTrustPassword);
+  }
+
+  private SslContextBuilder getSslContextBuilder(
+      String jksKeyPath, String jksKeyPassword, String jksTrustPath, String jksTrustPassword) {
+    SslContextBuilder builder = GrpcSslContexts.forClient();
+    try {
+      if (jksKeyPath != null && jksKeyPassword != null) {
+        KeyStore keyStore = KeyStore.getInstance("JKS");
+        keyStore.load(new FileInputStream(jksKeyPath), jksKeyPassword.toCharArray());
+        KeyManagerFactory keyManagerFactory =
+            KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        keyManagerFactory.init(keyStore, jksKeyPassword.toCharArray());
+        builder.keyManager(keyManagerFactory);
+      }
+      if (jksTrustPath != null && jksTrustPassword != null) {
+        KeyStore trustStore = KeyStore.getInstance("JKS");
+        trustStore.load(new FileInputStream(jksTrustPath), jksTrustPassword.toCharArray());
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(PUB_KEY_INFRA);
+        trustManagerFactory.init(trustStore);
+        builder.trustManager(trustManagerFactory);
+      }
+    } catch (Exception e) {
+      logger.error("JKS SSL context builder failed!", e);
+    }
+    return builder;
   }
 
   private SslContextBuilder getSslContextBuilder(

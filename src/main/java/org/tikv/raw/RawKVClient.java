@@ -1,16 +1,18 @@
 /*
- * Copyright 2018 PingCAP, Inc.
+ * Copyright 2018 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package org.tikv.raw;
@@ -37,6 +39,7 @@ import org.tikv.common.key.Key;
 import org.tikv.common.log.SlowLog;
 import org.tikv.common.log.SlowLogEmptyImpl;
 import org.tikv.common.log.SlowLogImpl;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.operation.iterator.RawScanIterator;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
@@ -57,7 +60,7 @@ public class RawKVClient implements RawKVClientBase {
   private static final Logger logger = LoggerFactory.getLogger(RawKVClient.class);
 
   public static final Histogram RAW_REQUEST_LATENCY =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_raw_requests_latency")
           .help("client raw request latency.")
           .labelNames("type")
@@ -106,21 +109,17 @@ public class RawKVClient implements RawKVClientBase {
   public void put(ByteString key, ByteString value, long ttl) {
     String label = "client_raw_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            conf.getRawKVWriteSlowLogInMS(),
-            new HashMap<String, String>(2) {
-              {
-                put("func", "put");
-                put("key", KeyUtils.formatBytesUTF8(key));
-              }
-            });
+
+    SlowLog slowLog = new SlowLogImpl(conf.getRawKVWriteSlowLogInMS());
+    SlowLogSpan span = slowLog.start("put");
+    span.addProperty("key", KeyUtils.formatBytesUTF8(key));
+
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
     try {
       while (true) {
         try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
-          slowLog.addProperty("region", client.getRegion().toString());
+          span.addProperty("region", client.getRegion().toString());
           client.rawPut(backOffer, key, value, ttl, atomicForCAS);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return;
@@ -135,6 +134,7 @@ public class RawKVClient implements RawKVClientBase {
       throw e;
     } finally {
       requestTimer.observeDuration();
+      span.end();
       slowLog.log();
     }
   }
@@ -171,21 +171,17 @@ public class RawKVClient implements RawKVClientBase {
 
     String label = "client_raw_compare_and_set";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            conf.getRawKVWriteSlowLogInMS(),
-            new HashMap<String, String>(2) {
-              {
-                put("func", "putIfAbsent");
-                put("key", KeyUtils.formatBytesUTF8(key));
-              }
-            });
+
+    SlowLog slowLog = new SlowLogImpl(conf.getRawKVWriteSlowLogInMS());
+    SlowLogSpan span = slowLog.start("putIfAbsent");
+    span.addProperty("key", KeyUtils.formatBytesUTF8(key));
+
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
     try {
       while (true) {
         try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
-          slowLog.addProperty("region", client.getRegion().toString());
+          span.addProperty("region", client.getRegion().toString());
           client.rawCompareAndSet(backOffer, key, prevValue, value, ttl);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return;
@@ -200,6 +196,7 @@ public class RawKVClient implements RawKVClientBase {
       throw e;
     } finally {
       requestTimer.observeDuration();
+      span.end();
       slowLog.log();
     }
   }
@@ -213,15 +210,11 @@ public class RawKVClient implements RawKVClientBase {
   public void batchPut(Map<ByteString, ByteString> kvPairs, long ttl) {
     String label = "client_raw_batch_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            conf.getRawKVBatchWriteSlowLogInMS(),
-            new HashMap<String, String>(2) {
-              {
-                put("func", "batchPut");
-                put("keySize", String.valueOf(kvPairs.size()));
-              }
-            });
+
+    SlowLog slowLog = new SlowLogImpl(conf.getRawKVBatchWriteSlowLogInMS());
+    SlowLogSpan span = slowLog.start("batchPut");
+    span.addProperty("keySize", String.valueOf(kvPairs.size()));
+
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchWriteTimeoutInMS(), slowLog);
     try {
@@ -234,6 +227,7 @@ public class RawKVClient implements RawKVClientBase {
       throw e;
     } finally {
       requestTimer.observeDuration();
+      span.end();
       slowLog.log();
     }
   }
@@ -242,22 +236,17 @@ public class RawKVClient implements RawKVClientBase {
   public Optional<ByteString> get(ByteString key) {
     String label = "client_raw_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            conf.getRawKVReadSlowLogInMS(),
-            new HashMap<String, String>(2) {
-              {
-                put("func", "get");
-                put("key", KeyUtils.formatBytesUTF8(key));
-              }
-            });
+
+    SlowLog slowLog = new SlowLogImpl(conf.getRawKVReadSlowLogInMS());
+    SlowLogSpan span = slowLog.start("get");
+    span.addProperty("key", KeyUtils.formatBytesUTF8(key));
 
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS(), slowLog);
     try {
       while (true) {
         try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
-          slowLog.addProperty("region", client.getRegion().toString());
+          span.addProperty("region", client.getRegion().toString());
           Optional<ByteString> result = client.rawGet(backOffer, key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return result;
@@ -272,6 +261,7 @@ public class RawKVClient implements RawKVClientBase {
       throw e;
     } finally {
       requestTimer.observeDuration();
+      span.end();
       slowLog.log();
     }
   }
@@ -280,15 +270,9 @@ public class RawKVClient implements RawKVClientBase {
   public List<KvPair> batchGet(List<ByteString> keys) {
     String label = "client_raw_batch_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            conf.getRawKVBatchReadSlowLogInMS(),
-            new HashMap<String, String>(2) {
-              {
-                put("func", "batchGet");
-                put("keySize", String.valueOf(keys.size()));
-              }
-            });
+    SlowLog slowLog = new SlowLogImpl(conf.getRawKVBatchReadSlowLogInMS());
+    SlowLogSpan span = slowLog.start("batchGet");
+    span.addProperty("keySize", String.valueOf(keys.size()));
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchReadTimeoutInMS(), slowLog);
     try {
@@ -302,6 +286,7 @@ public class RawKVClient implements RawKVClientBase {
       throw e;
     } finally {
       requestTimer.observeDuration();
+      span.end();
       slowLog.log();
     }
   }
@@ -310,15 +295,9 @@ public class RawKVClient implements RawKVClientBase {
   public void batchDelete(List<ByteString> keys) {
     String label = "client_raw_batch_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            conf.getRawKVBatchWriteSlowLogInMS(),
-            new HashMap<String, String>(2) {
-              {
-                put("func", "batchDelete");
-                put("keySize", String.valueOf(keys.size()));
-              }
-            });
+    SlowLog slowLog = new SlowLogImpl(conf.getRawKVBatchWriteSlowLogInMS());
+    SlowLogSpan span = slowLog.start("batchDelete");
+    span.addProperty("keySize", String.valueOf(keys.size()));
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchWriteTimeoutInMS(), slowLog);
     try {
@@ -332,6 +311,7 @@ public class RawKVClient implements RawKVClientBase {
       throw e;
     } finally {
       requestTimer.observeDuration();
+      span.end();
       slowLog.log();
     }
   }
@@ -340,21 +320,15 @@ public class RawKVClient implements RawKVClientBase {
   public Optional<Long> getKeyTTL(ByteString key) {
     String label = "client_raw_get_key_ttl";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            conf.getRawKVReadSlowLogInMS(),
-            new HashMap<String, String>(2) {
-              {
-                put("func", "getKeyTTL");
-                put("key", KeyUtils.formatBytesUTF8(key));
-              }
-            });
+    SlowLog slowLog = new SlowLogImpl(conf.getRawKVReadSlowLogInMS());
+    SlowLogSpan span = slowLog.start("getKeyTTL");
+    span.addProperty("key", KeyUtils.formatBytesUTF8(key));
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS(), slowLog);
     try {
       while (true) {
         try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
-          slowLog.addProperty("region", client.getRegion().toString());
+          span.addProperty("region", client.getRegion().toString());
           Optional<Long> result = client.rawGetKeyTTL(backOffer, key);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return result;
@@ -369,6 +343,7 @@ public class RawKVClient implements RawKVClientBase {
       throw e;
     } finally {
       requestTimer.observeDuration();
+      span.end();
       slowLog.log();
     }
   }
@@ -453,18 +428,12 @@ public class RawKVClient implements RawKVClientBase {
   public List<KvPair> scan(ByteString startKey, ByteString endKey, int limit, boolean keyOnly) {
     String label = "client_raw_scan";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            conf.getRawKVScanSlowLogInMS(),
-            new HashMap<String, String>(5) {
-              {
-                put("func", "scan");
-                put("startKey", KeyUtils.formatBytesUTF8(startKey));
-                put("endKey", KeyUtils.formatBytesUTF8(endKey));
-                put("limit", String.valueOf(limit));
-                put("keyOnly", String.valueOf(keyOnly));
-              }
-            });
+    SlowLog slowLog = new SlowLogImpl(conf.getRawKVScanSlowLogInMS());
+    SlowLogSpan span = slowLog.start("scan");
+    span.addProperty("startKey", KeyUtils.formatBytesUTF8(startKey));
+    span.addProperty("endKey", KeyUtils.formatBytesUTF8(endKey));
+    span.addProperty("limit", String.valueOf(limit));
+    span.addProperty("keyOnly", String.valueOf(keyOnly));
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVScanTimeoutInMS(), slowLog);
     try {
@@ -480,6 +449,7 @@ public class RawKVClient implements RawKVClientBase {
       throw e;
     } finally {
       requestTimer.observeDuration();
+      span.end();
       slowLog.log();
     }
   }
@@ -503,17 +473,11 @@ public class RawKVClient implements RawKVClientBase {
   public List<KvPair> scan(ByteString startKey, ByteString endKey, boolean keyOnly) {
     String label = "client_raw_scan_without_limit";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            conf.getRawKVScanSlowLogInMS(),
-            new HashMap<String, String>(4) {
-              {
-                put("func", "scan");
-                put("startKey", KeyUtils.formatBytesUTF8(startKey));
-                put("endKey", KeyUtils.formatBytesUTF8(endKey));
-                put("keyOnly", String.valueOf(keyOnly));
-              }
-            });
+    SlowLog slowLog = new SlowLogImpl(conf.getRawKVScanSlowLogInMS());
+    SlowLogSpan span = slowLog.start("scan");
+    span.addProperty("startKey", KeyUtils.formatBytesUTF8(startKey));
+    span.addProperty("endKey", KeyUtils.formatBytesUTF8(endKey));
+    span.addProperty("keyOnly", String.valueOf(keyOnly));
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVScanTimeoutInMS(), slowLog);
     try {
@@ -543,6 +507,7 @@ public class RawKVClient implements RawKVClientBase {
       throw e;
     } finally {
       requestTimer.observeDuration();
+      span.end();
       slowLog.log();
     }
   }
@@ -574,21 +539,15 @@ public class RawKVClient implements RawKVClientBase {
   public void delete(ByteString key) {
     String label = "client_raw_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog =
-        new SlowLogImpl(
-            conf.getRawKVWriteSlowLogInMS(),
-            new HashMap<String, String>(2) {
-              {
-                put("func", "delete");
-                put("key", KeyUtils.formatBytesUTF8(key));
-              }
-            });
+    SlowLog slowLog = new SlowLogImpl(conf.getRawKVWriteSlowLogInMS());
+    SlowLogSpan span = slowLog.start("delete");
+    span.addProperty("key", KeyUtils.formatBytesUTF8(key));
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
     try {
       while (true) {
         try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
-          slowLog.addProperty("region", client.getRegion().toString());
+          span.addProperty("region", client.getRegion().toString());
           client.rawDelete(backOffer, key, atomicForCAS);
           RAW_REQUEST_SUCCESS.labels(label).inc();
           return;
@@ -603,6 +562,7 @@ public class RawKVClient implements RawKVClientBase {
       throw e;
     } finally {
       requestTimer.observeDuration();
+      span.end();
       slowLog.log();
     }
   }

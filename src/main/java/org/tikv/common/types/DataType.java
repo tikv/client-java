@@ -1,16 +1,18 @@
 /*
- * Copyright 2017 PingCAP, Inc.
+ * Copyright 2021 TiKV Project Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package org.tikv.common.types;
@@ -368,19 +370,19 @@ public abstract class DataType implements Serializable {
   /**
    * Convert from Spark SQL Supported Java Type to TiDB Type
    *
-   * <p>1. data convert, e.g. Integer -> SHORT
+   * <p>1. data convert, e.g. Integer -&gt; SHORT
    *
    * <p>2. check overflow, e.g. write 1000 to short
    *
    * <p>Spark SQL only support following types:
    *
-   * <p>1. BooleanType -> java.lang.Boolean 2. ByteType -> java.lang.Byte 3. ShortType ->
+   * <p>{@literal 1. BooleanType -> java.lang.Boolean 2. ByteType -> java.lang.Byte 3. ShortType ->
    * java.lang.Short 4. IntegerType -> java.lang.Integer 5. LongType -> java.lang.Long 6. FloatType
    * -> java.lang.Float 7. DoubleType -> java.lang.Double 8. StringType -> String 9. DecimalType ->
    * java.math.BigDecimal 10. DateType -> java.sql.Date 11. TimestampType -> java.sql.Timestamp 12.
    * BinaryType -> byte array 13. ArrayType -> scala.collection.Seq (use getList for java.util.List)
    * 14. MapType -> scala.collection.Map (use getJavaMap for java.util.Map) 15. StructType ->
-   * org.apache.spark.sql.Row
+   * org.apache.spark.sql.Row }
    *
    * @param value
    * @return
