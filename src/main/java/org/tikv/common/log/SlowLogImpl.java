@@ -83,6 +83,7 @@ public class SlowLogImpl implements SlowLog {
 
   @Override
   public void log() {
+    recordTime();
     if (error != null || timeExceeded()) {
       SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
       logger.warn(
@@ -95,9 +96,12 @@ public class SlowLogImpl implements SlowLog {
     }
   }
 
-  boolean timeExceeded() {
+  private void recordTime() {
     long currentNS = System.nanoTime();
     durationMS = (currentNS - startNS) / 1_000_000;
+  }
+
+  boolean timeExceeded() {
     return slowThresholdMS >= 0 && durationMS > slowThresholdMS;
   }
 
