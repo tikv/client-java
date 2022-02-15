@@ -23,7 +23,7 @@ public class SeekLeaderStoreTest extends MockThreeStoresTest {
     client.put(key, value);
     Assert.assertEquals(value, client.get(key).get());
     servers.get(0).setState(State.Fail);
-    // Assert.assertEquals(State.Normal, servers.get(1).getState());
-    Assert.assertEquals(value, client.get(key).get());
+    servers.get(1).setRegion(region.switchPeer(stores.get(1).getId()));
+    client.get(key);
   }
 }

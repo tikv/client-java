@@ -27,6 +27,11 @@ import com.pingcap.tidb.tipb.SelectResponse;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
+import io.grpc.health.v1.HealthCheckRequest;
+import io.grpc.health.v1.HealthCheckResponse;
+import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.health.v1.HealthGrpc.HealthImplBase;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.HashMap;
@@ -36,6 +41,8 @@ import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Coprocessor;
@@ -50,6 +57,7 @@ import org.tikv.kvproto.TikvGrpc;
 
 public class KVMockServer extends TikvGrpc.TikvImplBase {
 
+  private final static Logger logger = LoggerFactory.getLogger(KVMockServer.class);
   private int port;
   private Server server;
   private TiRegion region;
@@ -87,6 +95,10 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     return port;
   }
 
+  public void setRegion(TiRegion region) {
+    this.region = region;
+  }
+
   public void put(ByteString key, ByteString value) {
     dataMap.put(toRawKey(key), value);
   }
@@ -116,7 +128,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     if (context.getRegionId() != region.getId()
         || !context.getRegionEpoch().equals(region.getRegionEpoch())
         || !context.getPeer().equals(region.getLeader())) {
-      throw new Exception();
+      throw new Exception("context doesn't match");
     }
   }
 
@@ -140,7 +152,12 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         setErrorInfo(errorCode, errBuilder);
         builder.setRegionError(errBuilder.build());
       } else {
-        builder.setValue(dataMap.get(toRawKey(key)));
+        Key rawKey = toRawKey(key);
+        ByteString value = dataMap.get(rawKey);
+        if (value == null) {
+          value = ByteString.EMPTY;
+        }
+        builder.setValue(value);
       }
       responseObserver.onNext(builder.build());
       responseObserver.onCompleted();
@@ -384,10 +401,27 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     return port;
   }
 
+  private static class HealCheck extends HealthImplBase {
+
+    @Override
+    public void check(HealthCheckRequest request,
+        StreamObserver<HealthCheckResponse> responseObserver) {
+      responseObserver.onNext(
+          HealthCheckResponse.newBuilder().setStatus(ServingStatus.SERVING).build());
+      responseObserver.onCompleted();
+    }
+  }
+
   public void start(TiRegion region, int port) throws IOException {
     this.port = port;
-    server = ServerBuilder.forPort(port).addService(this).build().start();
     this.region = region;
+
+    logger.info("start mock server on port: " + port);
+    server = ServerBuilder.forPort(port)
+        .addService(new HealCheck())
+        .addService(this)
+        .build()
+        .start();
     Runtime.getRuntime().addShutdownHook(new Thread(KVMockServer.this::stop));
   }
 

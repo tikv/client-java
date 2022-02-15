@@ -3,6 +3,7 @@ package org.tikv.common;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -15,15 +16,25 @@ import org.tikv.kvproto.Pdpb;
 
 public class MockThreeStoresTest extends PDMockServerTest {
 
-  public TiRegion region;
-  public ArrayList<KVMockServer> servers = new ArrayList<>();
+  protected TiRegion region;
+  protected List<KVMockServer> servers = new ArrayList<>();
+  protected List<Metapb.Store> stores;
 
   @Before
   @Override
   public void setup() throws IOException {
     super.setup();
 
-    int basePort = 0xabcd;
+    int basePort;
+    try (ServerSocket s = new ServerSocket(0)) {
+      basePort = s.getLocalPort();
+    }
+
+    ImmutableList<Metapb.Peer> peers = ImmutableList.of(
+        Metapb.Peer.newBuilder().setId(0x1).setStoreId(0x1).build(),
+        Metapb.Peer.newBuilder().setId(0x2).setStoreId(0x2).build(),
+        Metapb.Peer.newBuilder().setId(0x3).setStoreId(0x3).build()
+    );
 
     Metapb.Region region =
         Metapb.Region.newBuilder()
@@ -31,12 +42,10 @@ public class MockThreeStoresTest extends PDMockServerTest {
             .setId(0xff)
             .setStartKey(ByteString.EMPTY)
             .setEndKey(ByteString.EMPTY)
-            .addPeers(Metapb.Peer.newBuilder().setId(0x1).setStoreId(0x1))
-            .addPeers(Metapb.Peer.newBuilder().setId(0x2).setStoreId(0x2))
-            .addPeers(Metapb.Peer.newBuilder().setId(0x3).setStoreId(0x3))
+            .addAllPeers(peers)
             .build();
 
-    List<Metapb.Store> stores =
+    stores =
         ImmutableList.of(
             Metapb.Store.newBuilder()
                 .setAddress("127.0.0.1:" + basePort)
@@ -45,7 +54,6 @@ public class MockThreeStoresTest extends PDMockServerTest {
                 .build(),
             Metapb.Store.newBuilder()
                 .setAddress("127.0.0.1:" + (basePort + 1))
-                .setVersion("5.0.0")
                 .setVersion("5.0.0")
                 .setId(0x2)
                 .build(),
@@ -57,10 +65,12 @@ public class MockThreeStoresTest extends PDMockServerTest {
         );
 
     for (PDMockServer server : pdServers) {
-      server.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(region).build());
-      for (Metapb.Store store : stores) {
-        server.addGetStoreResp(Pdpb.GetStoreResponse.newBuilder().setStore(store).build());
-      }
+      server.addGetRegionListener(request ->
+          Pdpb.GetRegionResponse.newBuilder().setLeader(peers.get(0)).setRegion(region).build());
+      server.addGetStoreListener((request) -> {
+        int i = (int) request.getStoreId() - 1;
+        return Pdpb.GetStoreResponse.newBuilder().setStore(stores.get(i)).build();
+      });
     }
 
     this.region =

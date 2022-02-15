@@ -39,15 +39,15 @@ public abstract class PDMockServerTest {
 
   void setup(String addr) throws IOException {
     int basePort;
-    try (ServerSocket s = new ServerSocket(0)) {
+    try (ServerSocket s = new ServerSocket(51820)) {
       basePort = s.getLocalPort();
     }
 
     for (int i = 0; i < 3; i++) {
       PDMockServer server = new PDMockServer();
       server.start(CLUSTER_ID, basePort + i);
-      server.addGetMemberResp(
-          GrpcUtils.makeGetMembersResponse(
+      server.addGetMembersListener(
+          (request) -> GrpcUtils.makeGetMembersResponse(
               server.getClusterId(),
               GrpcUtils.makeMember(1, "http://" + addr + ":" + basePort),
               GrpcUtils.makeMember(2, "http://" + addr + ":" + (basePort + 1)),

@@ -40,6 +40,7 @@ import org.tikv.kvproto.Metapb.Peer;
 import org.tikv.kvproto.Metapb.Region;
 
 public class TiRegion implements Serializable {
+
   private static final Logger logger = LoggerFactory.getLogger(TiRegion.class);
 
   private final Region meta;
@@ -203,23 +204,23 @@ public class TiRegion implements Serializable {
 
   public boolean isMoreThan(ByteString key) {
     return FastByteComparisons.compareTo(
-            meta.getStartKey().toByteArray(),
-            0,
-            meta.getStartKey().size(),
-            key.toByteArray(),
-            0,
-            key.size())
+        meta.getStartKey().toByteArray(),
+        0,
+        meta.getStartKey().size(),
+        key.toByteArray(),
+        0,
+        key.size())
         > 0;
   }
 
   public boolean isLessThan(ByteString key) {
     return FastByteComparisons.compareTo(
-            meta.getEndKey().toByteArray(),
-            0,
-            meta.getEndKey().size(),
-            key.toByteArray(),
-            0,
-            key.size())
+        meta.getEndKey().toByteArray(),
+        0,
+        meta.getEndKey().size(),
+        key.toByteArray(),
+        0,
+        key.size())
         <= 0;
   }
 
@@ -269,6 +270,7 @@ public class TiRegion implements Serializable {
   }
 
   public class RegionVerID {
+
     final long id;
     final long confVer;
     final long ver;

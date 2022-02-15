@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.meta.TiTimestamp;
@@ -80,11 +81,11 @@ public class PDClientMockTest extends PDMockServerTest {
 
   @Test
   public void testGetRegionByKey() throws Exception {
-    byte[] startKey = new byte[] {1, 0, 2, 4};
-    byte[] endKey = new byte[] {1, 0, 2, 5};
+    byte[] startKey = new byte[]{1, 0, 2, 4};
+    byte[] endKey = new byte[]{1, 0, 2, 5};
     int confVer = 1026;
     int ver = 1027;
-    leader.addGetRegionResp(
+    leader.addGetRegionListener(request ->
         GrpcUtils.makeGetRegionResponse(
             leader.getClusterId(),
             GrpcUtils.makeRegion(
@@ -110,12 +111,12 @@ public class PDClientMockTest extends PDMockServerTest {
 
   @Test
   public void testGetRegionById() throws Exception {
-    byte[] startKey = new byte[] {1, 0, 2, 4};
-    byte[] endKey = new byte[] {1, 0, 2, 5};
+    byte[] startKey = new byte[]{1, 0, 2, 4};
+    byte[] endKey = new byte[]{1, 0, 2, 5};
     int confVer = 1026;
     int ver = 1027;
 
-    leader.addGetRegionByIDResp(
+    leader.addGetRegionByIDListener(request ->
         GrpcUtils.makeGetRegionResponse(
             leader.getClusterId(),
             GrpcUtils.makeRegion(
@@ -142,7 +143,7 @@ public class PDClientMockTest extends PDMockServerTest {
   public void testGetStore() throws Exception {
     long storeId = 1;
     String testAddress = "testAddress";
-    leader.addGetStoreResp(
+    leader.addGetStoreListener(request ->
         GrpcUtils.makeGetStoreResponse(
             leader.getClusterId(),
             GrpcUtils.makeStore(
@@ -161,7 +162,7 @@ public class PDClientMockTest extends PDMockServerTest {
       assertEquals("v1", r.getLabels(0).getValue());
       assertEquals("v2", r.getLabels(1).getValue());
 
-      leader.addGetStoreResp(
+      leader.addGetStoreListener(request ->
           GrpcUtils.makeGetStoreResponse(
               leader.getClusterId(),
               GrpcUtils.makeStore(storeId, testAddress, Metapb.StoreState.Tombstone)));
@@ -177,11 +178,15 @@ public class PDClientMockTest extends PDMockServerTest {
   public void testRetryPolicy() throws Exception {
     long storeId = 1024;
     ExecutorService service = Executors.newCachedThreadPool();
-    leader.addGetStoreResp(null);
-    leader.addGetStoreResp(null);
-    leader.addGetStoreResp(
-        GrpcUtils.makeGetStoreResponse(
-            leader.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up)));
+    AtomicInteger i = new AtomicInteger();
+    leader.addGetStoreListener(request -> {
+      if (i.getAndIncrement() < 2) {
+        return null;
+      } else {
+        return GrpcUtils.makeGetStoreResponse(leader.getClusterId(),
+            GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up));
+      }
+    });
     try (PDClient client = session.getPDClient()) {
       Callable<Store> storeCallable =
           () -> client.getStore(ConcreteBackOffer.newCustomBackOff(5000), 0);
@@ -194,16 +199,16 @@ public class PDClientMockTest extends PDMockServerTest {
       }
 
       // Should fail
-      leader.addGetStoreResp(null);
-      leader.addGetStoreResp(null);
-      leader.addGetStoreResp(null);
-      leader.addGetStoreResp(null);
-      leader.addGetStoreResp(null);
-      leader.addGetStoreResp(null);
+      AtomicInteger j = new AtomicInteger();
+      leader.addGetStoreListener(request -> {
+        if (j.getAndIncrement() < 6) {
+          return null;
+        } else {
+          return GrpcUtils.makeGetStoreResponse(
+              leader.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up));
+        }
+      });
 
-      leader.addGetStoreResp(
-          GrpcUtils.makeGetStoreResponse(
-              leader.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up)));
       try {
         client.getStore(defaultBackOff(), 0);
       } catch (GrpcException e) {
