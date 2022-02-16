@@ -103,7 +103,8 @@ public abstract class AbstractRegionStoreClient
   }
 
   @Override
-  public void close() throws GrpcException {}
+  public void close() throws GrpcException {
+  }
 
   /**
    * onNotLeader deals with NotLeaderError and returns whether re-splitting key range is needed
@@ -314,7 +315,6 @@ public abstract class AbstractRegionStoreClient
             }
           }
         } catch (Exception ignored) {
-          logger.error(ignored.getMessage() + " peer is " + task.peer.getId());
         }
       }
       if (unfinished.isEmpty()) {
