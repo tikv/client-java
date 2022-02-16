@@ -41,8 +41,9 @@ jobs:
       - name: Start TiUP Playground
         run: |
           /home/runner/.tiup/bin/tiup playground nightly --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> raw.out 2>&1 &
+          sleep 1m 30s
           /home/runner/.tiup/bin/tiup playground nightly --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> txn.out 2>&1 &
-          sleep 2m
+          sleep 30s
           echo "RAWKV_PD_ADDRESSES=$(cat raw.out | grep -oP '(?<=PD client endpoints: \[)[0-9\.:]+(?=\])')" >> $GITHUB_ENV
           echo "TXNKV_PD_ADDRESSES=$(cat txn.out | grep -oP '(?<=PD client endpoints: \[)[0-9\.:]+(?=\])')" >> $GITHUB_ENV
           echo "$GITHUB_ENV" >&2
