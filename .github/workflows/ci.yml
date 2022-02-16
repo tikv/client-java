@@ -51,13 +51,7 @@ jobs:
       - name: Run Integration Test
         run: mvn clean test
       - name: Upload coverage
-        uses: actions/upload-artifact@v2
-        with:
-          name: jacoco
-          path: |
-            ${{ github.workspace }}/target/jacoco.exec
-            ${{ github.workspace }}/target/site/jacoco
-      - uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v2
         with:
           files: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
           fail_ci_if_error: true
