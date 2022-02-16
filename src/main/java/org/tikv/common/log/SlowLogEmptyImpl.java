@@ -23,11 +23,18 @@ public class SlowLogEmptyImpl implements SlowLog {
   private SlowLogEmptyImpl() {}
 
   @Override
-  public void addProperty(String key, String value) {}
-
-  @Override
   public SlowLogSpan start(String name) {
     return SlowLogSpanEmptyImpl.INSTANCE;
+  }
+
+  @Override
+  public long getTraceId() {
+    return 0;
+  }
+
+  @Override
+  public long getThresholdMS() {
+    return 0;
   }
 
   @Override

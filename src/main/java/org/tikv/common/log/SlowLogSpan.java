@@ -20,6 +20,8 @@ package org.tikv.common.log;
 import com.google.gson.JsonElement;
 
 public interface SlowLogSpan {
+  void addProperty(String key, String value);
+
   void start();
 
   void end();

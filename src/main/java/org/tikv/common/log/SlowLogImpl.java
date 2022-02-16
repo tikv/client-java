@@ -19,11 +19,11 @@ package org.tikv.common.log;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import java.math.BigInteger;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +31,8 @@ public class SlowLogImpl implements SlowLog {
   private static final Logger logger = LoggerFactory.getLogger(SlowLogImpl.class);
 
   private static final int MAX_SPAN_SIZE = 1024;
+
+  private static final Random random = new Random();
 
   private final List<SlowLogSpan> slowLogSpans = new ArrayList<>();
   private Throwable error = null;
@@ -43,19 +45,15 @@ public class SlowLogImpl implements SlowLog {
 
   private final long slowThresholdMS;
 
-  /** Key-Value pairs which will be logged, e.g. function name, key, region, etc. */
-  private final Map<String, String> properties;
+  private final long traceId;
 
-  public SlowLogImpl(long slowThresholdMS, Map<String, String> properties) {
+  private long durationMS;
+
+  public SlowLogImpl(long slowThresholdMS) {
     this.startMS = System.currentTimeMillis();
     this.startNS = System.nanoTime();
     this.slowThresholdMS = slowThresholdMS;
-    this.properties = new HashMap<>(properties);
-  }
-
-  @Override
-  public void addProperty(String key, String value) {
-    this.properties.put(key, value);
+    this.traceId = random.nextLong();
   }
 
   @Override
@@ -69,32 +67,51 @@ public class SlowLogImpl implements SlowLog {
   }
 
   @Override
+  public long getTraceId() {
+    return traceId;
+  }
+
+  @Override
+  public long getThresholdMS() {
+    return slowThresholdMS;
+  }
+
+  @Override
   public void setError(Throwable err) {
     this.error = err;
   }
 
   @Override
   public void log() {
-    long currentNS = System.nanoTime();
-    long currentMS = startMS + (currentNS - startNS) / 1_000_000;
-    if (error != null || (slowThresholdMS >= 0 && currentMS - startMS > slowThresholdMS)) {
-      logger.warn("SlowLog:" + getSlowLogString(currentMS));
+    recordTime();
+    if (error != null || timeExceeded()) {
+      SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
+      logger.warn(
+          String.format(
+              "A request spent %s ms. start=%s, end=%s, SlowLog:%s",
+              durationMS,
+              dateFormat.format(startMS),
+              dateFormat.format(startMS + durationMS),
+              getSlowLogJson().toString()));
     }
   }
 
-  private String getSlowLogString(long currentMS) {
-    SimpleDateFormat dateFormat = getSimpleDateFormat();
+  private void recordTime() {
+    long currentNS = System.nanoTime();
+    durationMS = (currentNS - startNS) / 1_000_000;
+  }
+
+  boolean timeExceeded() {
+    return slowThresholdMS >= 0 && durationMS > slowThresholdMS;
+  }
+
+  JsonObject getSlowLogJson() {
     JsonObject jsonObject = new JsonObject();
 
-    jsonObject.addProperty("start", dateFormat.format(startMS));
-    jsonObject.addProperty("end", dateFormat.format(currentMS));
-    jsonObject.addProperty("duration", (currentMS - startMS) + "ms");
+    jsonObject.addProperty("trace_id", toUnsignedBigInteger(traceId));
+
     if (error != null) {
       jsonObject.addProperty("error", error.getMessage());
-    }
-
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      jsonObject.addProperty(entry.getKey(), entry.getValue());
     }
 
     JsonArray jsonArray = new JsonArray();
@@ -103,10 +120,16 @@ public class SlowLogImpl implements SlowLog {
     }
     jsonObject.add("spans", jsonArray);
 
-    return jsonObject.toString();
+    return jsonObject;
   }
 
-  public static SimpleDateFormat getSimpleDateFormat() {
-    return new SimpleDateFormat("HH:mm:ss.SSS");
+  static BigInteger toUnsignedBigInteger(long i) {
+    if (i >= 0) {
+      return BigInteger.valueOf(i);
+    } else {
+      long withoutSign = i & ~(1L << 63);
+
+      return (BigInteger.valueOf(1)).shiftLeft(63).add(BigInteger.valueOf(withoutSign));
+    }
   }
 }

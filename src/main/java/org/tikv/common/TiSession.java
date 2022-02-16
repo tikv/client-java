@@ -61,8 +61,10 @@ import org.tikv.txn.TxnKVClient;
 
 /**
  * TiSession is the holder for PD Client, Store pdClient and PD Cache All sessions share common
- * region store connection pool but separated PD conn and cache for better concurrency TiSession is
- * thread-safe but it's also recommended to have multiple session avoiding lock contention
+ * region store connection pool but separated PD conn and cache for better concurrency
+ *
+ * <p>TiSession is thread-safe but it's also recommended to have multiple session avoiding lock
+ * contention
  */
 public class TiSession implements AutoCloseable {
 

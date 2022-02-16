@@ -3,3 +3,4 @@
 echo $MAVEN_HOME
 
 mvn com.coveo:fmt-maven-plugin:format
+mvn xml-format:xml-format
