@@ -49,5 +49,5 @@ jobs:
           echo "$GITHUB_ENV" >&2
           echo "$(cat raw.out)" >&2
           echo "$(cat txn.out)" >&2
-      # - name: Run Integration Test
-      #   run: mvn clean test
+      - name: Run Integration Test
+        run: mvn clean test
