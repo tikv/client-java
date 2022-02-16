@@ -28,6 +28,8 @@ jobs:
 
   integration-test:
     name: Integration Test
+    permissions:
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -50,8 +52,17 @@ jobs:
           echo "$(cat txn.out)" >&2
       - name: Run Integration Test
         run: mvn clean test
-      - name: Comment coverage to PR
+      - name: Upload coverage
+        uses: actions/upload-artifact@v2
+        with:
+          name: jacoco
+          path: |
+            ${{ github.workspace }}/target/jacoco.exec
+            ${{ github.workspace }}/target/site/jacoco
+      - name: Comment coverage
         uses: madrapps/jacoco-report@v1.2
         with:
           paths: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
           token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 0
+          min-coverage-changed-files: 0

@@ -3,6 +3,9 @@
 [raftstore]
 # set store capacity, if no set, use disk capacity.
 capacity = "8G"
+pd-heartbeat-tick-interval = "2s"
+pd-store-heartbeat-tick-interval = "5s"
+split-region-check-tick-interval = "1s"
 
 [rocksdb]
 max-open-files = 10000
