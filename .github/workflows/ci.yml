@@ -45,8 +45,8 @@ jobs:
           sleep 2m
           echo "RAWKV_PD_ADDRESSES=$(cat raw.out | grep -oP '(?<=PD client endpoints: \[)[0-9\.:]+(?=\])')" >> $GITHUB_ENV
           echo "TXNKV_PD_ADDRESSES=$(cat txn.out | grep -oP '(?<=PD client endpoints: \[)[0-9\.:]+(?=\])')" >> $GITHUB_ENV
-          echo $GITHUB_ENV
-          cat raw.out | echo
-          cat txn.out | echo
-      - name: Run Integration Test
-        run: mvn clean test
+          echo "::set-output name=GITHUB_ENV::$(echo $GITHUB_ENV)"
+          echo "::set-output name=rawout::$(echo $(cat raw.out))"
+          echo "::set-output name=txnout::$(echo $(cat txn.out))"
+      # - name: Run Integration Test
+      #   run: mvn clean test
