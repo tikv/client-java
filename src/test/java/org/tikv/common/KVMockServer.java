@@ -57,7 +57,7 @@ import org.tikv.kvproto.TikvGrpc;
 
 public class KVMockServer extends TikvGrpc.TikvImplBase {
 
-  private final static Logger logger = LoggerFactory.getLogger(KVMockServer.class);
+  private static final Logger logger = LoggerFactory.getLogger(KVMockServer.class);
   private int port;
   private Server server;
   private TiRegion region;
@@ -85,10 +85,6 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
   public void setState(State state) {
     this.state = state;
-  }
-
-  public State getState() {
-    return state;
   }
 
   public int getPort() {
@@ -166,9 +162,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     }
   }
 
-  /**
-   *
-   */
+  /** */
   public void rawPut(
       org.tikv.kvproto.Kvrpcpb.RawPutRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawPutResponse> responseObserver) {
@@ -210,9 +204,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     }
   }
 
-  /**
-   *
-   */
+  /** */
   public void rawDelete(
       org.tikv.kvproto.Kvrpcpb.RawDeleteRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawDeleteResponse> responseObserver) {
@@ -404,8 +396,8 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   private static class HealCheck extends HealthImplBase {
 
     @Override
-    public void check(HealthCheckRequest request,
-        StreamObserver<HealthCheckResponse> responseObserver) {
+    public void check(
+        HealthCheckRequest request, StreamObserver<HealthCheckResponse> responseObserver) {
       responseObserver.onNext(
           HealthCheckResponse.newBuilder().setStatus(ServingStatus.SERVING).build());
       responseObserver.onCompleted();
@@ -417,11 +409,8 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     this.region = region;
 
     logger.info("start mock server on port: " + port);
-    server = ServerBuilder.forPort(port)
-        .addService(new HealCheck())
-        .addService(this)
-        .build()
-        .start();
+    server =
+        ServerBuilder.forPort(port).addService(new HealCheck()).addService(this).build().start();
     Runtime.getRuntime().addShutdownHook(new Thread(KVMockServer.this::stop));
   }
 

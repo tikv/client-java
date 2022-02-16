@@ -30,11 +30,11 @@ public class MockThreeStoresTest extends PDMockServerTest {
       basePort = s.getLocalPort();
     }
 
-    ImmutableList<Metapb.Peer> peers = ImmutableList.of(
-        Metapb.Peer.newBuilder().setId(0x1).setStoreId(0x1).build(),
-        Metapb.Peer.newBuilder().setId(0x2).setStoreId(0x2).build(),
-        Metapb.Peer.newBuilder().setId(0x3).setStoreId(0x3).build()
-    );
+    ImmutableList<Metapb.Peer> peers =
+        ImmutableList.of(
+            Metapb.Peer.newBuilder().setId(0x1).setStoreId(0x1).build(),
+            Metapb.Peer.newBuilder().setId(0x2).setStoreId(0x2).build(),
+            Metapb.Peer.newBuilder().setId(0x3).setStoreId(0x3).build());
 
     Metapb.Region region =
         Metapb.Region.newBuilder()
@@ -61,16 +61,20 @@ public class MockThreeStoresTest extends PDMockServerTest {
                 .setAddress("127.0.0.1:" + (basePort + 2))
                 .setVersion("5.0.0")
                 .setId(0x3)
-                .build()
-        );
+                .build());
 
     for (PDMockServer server : pdServers) {
-      server.addGetRegionListener(request ->
-          Pdpb.GetRegionResponse.newBuilder().setLeader(peers.get(0)).setRegion(region).build());
-      server.addGetStoreListener((request) -> {
-        int i = (int) request.getStoreId() - 1;
-        return Pdpb.GetStoreResponse.newBuilder().setStore(stores.get(i)).build();
-      });
+      server.addGetRegionListener(
+          request ->
+              Pdpb.GetRegionResponse.newBuilder()
+                  .setLeader(peers.get(0))
+                  .setRegion(region)
+                  .build());
+      server.addGetStoreListener(
+          (request) -> {
+            int i = (int) request.getStoreId() - 1;
+            return Pdpb.GetStoreResponse.newBuilder().setStore(stores.get(i)).build();
+          });
     }
 
     this.region =
