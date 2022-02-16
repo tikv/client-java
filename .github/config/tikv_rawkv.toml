@@ -3,3 +3,12 @@
 [raftstore]
 # set store capacity, if no set, use disk capacity.
 capacity = "8G"
+
+[storage]
+enable-ttl = true
+
+[rocksdb]
+max-open-files = 10000
+
+[raftdb]
+max-open-files = 10000
