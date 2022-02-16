@@ -40,13 +40,13 @@ jobs:
         run: curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
       - name: Start TiUP Playground
         run: |
-          /home/runner/.tiup/bin/tiup playground nightly --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> raw.out &
-          /home/runner/.tiup/bin/tiup playground nightly --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> txn.out &
+          /home/runner/.tiup/bin/tiup playground nightly --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> raw.out 2>&1 &
+          /home/runner/.tiup/bin/tiup playground nightly --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> txn.out 2>&1 &
           sleep 2m
           echo "RAWKV_PD_ADDRESSES=$(cat raw.out | grep -oP '(?<=PD client endpoints: \[)[0-9\.:]+(?=\])')" >> $GITHUB_ENV
           echo "TXNKV_PD_ADDRESSES=$(cat txn.out | grep -oP '(?<=PD client endpoints: \[)[0-9\.:]+(?=\])')" >> $GITHUB_ENV
-          echo "::set-output name=GITHUB_ENV::$(echo $GITHUB_ENV)"
-          echo "::set-output name=rawout::$(echo $(cat raw.out))"
-          echo "::set-output name=txnout::$(echo $(cat txn.out))"
+          echo "$GITHUB_ENV"
+          echo "$(cat raw.out)"
+          echo "$(cat txn.out)"
       # - name: Run Integration Test
       #   run: mvn clean test
