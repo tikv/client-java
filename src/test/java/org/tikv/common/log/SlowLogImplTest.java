@@ -28,10 +28,17 @@ public class SlowLogImplTest {
   public void testThresholdTime() throws InterruptedException {
     SlowLogImpl slowLog = new SlowLogImpl(1000);
     Thread.sleep(1100);
+    slowLog.log();
     Assert.assertTrue(slowLog.timeExceeded());
 
     slowLog = new SlowLogImpl(1000);
     Thread.sleep(500);
+    slowLog.log();
+    Assert.assertFalse(slowLog.timeExceeded());
+
+    slowLog = new SlowLogImpl(-1);
+    Thread.sleep(500);
+    slowLog.log();
     Assert.assertFalse(slowLog.timeExceeded());
   }
 
