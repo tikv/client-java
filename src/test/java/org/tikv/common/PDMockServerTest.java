@@ -61,7 +61,8 @@ public abstract class PDMockServerTest {
     conf.setEnableGrpcForward(false);
     conf.setKvMode("RAW");
     conf.setTest(true);
-    conf.setTimeout(20000000);
+    conf.setTimeout(2000);
+    conf.setEnableGrpcForward(true);
     session = TiSession.create(conf);
   }
 
