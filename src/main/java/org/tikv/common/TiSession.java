@@ -178,10 +178,6 @@ public class TiSession implements AutoCloseable {
   }
 
   private synchronized void warmUp() {
-    if (conf.isTest()) {
-      logger.info("skip warm up in test mode");
-      return;
-    }
     long warmUpStartTime = System.nanoTime();
     BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
     try {

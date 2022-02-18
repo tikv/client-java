@@ -26,8 +26,7 @@ import org.tikv.raw.RawKVClient;
 public class SeekProxyStoreTest extends MockThreeStoresTest {
 
   private RawKVClient createClient() {
-    RawKVClient client = session.createRawClient();
-    return client;
+    return session.createRawClient();
   }
 
   @Test
