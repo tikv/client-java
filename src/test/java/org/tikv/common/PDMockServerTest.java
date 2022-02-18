@@ -58,7 +58,6 @@ public abstract class PDMockServerTest {
 
     leader = pdServers.get(0);
     TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + leader.port);
-    conf.setEnableGrpcForward(false);
     conf.setKvMode("RAW");
     conf.setTest(true);
     conf.setTimeout(2000);
