@@ -1,3 +1,7 @@
+[![Maven Central](https://img.shields.io/maven-central/v/org.tikv/tikv-client-java.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22org.tikv%22%20AND%20a:%22tikv-client-java%22)
+[![Slack](https://img.shields.io/badge/chat-on%20Slack-brightgreen.svg)](https://slack.tidb.io/invite?team=tikv-wg&channel=client)
+[![codecov](https://codecov.io/gh/tikv/client-java/branch/master/graph/badge.svg?token=nSAjGaN0EH)](https://codecov.io/gh/tikv/client-java)
+
 ## TiKV JAVA Client
 
 A Java client for [TiDB](https://github.com/pingcap/tidb)/[TiKV](https://github.com/tikv/tikv).
