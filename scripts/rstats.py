@@ -21,7 +21,7 @@ import json
 import argparse
 
 def main():
-    pattern = r'.*SlowLog.*'
+    pattern = r'.*SlowLog:.*'
     slowstr = "SlowLog:"
     grpc_pattern = "gRPC tikvpb.Tikv"
     backoff_pattern = "backoff "
