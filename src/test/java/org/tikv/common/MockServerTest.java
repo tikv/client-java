@@ -29,14 +29,15 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
 
 public class MockServerTest extends PDMockServerTest {
+
   public KVMockServer server;
   public int port;
   public TiRegion region;
 
   @Before
   @Override
-  public void setUp() throws IOException {
-    super.setUp();
+  public void setup() throws IOException {
+    super.setup();
 
     Metapb.Region r =
         Metapb.Region.newBuilder()
@@ -62,9 +63,11 @@ public class MockServerTest extends PDMockServerTest {
             r.getPeers(0),
             r.getPeersList(),
             s.stream().map(TiStore::new).collect(Collectors.toList()));
-    pdServer.addGetRegionResp(Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
+    leader.addGetRegionListener(
+        request -> Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
     for (Metapb.Store store : s) {
-      pdServer.addGetStoreResp(Pdpb.GetStoreResponse.newBuilder().setStore(store).build());
+      leader.addGetStoreListener(
+          (request) -> Pdpb.GetStoreResponse.newBuilder().setStore(store).build());
     }
     server = new KVMockServer();
     port = server.start(region);

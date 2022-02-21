@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.meta.TiTimestamp;
@@ -46,7 +47,7 @@ public class PDClientMockTest extends PDMockServerTest {
   @Test
   public void testCreate() throws Exception {
     try (PDClient client = session.getPDClient()) {
-      assertEquals(LOCAL_ADDR + ":" + pdServer.port, client.getPdClientWrapper().getLeaderInfo());
+      assertEquals(LOCAL_ADDR + ":" + leader.port, client.getPdClientWrapper().getLeaderInfo());
       assertEquals(CLUSTER_ID, client.getHeader().getClusterId());
     }
   }
@@ -54,18 +55,17 @@ public class PDClientMockTest extends PDMockServerTest {
   @Test
   public void testSwitchLeader() throws Exception {
     try (PDClient client = session.getPDClient()) {
-      client.trySwitchLeader(HTTP + LOCAL_ADDR + ":" + (pdServer.port + 1));
+      client.trySwitchLeader(HTTP + LOCAL_ADDR + ":" + (leader.port + 1));
       assertEquals(
-          client.getPdClientWrapper().getLeaderInfo(),
-          HTTP + LOCAL_ADDR + ":" + (pdServer.port + 1));
+          client.getPdClientWrapper().getLeaderInfo(), HTTP + LOCAL_ADDR + ":" + (leader.port + 1));
     }
     tearDown();
-    setUp(LOCAL_ADDR_IPV6);
+    setup(LOCAL_ADDR_IPV6);
     try (PDClient client = session.getPDClient()) {
-      client.trySwitchLeader(HTTP + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
+      client.trySwitchLeader(HTTP + LOCAL_ADDR_IPV6 + ":" + (leader.port + 2));
       assertEquals(
           client.getPdClientWrapper().getLeaderInfo(),
-          HTTP + LOCAL_ADDR_IPV6 + ":" + (pdServer.port + 2));
+          HTTP + LOCAL_ADDR_IPV6 + ":" + (leader.port + 2));
     }
   }
 
@@ -84,16 +84,17 @@ public class PDClientMockTest extends PDMockServerTest {
     byte[] endKey = new byte[] {1, 0, 2, 5};
     int confVer = 1026;
     int ver = 1027;
-    pdServer.addGetRegionResp(
-        GrpcUtils.makeGetRegionResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeRegion(
-                1,
-                ByteString.copyFrom(startKey),
-                ByteString.copyFrom(endKey),
-                GrpcUtils.makeRegionEpoch(confVer, ver),
-                GrpcUtils.makePeer(1, 10),
-                GrpcUtils.makePeer(2, 20))));
+    leader.addGetRegionListener(
+        request ->
+            GrpcUtils.makeGetRegionResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeRegion(
+                    1,
+                    ByteString.copyFrom(startKey),
+                    ByteString.copyFrom(endKey),
+                    GrpcUtils.makeRegionEpoch(confVer, ver),
+                    GrpcUtils.makePeer(1, 10),
+                    GrpcUtils.makePeer(2, 20))));
     try (PDClient client = session.getPDClient()) {
       Pair<Metapb.Region, Metapb.Peer> rl =
           client.getRegionByKey(defaultBackOff(), ByteString.EMPTY);
@@ -115,16 +116,17 @@ public class PDClientMockTest extends PDMockServerTest {
     int confVer = 1026;
     int ver = 1027;
 
-    pdServer.addGetRegionByIDResp(
-        GrpcUtils.makeGetRegionResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeRegion(
-                1,
-                ByteString.copyFrom(startKey),
-                ByteString.copyFrom(endKey),
-                GrpcUtils.makeRegionEpoch(confVer, ver),
-                GrpcUtils.makePeer(1, 10),
-                GrpcUtils.makePeer(2, 20))));
+    leader.addGetRegionByIDListener(
+        request ->
+            GrpcUtils.makeGetRegionResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeRegion(
+                    1,
+                    ByteString.copyFrom(startKey),
+                    ByteString.copyFrom(endKey),
+                    GrpcUtils.makeRegionEpoch(confVer, ver),
+                    GrpcUtils.makePeer(1, 10),
+                    GrpcUtils.makePeer(2, 20))));
     try (PDClient client = session.getPDClient()) {
       Pair<Metapb.Region, Metapb.Peer> rl = client.getRegionByID(defaultBackOff(), 0);
       Metapb.Region r = rl.first;
@@ -142,15 +144,16 @@ public class PDClientMockTest extends PDMockServerTest {
   public void testGetStore() throws Exception {
     long storeId = 1;
     String testAddress = "testAddress";
-    pdServer.addGetStoreResp(
-        GrpcUtils.makeGetStoreResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeStore(
-                storeId,
-                testAddress,
-                Metapb.StoreState.Up,
-                GrpcUtils.makeStoreLabel("k1", "v1"),
-                GrpcUtils.makeStoreLabel("k2", "v2"))));
+    leader.addGetStoreListener(
+        request ->
+            GrpcUtils.makeGetStoreResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeStore(
+                    storeId,
+                    testAddress,
+                    Metapb.StoreState.Up,
+                    GrpcUtils.makeStoreLabel("k1", "v1"),
+                    GrpcUtils.makeStoreLabel("k2", "v2"))));
     try (PDClient client = session.getPDClient()) {
       Store r = client.getStore(defaultBackOff(), storeId);
       assertEquals(storeId, r.getId());
@@ -161,10 +164,11 @@ public class PDClientMockTest extends PDMockServerTest {
       assertEquals("v1", r.getLabels(0).getValue());
       assertEquals("v2", r.getLabels(1).getValue());
 
-      pdServer.addGetStoreResp(
-          GrpcUtils.makeGetStoreResponse(
-              pdServer.getClusterId(),
-              GrpcUtils.makeStore(storeId, testAddress, Metapb.StoreState.Tombstone)));
+      leader.addGetStoreListener(
+          request ->
+              GrpcUtils.makeGetStoreResponse(
+                  leader.getClusterId(),
+                  GrpcUtils.makeStore(storeId, testAddress, Metapb.StoreState.Tombstone)));
       assertEquals(StoreState.Tombstone, client.getStore(defaultBackOff(), storeId).getState());
     }
   }
@@ -177,11 +181,16 @@ public class PDClientMockTest extends PDMockServerTest {
   public void testRetryPolicy() throws Exception {
     long storeId = 1024;
     ExecutorService service = Executors.newCachedThreadPool();
-    pdServer.addGetStoreResp(null);
-    pdServer.addGetStoreResp(null);
-    pdServer.addGetStoreResp(
-        GrpcUtils.makeGetStoreResponse(
-            pdServer.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up)));
+    AtomicInteger i = new AtomicInteger();
+    leader.addGetStoreListener(
+        request -> {
+          if (i.getAndIncrement() < 2) {
+            return null;
+          } else {
+            return GrpcUtils.makeGetStoreResponse(
+                leader.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up));
+          }
+        });
     try (PDClient client = session.getPDClient()) {
       Callable<Store> storeCallable =
           () -> client.getStore(ConcreteBackOffer.newCustomBackOff(5000), 0);
@@ -194,16 +203,17 @@ public class PDClientMockTest extends PDMockServerTest {
       }
 
       // Should fail
-      pdServer.addGetStoreResp(null);
-      pdServer.addGetStoreResp(null);
-      pdServer.addGetStoreResp(null);
-      pdServer.addGetStoreResp(null);
-      pdServer.addGetStoreResp(null);
-      pdServer.addGetStoreResp(null);
+      AtomicInteger j = new AtomicInteger();
+      leader.addGetStoreListener(
+          request -> {
+            if (j.getAndIncrement() < 6) {
+              return null;
+            } else {
+              return GrpcUtils.makeGetStoreResponse(
+                  leader.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up));
+            }
+          });
 
-      pdServer.addGetStoreResp(
-          GrpcUtils.makeGetStoreResponse(
-              pdServer.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up)));
       try {
         client.getStore(defaultBackOff(), 0);
       } catch (GrpcException e) {
