@@ -36,16 +36,16 @@ def main():
                 item = {
                     'req': log['func'],
                     'start': log['start'],
-                    'tot_lat': int(log['duration'][:len(log['duration'])-2]),
+                    'tot_lat': latency_ms(log),
                     'tot_grpc': 0,
                     'tot_bo': 0,
                 }
                 items.append(item)
                 for span in log['spans']:
                     if grpc_pattern in span['name'] and span['duration'] != 'N/A':
-                        item['tot_grpc'] += int(span['duration'][:len(span['duration'])-2])
+                        item['tot_grpc'] += latency_ms(span)
                     elif backoff_pattern in span['name'] and span['duration'] != 'N/A':
-                        item['tot_bo'] += int(span['duration'][:len(span['duration'])-2])
+                        item['tot_bo'] += latency_ms(span)
 
         if args.order == "total":
             items = sorted(items, key=lambda d: d['tot_lat'], reverse=True)
@@ -62,9 +62,13 @@ def main():
     for item in items:
         print(fmtStr.format(item['req'], item['start'], item['tot_lat'], item['tot_grpc'], item['tot_bo']))
 
+def latency_ms(span):
+    return int(span['duration'][:len(span['duration'])-2])
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="rstats: A TiKV Java Client Request Stats Analyzer")
-    parser.add_argument("--order", dest="order", default="total", help="order the output, default: total. accepted value: total, grpc, backoff")
+    parser.add_argument("-o", dest="order", default="total", help="order the output, default: total. accepted value: total, grpc, backoff")
     parser.add_argument("slowlog", help="slow log file")
     return parser.parse_args()
 
