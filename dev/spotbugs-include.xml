@@ -5,5 +5,12 @@
         <Not>
             <Package name="~org\.tikv\.common\.parser.*"/>
         </Not>
+        <Not>
+            <Or>
+                <Bug pattern="EI_EXPOSE_REP"/>
+                <Bug pattern="EI_EXPOSE_REP2"/>
+            </Or>
+        </Not>
+        <Rank value="1"/>
     </Match>
 </FindBugsFilter>

@@ -1,3 +1,7 @@
+[![Maven Central](https://img.shields.io/maven-central/v/org.tikv/tikv-client-java.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22org.tikv%22%20AND%20a:%22tikv-client-java%22)
+[![Slack](https://img.shields.io/badge/chat-on%20Slack-brightgreen.svg)](https://slack.tidb.io/invite?team=tikv-wg&channel=client)
+[![codecov](https://codecov.io/gh/tikv/client-java/branch/master/graph/badge.svg?token=nSAjGaN0EH)](https://codecov.io/gh/tikv/client-java)
+
 ## TiKV JAVA Client
 
 A Java client for [TiDB](https://github.com/pingcap/tidb)/[TiKV](https://github.com/tikv/tikv).
@@ -51,11 +55,18 @@ Find more demo in [KVRawClientTest](https://github.com/birdstorm/KVRawClientTest
 See [Java Client Documents](/docs/README.md) for references about how to config and monitor Java Client.
 
 A [Maven site](https://tikv.github.io/client-java/site) is also available. It includes:
-1. [API reference](https://tikv.github.io/client-java/site/apidocs/index.html) 
+1. [API reference](https://tikv.github.io/client-java/site/apidocs/index.html)
 2. [Spotbugs Reports](https://tikv.github.io/client-java/site/spotbugs.html)
 3. [Source Code Xref](https://tikv.github.io/client-java/site/xref/index.html)
 
 ## Community
+
+### Forum
+
+- User forum: [AskTUG](https://asktug.com/)
+- Contributor forum: [https://internals.tidb.io/](https://internals.tidb.io/)
+
+### Contribute to TiKV Java Client
 
 See [Contribution Guide](https://tikv.github.io/client-java/contribution/introduction.html) for references about how to contribute to this project.
 
