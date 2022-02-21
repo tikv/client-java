@@ -280,13 +280,13 @@ TiKV Java Client
 <td>org.tikv.common.TiSession.getImporterRegionStoreClientBuilder() uses the same code for two branches</td>
 <td>STYLE</td>
 <td><a class="externalLink" href="https://spotbugs.readthedocs.io/en/latest/bugDescriptions.html#DB_DUPLICATE_BRANCHES">DB_DUPLICATE_BRANCHES</a></td>
-<td><a href="./xref/org/tikv/common/TiSession.html#L296">296-299</a></td>
+<td><a href="./xref/org/tikv/common/TiSession.html#L308">308-311</a></td>
 <td>Medium</td></tr>
 <tr class="b">
 <td>org.tikv.common.TiSession.closeAwaitTermination(long) calls Thread.sleep() with a lock held</td>
 <td>MT_CORRECTNESS</td>
 <td><a class="externalLink" href="https://spotbugs.readthedocs.io/en/latest/bugDescriptions.html#SWL_SLEEP_WITH_LOCK_HELD">SWL_SLEEP_WITH_LOCK_HELD</a></td>
-<td><a href="./xref/org/tikv/common/TiSession.html#L701">701</a></td>
+<td><a href="./xref/org/tikv/common/TiSession.html#L713">713</a></td>
 <td>Medium</td></tr></table></div><a name="org.tikv.common.catalog.CatalogTransaction"></a>
 <div class="section">
 <h3><a name="org.tikv.common.catalog.CatalogTransaction"></a>org.tikv.common.catalog.CatalogTransaction</h3>
@@ -730,7 +730,7 @@ TiKV Java Client
 <td>org.tikv.common.region.AbstractRegionStoreClient.seekLeaderStore(BackOffer) has Boolean return type and returns explicit null</td>
 <td>BAD_PRACTICE</td>
 <td><a class="externalLink" href="https://spotbugs.readthedocs.io/en/latest/bugDescriptions.html#NP_BOOLEAN_RETURN_NULL">NP_BOOLEAN_RETURN_NULL</a></td>
-<td><a href="./xref/org/tikv/common/region/AbstractRegionStoreClient.html#L247">247</a></td>
+<td><a href="./xref/org/tikv/common/region/AbstractRegionStoreClient.html#L249">249</a></td>
 <td>Medium</td></tr></table></div><a name="org.tikv.common.region.RegionCache"></a>
 <div class="section">
 <h3><a name="org.tikv.common.region.RegionCache"></a>org.tikv.common.region.RegionCache</h3>
@@ -766,7 +766,7 @@ TiKV Java Client
 <td>Should org.tikv.common.region.TiRegion$RegionVerID be a _static_ inner class?</td>
 <td>PERFORMANCE</td>
 <td><a class="externalLink" href="https://spotbugs.readthedocs.io/en/latest/bugDescriptions.html#SIC_INNER_SHOULD_BE_STATIC">SIC_INNER_SHOULD_BE_STATIC</a></td>
-<td><a href="./xref/org/tikv/common/region/TiRegion.html#L276">276-312</a></td>
+<td><a href="./xref/org/tikv/common/region/TiRegion.html#L278">278-314</a></td>
 <td>Medium</td></tr></table></div><a name="org.tikv.common.region.TiStore"></a>
 <div class="section">
 <h3><a name="org.tikv.common.region.TiStore"></a>org.tikv.common.region.TiStore</h3>
