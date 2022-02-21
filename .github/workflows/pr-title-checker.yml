@@ -1,0 +1,14 @@
+name: 'PR Title Checker'
+on:
+  pull_request:
+    types: [edited, opened, synchronize, reopened]
+
+jobs:
+  title-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: naveenk1223/action-pr-title@master
+        with:
+          regex: '\[to|fix|close #[0-9]+\] .+'
+          prefix_case_sensitive: true
+          max_length: -1
