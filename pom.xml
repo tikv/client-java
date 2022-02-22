@@ -278,7 +278,7 @@
                     <execution>
                         <id>clone proto files</id>
                         <configuration>
-                            <executable>${basedir}/scripts/proto.sh</executable>
+                            <executable>${basedir}/dev/proto.sh</executable>
                         </configuration>
                         <phase>validate</phase>
                         <goals>
