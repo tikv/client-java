@@ -1,8 +1,6 @@
-# TiSpark Dev Tools Guide
+# TiKV Java Client Dev Tools
 
-## Formatting
-
-### Java Format
+## Code Formatting
 
 TiKV Java Client formats its code using [Google-Java-Format Maven Plugin](https://github.com/coveooss/fmt-maven-plugin) which follows Google's code styleguide. It is also checked on CI before build.
 
