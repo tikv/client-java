@@ -40,6 +40,7 @@ import org.tikv.kvproto.Metapb.Peer;
 import org.tikv.kvproto.Metapb.Region;
 
 public class TiRegion implements Serializable {
+
   private static final Logger logger = LoggerFactory.getLogger(TiRegion.class);
 
   private final Region meta;
@@ -269,6 +270,7 @@ public class TiRegion implements Serializable {
   }
 
   public class RegionVerID {
+
     final long id;
     final long confVer;
     final long ver;

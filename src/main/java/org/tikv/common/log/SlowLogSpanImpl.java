@@ -17,76 +17,78 @@
 
 package org.tikv.common.log;
 
-import static org.tikv.common.log.SlowLogImpl.DATE_FORMAT;
-
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.text.SimpleDateFormat;
+import java.util.HashMap;
+import java.util.Map;
 
 public class SlowLogSpanImpl implements SlowLogSpan {
   private final String name;
-  private final long requestStartNS;
-  private final long requestStartMS;
+  private final long requestStartInstantNS;
+  private final long requestStartUnixNS;
 
-  private long startMS;
-  private long endMS;
+  /** Key-Value pairs which will be logged, e.g. function name, key, region, etc. */
+  private final Map<String, String> properties;
+
   /**
    * use System.nanoTime() to calculate duration, cause System.currentTimeMillis() is not monotonic
    */
-  private long startNS;
+  private long startInstantNS;
 
-  private long endNS;
+  private long endInstantNS;
 
-  public SlowLogSpanImpl(String name, long requestStartMS, long requestStartNS) {
+  public SlowLogSpanImpl(String name, long requestStartMS, long requestStartInstantNS) {
     this.name = name;
-    this.requestStartMS = requestStartMS;
-    this.requestStartNS = requestStartNS;
-    this.startMS = 0;
-    this.startNS = 0;
-    this.endMS = 0;
-    this.endNS = 0;
+    this.requestStartUnixNS = requestStartMS * 1_000_000;
+    this.requestStartInstantNS = requestStartInstantNS;
+    this.properties = new HashMap<>();
+    this.startInstantNS = 0;
+    this.endInstantNS = 0;
+  }
+
+  @Override
+  public void addProperty(String key, String value) {
+    properties.put(key, value);
   }
 
   @Override
   public void start() {
-    startNS = System.nanoTime();
-    startMS = requestStartMS + (startNS - requestStartNS) / 1_000_000;
+    startInstantNS = System.nanoTime();
   }
 
   @Override
   public void end() {
-    endNS = System.nanoTime();
-    endMS = startMS + (endNS - startNS) / 1_000_000;
+    endInstantNS = System.nanoTime();
   }
 
   @Override
   public JsonElement toJsonElement() {
+    SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
     JsonObject jsonObject = new JsonObject();
-    jsonObject.addProperty("name", name);
-    jsonObject.addProperty("start", getStartString());
-    jsonObject.addProperty("end", getEndString());
-    jsonObject.addProperty("duration", getDurationString());
+    jsonObject.addProperty("event", name);
+    jsonObject.addProperty("begin", dateFormat.format(getStartUnixNS() / 1_000_000));
+    jsonObject.addProperty("duration_ms", getDurationNS() / 1_000_000);
+
+    if (!properties.isEmpty()) {
+      JsonObject propertiesObject = new JsonObject();
+      for (Map.Entry<String, String> entry : properties.entrySet()) {
+        propertiesObject.addProperty(entry.getKey(), entry.getValue());
+      }
+      jsonObject.add("properties", propertiesObject);
+    }
 
     return jsonObject;
   }
 
-  private String getStartString() {
-    if (startMS == 0) {
-      return "N/A";
-    }
-    return DATE_FORMAT.format(startMS);
+  private long getStartUnixNS() {
+    return requestStartUnixNS + (startInstantNS - requestStartInstantNS);
   }
 
-  private String getEndString() {
-    if (endMS == 0) {
-      return "N/A";
+  private long getDurationNS() {
+    if (startInstantNS == 0 || endInstantNS == 0) {
+      return -1;
     }
-    return DATE_FORMAT.format(endMS);
-  }
-
-  private String getDurationString() {
-    if (startMS == 0 || endMS == 0) {
-      return "N/A";
-    }
-    return (endMS - startMS) + "ms";
+    return endInstantNS - startInstantNS;
   }
 }

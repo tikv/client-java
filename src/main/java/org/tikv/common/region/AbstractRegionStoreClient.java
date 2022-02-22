@@ -29,32 +29,36 @@ import io.prometheus.client.Histogram;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
+import org.tikv.common.log.SlowLog;
 import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.HistogramUtils;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
+import org.tikv.kvproto.Tracepb;
 
 public abstract class AbstractRegionStoreClient
     extends AbstractGRPCClient<TikvGrpc.TikvBlockingStub, TikvGrpc.TikvFutureStub>
     implements RegionErrorReceiver {
+
   private static final Logger logger = LoggerFactory.getLogger(AbstractRegionStoreClient.class);
 
   public static final Histogram SEEK_LEADER_STORE_DURATION =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_seek_leader_store_duration")
           .help("seek leader store duration.")
           .register();
 
   public static final Histogram SEEK_PROXY_STORE_DURATION =
-      Histogram.build()
+      HistogramUtils.buildDuration()
           .name("client_java_seek_proxy_store_duration")
           .help("seek proxy store duration.")
           .register();
@@ -151,12 +155,30 @@ public abstract class AbstractRegionStoreClient
     return false;
   }
 
-  protected Kvrpcpb.Context makeContext(TiStoreType storeType) {
-    return region.getReplicaContext(java.util.Collections.emptySet(), storeType);
+  private Kvrpcpb.Context addTraceId(Kvrpcpb.Context context, SlowLog slowLog) {
+    if (slowLog.getThresholdMS() < 0) {
+      // disable tikv tracing
+      return context;
+    }
+    long traceId = slowLog.getTraceId();
+    return Kvrpcpb.Context.newBuilder(context)
+        .setTraceContext(
+            Tracepb.TraceContext.newBuilder()
+                .setDurationThresholdMs(
+                    (int) (slowLog.getThresholdMS() * conf.getRawKVServerSlowLogFactor()))
+                .addRemoteParentSpans(Tracepb.RemoteParentSpan.newBuilder().setTraceId(traceId)))
+        .build();
   }
 
-  protected Kvrpcpb.Context makeContext(Set<Long> resolvedLocks, TiStoreType storeType) {
-    return region.getReplicaContext(resolvedLocks, storeType);
+  protected Kvrpcpb.Context makeContext(TiStoreType storeType, SlowLog slowLog) {
+    Kvrpcpb.Context context = region.getReplicaContext(java.util.Collections.emptySet(), storeType);
+    return addTraceId(context, slowLog);
+  }
+
+  protected Kvrpcpb.Context makeContext(
+      Set<Long> resolvedLocks, TiStoreType storeType, SlowLog slowLog) {
+    Kvrpcpb.Context context = region.getReplicaContext(resolvedLocks, storeType);
+    return addTraceId(context, slowLog);
   }
 
   private void updateClientStub() {
@@ -209,6 +231,7 @@ public abstract class AbstractRegionStoreClient
             // switch to leader store
             store = currentLeaderStore;
             updateClientStub();
+            return true;
           }
           return false;
         }
@@ -315,7 +338,7 @@ public abstract class AbstractRegionStoreClient
       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
       Kvrpcpb.RawGetRequest rawGetRequest =
           Kvrpcpb.RawGetRequest.newBuilder()
-              .setContext(region.getReplicaContext(peer))
+              .setContext(region.getReplicaContext(region.getLeader()))
               .setKey(key)
               .build();
       ListenableFuture<Kvrpcpb.RawGetResponse> task =
@@ -353,6 +376,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   private static class SwitchLeaderTask {
+
     private final ListenableFuture<Kvrpcpb.RawGetResponse> task;
     private final Metapb.Peer peer;
 
@@ -363,6 +387,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   private static class ForwardCheckTask {
+
     private final ListenableFuture<Kvrpcpb.RawGetResponse> task;
     private final Metapb.Store store;
 

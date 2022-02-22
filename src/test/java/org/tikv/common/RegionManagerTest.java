@@ -24,6 +24,7 @@ import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Before;
 import org.junit.Test;
 import org.tikv.common.key.Key;
@@ -36,12 +37,13 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.StoreState;
 
 public class RegionManagerTest extends PDMockServerTest {
+
   private RegionManager mgr;
 
   @Before
   @Override
-  public void setUp() throws IOException {
-    super.setUp();
+  public void setup() throws IOException {
+    super.setup();
     mgr = session.getRegionManager();
   }
 
@@ -64,27 +66,30 @@ public class RegionManagerTest extends PDMockServerTest {
     int ver = 1027;
     long regionId = 233;
     String testAddress = "127.0.0.1";
-    pdServer.addGetRegionResp(
-        GrpcUtils.makeGetRegionResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeRegion(
-                regionId,
-                GrpcUtils.encodeKey(startKey.toByteArray()),
-                GrpcUtils.encodeKey(endKey.toByteArray()),
-                GrpcUtils.makeRegionEpoch(confVer, ver),
-                GrpcUtils.makePeer(1, 10),
-                GrpcUtils.makePeer(2, 20))));
-    for (long id : new long[] {10, 20}) {
-      pdServer.addGetStoreResp(
-          GrpcUtils.makeGetStoreResponse(
-              pdServer.getClusterId(),
-              GrpcUtils.makeStore(
-                  id,
-                  testAddress,
-                  Metapb.StoreState.Up,
-                  GrpcUtils.makeStoreLabel("k1", "v1"),
-                  GrpcUtils.makeStoreLabel("k2", "v2"))));
-    }
+    leader.addGetRegionListener(
+        request ->
+            GrpcUtils.makeGetRegionResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeRegion(
+                    regionId,
+                    GrpcUtils.encodeKey(startKey.toByteArray()),
+                    GrpcUtils.encodeKey(endKey.toByteArray()),
+                    GrpcUtils.makeRegionEpoch(confVer, ver),
+                    GrpcUtils.makePeer(1, 10),
+                    GrpcUtils.makePeer(2, 20))));
+
+    AtomicInteger i = new AtomicInteger(0);
+    long[] ids = new long[] {10, 20};
+    leader.addGetStoreListener(
+        (request ->
+            GrpcUtils.makeGetStoreResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeStore(
+                    ids[i.getAndIncrement()],
+                    testAddress,
+                    StoreState.Up,
+                    GrpcUtils.makeStoreLabel("k1", "v1"),
+                    GrpcUtils.makeStoreLabel("k2", "v2")))));
 
     TiRegion region = mgr.getRegionByKey(startKey);
     assertEquals(region.getId(), regionId);
@@ -103,27 +108,30 @@ public class RegionManagerTest extends PDMockServerTest {
     int confVer = 1026;
     int ver = 1027;
     long regionId = 233;
-    pdServer.addGetRegionResp(
-        GrpcUtils.makeGetRegionResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeRegion(
-                regionId,
-                GrpcUtils.encodeKey(startKey.toByteArray()),
-                GrpcUtils.encodeKey(endKey.toByteArray()),
-                GrpcUtils.makeRegionEpoch(confVer, ver),
-                GrpcUtils.makePeer(storeId, 10),
-                GrpcUtils.makePeer(storeId + 1, 20))));
-    for (long id : new long[] {10, 20}) {
-      pdServer.addGetStoreResp(
-          GrpcUtils.makeGetStoreResponse(
-              pdServer.getClusterId(),
-              GrpcUtils.makeStore(
-                  id,
-                  testAddress,
-                  Metapb.StoreState.Up,
-                  GrpcUtils.makeStoreLabel("k1", "v1"),
-                  GrpcUtils.makeStoreLabel("k2", "v2"))));
-    }
+    leader.addGetRegionListener(
+        request ->
+            GrpcUtils.makeGetRegionResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeRegion(
+                    regionId,
+                    GrpcUtils.encodeKey(startKey.toByteArray()),
+                    GrpcUtils.encodeKey(endKey.toByteArray()),
+                    GrpcUtils.makeRegionEpoch(confVer, ver),
+                    GrpcUtils.makePeer(storeId, 10),
+                    GrpcUtils.makePeer(storeId + 1, 20))));
+
+    AtomicInteger i = new AtomicInteger(0);
+    long[] ids = new long[] {10, 20};
+    leader.addGetStoreListener(
+        (request ->
+            GrpcUtils.makeGetStoreResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeStore(
+                    ids[i.getAndIncrement()],
+                    testAddress,
+                    StoreState.Up,
+                    GrpcUtils.makeStoreLabel("k1", "v1"),
+                    GrpcUtils.makeStoreLabel("k2", "v2")))));
 
     Pair<TiRegion, TiStore> pair = mgr.getRegionStorePairByKey(searchKey);
     assertEquals(pair.first.getId(), regionId);
@@ -134,27 +142,29 @@ public class RegionManagerTest extends PDMockServerTest {
   public void getStoreById() {
     long storeId = 234;
     String testAddress = "testAddress";
-    pdServer.addGetStoreResp(
-        GrpcUtils.makeGetStoreResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeStore(
-                storeId,
-                testAddress,
-                Metapb.StoreState.Up,
-                GrpcUtils.makeStoreLabel("k1", "v1"),
-                GrpcUtils.makeStoreLabel("k2", "v2"))));
+    leader.addGetStoreListener(
+        request ->
+            GrpcUtils.makeGetStoreResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeStore(
+                    storeId,
+                    testAddress,
+                    Metapb.StoreState.Up,
+                    GrpcUtils.makeStoreLabel("k1", "v1"),
+                    GrpcUtils.makeStoreLabel("k2", "v2"))));
     TiStore store = mgr.getStoreById(storeId);
     assertEquals(store.getStore().getId(), storeId);
 
-    pdServer.addGetStoreResp(
-        GrpcUtils.makeGetStoreResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeStore(
-                storeId + 1,
-                testAddress,
-                StoreState.Tombstone,
-                GrpcUtils.makeStoreLabel("k1", "v1"),
-                GrpcUtils.makeStoreLabel("k2", "v2"))));
+    leader.addGetStoreListener(
+        request ->
+            GrpcUtils.makeGetStoreResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeStore(
+                    storeId + 1,
+                    testAddress,
+                    StoreState.Tombstone,
+                    GrpcUtils.makeStoreLabel("k1", "v1"),
+                    GrpcUtils.makeStoreLabel("k2", "v2"))));
 
     try {
       mgr.getStoreById(storeId + 1);

@@ -22,7 +22,12 @@ import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -34,8 +39,16 @@ import org.tikv.common.importer.ImporterStoreClient;
 import org.tikv.common.importer.SwitchTiKVModeClient;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiTimestamp;
-import org.tikv.common.region.*;
-import org.tikv.common.util.*;
+import org.tikv.common.region.RegionManager;
+import org.tikv.common.region.RegionStoreClient;
+import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
+import org.tikv.common.util.BackOffFunction;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
@@ -48,8 +61,10 @@ import org.tikv.txn.TxnKVClient;
 
 /**
  * TiSession is the holder for PD Client, Store pdClient and PD Cache All sessions share common
- * region store connection pool but separated PD conn and cache for better concurrency TiSession is
- * thread-safe but it's also recommended to have multiple session avoiding lock contention
+ * region store connection pool but separated PD conn and cache for better concurrency
+ *
+ * <p>TiSession is thread-safe but it's also recommended to have multiple session avoiding lock
+ * contention
  */
 public class TiSession implements AutoCloseable {
 
@@ -166,6 +181,13 @@ public class TiSession implements AutoCloseable {
     long warmUpStartTime = System.nanoTime();
     BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
     try {
+      // let JVM ClassLoader load gRPC error related classes
+      // this operation may cost 100ms
+      Errorpb.Error.newBuilder()
+          .setNotLeader(Errorpb.NotLeader.newBuilder().build())
+          .build()
+          .toString();
+
       this.client = getPDClient();
       this.regionManager = getRegionManager();
       List<Metapb.Store> stores = this.client.getAllStores(backOffer);
