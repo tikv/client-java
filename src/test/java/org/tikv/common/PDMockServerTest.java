@@ -23,9 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
-import org.tikv.common.MockRequestInterceptor.MockRequestInterceptorBuilder;
-import org.tikv.kvproto.Pdpb.GetMembersRequest;
-import org.tikv.kvproto.Pdpb.GetMembersResponse;
 
 public abstract class PDMockServerTest {
 
@@ -50,17 +47,14 @@ public abstract class PDMockServerTest {
       PDMockServer server = new PDMockServer();
       server.start(CLUSTER_ID, basePort + i);
 
-      Interceptor<GetMembersRequest, GetMembersResponse> interceptor =
-          new MockRequestInterceptorBuilder<GetMembersRequest, GetMembersResponse>()
-              .withHandler(
-                  (request) ->
-                      GrpcUtils.makeGetMembersResponse(
-                          server.getClusterId(),
-                          GrpcUtils.makeMember(1, "http://" + addr + ":" + basePort),
-                          GrpcUtils.makeMember(2, "http://" + addr + ":" + (basePort + 1)),
-                          GrpcUtils.makeMember(3, "http://" + addr + ":" + (basePort + 2))))
-              .build();
-      server.addGetMembersInterceptor(interceptor);
+      server.addGetMembersInterceptor(
+          (request) ->
+              GrpcUtils.makeGetMembersResponse(
+                  server.getClusterId(),
+                  GrpcUtils.makeMember(1, "http://" + addr + ":" + basePort),
+                  GrpcUtils.makeMember(2, "http://" + addr + ":" + (basePort + 1)),
+                  GrpcUtils.makeMember(3, "http://" + addr + ":" + (basePort + 2)))
+      );
 
       pdServers.add(server);
     }
