@@ -83,8 +83,8 @@ public class PDClientMockTest extends PDMockServerTest {
 
   @Test
   public void testGetRegionByKey() throws Exception {
-    byte[] startKey = new byte[]{1, 0, 2, 4};
-    byte[] endKey = new byte[]{1, 0, 2, 5};
+    byte[] startKey = new byte[] {1, 0, 2, 4};
+    byte[] endKey = new byte[] {1, 0, 2, 5};
     int confVer = 1026;
     int ver = 1027;
     leader.addGetRegionInterceptor(
@@ -114,8 +114,8 @@ public class PDClientMockTest extends PDMockServerTest {
 
   @Test
   public void testGetRegionById() throws Exception {
-    byte[] startKey = new byte[]{1, 0, 2, 4};
-    byte[] endKey = new byte[]{1, 0, 2, 5};
+    byte[] startKey = new byte[] {1, 0, 2, 4};
+    byte[] endKey = new byte[] {1, 0, 2, 5};
     int confVer = 1026;
     int ver = 1027;
 
@@ -167,10 +167,11 @@ public class PDClientMockTest extends PDMockServerTest {
       assertEquals("v1", r.getLabels(0).getValue());
       assertEquals("v2", r.getLabels(1).getValue());
 
-      leader.addGetStoreInterceptor(request ->
-          GrpcUtils.makeGetStoreResponse(
-              leader.getClusterId(),
-              GrpcUtils.makeStore(storeId, testAddress, Metapb.StoreState.Tombstone)));
+      leader.addGetStoreInterceptor(
+          request ->
+              GrpcUtils.makeGetStoreResponse(
+                  leader.getClusterId(),
+                  GrpcUtils.makeStore(storeId, testAddress, Metapb.StoreState.Tombstone)));
       assertEquals(StoreState.Tombstone, client.getStore(defaultBackOff(), storeId).getState());
     }
   }
@@ -186,15 +187,16 @@ public class PDClientMockTest extends PDMockServerTest {
     AtomicInteger i = new AtomicInteger();
     Interceptor<GetStoreRequest, GetStoreResponse> interceptor =
         new MockRequestInterceptorBuilder<GetStoreRequest, GetStoreResponse>()
-            .withHandler(request -> {
+            .withHandler(
+                request -> {
                   if (i.getAndIncrement() < 2) {
                     return null;
                   } else {
                     return GrpcUtils.makeGetStoreResponse(
                         leader.getClusterId(), GrpcUtils.makeStore(storeId, "", StoreState.Up));
                   }
-                }
-            ).build();
+                })
+            .build();
     leader.addGetStoreInterceptor(interceptor);
 
     try (PDClient client = session.getPDClient()) {
@@ -210,16 +212,19 @@ public class PDClientMockTest extends PDMockServerTest {
 
       // Should fail
       AtomicInteger j = new AtomicInteger();
-      interceptor = new MockRequestInterceptorBuilder<GetStoreRequest, GetStoreResponse>().withHandler(
-          request -> {
-            if (j.getAndIncrement() < 6) {
-              return null;
-            } else {
-              return GrpcUtils.makeGetStoreResponse(
-                  leader.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up));
-            }
-          }
-      ).build();
+      interceptor =
+          new MockRequestInterceptorBuilder<GetStoreRequest, GetStoreResponse>()
+              .withHandler(
+                  request -> {
+                    if (j.getAndIncrement() < 6) {
+                      return null;
+                    } else {
+                      return GrpcUtils.makeGetStoreResponse(
+                          leader.getClusterId(),
+                          GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up));
+                    }
+                  })
+              .build();
       leader.addGetStoreInterceptor(interceptor);
 
       try {

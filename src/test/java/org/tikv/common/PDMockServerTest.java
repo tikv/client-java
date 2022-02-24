@@ -58,8 +58,8 @@ public abstract class PDMockServerTest {
                           server.getClusterId(),
                           GrpcUtils.makeMember(1, "http://" + addr + ":" + basePort),
                           GrpcUtils.makeMember(2, "http://" + addr + ":" + (basePort + 1)),
-                          GrpcUtils.makeMember(3, "http://" + addr + ":" + (basePort + 2)))
-              ).build();
+                          GrpcUtils.makeMember(3, "http://" + addr + ":" + (basePort + 2))))
+              .build();
       server.addGetMembersInterceptor(interceptor);
 
       pdServers.add(server);
