@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
+import org.tikv.common.MockRequestInterceptor.MockRequestInterceptorBuilder;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.util.BackOffer;
@@ -38,6 +39,8 @@ import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
+import org.tikv.kvproto.Pdpb.GetStoreRequest;
+import org.tikv.kvproto.Pdpb.GetStoreResponse;
 
 public class PDClientMockTest extends PDMockServerTest {
 
@@ -80,11 +83,11 @@ public class PDClientMockTest extends PDMockServerTest {
 
   @Test
   public void testGetRegionByKey() throws Exception {
-    byte[] startKey = new byte[] {1, 0, 2, 4};
-    byte[] endKey = new byte[] {1, 0, 2, 5};
+    byte[] startKey = new byte[]{1, 0, 2, 4};
+    byte[] endKey = new byte[]{1, 0, 2, 5};
     int confVer = 1026;
     int ver = 1027;
-    leader.addGetRegionListener(
+    leader.addGetRegionInterceptor(
         request ->
             GrpcUtils.makeGetRegionResponse(
                 leader.getClusterId(),
@@ -111,12 +114,12 @@ public class PDClientMockTest extends PDMockServerTest {
 
   @Test
   public void testGetRegionById() throws Exception {
-    byte[] startKey = new byte[] {1, 0, 2, 4};
-    byte[] endKey = new byte[] {1, 0, 2, 5};
+    byte[] startKey = new byte[]{1, 0, 2, 4};
+    byte[] endKey = new byte[]{1, 0, 2, 5};
     int confVer = 1026;
     int ver = 1027;
 
-    leader.addGetRegionByIDListener(
+    leader.addGetRegionByIdInterceptor(
         request ->
             GrpcUtils.makeGetRegionResponse(
                 leader.getClusterId(),
@@ -144,7 +147,7 @@ public class PDClientMockTest extends PDMockServerTest {
   public void testGetStore() throws Exception {
     long storeId = 1;
     String testAddress = "testAddress";
-    leader.addGetStoreListener(
+    leader.addGetStoreInterceptor(
         request ->
             GrpcUtils.makeGetStoreResponse(
                 leader.getClusterId(),
@@ -164,11 +167,10 @@ public class PDClientMockTest extends PDMockServerTest {
       assertEquals("v1", r.getLabels(0).getValue());
       assertEquals("v2", r.getLabels(1).getValue());
 
-      leader.addGetStoreListener(
-          request ->
-              GrpcUtils.makeGetStoreResponse(
-                  leader.getClusterId(),
-                  GrpcUtils.makeStore(storeId, testAddress, Metapb.StoreState.Tombstone)));
+      leader.addGetStoreInterceptor(request ->
+          GrpcUtils.makeGetStoreResponse(
+              leader.getClusterId(),
+              GrpcUtils.makeStore(storeId, testAddress, Metapb.StoreState.Tombstone)));
       assertEquals(StoreState.Tombstone, client.getStore(defaultBackOff(), storeId).getState());
     }
   }
@@ -182,15 +184,19 @@ public class PDClientMockTest extends PDMockServerTest {
     long storeId = 1024;
     ExecutorService service = Executors.newCachedThreadPool();
     AtomicInteger i = new AtomicInteger();
-    leader.addGetStoreListener(
-        request -> {
-          if (i.getAndIncrement() < 2) {
-            return null;
-          } else {
-            return GrpcUtils.makeGetStoreResponse(
-                leader.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up));
-          }
-        });
+    Interceptor<GetStoreRequest, GetStoreResponse> interceptor =
+        new MockRequestInterceptorBuilder<GetStoreRequest, GetStoreResponse>()
+            .withHandler(request -> {
+                  if (i.getAndIncrement() < 2) {
+                    return null;
+                  } else {
+                    return GrpcUtils.makeGetStoreResponse(
+                        leader.getClusterId(), GrpcUtils.makeStore(storeId, "", StoreState.Up));
+                  }
+                }
+            ).build();
+    leader.addGetStoreInterceptor(interceptor);
+
     try (PDClient client = session.getPDClient()) {
       Callable<Store> storeCallable =
           () -> client.getStore(ConcreteBackOffer.newCustomBackOff(5000), 0);
@@ -204,7 +210,7 @@ public class PDClientMockTest extends PDMockServerTest {
 
       // Should fail
       AtomicInteger j = new AtomicInteger();
-      leader.addGetStoreListener(
+      interceptor = new MockRequestInterceptorBuilder<GetStoreRequest, GetStoreResponse>().withHandler(
           request -> {
             if (j.getAndIncrement() < 6) {
               return null;
@@ -212,7 +218,9 @@ public class PDClientMockTest extends PDMockServerTest {
               return GrpcUtils.makeGetStoreResponse(
                   leader.getClusterId(), GrpcUtils.makeStore(storeId, "", Metapb.StoreState.Up));
             }
-          });
+          }
+      ).build();
+      leader.addGetStoreInterceptor(interceptor);
 
       try {
         client.getStore(defaultBackOff(), 0);

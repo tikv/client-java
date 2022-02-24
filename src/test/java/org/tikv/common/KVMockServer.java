@@ -162,7 +162,9 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     }
   }
 
-  /** */
+  /**
+   *
+   */
   public void rawPut(
       org.tikv.kvproto.Kvrpcpb.RawPutRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawPutResponse> responseObserver) {
@@ -204,7 +206,9 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     }
   }
 
-  /** */
+  /**
+   *
+   */
   public void rawDelete(
       org.tikv.kvproto.Kvrpcpb.RawDeleteRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawDeleteResponse> responseObserver) {

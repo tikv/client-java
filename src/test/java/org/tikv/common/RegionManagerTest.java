@@ -66,7 +66,7 @@ public class RegionManagerTest extends PDMockServerTest {
     int ver = 1027;
     long regionId = 233;
     String testAddress = "127.0.0.1";
-    leader.addGetRegionListener(
+    leader.addGetRegionInterceptor(
         request ->
             GrpcUtils.makeGetRegionResponse(
                 leader.getClusterId(),
@@ -80,7 +80,7 @@ public class RegionManagerTest extends PDMockServerTest {
 
     AtomicInteger i = new AtomicInteger(0);
     long[] ids = new long[] {10, 20};
-    leader.addGetStoreListener(
+    leader.addGetStoreInterceptor(
         (request ->
             GrpcUtils.makeGetStoreResponse(
                 leader.getClusterId(),
@@ -108,7 +108,7 @@ public class RegionManagerTest extends PDMockServerTest {
     int confVer = 1026;
     int ver = 1027;
     long regionId = 233;
-    leader.addGetRegionListener(
+    leader.addGetRegionInterceptor(
         request ->
             GrpcUtils.makeGetRegionResponse(
                 leader.getClusterId(),
@@ -122,7 +122,7 @@ public class RegionManagerTest extends PDMockServerTest {
 
     AtomicInteger i = new AtomicInteger(0);
     long[] ids = new long[] {10, 20};
-    leader.addGetStoreListener(
+    leader.addGetStoreInterceptor(
         (request ->
             GrpcUtils.makeGetStoreResponse(
                 leader.getClusterId(),
@@ -142,7 +142,7 @@ public class RegionManagerTest extends PDMockServerTest {
   public void getStoreById() {
     long storeId = 234;
     String testAddress = "testAddress";
-    leader.addGetStoreListener(
+    leader.addGetStoreInterceptor(
         request ->
             GrpcUtils.makeGetStoreResponse(
                 leader.getClusterId(),
@@ -155,7 +155,7 @@ public class RegionManagerTest extends PDMockServerTest {
     TiStore store = mgr.getStoreById(storeId);
     assertEquals(store.getStore().getId(), storeId);
 
-    leader.addGetStoreListener(
+    leader.addGetStoreInterceptor(
         request ->
             GrpcUtils.makeGetStoreResponse(
                 leader.getClusterId(),

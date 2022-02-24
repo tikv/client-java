@@ -81,13 +81,13 @@ public class MockThreeStoresTest extends PDMockServerTest {
                 .build());
 
     for (PDMockServer server : pdServers) {
-      server.addGetRegionListener(
+      server.addGetRegionInterceptor(
           request ->
               Pdpb.GetRegionResponse.newBuilder()
                   .setLeader(peers.get(0))
                   .setRegion(region)
                   .build());
-      server.addGetStoreListener(
+      server.addGetStoreInterceptor(
           (request) -> {
             int i = (int) request.getStoreId() - 1;
             return Pdpb.GetStoreResponse.newBuilder().setStore(stores.get(i)).build();

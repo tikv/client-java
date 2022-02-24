@@ -19,12 +19,9 @@ package org.tikv.common;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
-import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.util.Optional;
-import java.util.function.Function;
 import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.Pdpb.GetMembersRequest;
 import org.tikv.kvproto.Pdpb.GetMembersResponse;
@@ -42,22 +39,23 @@ public class PDMockServer extends PDGrpc.PDImplBase {
   private long clusterId;
   private Server server;
 
-  private Function<GetMembersRequest, GetMembersResponse> getMembersListener;
-  private Function<GetStoreRequest, GetStoreResponse> getStoreListener;
-  private Function<GetRegionRequest, GetRegionResponse> getRegionListener;
-  private Function<GetRegionByIDRequest, GetRegionResponse> getRegionByIDListener;
+  private Interceptor<GetMembersRequest, GetMembersResponse> getMembersInterceptor;
+  private Interceptor<GetStoreRequest, GetStoreResponse> getStoreInterceptor;
+  private Interceptor<GetRegionRequest, GetRegionResponse> getRegionInterceptor;
+  private Interceptor<GetRegionByIDRequest, GetRegionResponse> getRegionByIDInterceptor;
 
-  public void addGetMembersListener(Function<GetMembersRequest, GetMembersResponse> func) {
-    getMembersListener = func;
+  public void addGetMembersInterceptor(
+      Interceptor<GetMembersRequest, GetMembersResponse> interceptor) {
+    getMembersInterceptor = interceptor;
   }
 
   @Override
   public void getMembers(GetMembersRequest request, StreamObserver<GetMembersResponse> resp) {
     try {
-      resp.onNext(Optional.ofNullable(getMembersListener.apply(request)).get());
+      resp.onNext(getMembersInterceptor.apply(request));
       resp.onCompleted();
-    } catch (Exception e) {
-      resp.onError(Status.INTERNAL.asRuntimeException());
+    } catch (Throwable t) {
+      resp.onError(t);
     }
   }
 
@@ -68,10 +66,12 @@ public class PDMockServer extends PDGrpc.PDImplBase {
       private int logical = 0;
 
       @Override
-      public void onNext(TsoRequest value) {}
+      public void onNext(TsoRequest value) {
+      }
 
       @Override
-      public void onError(Throwable t) {}
+      public void onError(Throwable t) {
+      }
 
       @Override
       public void onCompleted() {
@@ -81,45 +81,46 @@ public class PDMockServer extends PDGrpc.PDImplBase {
     };
   }
 
-  public void addGetRegionListener(Function<GetRegionRequest, GetRegionResponse> func) {
-    getRegionListener = func;
+  public void addGetRegionInterceptor(Interceptor<GetRegionRequest, GetRegionResponse> func) {
+    getRegionInterceptor = func;
   }
 
   @Override
   public void getRegion(GetRegionRequest request, StreamObserver<GetRegionResponse> resp) {
     try {
-      resp.onNext(getRegionListener.apply(request));
+      resp.onNext(getRegionInterceptor.apply(request));
       resp.onCompleted();
-    } catch (Exception e) {
-      resp.onError(Status.INTERNAL.asRuntimeException());
+    } catch (Throwable t) {
+      resp.onError(t);
     }
   }
 
-  public void addGetRegionByIDListener(Function<GetRegionByIDRequest, GetRegionResponse> func) {
-    getRegionByIDListener = func;
+  public void addGetRegionByIdInterceptor(
+      Interceptor<GetRegionByIDRequest, GetRegionResponse> func) {
+    getRegionByIDInterceptor = func;
   }
 
   @Override
   public void getRegionByID(GetRegionByIDRequest request, StreamObserver<GetRegionResponse> resp) {
     try {
-      resp.onNext(getRegionByIDListener.apply(request));
+      resp.onNext(getRegionByIDInterceptor.apply(request));
       resp.onCompleted();
-    } catch (Exception e) {
-      resp.onError(Status.INTERNAL.asRuntimeException());
+    } catch (Throwable e) {
+      resp.onError(e);
     }
   }
 
-  public void addGetStoreListener(Function<GetStoreRequest, GetStoreResponse> func) {
-    getStoreListener = func;
+  public void addGetStoreInterceptor(Interceptor<GetStoreRequest, GetStoreResponse> func) {
+    getStoreInterceptor = func;
   }
 
   @Override
   public void getStore(GetStoreRequest request, StreamObserver<GetStoreResponse> resp) {
     try {
-      resp.onNext(Optional.ofNullable(getStoreListener.apply(request)).get());
+      resp.onNext(getStoreInterceptor.apply(request));
       resp.onCompleted();
-    } catch (Exception e) {
-      resp.onError(Status.INTERNAL.asRuntimeException());
+    } catch (Throwable e) {
+      resp.onError(e);
     }
   }
 
