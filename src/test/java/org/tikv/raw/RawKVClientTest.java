@@ -381,7 +381,9 @@ public class RawKVClientTest extends BaseRawKVTest {
   // https://github.com/tikv/client-java/issues/540
   @Test
   public void scanTestForIssue540() {
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
     client.put(ByteString.EMPTY, ByteString.EMPTY);
+    logger.info(client.scan(ByteString.EMPTY, 2).toString());
     Assert.assertEquals(1, client.scan(ByteString.EMPTY, 2).size());
     client.delete(ByteString.EMPTY);
   }
