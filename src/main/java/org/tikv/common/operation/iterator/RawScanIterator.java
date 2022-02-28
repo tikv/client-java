@@ -30,6 +30,7 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawScanIterator extends ScanIterator {
+
   private final BackOffer scanBackOffer;
 
   public RawScanIterator(
@@ -67,11 +68,18 @@ public class RawScanIterator extends ScanIterator {
     }
   }
 
-  private boolean notEndOfScan() {
-    return limit > 0
-        && !(processingLastBatch
-            && (index >= currentCache.size()
-                || Key.toRawKey(currentCache.get(index).getKey()).compareTo(endKey) >= 0));
+  private boolean eof() {
+    if (limit <= 0) {
+      return true;
+    }
+    if (!processingLastBatch) {
+      return false;
+    }
+    if (index >= currentCache.size()) {
+      return true;
+    }
+    ByteString lastKey = currentCache.get(index).getKey();
+    return !lastKey.isEmpty() && Key.toRawKey(lastKey).compareTo(endKey) >= 0;
   }
 
   boolean isCacheDrained() {
@@ -90,7 +98,7 @@ public class RawScanIterator extends ScanIterator {
         return false;
       }
     }
-    return notEndOfScan();
+    return !eof();
   }
 
   private Kvrpcpb.KvPair getCurrent() {
