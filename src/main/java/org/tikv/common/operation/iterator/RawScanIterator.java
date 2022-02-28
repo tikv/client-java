@@ -69,14 +69,8 @@ public class RawScanIterator extends ScanIterator {
   }
 
   private boolean endOfScan() {
-    if (limit <= 0) {
-      return true;
-    }
     if (!processingLastBatch) {
       return false;
-    }
-    if (index >= currentCache.size()) {
-      return true;
     }
     ByteString lastKey = currentCache.get(index).getKey();
     return !lastKey.isEmpty() && Key.toRawKey(lastKey).compareTo(endKey) >= 0;

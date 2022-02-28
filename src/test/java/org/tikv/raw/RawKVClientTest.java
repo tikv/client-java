@@ -21,6 +21,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -378,14 +379,32 @@ public class RawKVClientTest extends BaseRawKVTest {
     return client.scan(RAW_START_KEY, RAW_END_KEY);
   }
 
-  // https://github.com/tikv/client-java/issues/540
   @Test
   public void scanTestForIssue540() {
+    ByteString splitKeyA = ByteString.copyFromUtf8("splitKeyA");
+    ByteString splitKeyB = ByteString.copyFromUtf8("splitKeyB");
+    session.splitRegionAndScatter(
+        ImmutableList.of(splitKeyA.toByteArray(), splitKeyB.toByteArray()));
     client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+
     client.put(ByteString.EMPTY, ByteString.EMPTY);
-    logger.info(client.scan(ByteString.EMPTY, 2).toString());
-    Assert.assertEquals(1, client.scan(ByteString.EMPTY, 2).size());
-    client.delete(ByteString.EMPTY);
+    client.put(splitKeyA, ByteString.EMPTY);
+    Assert.assertEquals(0, client.scan(ByteString.EMPTY, 0).size());
+    Assert.assertEquals(1, client.scan(ByteString.EMPTY, 1).size());
+    Assert.assertEquals(2, client.scan(ByteString.EMPTY, 2).size());
+    Assert.assertEquals(2, client.scan(ByteString.EMPTY, 3).size());
+
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+
+    client.put(ByteString.EMPTY, ByteString.EMPTY);
+    client.put(splitKeyA, ByteString.EMPTY);
+    client.put(splitKeyA.concat(ByteString.copyFromUtf8("1")), ByteString.EMPTY);
+    client.put(splitKeyA.concat(ByteString.copyFromUtf8("2")), ByteString.EMPTY);
+    client.put(splitKeyA.concat(ByteString.copyFromUtf8("3")), ByteString.EMPTY);
+    client.put(splitKeyB.concat(ByteString.copyFromUtf8("1")), ByteString.EMPTY);
+    Assert.assertEquals(6, client.scan(ByteString.EMPTY, 7).size());
+    Assert.assertEquals(0, client.scan(ByteString.EMPTY, -1).size());
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
   }
 
   @Test
