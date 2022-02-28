@@ -68,7 +68,7 @@ public class RawScanIterator extends ScanIterator {
     }
   }
 
-  private boolean eof() {
+  private boolean endOfScan() {
     if (limit <= 0) {
       return true;
     }
@@ -98,7 +98,7 @@ public class RawScanIterator extends ScanIterator {
         return false;
       }
     }
-    return !eof();
+    return !endOfScan();
   }
 
   private Kvrpcpb.KvPair getCurrent() {
