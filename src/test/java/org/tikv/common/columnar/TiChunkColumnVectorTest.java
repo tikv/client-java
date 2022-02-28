@@ -1,14 +1,10 @@
 package org.tikv.common.columnar;
 
-import static org.tikv.common.types.MySQLType.TypeBit;
-
 import java.nio.ByteBuffer;
 import junit.framework.TestCase;
 import org.junit.Assert;
 import org.junit.Test;
 import org.tikv.common.types.BitType;
-import org.tikv.common.types.DataType;
-import org.tikv.common.types.MySQLType;
 
 public class TiChunkColumnVectorTest extends TestCase {
 
