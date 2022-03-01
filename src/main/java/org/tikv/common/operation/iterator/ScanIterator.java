@@ -88,7 +88,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
       Key lastKey = Key.EMPTY;
       // Session should be single-threaded itself
       // so that we don't worry about conf change in the middle
-      // of a transaction. Otherwise below code might lose data
+      // of a transaction. Otherwise, below code might lose data
       if (currentCache.size() < limit) {
         startKey = curRegionEndKey;
         lastKey = Key.toRawKey(curRegionEndKey);
