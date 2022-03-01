@@ -46,6 +46,7 @@ import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest extends BaseRawKVTest {
+
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -382,7 +383,14 @@ public class RawKVClientTest extends BaseRawKVTest {
   public void scanTestForIssue540() {
     ByteString splitKeyA = ByteString.copyFromUtf8("splitKeyA");
     ByteString splitKeyB = ByteString.copyFromUtf8("splitKeyB");
-    session.splitRegionAndScatter(ImmutableList.of(splitKeyA.toByteArray(), splitKeyB.toByteArray()));
+    int splitRegionBackoffMS = 12000;
+    int scatterRegionBackoffMS = 30000;
+    int scatterWaitMS = 300000;
+    session.splitRegionAndScatter(
+        ImmutableList.of(splitKeyA.toByteArray(), splitKeyB.toByteArray()),
+        splitRegionBackoffMS,
+        scatterRegionBackoffMS,
+        scatterWaitMS);
     client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
 
     client.put(ByteString.EMPTY, ByteString.EMPTY);
@@ -411,9 +419,7 @@ public class RawKVClientTest extends BaseRawKVTest {
     baseTest(100, 100, 100, 100, false, true, true, true, true);
   }
 
-  /**
-   * Example of benchmarking base test
-   */
+  /** Example of benchmarking base test */
   public void benchmark() {
     baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, false, false, false, false);
     baseTest(TEST_CASES, TEST_CASES, 200, 5000, true, true, true, true, true);
