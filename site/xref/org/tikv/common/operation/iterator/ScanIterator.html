@@ -98,7 +98,7 @@
 <a class="jxr_linenumber" name="L90" href="#L90">90</a>        <a name="Key" href="../../../../../org/tikv/common/key/Key.html#Key">Key</a> lastKey = Key.EMPTY;
 <a class="jxr_linenumber" name="L91" href="#L91">91</a>        <em class="jxr_comment">// Session should be single-threaded itself</em>
 <a class="jxr_linenumber" name="L92" href="#L92">92</a>        <em class="jxr_comment">// so that we don't worry about conf change in the middle</em>
-<a class="jxr_linenumber" name="L93" href="#L93">93</a>        <em class="jxr_comment">// of a transaction. Otherwise below code might lose data</em>
+<a class="jxr_linenumber" name="L93" href="#L93">93</a>        <em class="jxr_comment">// of a transaction. Otherwise, below code might lose data</em>
 <a class="jxr_linenumber" name="L94" href="#L94">94</a>        <strong class="jxr_keyword">if</strong> (currentCache.size() &lt; limit) {
 <a class="jxr_linenumber" name="L95" href="#L95">95</a>          startKey = curRegionEndKey;
 <a class="jxr_linenumber" name="L96" href="#L96">96</a>          lastKey = Key.toRawKey(curRegionEndKey);
