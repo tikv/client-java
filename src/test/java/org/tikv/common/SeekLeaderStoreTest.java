@@ -18,9 +18,13 @@
 package org.tikv.common;
 
 import com.google.protobuf.ByteString;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Assert;
 import org.junit.Test;
 import org.tikv.common.KVMockServer.State;
+import org.tikv.kvproto.Metapb;
+import org.tikv.kvproto.Metapb.StoreState;
+import org.tikv.kvproto.Pdpb;
 import org.tikv.raw.RawKVClient;
 
 public class SeekLeaderStoreTest extends MockThreeStoresTest {
@@ -34,12 +38,41 @@ public class SeekLeaderStoreTest extends MockThreeStoresTest {
     RawKVClient client = createClient();
     ByteString key = ByteString.copyFromUtf8("key");
     ByteString value = ByteString.copyFromUtf8("value");
+
     put(key, value);
 
-    client.put(key, value);
     Assert.assertEquals(value, client.get(key).get());
     servers.get(0).setState(State.Fail);
     servers.get(1).setRegion(region.switchPeer(stores.get(1).getId()));
     Assert.assertEquals(value, client.get(key).get());
+
+    remove(key, value);
+  }
+
+  @Test
+  public void testSeekLeaderMeetInvalidStore() {
+    RawKVClient client = createClient();
+    ByteString key = ByteString.copyFromUtf8("key");
+    ByteString value = ByteString.copyFromUtf8("value");
+
+    put(key, value);
+
+    servers.get(0).setState(State.Fail);
+    servers.get(2).setRegion(region.switchPeer(stores.get(2).getId()));
+
+    AtomicInteger i = new AtomicInteger(0);
+    leader.addGetStoreListener(
+        request -> {
+          Metapb.Store.Builder storeBuilder =
+              Metapb.Store.newBuilder().mergeFrom(stores.get((int) request.getStoreId() - 1));
+          if (request.getStoreId() == 0x2 && i.incrementAndGet() > 0) {
+            storeBuilder.setState(StoreState.Tombstone);
+          }
+          return Pdpb.GetStoreResponse.newBuilder().setStore(storeBuilder.build()).build();
+        });
+
+    Assert.assertEquals(value, client.get(key).get());
+
+    remove(key, value);
   }
 }
