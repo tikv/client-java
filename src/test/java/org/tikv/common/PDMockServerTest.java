@@ -39,7 +39,7 @@ public abstract class PDMockServerTest {
 
   void setup(String addr) throws IOException {
     int basePort;
-    try (ServerSocket s = new ServerSocket(51820)) {
+    try (ServerSocket s = new ServerSocket(0)) {
       basePort = s.getLocalPort();
     }
 
