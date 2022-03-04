@@ -43,13 +43,18 @@ public class TableCodec {
   }
 
   public static Object[] decodeObjects(byte[] value, Long handle, TiTableInfo tableInfo) {
+    return decodeObjects(value, handle, tableInfo, false);
+  }
+
+  public static Object[] decodeObjects(
+      byte[] value, Long handle, TiTableInfo tableInfo, boolean enableTableInfoCheck) {
     if (value.length == 0) {
       throw new CodecException("Decode fails: value length is zero");
     }
     if ((value[0] & 0xff) == org.tikv.common.codec.RowV2.CODEC_VER) {
-      return TableCodecV2.decodeObjects(value, handle, tableInfo);
+      return TableCodecV2.decodeObjects(value, handle, tableInfo, enableTableInfoCheck);
     }
-    return TableCodecV1.decodeObjects(value, handle, tableInfo);
+    return TableCodecV1.decodeObjects(value, handle, tableInfo, enableTableInfoCheck);
   }
 
   public static Row decodeRow(byte[] value, Long handle, TiTableInfo tableInfo) {

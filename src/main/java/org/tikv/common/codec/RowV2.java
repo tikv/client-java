@@ -139,6 +139,14 @@ public class RowV2 {
     return cdo.toBytes();
   }
 
+  public int columnCount() {
+    if (this.large) {
+      return this.colIDs32.length;
+    } else {
+      return this.colIDs.length;
+    }
+  }
+
   private int binarySearch(int i, int j, long colID) {
     while (i < j) {
       int h = (int) ((i + (long) j) >> 1);

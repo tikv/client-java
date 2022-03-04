@@ -20,6 +20,7 @@ package org.tikv.common.codec;
 import java.util.HashMap;
 import java.util.List;
 import org.tikv.common.codec.Codec.IntegerCodec;
+import org.tikv.common.exception.RowValueHasMoreColumnException;
 import org.tikv.common.meta.TiColumnInfo;
 import org.tikv.common.meta.TiTableInfo;
 import org.tikv.common.row.ObjectRowImpl;
@@ -52,6 +53,11 @@ public class TableCodecV1 {
   }
 
   protected static Object[] decodeObjects(byte[] value, Long handle, TiTableInfo tableInfo) {
+    return decodeObjects(value, handle, tableInfo, false);
+  }
+
+  protected static Object[] decodeObjects(
+      byte[] value, Long handle, TiTableInfo tableInfo, boolean enableTableInfoCheck) {
     if (handle == null && tableInfo.isPkHandle()) {
       throw new IllegalArgumentException("when pk is handle, handle cannot be null");
     }
@@ -68,8 +74,15 @@ public class TableCodecV1 {
     Object[] res = new Object[colSize];
     while (!cdi.eof()) {
       long colID = (long) IntegerType.BIGINT.decode(cdi);
-      Object colValue = idToColumn.get(colID).getType().decodeForBatchWrite(cdi);
-      decodedDataMap.put(colID, colValue);
+      TiColumnInfo colInfo = idToColumn.get(colID);
+      if (null != colInfo) {
+        Object colValue = colInfo.getType().decodeForBatchWrite(cdi);
+        decodedDataMap.put(colID, colValue);
+      } else {
+        if (enableTableInfoCheck) {
+          throw new RowValueHasMoreColumnException();
+        }
+      }
     }
 
     // construct Row with Map<ColumnID, Data> & handle
