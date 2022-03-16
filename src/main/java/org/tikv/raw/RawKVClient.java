@@ -17,13 +17,30 @@
 
 package org.tikv.raw;
 
-import static org.tikv.common.util.ClientUtils.*;
+import static org.tikv.common.util.ClientUtils.appendBatches;
+import static org.tikv.common.util.ClientUtils.genUUID;
+import static org.tikv.common.util.ClientUtils.getBatches;
+import static org.tikv.common.util.ClientUtils.getTasks;
+import static org.tikv.common.util.ClientUtils.getTasksWithOutput;
+import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
 
 import com.google.protobuf.ByteString;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +61,14 @@ import org.tikv.common.operation.iterator.RawScanIterator;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
-import org.tikv.common.util.*;
+import org.tikv.common.util.BackOffFunction;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.Batch;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.DeleteRange;
+import org.tikv.common.util.HistogramUtils;
+import org.tikv.common.util.Pair;
+import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClient implements RawKVClientBase {
@@ -97,6 +121,12 @@ public class RawKVClient implements RawKVClientBase {
     this.atomicForCAS = conf.isEnableAtomicForCAS();
   }
 
+  private SlowLog withClusterInfo(SlowLog logger) {
+    return logger
+        .withField("cluster_id", tiSession.getPDClient().getClusterId())
+        .withField("pd_addresses", tiSession.getPDClient().getPdAddrs());
+  }
+
   @Override
   public void close() {}
 
@@ -110,7 +140,7 @@ public class RawKVClient implements RawKVClientBase {
     String label = "client_raw_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
 
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVWriteSlowLogInMS());
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVWriteSlowLogInMS()));
     SlowLogSpan span = slowLog.start("put");
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
 
@@ -172,7 +202,7 @@ public class RawKVClient implements RawKVClientBase {
     String label = "client_raw_compare_and_set";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
 
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVWriteSlowLogInMS());
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVWriteSlowLogInMS()));
     SlowLogSpan span = slowLog.start("putIfAbsent");
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
 
@@ -211,7 +241,7 @@ public class RawKVClient implements RawKVClientBase {
     String label = "client_raw_batch_put";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
 
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVBatchWriteSlowLogInMS());
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVBatchWriteSlowLogInMS()));
     SlowLogSpan span = slowLog.start("batchPut");
     span.addProperty("keySize", String.valueOf(kvPairs.size()));
 
@@ -237,7 +267,7 @@ public class RawKVClient implements RawKVClientBase {
     String label = "client_raw_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
 
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVReadSlowLogInMS());
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVReadSlowLogInMS()));
     SlowLogSpan span = slowLog.start("get");
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
 
@@ -270,7 +300,7 @@ public class RawKVClient implements RawKVClientBase {
   public List<KvPair> batchGet(List<ByteString> keys) {
     String label = "client_raw_batch_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVBatchReadSlowLogInMS());
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVBatchReadSlowLogInMS()));
     SlowLogSpan span = slowLog.start("batchGet");
     span.addProperty("keySize", String.valueOf(keys.size()));
     ConcreteBackOffer backOffer =
@@ -295,7 +325,7 @@ public class RawKVClient implements RawKVClientBase {
   public void batchDelete(List<ByteString> keys) {
     String label = "client_raw_batch_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVBatchWriteSlowLogInMS());
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVBatchWriteSlowLogInMS()));
     SlowLogSpan span = slowLog.start("batchDelete");
     span.addProperty("keySize", String.valueOf(keys.size()));
     ConcreteBackOffer backOffer =
@@ -320,7 +350,7 @@ public class RawKVClient implements RawKVClientBase {
   public Optional<Long> getKeyTTL(ByteString key) {
     String label = "client_raw_get_key_ttl";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVReadSlowLogInMS());
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVReadSlowLogInMS()));
     SlowLogSpan span = slowLog.start("getKeyTTL");
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
     ConcreteBackOffer backOffer =
@@ -428,7 +458,7 @@ public class RawKVClient implements RawKVClientBase {
   public List<KvPair> scan(ByteString startKey, ByteString endKey, int limit, boolean keyOnly) {
     String label = "client_raw_scan";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVScanSlowLogInMS());
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVScanSlowLogInMS()));
     SlowLogSpan span = slowLog.start("scan");
     span.addProperty("startKey", KeyUtils.formatBytesUTF8(startKey));
     span.addProperty("endKey", KeyUtils.formatBytesUTF8(endKey));
@@ -473,7 +503,7 @@ public class RawKVClient implements RawKVClientBase {
   public List<KvPair> scan(ByteString startKey, ByteString endKey, boolean keyOnly) {
     String label = "client_raw_scan_without_limit";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVScanSlowLogInMS());
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVScanSlowLogInMS()));
     SlowLogSpan span = slowLog.start("scan");
     span.addProperty("startKey", KeyUtils.formatBytesUTF8(startKey));
     span.addProperty("endKey", KeyUtils.formatBytesUTF8(endKey));
@@ -539,7 +569,7 @@ public class RawKVClient implements RawKVClientBase {
   public void delete(ByteString key) {
     String label = "client_raw_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVWriteSlowLogInMS());
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVWriteSlowLogInMS()));
     SlowLogSpan span = slowLog.start("delete");
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
     ConcreteBackOffer backOffer =
