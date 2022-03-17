@@ -749,7 +749,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   static class PDClientWrapper {
-
     private final String leaderInfo;
     private final PDBlockingStub blockingStub;
     private final PDFutureStub asyncStub;
