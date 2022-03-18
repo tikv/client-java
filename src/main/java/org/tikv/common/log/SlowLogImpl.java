@@ -31,7 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SlowLogImpl implements SlowLog {
-
   private static final Logger logger = LoggerFactory.getLogger(SlowLogImpl.class);
 
   private static final int MAX_SPAN_SIZE = 1024;
@@ -90,6 +89,11 @@ public class SlowLogImpl implements SlowLog {
   public SlowLog withFields(Map<String, Object> fields) {
     this.fields.putAll(fields);
     return this;
+  }
+
+  @Override
+  public Object getField(String key) {
+    return fields.get(key);
   }
 
   @Override

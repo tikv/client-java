@@ -52,7 +52,7 @@ public class ConcreteBackOffer implements BackOffer {
       HistogramUtils.buildDuration()
           .name("client_java_backoff_duration")
           .help("backoff duration.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
 
   private ConcreteBackOffer(int maxSleep, long deadline, SlowLog slowLog) {
@@ -173,7 +173,12 @@ public class ConcreteBackOffer implements BackOffer {
   }
 
   public boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType, long maxSleepMs) {
-    Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(funcType.name()).startTimer();
+    Object clusterId = slowLog.getField("cluster_id");
+    String[] labels =
+        clusterId == null
+            ? new String[] {funcType.name()}
+            : new String[] {funcType.name(), clusterId.toString()};
+    Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(labels).startTimer();
     SlowLogSpan slowLogSpan = getSlowLog().start("backoff");
     slowLogSpan.addProperty("type", funcType.name());
     BackOffFunction backOffFunction =

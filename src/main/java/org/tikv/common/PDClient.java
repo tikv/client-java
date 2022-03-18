@@ -127,6 +127,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       HistogramUtils.buildDuration()
           .name("client_java_pd_get_region_by_requests_latency")
           .help("pd getRegionByKey request latency.")
+          .labelNames("cluster")
           .register();
 
   private PDClient(TiConfiguration conf, ChannelFactory channelFactory) {
@@ -309,7 +310,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   @Override
   public Pair<Metapb.Region, Metapb.Peer> getRegionByKey(BackOffer backOffer, ByteString key) {
-    Histogram.Timer requestTimer = PD_GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
+    Histogram.Timer requestTimer =
+        PD_GET_REGION_BY_KEY_REQUEST_LATENCY.labels(String.valueOf(getClusterId())).startTimer();
     try {
       if (conf.isTxnKVMode()) {
         CodecDataOutput cdo = new CodecDataOutput();

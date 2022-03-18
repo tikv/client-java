@@ -55,12 +55,14 @@ public abstract class AbstractRegionStoreClient
       HistogramUtils.buildDuration()
           .name("client_java_seek_leader_store_duration")
           .help("seek leader store duration.")
+          .labelNames("cluster")
           .register();
 
   public static final Histogram SEEK_PROXY_STORE_DURATION =
       HistogramUtils.buildDuration()
           .name("client_java_seek_proxy_store_duration")
           .help("seek proxy store duration.")
+          .labelNames("cluster")
           .register();
 
   protected final RegionManager regionManager;
@@ -202,7 +204,10 @@ public abstract class AbstractRegionStoreClient
   }
 
   private Boolean seekLeaderStore(BackOffer backOffer) {
-    Histogram.Timer switchLeaderDurationTimer = SEEK_LEADER_STORE_DURATION.startTimer();
+    Histogram.Timer switchLeaderDurationTimer =
+        SEEK_LEADER_STORE_DURATION
+            .labels(String.valueOf(regionManager.getPDClient().getClusterId()))
+            .startTimer();
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("seekLeaderStore");
     try {
       List<Metapb.Peer> peers = region.getFollowerList();
@@ -251,7 +256,10 @@ public abstract class AbstractRegionStoreClient
 
   private boolean seekProxyStore(BackOffer backOffer) {
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("seekProxyStore");
-    Histogram.Timer grpcForwardDurationTimer = SEEK_PROXY_STORE_DURATION.startTimer();
+    Histogram.Timer grpcForwardDurationTimer =
+        SEEK_PROXY_STORE_DURATION
+            .labels(String.valueOf(regionManager.getPDClient().getClusterId()))
+            .startTimer();
     try {
       logger.info(String.format("try grpc forward: region[%d]", region.getId()));
       // when current leader cannot be reached

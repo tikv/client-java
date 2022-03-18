@@ -67,4 +67,6 @@ public interface ReadOnlyPDClient {
   List<Store> getAllStores(BackOffer backOffer);
 
   TiConfiguration.ReplicaRead getReplicaRead();
+
+  long getClusterId();
 }

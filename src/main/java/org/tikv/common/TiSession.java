@@ -158,7 +158,7 @@ public class TiSession implements AutoCloseable {
     if (conf.isWarmUpEnable() && conf.isRawKVMode()) {
       warmUp();
     }
-    this.circuitBreaker = new CircuitBreakerImpl(conf);
+    this.circuitBreaker = new CircuitBreakerImpl(conf, client.getClusterId());
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
 
