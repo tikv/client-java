@@ -72,6 +72,8 @@ import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClient implements RawKVClientBase {
+  private final long clusterId;
+  private final List<URI> pdAddresses;
   private final TiSession tiSession;
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
@@ -119,6 +121,12 @@ public class RawKVClient implements RawKVClientBase {
     this.batchScanThreadPool = session.getThreadPoolForBatchScan();
     this.deleteRangeThreadPool = session.getThreadPoolForDeleteRange();
     this.atomicForCAS = conf.isEnableAtomicForCAS();
+    this.clusterId = session.getPDClient().getClusterId();
+    this.pdAddresses = session.getPDClient().getPdAddrs();
+  }
+
+  private SlowLog withClusterInfo(SlowLog logger) {
+    return logger.withField("cluster_id", clusterId).withField("pd_addresses", pdAddresses);
   }
 
   private SlowLog withClusterInfo(SlowLog logger) {
