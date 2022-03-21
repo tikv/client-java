@@ -127,9 +127,7 @@ public class RawKVClient implements RawKVClientBase {
   }
 
   private SlowLog withClusterInfo(SlowLog logger) {
-    return logger
-        .withField("cluster_id", clusterId)
-        .withField("pd_addresses", pdAddresses);
+    return logger.withField("cluster_id", clusterId).withField("pd_addresses", pdAddresses);
   }
 
   private String[] withClusterId(String label) {

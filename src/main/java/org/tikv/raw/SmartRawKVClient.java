@@ -211,7 +211,8 @@ public class SmartRawKVClient implements RawKVClientBase {
   }
 
   <T> T callWithCircuitBreaker(String funcName, Function1<T> func) {
-    String[] labels = new String[] {funcName, client.getSession().getPDClient().getClusterId().toString()};
+    String[] labels =
+        new String[] {funcName, client.getSession().getPDClient().getClusterId().toString()};
 
     Histogram.Timer requestTimer = REQUEST_LATENCY.labels(labels).startTimer();
     try {
@@ -252,7 +253,9 @@ public class SmartRawKVClient implements RawKVClientBase {
       }
     } else {
       logger.debug("Circuit Breaker Opened");
-      CIRCUIT_BREAKER_OPENED.labels(funcName, client.getSession().getPDClient().getClusterId().toString()).inc();
+      CIRCUIT_BREAKER_OPENED
+          .labels(funcName, client.getSession().getPDClient().getClusterId().toString())
+          .inc();
       throw new CircuitBreakerOpenException();
     }
   }

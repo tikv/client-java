@@ -109,7 +109,8 @@ public class RegionManager {
       BackOffer backOffer, ByteString startKey, ByteString endKey, int limit) {
     Long clusterId = pdClient.getClusterId();
     backOffer.withClusterId(clusterId);
-    Histogram.Timer requestTimer = SCAN_REGIONS_REQUEST_LATENCY.labels(clusterId.toString()).startTimer();
+    Histogram.Timer requestTimer =
+        SCAN_REGIONS_REQUEST_LATENCY.labels(clusterId.toString()).startTimer();
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("scanRegions");
     try {
       return pdClient.scanRegions(backOffer, startKey, endKey, limit);
@@ -128,7 +129,8 @@ public class RegionManager {
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
     Long clusterId = pdClient.getClusterId();
     backOffer.withClusterId(clusterId);
-    Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.labels(clusterId.toString()).startTimer();
+    Histogram.Timer requestTimer =
+        GET_REGION_BY_KEY_REQUEST_LATENCY.labels(clusterId.toString()).startTimer();
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("getRegionByKey");
     TiRegion region = cache.getRegionByKey(key, backOffer);
     try {

@@ -127,8 +127,7 @@ import org.tikv.txn.exception.LockException;
 public class RegionStoreClient extends AbstractRegionStoreClient {
 
   private static final Logger logger = LoggerFactory.getLogger(RegionStoreClient.class);
-  @VisibleForTesting
-  public final AbstractLockResolverClient lockResolverClient;
+  @VisibleForTesting public final AbstractLockResolverClient lockResolverClient;
   private final TiStoreType storeType;
   /** startTS -> List(locks) */
   private final Map<Long, Set<Long>> resolvedLocks = new HashMap<>();
@@ -223,11 +222,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * Fetch a value according to a key
    *
    * @param backOffer backOffer
-   * @param key       key to fetch
-   * @param version   key version
+   * @param key key to fetch
+   * @param version key version
    * @return value
    * @throws TiClientInternalException TiSpark Client exception, unexpected
-   * @throws KeyException              Key may be locked
+   * @throws KeyException Key may be locked
    */
   public ByteString get(BackOffer backOffer, ByteString key, long version)
       throws TiClientInternalException, KeyException {
@@ -262,7 +261,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   /**
    * @param resp GetResponse
    * @throws TiClientInternalException TiSpark Client exception, unexpected
-   * @throws KeyException              Key may be locked
+   * @throws KeyException Key may be locked
    */
   private void handleGetResponse(GetResponse resp) throws TiClientInternalException, KeyException {
     if (resp == null) {
@@ -415,13 +414,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * Prewrite batch keys
    *
    * @param backOffer backOffer
-   * @param primary   primary lock of keys
+   * @param primary primary lock of keys
    * @param mutations batch key-values as mutations
-   * @param startTs   startTs of prewrite
-   * @param lockTTL   lock ttl
+   * @param startTs startTs of prewrite
+   * @param lockTTL lock ttl
    * @throws TiClientInternalException TiSpark Client exception, unexpected
-   * @throws KeyException              Key may be locked
-   * @throws RegionException           region error occurs
+   * @throws KeyException Key may be locked
+   * @throws RegionException region error occurs
    */
   public void prewrite(
       BackOffer backOffer,
@@ -453,15 +452,15 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               getIsV4()
                   ? PrewriteRequest.newBuilder()
-                  .setContext(makeContext(storeType, bo.getSlowLog()))
-                  .setStartVersion(startTs)
-                  .setPrimaryLock(primaryLock)
-                  .addAllMutations(mutations)
-                  .setLockTtl(ttl)
-                  .setSkipConstraintCheck(skipConstraintCheck)
-                  .setMinCommitTs(startTs)
-                  .setTxnSize(16)
-                  .build()
+                      .setContext(makeContext(storeType, bo.getSlowLog()))
+                      .setStartVersion(startTs)
+                      .setPrimaryLock(primaryLock)
+                      .addAllMutations(mutations)
+                      .setLockTtl(ttl)
+                      .setSkipConstraintCheck(skipConstraintCheck)
+                      .setMinCommitTs(startTs)
+                      .setTxnSize(16)
+                      .build()
                   : PrewriteRequest.newBuilder()
                       .setContext(makeContext(storeType, bo.getSlowLog()))
                       .setStartVersion(startTs)
@@ -491,10 +490,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   /**
    * @param backOffer backOffer
-   * @param resp      response
+   * @param resp response
    * @return Return true means the rpc call success. Return false means the rpc call fail,
-   * RegionStoreClient should retry. Throw an Exception means the rpc call fail, RegionStoreClient
-   * cannot handle this kind of error
+   *     RegionStoreClient should retry. Throw an Exception means the rpc call fail,
+   *     RegionStoreClient cannot handle this kind of error
    * @throws TiClientInternalException
    * @throws RegionException
    * @throws KeyException
@@ -536,9 +535,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return false;
   }
 
-  /**
-   * TXN Heart Beat: update primary key ttl
-   */
+  /** TXN Heart Beat: update primary key ttl */
   public void txnHeartBeat(BackOffer bo, ByteString primaryLock, long startTs, long ttl) {
     bo.withClusterId(pdClient.getClusterId());
     boolean forWrite = false;
@@ -591,9 +588,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * Commit batch keys
    *
    * @param backOffer backOffer
-   * @param keys      keys to commit
-   * @param startTs   start version
-   * @param commitTs  commit version
+   * @param keys keys to commit
+   * @param startTs start version
+   * @param commitTs commit version
    */
   public void commit(BackOffer backOffer, Iterable<ByteString> keys, long startTs, long commitTs)
       throws KeyException {
@@ -648,7 +645,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   /**
    * Execute and retrieve the response from TiKV server.
    *
-   * @param req    Select request to process
+   * @param req Select request to process
    * @param ranges Key range list
    * @return Remaining tasks of this request, if task split happens, null otherwise
    */
@@ -913,7 +910,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Long clusterId = pdClient.getClusterId();
     backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get_key_ttl", clusterId.toString())
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_get_key_ttl", clusterId.toString())
             .startTimer();
     try {
       Supplier<RawGetKeyTTLRequest> factory =
@@ -955,7 +953,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Long clusterId = pdClient.getClusterId();
     backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete", clusterId.toString())
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_delete", clusterId.toString())
             .startTimer();
     try {
       Supplier<RawDeleteRequest> factory =
@@ -1042,7 +1041,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Long clusterId = pdClient.getClusterId();
     backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put_if_absent", clusterId.toString())
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_put_if_absent", clusterId.toString())
             .startTimer();
     try {
       Supplier<RawCASRequest> factory =
@@ -1095,7 +1095,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Long clusterId = pdClient.getClusterId();
     backoffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_get", clusterId.toString())
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_batch_get", clusterId.toString())
             .startTimer();
     try {
       if (keys.isEmpty()) {
@@ -1134,7 +1135,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Long clusterId = pdClient.getClusterId();
     backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_put", clusterId.toString())
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_batch_put", clusterId.toString())
             .startTimer();
     try {
       if (kvPairs.isEmpty()) {
@@ -1190,7 +1192,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Long clusterId = pdClient.getClusterId();
     backoffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_delete", clusterId.toString())
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_batch_delete", clusterId.toString())
             .startTimer();
     try {
       if (keys.isEmpty()) {
@@ -1289,7 +1292,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     Long clusterId = pdClient.getClusterId();
     backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete_range", clusterId.toString())
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_delete_range", clusterId.toString())
             .startTimer();
     try {
       Supplier<RawDeleteRangeRequest> factory =
