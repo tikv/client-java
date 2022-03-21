@@ -15,13 +15,31 @@
 
 package org.tikv.raw;
 
-import static org.tikv.common.util.ClientUtils.*;
+import static org.tikv.common.util.ClientUtils.appendBatches;
+import static org.tikv.common.util.ClientUtils.genUUID;
+import static org.tikv.common.util.ClientUtils.getBatches;
+import static org.tikv.common.util.ClientUtils.getTasks;
+import static org.tikv.common.util.ClientUtils.getTasksWithOutput;
+import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
 
 import com.google.protobuf.ByteString;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
-import java.util.*;
-import java.util.concurrent.*;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,10 +55,23 @@ import org.tikv.common.operation.iterator.RawScanIterator;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
-import org.tikv.common.util.*;
+import org.tikv.common.util.BackOffFunction;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.Batch;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.DeleteRange;
+import org.tikv.common.util.HistogramUtils;
+import org.tikv.common.util.Pair;
+import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClient implements RawKVClientBase {
+<<<<<<< HEAD
+=======
+  private final long clusterId;
+  private final List<URI> pdAddresses;
+  private final TiSession tiSession;
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
   private final ExecutorService batchGetThreadPool;
@@ -84,6 +115,16 @@ public class RawKVClient implements RawKVClientBase {
     this.batchDeleteThreadPool = session.getThreadPoolForBatchDelete();
     this.batchScanThreadPool = session.getThreadPoolForBatchScan();
     this.deleteRangeThreadPool = session.getThreadPoolForDeleteRange();
+<<<<<<< HEAD
+=======
+    this.atomicForCAS = conf.isEnableAtomicForCAS();
+    this.clusterId = session.getPDClient().getClusterId();
+    this.pdAddresses = session.getPDClient().getPdAddrs();
+  }
+
+  private SlowLog withClusterInfo(SlowLog logger) {
+    return logger.withField("cluster_id", clusterId).withField("pd_addresses", pdAddresses);
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
   }
 
   @Override
@@ -99,10 +140,16 @@ public class RawKVClient implements RawKVClientBase {
     put(key, value, ttl, false);
   }
 
+<<<<<<< HEAD
   @Override
   public void putAtomic(ByteString key, ByteString value, long ttl) {
     put(key, value, ttl, true);
   }
+=======
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVWriteSlowLogInMS()));
+    SlowLogSpan span = slowLog.start("put");
+    span.addProperty("key", KeyUtils.formatBytesUTF8(key));
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
 
   private void put(ByteString key, ByteString value, long ttl, boolean atomic) {
     String label = "client_raw_put";
@@ -149,6 +196,7 @@ public class RawKVClient implements RawKVClientBase {
   public ByteString putIfAbsent(ByteString key, ByteString value, long ttl) {
     String label = "client_raw_put_if_absent";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+<<<<<<< HEAD
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVWriteSlowLogInMS(),
@@ -158,6 +206,13 @@ public class RawKVClient implements RawKVClientBase {
                 put("key", KeyUtils.formatBytesUTF8(key));
               }
             });
+=======
+
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVWriteSlowLogInMS()));
+    SlowLogSpan span = slowLog.start("putIfAbsent");
+    span.addProperty("key", KeyUtils.formatBytesUTF8(key));
+
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
     try {
@@ -192,6 +247,7 @@ public class RawKVClient implements RawKVClientBase {
     batchPut(kvPairs, ttl, false);
   }
 
+<<<<<<< HEAD
   @Override
   public void batchPutAtomic(Map<ByteString, ByteString> kvPairs) {
     batchPutAtomic(kvPairs, 0);
@@ -201,6 +257,11 @@ public class RawKVClient implements RawKVClientBase {
   public void batchPutAtomic(Map<ByteString, ByteString> kvPairs, long ttl) {
     batchPut(kvPairs, ttl, true);
   }
+=======
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVBatchWriteSlowLogInMS()));
+    SlowLogSpan span = slowLog.start("batchPut");
+    span.addProperty("keySize", String.valueOf(kvPairs.size()));
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
 
   private void batchPut(Map<ByteString, ByteString> kvPairs, long ttl, boolean atomic) {
     String label = "client_raw_batch_put";
@@ -234,6 +295,7 @@ public class RawKVClient implements RawKVClientBase {
   public ByteString get(ByteString key) {
     String label = "client_raw_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+<<<<<<< HEAD
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVReadSlowLogInMS(),
@@ -243,6 +305,12 @@ public class RawKVClient implements RawKVClientBase {
                 put("key", KeyUtils.formatBytesUTF8(key));
               }
             });
+=======
+
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVReadSlowLogInMS()));
+    SlowLogSpan span = slowLog.start("get");
+    span.addProperty("key", KeyUtils.formatBytesUTF8(key));
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
 
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS(), slowLog);
@@ -272,6 +340,7 @@ public class RawKVClient implements RawKVClientBase {
   public List<KvPair> batchGet(List<ByteString> keys) {
     String label = "client_raw_batch_get";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+<<<<<<< HEAD
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVBatchReadSlowLogInMS(),
@@ -281,6 +350,11 @@ public class RawKVClient implements RawKVClientBase {
                 put("keySize", String.valueOf(keys.size()));
               }
             });
+=======
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVBatchReadSlowLogInMS()));
+    SlowLogSpan span = slowLog.start("batchGet");
+    span.addProperty("keySize", String.valueOf(keys.size()));
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchReadTimeoutInMS(), slowLog);
     try {
@@ -311,6 +385,7 @@ public class RawKVClient implements RawKVClientBase {
   private void batchDelete(List<ByteString> keys, boolean atomic) {
     String label = "client_raw_batch_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+<<<<<<< HEAD
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVBatchWriteSlowLogInMS(),
@@ -320,6 +395,11 @@ public class RawKVClient implements RawKVClientBase {
                 put("keySize", String.valueOf(keys.size()));
               }
             });
+=======
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVBatchWriteSlowLogInMS()));
+    SlowLogSpan span = slowLog.start("batchDelete");
+    span.addProperty("keySize", String.valueOf(keys.size()));
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchWriteTimeoutInMS(), slowLog);
     try {
@@ -341,6 +421,7 @@ public class RawKVClient implements RawKVClientBase {
   public Long getKeyTTL(ByteString key) {
     String label = "client_raw_get_key_ttl";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+<<<<<<< HEAD
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVReadSlowLogInMS(),
@@ -350,6 +431,11 @@ public class RawKVClient implements RawKVClientBase {
                 put("key", KeyUtils.formatBytesUTF8(key));
               }
             });
+=======
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVReadSlowLogInMS()));
+    SlowLogSpan span = slowLog.start("getKeyTTL");
+    span.addProperty("key", KeyUtils.formatBytesUTF8(key));
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS(), slowLog);
     try {
@@ -434,6 +520,7 @@ public class RawKVClient implements RawKVClientBase {
   public List<KvPair> scan(ByteString startKey, ByteString endKey, int limit, boolean keyOnly) {
     String label = "client_raw_scan";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+<<<<<<< HEAD
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVScanSlowLogInMS(),
@@ -446,6 +533,14 @@ public class RawKVClient implements RawKVClientBase {
                 put("keyOnly", String.valueOf(keyOnly));
               }
             });
+=======
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVScanSlowLogInMS()));
+    SlowLogSpan span = slowLog.start("scan");
+    span.addProperty("startKey", KeyUtils.formatBytesUTF8(startKey));
+    span.addProperty("endKey", KeyUtils.formatBytesUTF8(endKey));
+    span.addProperty("limit", String.valueOf(limit));
+    span.addProperty("keyOnly", String.valueOf(keyOnly));
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVScanTimeoutInMS(), slowLog);
     try {
@@ -484,6 +579,7 @@ public class RawKVClient implements RawKVClientBase {
   public List<KvPair> scan(ByteString startKey, ByteString endKey, boolean keyOnly) {
     String label = "client_raw_scan_without_limit";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+<<<<<<< HEAD
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVScanSlowLogInMS(),
@@ -495,6 +591,13 @@ public class RawKVClient implements RawKVClientBase {
                 put("keyOnly", String.valueOf(keyOnly));
               }
             });
+=======
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVScanSlowLogInMS()));
+    SlowLogSpan span = slowLog.start("scan");
+    span.addProperty("startKey", KeyUtils.formatBytesUTF8(startKey));
+    span.addProperty("endKey", KeyUtils.formatBytesUTF8(endKey));
+    span.addProperty("keyOnly", String.valueOf(keyOnly));
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVScanTimeoutInMS(), slowLog);
     try {
@@ -564,6 +667,7 @@ public class RawKVClient implements RawKVClientBase {
   private void delete(ByteString key, boolean atomic) {
     String label = "client_raw_delete";
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
+<<<<<<< HEAD
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVWriteSlowLogInMS(),
@@ -574,6 +678,11 @@ public class RawKVClient implements RawKVClientBase {
                 put("atomic", String.valueOf(atomic));
               }
             });
+=======
+    SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVWriteSlowLogInMS()));
+    SlowLogSpan span = slowLog.start("delete");
+    span.addProperty("key", KeyUtils.formatBytesUTF8(key));
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
     try {

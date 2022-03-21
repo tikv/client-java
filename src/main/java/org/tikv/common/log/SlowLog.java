@@ -17,12 +17,26 @@
 
 package org.tikv.common.log;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+
 public interface SlowLog {
+<<<<<<< HEAD
   void addProperty(String key, String value);
+=======
+
+  SlowLogSpan start(String name);
+>>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
 
   SlowLogSpan start(String name);
 
   void setError(Throwable err);
+
+  SlowLog withFields(Map<String, Object> fields);
+
+  default SlowLog withField(String key, Object value) {
+    return withFields(ImmutableMap.of(key, value));
+  }
 
   void log();
 }
