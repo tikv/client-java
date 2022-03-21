@@ -206,7 +206,7 @@ public abstract class AbstractRegionStoreClient
   private Boolean seekLeaderStore(BackOffer backOffer) {
     Histogram.Timer switchLeaderDurationTimer =
         SEEK_LEADER_STORE_DURATION
-            .labels(String.valueOf(regionManager.getPDClient().getClusterId()))
+            .labels(regionManager.getPDClient().getClusterId().toString())
             .startTimer();
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("seekLeaderStore");
     try {
@@ -258,7 +258,7 @@ public abstract class AbstractRegionStoreClient
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("seekProxyStore");
     Histogram.Timer grpcForwardDurationTimer =
         SEEK_PROXY_STORE_DURATION
-            .labels(String.valueOf(regionManager.getPDClient().getClusterId()))
+            .labels(regionManager.getPDClient().getClusterId().toString())
             .startTimer();
     try {
       logger.info(String.format("try grpc forward: region[%d]", region.getId()));

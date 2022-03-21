@@ -27,6 +27,7 @@ import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
 import com.google.protobuf.ByteString;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -72,7 +73,7 @@ import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClient implements RawKVClientBase {
-  private final long clusterId;
+  private final Long clusterId;
   private final List<URI> pdAddresses;
   private final TiSession tiSession;
   private final RegionStoreClientBuilder clientBuilder;
@@ -126,17 +127,13 @@ public class RawKVClient implements RawKVClientBase {
   }
 
   private SlowLog withClusterInfo(SlowLog logger) {
-    return logger.withField("cluster_id", clusterId).withField("pd_addresses", pdAddresses);
-  }
-
-  private SlowLog withClusterInfo(SlowLog logger) {
     return logger
-        .withField("cluster_id", tiSession.getPDClient().getClusterId())
-        .withField("pd_addresses", tiSession.getPDClient().getPdAddrs());
+        .withField("cluster_id", clusterId)
+        .withField("pd_addresses", pdAddresses);
   }
 
   private String[] withClusterId(String label) {
-    return new String[] {label, String.valueOf(tiSession.getPDClient().getClusterId())};
+    return new String[] {label, clusterId.toString()};
   }
 
   @Override

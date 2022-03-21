@@ -35,7 +35,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
           .labelNames("type", "cluster")
           .register();
 
-  private final long clusterId;
+  private final Long clusterId;
   private final boolean enable;
   private final int windowInSeconds;
   private final int errorThresholdPercentage;
@@ -129,7 +129,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   @Override
   public void recordAttemptSuccess() {
-    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("success", String.valueOf(clusterId)).inc();
+    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("success", clusterId.toString()).inc();
     if (attemptSuccessCount.incrementAndGet() >= this.attemptRequestCount) {
       halfOpen2Close();
     }
@@ -137,7 +137,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   @Override
   public void recordAttemptFailure() {
-    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("failure", String.valueOf(clusterId)).inc();
+    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("failure", clusterId.toString()).inc();
     halfOpen2Open();
   }
 
