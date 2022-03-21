@@ -127,9 +127,7 @@ public class RawKVClient implements RawKVClientBase {
   }
 
   private SlowLog withClusterInfo(SlowLog logger) {
-    return logger
-        .withField("cluster_id", clusterId)
-        .withField("pd_addresses", pdAddresses);
+    return logger.withField("cluster_id", clusterId).withField("pd_addresses", pdAddresses);
   }
 
   @Override
@@ -387,17 +385,17 @@ public class RawKVClient implements RawKVClientBase {
   public List<List<ByteString>> batchScanKeys(
       List<Pair<ByteString, ByteString>> ranges, int eachLimit) {
     return batchScan(
-        ranges
-            .stream()
-            .map(
-                range ->
-                    ScanOption.newBuilder()
-                        .setStartKey(range.first)
-                        .setEndKey(range.second)
-                        .setLimit(eachLimit)
-                        .setKeyOnly(true)
-                        .build())
-            .collect(Collectors.toList()))
+            ranges
+                .stream()
+                .map(
+                    range ->
+                        ScanOption.newBuilder()
+                            .setStartKey(range.first)
+                            .setEndKey(range.second)
+                            .setLimit(eachLimit)
+                            .setKeyOnly(true)
+                            .build())
+                .collect(Collectors.toList()))
         .stream()
         .map(kvs -> kvs.stream().map(kv -> kv.getKey()).collect(Collectors.toList()))
         .collect(Collectors.toList());
@@ -640,7 +638,7 @@ public class RawKVClient implements RawKVClientBase {
    * Ingest KV pairs to RawKV using StreamKV API.
    *
    * @param list
-   * @param ttl  the ttl of the key (in seconds), 0 means the key will never be outdated
+   * @param ttl the ttl of the key (in seconds), 0 means the key will never be outdated
    */
   public synchronized void ingest(List<Pair<ByteString, ByteString>> list, Long ttl)
       throws GrpcException {
@@ -1069,7 +1067,7 @@ public class RawKVClient implements RawKVClientBase {
    * Scan all raw key-value pairs from TiKV in range [startKey, endKey)
    *
    * @param startKey raw start key, inclusive
-   * @param endKey   raw end key, exclusive
+   * @param endKey raw end key, exclusive
    * @return iterator of key-value pairs in range
    */
   public Iterator<KvPair> scan0(ByteString startKey, ByteString endKey) {
@@ -1088,8 +1086,8 @@ public class RawKVClient implements RawKVClientBase {
    * Scan keys with prefix
    *
    * @param prefixKey prefix key
-   * @param limit     limit of keys retrieved
-   * @param keyOnly   whether to scan in keyOnly mode
+   * @param limit limit of keys retrieved
+   * @param keyOnly whether to scan in keyOnly mode
    * @return kvPairs iterator with the specified prefix
    */
   public Iterator<KvPair> scanPrefix0(ByteString prefixKey, int limit, boolean keyOnly) {
@@ -1108,8 +1106,8 @@ public class RawKVClient implements RawKVClientBase {
    * Scan all raw key-value pairs from TiKV in range [startKey, endKey)
    *
    * @param startKey raw start key, inclusive
-   * @param endKey   raw end key, exclusive
-   * @param keyOnly  whether to scan in key-only mode
+   * @param endKey raw end key, exclusive
+   * @param keyOnly whether to scan in key-only mode
    * @return iterator of key-value pairs in range
    */
   public Iterator<KvPair> scan0(ByteString startKey, ByteString endKey, boolean keyOnly) {
