@@ -22,6 +22,7 @@ import io.grpc.Status;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
 import java.util.concurrent.Callable;
+import org.tikv.common.ClusterIdRecorder;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.operation.ErrorHandler;
@@ -29,7 +30,7 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.HistogramUtils;
 
-public abstract class RetryPolicy<RespT> {
+public abstract class RetryPolicy<RespT> implements ClusterIdRecorder {
   BackOffer backOffer = ConcreteBackOffer.newCopNextMaxBackOff();
   public static final Histogram GRPC_SINGLE_REQUEST_LATENCY =
       HistogramUtils.buildDuration()
@@ -72,12 +73,7 @@ public abstract class RetryPolicy<RespT> {
   }
 
   public RespT callWithRetry(Callable<RespT> proc, String methodName, BackOffer backOffer) {
-    Object clusterId = backOffer.getSlowLog().getField("cluster_id");
-    String[] labels =
-        clusterId == null
-            ? new String[] {methodName}
-            : new String[] {methodName, clusterId.toString()};
-
+    String[] labels = new String[] {methodName, getClusterId().toString()};
     Histogram.Timer callWithRetryTimer = CALL_WITH_RETRY_DURATION.labels(labels).startTimer();
     SlowLogSpan callWithRetrySlowLogSpan = backOffer.getSlowLog().start("callWithRetry");
     callWithRetrySlowLogSpan.addProperty("method", methodName);

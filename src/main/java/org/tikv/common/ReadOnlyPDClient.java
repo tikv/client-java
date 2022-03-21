@@ -68,5 +68,5 @@ public interface ReadOnlyPDClient {
 
   TiConfiguration.ReplicaRead getReplicaRead();
 
-  long getClusterId();
+  Long getClusterId();
 }

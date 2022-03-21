@@ -151,6 +151,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   @Override
   public TiTimestamp getTimestamp(BackOffer backOffer) {
+    backOffer.withClusterId(getClusterId());
     Supplier<TsoRequest> request = () -> tsoReq;
 
     PDErrorHandler<TsoResponse> handler =
@@ -233,6 +234,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
    * @param region represents a region info
    */
   void scatterRegion(Metapb.Region region, BackOffer backOffer) {
+    backOffer.withClusterId(getClusterId());
     Supplier<ScatterRegionRequest> request =
         () ->
             ScatterRegionRequest.newBuilder().setHeader(header).setRegionId(region.getId()).build();
@@ -257,6 +259,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
    * @param region
    */
   void waitScatterRegionFinish(Metapb.Region region, BackOffer backOffer) {
+    backOffer.withClusterId(getClusterId());
     for (; ; ) {
       GetOperatorResponse resp = getOperator(region.getId());
       if (resp != null) {
@@ -310,8 +313,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   @Override
   public Pair<Metapb.Region, Metapb.Peer> getRegionByKey(BackOffer backOffer, ByteString key) {
+    backOffer.withClusterId(getClusterId());
     Histogram.Timer requestTimer =
-        PD_GET_REGION_BY_KEY_REQUEST_LATENCY.labels(String.valueOf(getClusterId())).startTimer();
+        PD_GET_REGION_BY_KEY_REQUEST_LATENCY.labels(getClusterId().toString()).startTimer();
     try {
       if (conf.isTxnKVMode()) {
         CodecDataOutput cdo = new CodecDataOutput();
@@ -336,6 +340,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   @Override
   public Pair<Metapb.Region, Metapb.Peer> getRegionByID(BackOffer backOffer, long id) {
+    backOffer.withClusterId(getClusterId());
     Supplier<GetRegionByIDRequest> request =
         () -> GetRegionByIDRequest.newBuilder().setHeader(header).setRegionId(id).build();
     PDErrorHandler<GetRegionResponse> handler =
@@ -349,6 +354,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   @Override
   public List<Pdpb.Region> scanRegions(
       BackOffer backOffer, ByteString startKey, ByteString endKey, int limit) {
+    backOffer.withClusterId(getClusterId());
     // no need to backoff because ScanRegions is just for optimization
     // introduce a warm-up timeout for ScanRegions requests
     PDGrpc.PDBlockingStub stub =
@@ -382,6 +388,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   @Override
   public Store getStore(BackOffer backOffer, long storeId) {
+    backOffer.withClusterId(getClusterId());
     GetStoreResponse resp =
         callWithRetry(
             backOffer,
@@ -396,6 +403,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   @Override
   public List<Store> getAllStores(BackOffer backOffer) {
+    backOffer.withClusterId(getClusterId());
     return callWithRetry(
             backOffer,
             PDGrpc.getGetAllStoresMethod(),
@@ -843,7 +851,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return builder.build();
   }
 
-  public long getClusterId() {
+  public Long getClusterId() {
     return header.getClusterId();
   }
 

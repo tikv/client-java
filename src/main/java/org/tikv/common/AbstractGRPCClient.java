@@ -82,18 +82,17 @@ public abstract class AbstractGRPCClient<
     if (logger.isTraceEnabled()) {
       logger.trace(String.format("Calling %s...", method.getFullMethodName()));
     }
-    RetryPolicy.Builder<RespT> builder = new Builder<>(backOffer);
+    RetryPolicy<RespT> policy = new Builder<RespT>(backOffer).create(handler);
+    policy.withClusterId(backOffer.getClusterId());
     RespT resp =
-        builder
-            .create(handler)
-            .callWithRetry(
-                () -> {
-                  BlockingStubT stub = getBlockingStub();
-                  return ClientCalls.blockingUnaryCall(
-                      stub.getChannel(), method, stub.getCallOptions(), requestFactory.get());
-                },
-                method.getFullMethodName(),
-                backOffer);
+        policy.callWithRetry(
+            () -> {
+              BlockingStubT stub = getBlockingStub();
+              return ClientCalls.blockingUnaryCall(
+                  stub.getChannel(), method, stub.getCallOptions(), requestFactory.get());
+            },
+            method.getFullMethodName(),
+            backOffer);
 
     if (logger.isTraceEnabled()) {
       logger.trace(String.format("leaving %s...", method.getFullMethodName()));
@@ -109,20 +108,19 @@ public abstract class AbstractGRPCClient<
       ErrorHandler<RespT> handler) {
     logger.debug(String.format("Calling %s...", method.getFullMethodName()));
 
-    RetryPolicy.Builder<RespT> builder = new Builder<>(backOffer);
-    builder
-        .create(handler)
-        .callWithRetry(
-            () -> {
-              FutureStubT stub = getAsyncStub();
-              ClientCalls.asyncUnaryCall(
-                  stub.getChannel().newCall(method, stub.getCallOptions()),
-                  requestFactory.get(),
-                  responseObserver);
-              return null;
-            },
-            method.getFullMethodName(),
-            backOffer);
+    RetryPolicy<RespT> policy = new Builder<RespT>(backOffer).create(handler);
+    policy.withClusterId(backOffer.getClusterId());
+    policy.callWithRetry(
+        () -> {
+          FutureStubT stub = getAsyncStub();
+          ClientCalls.asyncUnaryCall(
+              stub.getChannel().newCall(method, stub.getCallOptions()),
+              requestFactory.get(),
+              responseObserver);
+          return null;
+        },
+        method.getFullMethodName(),
+        backOffer);
     logger.debug(String.format("leaving %s...", method.getFullMethodName()));
   }
 
@@ -133,18 +131,18 @@ public abstract class AbstractGRPCClient<
       ErrorHandler<StreamObserver<ReqT>> handler) {
     logger.debug(String.format("Calling %s...", method.getFullMethodName()));
 
-    RetryPolicy.Builder<StreamObserver<ReqT>> builder = new Builder<>(backOffer);
+    RetryPolicy<StreamObserver<ReqT>> policy =
+        new Builder<StreamObserver<ReqT>>(backOffer).create(handler);
+    policy.withClusterId(backOffer.getClusterId());
     StreamObserver<ReqT> observer =
-        builder
-            .create(handler)
-            .callWithRetry(
-                () -> {
-                  FutureStubT stub = getAsyncStub();
-                  return asyncBidiStreamingCall(
-                      stub.getChannel().newCall(method, stub.getCallOptions()), responseObserver);
-                },
-                method.getFullMethodName(),
-                backOffer);
+        policy.callWithRetry(
+            () -> {
+              FutureStubT stub = getAsyncStub();
+              return asyncBidiStreamingCall(
+                  stub.getChannel().newCall(method, stub.getCallOptions()), responseObserver);
+            },
+            method.getFullMethodName(),
+            backOffer);
     logger.debug(String.format("leaving %s...", method.getFullMethodName()));
     return observer;
   }
@@ -156,19 +154,18 @@ public abstract class AbstractGRPCClient<
       ErrorHandler<StreamingResponse> handler) {
     logger.debug(String.format("Calling %s...", method.getFullMethodName()));
 
-    RetryPolicy.Builder<StreamingResponse> builder = new Builder<>(backOffer);
+    RetryPolicy<StreamingResponse> policy =
+        new Builder<StreamingResponse>(backOffer).create(handler);
     StreamingResponse response =
-        builder
-            .create(handler)
-            .callWithRetry(
-                () -> {
-                  BlockingStubT stub = getBlockingStub();
-                  return new StreamingResponse(
-                      blockingServerStreamingCall(
-                          stub.getChannel(), method, stub.getCallOptions(), requestFactory.get()));
-                },
-                method.getFullMethodName(),
-                backOffer);
+        policy.callWithRetry(
+            () -> {
+              BlockingStubT stub = getBlockingStub();
+              return new StreamingResponse(
+                  blockingServerStreamingCall(
+                      stub.getChannel(), method, stub.getCallOptions(), requestFactory.get()));
+            },
+            method.getFullMethodName(),
+            backOffer);
     logger.debug(String.format("leaving %s...", method.getFullMethodName()));
     return response;
   }

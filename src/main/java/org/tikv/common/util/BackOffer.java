@@ -17,9 +17,10 @@
 
 package org.tikv.common.util;
 
+import org.tikv.common.ClusterIdRecorder;
 import org.tikv.common.log.SlowLog;
 
-public interface BackOffer {
+public interface BackOffer extends ClusterIdRecorder {
   // Back off types.
   int seconds = 1000;
   int TSO_MAX_BACKOFF = 5 * seconds;
