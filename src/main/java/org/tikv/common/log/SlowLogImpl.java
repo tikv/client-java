@@ -24,11 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-<<<<<<< HEAD
-=======
 import java.util.Map.Entry;
-import java.util.Random;
->>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,13 +47,17 @@ public class SlowLogImpl implements SlowLog {
   private final long slowThresholdMS;
 
   /** Key-Value pairs which will be logged, e.g. function name, key, region, etc. */
-  private final Map<String, String> properties;
+  private final Map<String, Object> properties;
 
-  public SlowLogImpl(long slowThresholdMS, Map<String, String> properties) {
+  public SlowLogImpl(long slowThresholdMS, Map<String, Object> properties) {
     this.startMS = System.currentTimeMillis();
     this.startNS = System.nanoTime();
     this.slowThresholdMS = slowThresholdMS;
     this.properties = new HashMap<>(properties);
+  }
+
+  public SlowLogImpl(long slowThresholdMS) {
+    this(slowThresholdMS, new HashMap<>());
   }
 
   @Override
@@ -81,12 +81,6 @@ public class SlowLogImpl implements SlowLog {
   }
 
   @Override
-  public SlowLog withFields(Map<String, Object> fields) {
-    this.fields.putAll(fields);
-    return this;
-  }
-
-  @Override
   public void log() {
     long currentNS = System.nanoTime();
     long currentMS = startMS + (currentNS - startNS) / 1_000_000;
@@ -106,20 +100,7 @@ public class SlowLogImpl implements SlowLog {
       jsonObject.addProperty("error", error.getMessage());
     }
 
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      jsonObject.addProperty(entry.getKey(), entry.getValue());
-    }
-
-    JsonArray jsonArray = new JsonArray();
-    for (SlowLogSpan slowLogSpan : slowLogSpans) {
-      jsonArray.add(slowLogSpan.toJsonElement());
-    }
-    jsonObject.add("spans", jsonArray);
-
-<<<<<<< HEAD
-    return jsonObject.toString();
-=======
-    for (Entry<String, Object> entry : fields.entrySet()) {
+    for (Entry<String, Object> entry : properties.entrySet()) {
       Object value = entry.getValue();
       if (value instanceof List) {
         JsonArray field = new JsonArray();
@@ -138,8 +119,13 @@ public class SlowLogImpl implements SlowLog {
       }
     }
 
-    return jsonObject;
->>>>>>> d354ffc99... [to #556] slowlog: attach cluster_id and pd_addresses to slow log properties (#557)
+    JsonArray jsonArray = new JsonArray();
+    for (SlowLogSpan slowLogSpan : slowLogSpans) {
+      jsonArray.add(slowLogSpan.toJsonElement());
+    }
+    jsonObject.add("spans", jsonArray);
+
+    return jsonObject.toString();
   }
 
   public static SimpleDateFormat getSimpleDateFormat() {
