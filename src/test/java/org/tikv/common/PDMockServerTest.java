@@ -54,9 +54,11 @@ public abstract class PDMockServerTest {
                   GrpcUtils.makeMember(2, "http://" + addr + ":" + (basePort + 1)),
                   GrpcUtils.makeMember(3, "http://" + addr + ":" + (basePort + 2))));
       pdServers.add(server);
+      if (i == 0) {
+        leader = server;
+      }
     }
 
-    leader = pdServers.get(0);
     TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + leader.port);
     conf.setKvMode("RAW");
     conf.setWarmUpEnable(false);
