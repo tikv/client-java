@@ -18,18 +18,22 @@
 package org.tikv.common;
 
 import java.io.IOException;
+import java.net.ServerSocket;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.After;
 import org.junit.Before;
 
 public abstract class PDMockServerTest {
   protected static final String LOCAL_ADDR = "127.0.0.1";
   static final long CLUSTER_ID = 1024;
-  protected static TiSession session;
-  protected PDMockServer pdServer;
+  protected TiSession session;
+  protected PDMockServer leader;
+  protected List<PDMockServer> pdServers = new ArrayList<>();
 
   @Before
-  public void setUp() throws IOException {
-    setUp(LOCAL_ADDR);
+  public void setup() throws IOException {
+    setup(LOCAL_ADDR);
   }
 
   void setup(String addr) throws IOException {
@@ -56,14 +60,17 @@ public abstract class PDMockServerTest {
 
     TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + leader.port);
     conf.setKvMode("RAW");
-    conf.setTest(true);
+    conf.setWarmUpEnable(false);
     conf.setTimeout(2000);
+    conf.setEnableGrpcForward(true);
     session = TiSession.create(conf);
   }
 
   @After
   public void tearDown() throws Exception {
     session.close();
-    pdServer.stop();
+    for (PDMockServer server : pdServers) {
+      server.stop();
+    }
   }
 }
