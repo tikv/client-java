@@ -21,6 +21,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,6 +43,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
@@ -64,7 +66,6 @@ import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClientTest extends BaseRawKVTest {
-
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -448,6 +449,34 @@ public class RawKVClientTest extends BaseRawKVTest {
 
   private List<Kvrpcpb.KvPair> rawKeys() {
     return client.scan(RAW_START_KEY, RAW_END_KEY);
+  }
+
+  @Test
+  public void scanTestForIssue540() {
+    ByteString splitKeyA = ByteString.copyFromUtf8("splitKeyA");
+    ByteString splitKeyB = ByteString.copyFromUtf8("splitKeyB");
+    session.splitRegionAndScatter(
+        ImmutableList.of(splitKeyA.toByteArray(), splitKeyB.toByteArray()));
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+
+    client.put(ByteString.EMPTY, ByteString.EMPTY);
+    client.put(splitKeyA, ByteString.EMPTY);
+    Assert.assertEquals(0, client.scan(ByteString.EMPTY, 0).size());
+    Assert.assertEquals(1, client.scan(ByteString.EMPTY, 1).size());
+    Assert.assertEquals(2, client.scan(ByteString.EMPTY, 2).size());
+    Assert.assertEquals(2, client.scan(ByteString.EMPTY, 3).size());
+
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+
+    client.put(ByteString.EMPTY, ByteString.EMPTY);
+    client.put(splitKeyA, ByteString.EMPTY);
+    client.put(splitKeyA.concat(ByteString.copyFromUtf8("1")), ByteString.EMPTY);
+    client.put(splitKeyA.concat(ByteString.copyFromUtf8("2")), ByteString.EMPTY);
+    client.put(splitKeyA.concat(ByteString.copyFromUtf8("3")), ByteString.EMPTY);
+    client.put(splitKeyB.concat(ByteString.copyFromUtf8("1")), ByteString.EMPTY);
+    Assert.assertEquals(6, client.scan(ByteString.EMPTY, 7).size());
+    Assert.assertEquals(0, client.scan(ByteString.EMPTY, -1).size());
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
   }
 
   @Test
