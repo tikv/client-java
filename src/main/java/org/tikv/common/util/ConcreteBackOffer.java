@@ -39,6 +39,7 @@ import org.tikv.common.log.SlowLogSpan;
 public class ConcreteBackOffer implements BackOffer {
   private static final Logger logger = LoggerFactory.getLogger(ConcreteBackOffer.class);
   private final int maxSleep;
+  private final Long clusterId;
 
   @VisibleForTesting
   public final Map<BackOffFunction.BackOffFuncType, BackOffFunction> backOffFunctionMap;
@@ -55,11 +56,12 @@ public class ConcreteBackOffer implements BackOffer {
           .labelNames("type", "cluster")
           .register();
 
-  private ConcreteBackOffer(int maxSleep, long deadline, SlowLog slowLog) {
+  private ConcreteBackOffer(int maxSleep, long deadline, SlowLog slowLog, long clusterId) {
     Preconditions.checkArgument(
         maxSleep == 0 || deadline == 0, "Max sleep time should be 0 or Deadline should be 0.");
     Preconditions.checkArgument(maxSleep >= 0, "Max sleep time cannot be less than 0.");
     Preconditions.checkArgument(deadline >= 0, "Deadline cannot be less than 0.");
+    this.clusterId = clusterId;
     this.maxSleep = maxSleep;
     this.errors = Collections.synchronizedList(new ArrayList<>());
     this.backOffFunctionMap = new ConcurrentHashMap<>();
@@ -68,6 +70,7 @@ public class ConcreteBackOffer implements BackOffer {
   }
 
   private ConcreteBackOffer(ConcreteBackOffer source) {
+    this.clusterId = source.clusterId;
     this.maxSleep = source.maxSleep;
     this.totalSleep = source.totalSleep;
     this.errors = source.errors;
@@ -76,37 +79,54 @@ public class ConcreteBackOffer implements BackOffer {
     this.slowLog = source.slowLog;
   }
 
-  public static ConcreteBackOffer newDeadlineBackOff(int timeoutInMs, SlowLog slowLog) {
+  public static ConcreteBackOffer newDeadlineBackOff(
+      int timeoutInMs, SlowLog slowLog, long clusterId) {
     long deadline = System.currentTimeMillis() + timeoutInMs;
-    return new ConcreteBackOffer(0, deadline, slowLog);
+    return new ConcreteBackOffer(0, deadline, slowLog, clusterId);
+  }
+
+  public static ConcreteBackOffer newDeadlineBackOff(int timeoutInMs, SlowLog slowLog) {
+    return newDeadlineBackOff(timeoutInMs, slowLog, 0);
+  }
+
+  public static ConcreteBackOffer newCustomBackOff(int maxSleep, long clusterId) {
+    return new ConcreteBackOffer(maxSleep, 0, SlowLogEmptyImpl.INSTANCE, clusterId);
   }
 
   public static ConcreteBackOffer newCustomBackOff(int maxSleep) {
-    return new ConcreteBackOffer(maxSleep, 0, SlowLogEmptyImpl.INSTANCE);
+    return newCustomBackOff(maxSleep, 0);
   }
 
   public static ConcreteBackOffer newScannerNextMaxBackOff() {
-    return new ConcreteBackOffer(SCANNER_NEXT_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
+    return new ConcreteBackOffer(SCANNER_NEXT_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE, 0);
   }
 
   public static ConcreteBackOffer newBatchGetMaxBackOff() {
-    return new ConcreteBackOffer(BATCH_GET_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
+    return new ConcreteBackOffer(BATCH_GET_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE, 0);
   }
 
   public static ConcreteBackOffer newCopNextMaxBackOff() {
-    return new ConcreteBackOffer(COP_NEXT_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
+    return newCopNextMaxBackOff(0);
   }
 
-  public static ConcreteBackOffer newGetBackOff() {
-    return new ConcreteBackOffer(GET_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
+  public static ConcreteBackOffer newCopNextMaxBackOff(long clusterId) {
+    return new ConcreteBackOffer(COP_NEXT_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE, clusterId);
+  }
+
+  public static ConcreteBackOffer newGetBackOff(long clusterId) {
+    return new ConcreteBackOffer(GET_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE, clusterId);
+  }
+
+  public static ConcreteBackOffer newRawKVBackOff(long clusterId) {
+    return new ConcreteBackOffer(RAWKV_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE, clusterId);
   }
 
   public static ConcreteBackOffer newRawKVBackOff() {
-    return new ConcreteBackOffer(RAWKV_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
+    return newRawKVBackOff(0);
   }
 
-  public static ConcreteBackOffer newTsoBackOff() {
-    return new ConcreteBackOffer(TSO_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE);
+  public static ConcreteBackOffer newTsoBackOff(long clusterId) {
+    return new ConcreteBackOffer(TSO_MAX_BACKOFF, 0, SlowLogEmptyImpl.INSTANCE, clusterId);
   }
 
   public static ConcreteBackOffer create(BackOffer source) {
@@ -173,7 +193,7 @@ public class ConcreteBackOffer implements BackOffer {
   }
 
   public boolean canRetryAfterSleep(BackOffFunction.BackOffFuncType funcType, long maxSleepMs) {
-    String[] labels = new String[] {funcType.name(), getClusterId().toString()};
+    String[] labels = new String[] {funcType.name(), clusterId.toString()};
     Histogram.Timer backOffTimer = BACKOFF_DURATION.labels(labels).startTimer();
     SlowLogSpan slowLogSpan = getSlowLog().start("backoff");
     slowLogSpan.addProperty("type", funcType.name());
@@ -239,5 +259,9 @@ public class ConcreteBackOffer implements BackOffer {
   @Override
   public SlowLog getSlowLog() {
     return slowLog;
+  }
+
+  public Long getClusterId() {
+    return clusterId;
   }
 }

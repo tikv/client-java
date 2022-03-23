@@ -152,7 +152,7 @@ public class RawKVClient implements RawKVClientBase {
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
 
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog, clusterId);
     try {
       while (true) {
         try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
@@ -214,7 +214,7 @@ public class RawKVClient implements RawKVClientBase {
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
 
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog, clusterId);
     try {
       while (true) {
         try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
@@ -253,7 +253,8 @@ public class RawKVClient implements RawKVClientBase {
     span.addProperty("keySize", String.valueOf(kvPairs.size()));
 
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchWriteTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(
+            conf.getRawKVBatchWriteTimeoutInMS(), slowLog, clusterId);
     try {
       long deadline = System.currentTimeMillis() + conf.getRawKVBatchWriteTimeoutInMS();
       doSendBatchPut(backOffer, kvPairs, ttl, deadline);
@@ -279,7 +280,7 @@ public class RawKVClient implements RawKVClientBase {
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
 
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS(), slowLog, clusterId);
     try {
       while (true) {
         try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
@@ -311,7 +312,8 @@ public class RawKVClient implements RawKVClientBase {
     SlowLogSpan span = slowLog.start("batchGet");
     span.addProperty("keySize", String.valueOf(keys.size()));
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchReadTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(
+            conf.getRawKVBatchReadTimeoutInMS(), slowLog, clusterId);
     try {
       long deadline = System.currentTimeMillis() + conf.getRawKVBatchReadTimeoutInMS();
       List<KvPair> result = doSendBatchGet(backOffer, keys, deadline);
@@ -336,7 +338,8 @@ public class RawKVClient implements RawKVClientBase {
     SlowLogSpan span = slowLog.start("batchDelete");
     span.addProperty("keySize", String.valueOf(keys.size()));
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVBatchWriteTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(
+            conf.getRawKVBatchWriteTimeoutInMS(), slowLog, clusterId);
     try {
       long deadline = System.currentTimeMillis() + conf.getRawKVBatchWriteTimeoutInMS();
       doSendBatchDelete(backOffer, keys, deadline);
@@ -360,7 +363,7 @@ public class RawKVClient implements RawKVClientBase {
     SlowLogSpan span = slowLog.start("getKeyTTL");
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVReadTimeoutInMS(), slowLog, clusterId);
     try {
       while (true) {
         try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
@@ -471,7 +474,7 @@ public class RawKVClient implements RawKVClientBase {
     span.addProperty("limit", String.valueOf(limit));
     span.addProperty("keyOnly", String.valueOf(keyOnly));
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVScanTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVScanTimeoutInMS(), slowLog, clusterId);
     try {
       Iterator<KvPair> iterator =
           rawScanIterator(conf, clientBuilder, startKey, endKey, limit, keyOnly, backOffer);
@@ -515,7 +518,7 @@ public class RawKVClient implements RawKVClientBase {
     span.addProperty("endKey", KeyUtils.formatBytesUTF8(endKey));
     span.addProperty("keyOnly", String.valueOf(keyOnly));
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVScanTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVScanTimeoutInMS(), slowLog, clusterId);
     try {
       ByteString newStartKey = startKey;
       List<KvPair> result = new ArrayList<>();
@@ -579,7 +582,7 @@ public class RawKVClient implements RawKVClientBase {
     SlowLogSpan span = slowLog.start("delete");
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
     ConcreteBackOffer backOffer =
-        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog);
+        ConcreteBackOffer.newDeadlineBackOff(conf.getRawKVWriteTimeoutInMS(), slowLog, clusterId);
     try {
       while (true) {
         try (RegionStoreClient client = clientBuilder.build(key, backOffer)) {
@@ -609,7 +612,7 @@ public class RawKVClient implements RawKVClientBase {
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(labels).startTimer();
     ConcreteBackOffer backOffer =
         ConcreteBackOffer.newDeadlineBackOff(
-            conf.getRawKVCleanTimeoutInMS(), SlowLogEmptyImpl.INSTANCE);
+            conf.getRawKVCleanTimeoutInMS(), SlowLogEmptyImpl.INSTANCE, clusterId);
     try {
       long deadline = System.currentTimeMillis() + conf.getRawKVCleanTimeoutInMS();
       doSendDeleteRange(backOffer, startKey, endKey, deadline);
@@ -1179,6 +1182,6 @@ public class RawKVClient implements RawKVClientBase {
   }
 
   private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
+    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS(), clusterId);
   }
 }

@@ -83,7 +83,6 @@ public abstract class AbstractGRPCClient<
       logger.trace(String.format("Calling %s...", method.getFullMethodName()));
     }
     RetryPolicy<RespT> policy = new Builder<RespT>(backOffer).create(handler);
-    policy.withClusterId(backOffer.getClusterId());
     RespT resp =
         policy.callWithRetry(
             () -> {
@@ -109,7 +108,6 @@ public abstract class AbstractGRPCClient<
     logger.debug(String.format("Calling %s...", method.getFullMethodName()));
 
     RetryPolicy<RespT> policy = new Builder<RespT>(backOffer).create(handler);
-    policy.withClusterId(backOffer.getClusterId());
     policy.callWithRetry(
         () -> {
           FutureStubT stub = getAsyncStub();
@@ -133,7 +131,6 @@ public abstract class AbstractGRPCClient<
 
     RetryPolicy<StreamObserver<ReqT>> policy =
         new Builder<StreamObserver<ReqT>>(backOffer).create(handler);
-    policy.withClusterId(backOffer.getClusterId());
     StreamObserver<ReqT> observer =
         policy.callWithRetry(
             () -> {

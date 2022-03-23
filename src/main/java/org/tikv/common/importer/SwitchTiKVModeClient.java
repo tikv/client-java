@@ -73,7 +73,8 @@ public class SwitchTiKVModeClient {
   }
 
   private void doSwitchTiKVMode(ImportSstpb.SwitchMode mode) {
-    BackOffer bo = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
+    BackOffer bo =
+        ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF, pdClient.getClusterId());
     List<Metapb.Store> allStores = pdClient.getAllStores(bo);
     for (Metapb.Store store : allStores) {
       ImporterStoreClient client = builder.build(new TiStore(store));

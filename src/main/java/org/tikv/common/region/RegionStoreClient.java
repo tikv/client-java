@@ -230,7 +230,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    */
   public ByteString get(BackOffer backOffer, ByteString key, long version)
       throws TiClientInternalException, KeyException {
-    backOffer.withClusterId(pdClient.getClusterId());
     boolean forWrite = false;
     Supplier<GetRequest> factory =
         () ->
@@ -277,7 +276,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public List<KvPair> batchGet(BackOffer backOffer, Iterable<ByteString> keys, long version) {
-    backOffer.withClusterId(pdClient.getClusterId());
     boolean forWrite = false;
     Supplier<BatchGetRequest> request =
         () ->
@@ -338,7 +336,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public List<KvPair> scan(
       BackOffer backOffer, ByteString startKey, long version, boolean keyOnly) {
-    backOffer.withClusterId(pdClient.getClusterId());
     boolean forWrite = false;
     while (true) {
       // we should refresh region
@@ -445,7 +442,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       long ttl,
       boolean skipConstraintCheck)
       throws TiClientInternalException, KeyException, RegionException {
-    bo.withClusterId(pdClient.getClusterId());
     boolean forWrite = true;
     while (true) {
       Supplier<PrewriteRequest> factory =
@@ -537,7 +533,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   /** TXN Heart Beat: update primary key ttl */
   public void txnHeartBeat(BackOffer bo, ByteString primaryLock, long startTs, long ttl) {
-    bo.withClusterId(pdClient.getClusterId());
     boolean forWrite = false;
     while (true) {
       Supplier<TxnHeartBeatRequest> factory =
@@ -594,7 +589,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    */
   public void commit(BackOffer backOffer, Iterable<ByteString> keys, long startTs, long commitTs)
       throws KeyException {
-    backOffer.withClusterId(pdClient.getClusterId());
     boolean forWrite = true;
     Supplier<CommitRequest> factory =
         () ->
@@ -655,7 +649,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       List<Coprocessor.KeyRange> ranges,
       Queue<SelectResponse> responseQueue,
       long startTs) {
-    backOffer.withClusterId(pdClient.getClusterId());
     boolean forWrite = false;
     if (req == null || ranges == null || req.getExecutorsCount() < 1) {
       throw new IllegalArgumentException("Invalid coprocessor argument!");
@@ -810,7 +803,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     StreamingResponse responseIterator =
         this.callServerStreamingWithRetry(
-            ConcreteBackOffer.newCopNextMaxBackOff(),
+            ConcreteBackOffer.newCopNextMaxBackOff(pdClient.getClusterId()),
             TikvGrpc.getCoprocessorStreamMethod(),
             reqToSend,
             handler);
@@ -846,7 +839,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     SplitRegionResponse resp =
         callWithRetry(
-            ConcreteBackOffer.newGetBackOff(), TikvGrpc.getSplitRegionMethod(), request, handler);
+            ConcreteBackOffer.newGetBackOff(pdClient.getClusterId()),
+            TikvGrpc.getSplitRegionMethod(),
+            request,
+            handler);
 
     if (resp == null) {
       this.regionManager.onRequestFail(region);
@@ -867,7 +863,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public Optional<ByteString> rawGet(BackOffer backOffer, ByteString key) {
     Long clusterId = pdClient.getClusterId();
-    backOffer.withClusterId(pdClient.getClusterId());
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get", clusterId.toString()).startTimer();
     try {
@@ -908,7 +903,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public Optional<Long> rawGetKeyTTL(BackOffer backOffer, ByteString key) {
     Long clusterId = pdClient.getClusterId();
-    backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY
             .labels("client_grpc_raw_get_key_ttl", clusterId.toString())
@@ -951,7 +945,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public void rawDelete(BackOffer backOffer, ByteString key, boolean atomicForCAS) {
     Long clusterId = pdClient.getClusterId();
-    backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY
             .labels("client_grpc_raw_delete", clusterId.toString())
@@ -993,7 +986,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   public void rawPut(
       BackOffer backOffer, ByteString key, ByteString value, long ttl, boolean atomicForCAS) {
     Long clusterId = pdClient.getClusterId();
-    backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put", clusterId.toString()).startTimer();
     try {
@@ -1039,7 +1031,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       long ttl)
       throws RawCASConflictException {
     Long clusterId = pdClient.getClusterId();
-    backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY
             .labels("client_grpc_raw_put_if_absent", clusterId.toString())
@@ -1093,7 +1084,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public List<KvPair> rawBatchGet(BackOffer backoffer, List<ByteString> keys) {
     Long clusterId = pdClient.getClusterId();
-    backoffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY
             .labels("client_grpc_raw_batch_get", clusterId.toString())
@@ -1133,7 +1123,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   public void rawBatchPut(
       BackOffer backOffer, List<KvPair> kvPairs, long ttl, boolean atomicForCAS) {
     Long clusterId = pdClient.getClusterId();
-    backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY
             .labels("client_grpc_raw_batch_put", clusterId.toString())
@@ -1190,7 +1179,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public void rawBatchDelete(BackOffer backoffer, List<ByteString> keys, boolean atomicForCAS) {
     Long clusterId = pdClient.getClusterId();
-    backoffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY
             .labels("client_grpc_raw_batch_delete", clusterId.toString())
@@ -1242,7 +1230,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    */
   public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
     Long clusterId = pdClient.getClusterId();
-    backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_scan", clusterId.toString()).startTimer();
     try {
@@ -1290,7 +1277,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    */
   public void rawDeleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
     Long clusterId = pdClient.getClusterId();
-    backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY
             .labels("client_grpc_raw_delete_range", clusterId.toString())
@@ -1451,8 +1437,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
 
     private BackOffer defaultBackOff() {
-      BackOffer backoffer = ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
-      backoffer.withClusterId(pdClient.getClusterId());
+      BackOffer backoffer =
+          ConcreteBackOffer.newCustomBackOff(
+              conf.getRawKVDefaultBackoffInMS(), pdClient.getClusterId());
       return backoffer;
     }
   }

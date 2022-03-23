@@ -108,7 +108,6 @@ public class RegionManager {
   public List<Pdpb.Region> scanRegions(
       BackOffer backOffer, ByteString startKey, ByteString endKey, int limit) {
     Long clusterId = pdClient.getClusterId();
-    backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         SCAN_REGIONS_REQUEST_LATENCY.labels(clusterId.toString()).startTimer();
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("scanRegions");
@@ -128,7 +127,6 @@ public class RegionManager {
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
     Long clusterId = pdClient.getClusterId();
-    backOffer.withClusterId(clusterId);
     Histogram.Timer requestTimer =
         GET_REGION_BY_KEY_REQUEST_LATENCY.labels(clusterId.toString()).startTimer();
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("getRegionByKey");
@@ -323,6 +321,7 @@ public class RegionManager {
   }
 
   private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
+    return ConcreteBackOffer.newCustomBackOff(
+        conf.getRawKVDefaultBackoffInMS(), pdClient.getClusterId());
   }
 }
