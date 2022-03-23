@@ -210,6 +210,7 @@ public abstract class AbstractRegionStoreClient
             // switch to leader store
             store = currentLeaderStore;
             updateClientStub();
+            return true;
           }
           return false;
         }
