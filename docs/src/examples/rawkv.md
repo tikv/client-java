@@ -29,7 +29,7 @@ public class Main {
     client.put(ByteString.copyFromUtf8("k5"), ByteString.copyFromUtf8("Raw KV"));
 
     // get
-    Optional<ByteString> result = client.get(ByteString.copyFromUtf8("k1"));
+    Optional<ByteString> result = Optional.of(client.get(ByteString.copyFromUtf8("k1")));
     System.out.println(result.get().toStringUtf8());
 
     // batch get
