@@ -54,7 +54,6 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <rocksdb.version>6.22.1.1</rocksdb.version>
         <protobuf.version>3.5.1</protobuf.version>
         <log4j.version>1.2.17</log4j.version>
         <slf4j.version>1.7.16</slf4j.version>
@@ -91,11 +90,6 @@
             <groupId>io.perfmark</groupId>
             <artifactId>perfmark-traceviewer</artifactId>
             <version>0.24.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.rocksdb</groupId>
-            <artifactId>rocksdbjni</artifactId>
-            <version>${rocksdb.version}</version>
         </dependency>
         <dependency>
             <groupId>org.antlr</groupId>
