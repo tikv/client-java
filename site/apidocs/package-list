@@ -11,8 +11,6 @@ io.grpc.stub
 io.netty.buffer
 io.netty.channel.socket.nio
 io.netty.handler.codec.http2
-org.tikv.br
-org.tikv.cdc
 org.tikv.common
 org.tikv.common.catalog
 org.tikv.common.codec

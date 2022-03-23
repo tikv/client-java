@@ -1,5 +1,4 @@
 org.tikv
-org.tikv.br
 org.tikv.common
 org.tikv.common.codec
 org.tikv.common.importer
