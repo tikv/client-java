@@ -30,18 +30,6 @@ public abstract class PDMockServerTest {
     setUp(LOCAL_ADDR);
   }
 
-<<<<<<< HEAD
-  void setUp(String addr) throws IOException {
-    pdServer = new PDMockServer();
-    pdServer.start(CLUSTER_ID);
-    pdServer.addGetMemberResp(
-        GrpcUtils.makeGetMembersResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeMember(1, "http://" + addr + ":" + pdServer.port),
-            GrpcUtils.makeMember(2, "http://" + addr + ":" + (pdServer.port + 1)),
-            GrpcUtils.makeMember(3, "http://" + addr + ":" + (pdServer.port + 2))));
-    TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + pdServer.port);
-=======
   void setup(String addr) throws IOException {
     int basePort;
     try (ServerSocket s = new ServerSocket(0)) {
@@ -69,7 +57,6 @@ public abstract class PDMockServerTest {
     conf.setWarmUpEnable(false);
     conf.setTimeout(2000);
     conf.setEnableGrpcForward(true);
->>>>>>> e89ca5f37... [close #550] rawkv: fix seek leader/proxy store early abort (#551)
     session = TiSession.create(conf);
   }
 
