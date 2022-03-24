@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -43,6 +44,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -61,9 +63,9 @@ import org.tikv.common.util.FastByteComparisons;
 import org.tikv.common.util.Pair;
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
+import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClientTest extends BaseRawKVTest {
-
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -328,6 +330,76 @@ public class RawKVClientTest extends BaseRawKVTest {
   }
 
   @Test
+  public void batchDeleteTest() {
+    int cnt = 8;
+    List<ByteString> keys = new ArrayList<>();
+    for (int i = 0; i < cnt; i++) {
+      ByteString key = getRandomRawKey().concat(ByteString.copyFromUtf8("batch_delete_test"));
+      client.put(key, key);
+      keys.add(key);
+    }
+
+    client.batchDelete(keys);
+
+    for (int i = 0; i < cnt; i++) {
+      checkNotExist(keys.get(i));
+    }
+  }
+
+  @Test
+  public void scan0test() {
+    int cnt = 8;
+    ByteString prefix = ByteString.copyFromUtf8("scan0_test");
+    client.deletePrefix(prefix);
+    List<ByteString> keys = new ArrayList<>();
+    for (int i = 0; i < cnt; i++) {
+      ByteString key = prefix.concat(getRandomRawKey());
+      client.put(key, key);
+      keys.add(key);
+    }
+
+    int i = 0;
+    Iterator<KvPair> iter = client.scan0(prefix, ByteString.EMPTY, cnt);
+    while (iter.hasNext()) {
+      i++;
+      KvPair pair = iter.next();
+      assertEquals(pair.getKey(), pair.getValue());
+    }
+    assertEquals(cnt, i);
+
+    i = 0;
+    iter = client.scan0(prefix, ByteString.EMPTY, true);
+    while (iter.hasNext()) {
+      i++;
+      KvPair pair = iter.next();
+      assertEquals(pair.getValue(), ByteString.EMPTY);
+    }
+    assertEquals(cnt, i);
+  }
+
+  @Test
+  public void ingestTest() {
+    Assume.assumeTrue(tikvVersionNewerThan("5.2.0"));
+    int cnt = 8;
+    ByteString prefix = ByteString.copyFromUtf8("ingest_test");
+    client.deletePrefix(prefix);
+    List<Pair<ByteString, ByteString>> kvs = new ArrayList<>();
+    for (int i = 0; i < cnt; i++) {
+      ByteString key = prefix.concat(getRandomRawKey());
+      kvs.add(Pair.create(key, key));
+    }
+    kvs.sort(
+        (o1, o2) -> {
+          Key k1 = Key.toRawKey(o1.first.toByteArray());
+          Key k2 = Key.toRawKey(o2.first.toByteArray());
+          return k1.compareTo(k2);
+        });
+    client.ingest(kvs);
+
+    assertEquals(client.scan(prefix, ByteString.EMPTY).size(), cnt);
+  }
+
+  @Test
   public void simpleTest() {
     ByteString key = rawKey("key");
     ByteString key0 = rawKey("key0");
@@ -464,8 +536,8 @@ public class RawKVClientTest extends BaseRawKVTest {
       }
 
       // TODO: check whether cluster supports ttl
-      //  long ttl = 10;
-      //  rawTTLTest(10, ttl, benchmark);
+      long ttl = 10;
+      rawTTLTest(10, ttl, benchmark);
 
       prepare();
     } catch (final TiKVException e) {
@@ -827,7 +899,8 @@ public class RawKVClientTest extends BaseRawKVTest {
     }
   }
 
-  private void rawTTLTest(int cases, long ttl, boolean benchmark) {
+  public void rawTTLTest(int cases, long ttl, boolean benchmark) {
+    Assume.assumeTrue(tikvVersionNewerThan("v5.0.0"));
     logger.info("ttl testing");
     if (benchmark) {
       for (int i = 0; i < cases; i++) {
