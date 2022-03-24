@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.log.SlowLog;
 import org.tikv.common.log.SlowLogSpan;
@@ -153,6 +154,42 @@ public abstract class AbstractRegionStoreClient
       return seekProxyStore(backOffer);
     }
     return false;
+  }
+
+  public ByteString buildRequestKey(ByteString key) {
+    switch (conf.getApiVersion()) {
+      case V1:
+        return key;
+      case V2:
+        if (conf.getKvMode() == KVMode.RAW) {
+          return ByteString.copyFromUtf8(TiConfiguration.API_V2_RAW_PREFIX).concat(key);
+        } else if (conf.getKvMode() == KVMode.TXN) {
+          return ByteString.copyFromUtf8(TiConfiguration.API_V2_TXN_PREFIX).concat(key);
+        }
+      default:
+        throw new IllegalArgumentException("unknown api version or kv mode");
+    }
+  }
+
+  public ByteString unwrapResponseKey(ByteString key) {
+    switch (conf.getApiVersion()) {
+      case V1:
+        return key;
+      case V2:
+        if (conf.getKvMode() == KVMode.RAW) {
+          if (!key.startsWith(ByteString.copyFromUtf8(TiConfiguration.API_V2_RAW_PREFIX))) {
+            throw new IllegalArgumentException("key corrupted, wrong prefix");
+          }
+          return key.substring(1);
+        } else if (conf.getKvMode() == KVMode.TXN) {
+          if (!key.startsWith(ByteString.copyFromUtf8(TiConfiguration.API_V2_TXN_PREFIX))) {
+            throw new IllegalArgumentException("key corrupted, wrong prefix");
+          }
+          return key.substring(1);
+        }
+      default:
+        throw new IllegalArgumentException("unknown api version or kv mode");
+    }
   }
 
   private Kvrpcpb.Context addTraceId(Kvrpcpb.Context context, SlowLog slowLog) {

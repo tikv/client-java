@@ -18,7 +18,9 @@
 package org.tikv.common.region;
 
 import static org.tikv.common.region.RegionStoreClient.RequestTypes.REQ_TYPE_DAG;
-import static org.tikv.common.util.BackOffFunction.BackOffFuncType.*;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLock;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
@@ -29,23 +31,83 @@ import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.PDClient;
 import org.tikv.common.StoreVersion;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.Version;
-import org.tikv.common.exception.*;
+import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.KeyException;
+import org.tikv.common.exception.RawCASConflictException;
+import org.tikv.common.exception.RegionException;
+import org.tikv.common.exception.SelectException;
+import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.log.SlowLogEmptyImpl;
 import org.tikv.common.operation.KVErrorHandler;
 import org.tikv.common.operation.RegionErrorHandler;
 import org.tikv.common.streaming.StreamingResponse;
-import org.tikv.common.util.*;
+import org.tikv.common.util.BackOffFunction;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.Batch;
+import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.HistogramUtils;
+import org.tikv.common.util.Pair;
+import org.tikv.common.util.RangeSplitter;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Errorpb;
-import org.tikv.kvproto.Kvrpcpb.*;
+import org.tikv.kvproto.Kvrpcpb.BatchGetRequest;
+import org.tikv.kvproto.Kvrpcpb.BatchGetResponse;
+import org.tikv.kvproto.Kvrpcpb.CommitRequest;
+import org.tikv.kvproto.Kvrpcpb.CommitResponse;
+import org.tikv.kvproto.Kvrpcpb.GetRequest;
+import org.tikv.kvproto.Kvrpcpb.GetResponse;
+import org.tikv.kvproto.Kvrpcpb.KeyError;
+import org.tikv.kvproto.Kvrpcpb.KvPair;
+import org.tikv.kvproto.Kvrpcpb.Mutation;
+import org.tikv.kvproto.Kvrpcpb.PrewriteRequest;
+import org.tikv.kvproto.Kvrpcpb.PrewriteResponse;
+import org.tikv.kvproto.Kvrpcpb.RawBatchDeleteRequest;
+import org.tikv.kvproto.Kvrpcpb.RawBatchDeleteResponse;
+import org.tikv.kvproto.Kvrpcpb.RawBatchGetRequest;
+import org.tikv.kvproto.Kvrpcpb.RawBatchGetResponse;
+import org.tikv.kvproto.Kvrpcpb.RawBatchPutRequest;
+import org.tikv.kvproto.Kvrpcpb.RawBatchPutResponse;
+import org.tikv.kvproto.Kvrpcpb.RawCASRequest;
+import org.tikv.kvproto.Kvrpcpb.RawCASResponse;
+import org.tikv.kvproto.Kvrpcpb.RawDeleteRangeRequest;
+import org.tikv.kvproto.Kvrpcpb.RawDeleteRangeResponse;
+import org.tikv.kvproto.Kvrpcpb.RawDeleteRequest;
+import org.tikv.kvproto.Kvrpcpb.RawDeleteResponse;
+import org.tikv.kvproto.Kvrpcpb.RawGetKeyTTLRequest;
+import org.tikv.kvproto.Kvrpcpb.RawGetKeyTTLResponse;
+import org.tikv.kvproto.Kvrpcpb.RawGetRequest;
+import org.tikv.kvproto.Kvrpcpb.RawGetResponse;
+import org.tikv.kvproto.Kvrpcpb.RawPutRequest;
+import org.tikv.kvproto.Kvrpcpb.RawPutResponse;
+import org.tikv.kvproto.Kvrpcpb.RawScanRequest;
+import org.tikv.kvproto.Kvrpcpb.RawScanResponse;
+import org.tikv.kvproto.Kvrpcpb.ScanRequest;
+import org.tikv.kvproto.Kvrpcpb.ScanResponse;
+import org.tikv.kvproto.Kvrpcpb.SplitRegionRequest;
+import org.tikv.kvproto.Kvrpcpb.SplitRegionResponse;
+import org.tikv.kvproto.Kvrpcpb.TxnHeartBeatRequest;
+import org.tikv.kvproto.Kvrpcpb.TxnHeartBeatResponse;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
@@ -64,7 +126,6 @@ import org.tikv.txn.exception.LockException;
 
 /** Note that RegionStoreClient itself is not thread-safe */
 public class RegionStoreClient extends AbstractRegionStoreClient {
-
   private static final Logger logger = LoggerFactory.getLogger(RegionStoreClient.class);
   @VisibleForTesting public final AbstractLockResolverClient lockResolverClient;
   private final TiStoreType storeType;
@@ -175,7 +236,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             GetRequest.newBuilder()
                 .setContext(
                     makeContext(getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
-                .setKey(key)
+                .setKey(buildRequestKey(key))
                 .setVersion(version)
                 .build();
 
@@ -286,7 +347,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(
                       makeContext(
                           getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
-                  .setStartKey(startKey)
+                  .setStartKey(buildRequestKey(startKey))
                   .setVersion(version)
                   .setKeyOnly(keyOnly)
                   .setLimit(getConf().getScanBatchSize())
@@ -333,7 +394,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             KvPair.newBuilder()
                 .setError(kvPair.getError())
                 .setValue(kvPair.getValue())
-                .setKey(lock.getKey())
+                .setKey(unwrapResponseKey(lock.getKey()))
                 .build());
       } else {
         newKvPairs.add(kvPair);
@@ -788,8 +849,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new TiClientInternalException(
           String.format(
-              "failed to split region %d because %s",
-              region.getId(), resp.getRegionError().toString()));
+              "failed to split region %d because %s", region.getId(), resp.getRegionError()));
     }
 
     return resp.getRegionsList();
@@ -805,7 +865,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawGetRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setKey(key)
+                  .setKey(buildRequestKey(key))
                   .build();
       RegionErrorHandler<RawGetResponse> handler =
           new RegionErrorHandler<RawGetResponse>(
@@ -844,7 +904,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawGetKeyTTLRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setKey(key)
+                  .setKey(buildRequestKey(key))
                   .build();
       RegionErrorHandler<RawGetKeyTTLResponse> handler =
           new RegionErrorHandler<RawGetKeyTTLResponse>(
@@ -883,7 +943,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawDeleteRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setKey(key)
+                  .setKey(buildRequestKey(key))
                   .setForCas(atomicForCAS)
                   .build();
 
@@ -921,7 +981,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawPutRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setKey(key)
+                  .setKey(buildRequestKey(key))
                   .setValue(value)
                   .setTtl(ttl)
                   .setForCas(atomicForCAS)
@@ -965,7 +1025,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawCASRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setKey(key)
+                  .setKey(buildRequestKey(key))
                   .setValue(value)
                   .setPreviousValue(prevValue.orElse(ByteString.EMPTY))
                   .setPreviousNotExist(!prevValue.isPresent())
@@ -1075,7 +1135,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     for (int i = 0; i < batch.getKeys().size(); i++) {
       pairs.add(
           KvPair.newBuilder()
-              .setKey(batch.getKeys().get(i))
+              .setKey(buildRequestKey(batch.getKeys().get(i)))
               .setValue(batch.getValues().get(i))
               .build());
     }
@@ -1152,7 +1212,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawScanRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setStartKey(key)
+                  .setStartKey(buildRequestKey(key))
                   .setKeyOnly(keyOnly)
                   .setLimit(limit)
                   .build();
@@ -1180,7 +1240,15 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
     }
-    return resp.getKvsList();
+    return resp.getKvsList()
+        .stream()
+        .map(
+            kvPair ->
+                KvPair.newBuilder()
+                    .setKey(unwrapResponseKey(kvPair.getKey()))
+                    .setValue(kvPair.getValue())
+                    .build())
+        .collect(Collectors.toList());
   }
 
   /**
@@ -1198,8 +1266,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawDeleteRangeRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setStartKey(startKey)
-                  .setEndKey(endKey)
+                  .setStartKey(buildRequestKey(startKey))
+                  .setEndKey(buildRequestKey(endKey))
                   .build();
 
       RegionErrorHandler<RawDeleteRangeResponse> handler =

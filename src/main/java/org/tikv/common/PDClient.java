@@ -311,7 +311,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   public Pair<Metapb.Region, Metapb.Peer> getRegionByKey(BackOffer backOffer, ByteString key) {
     Histogram.Timer requestTimer = PD_GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
     try {
-      if (conf.isTxnKVMode()) {
+      if (conf.isTxnKVMode() || conf.getApiVersion().isV2()) {
         CodecDataOutput cdo = new CodecDataOutput();
         BytesCodec.writeBytes(cdo, key.toByteArray());
         key = cdo.toByteString();
@@ -326,7 +326,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
       GetRegionResponse resp =
           callWithRetry(backOffer, PDGrpc.getGetRegionMethod(), request, handler);
-      return new Pair<Metapb.Region, Metapb.Peer>(decodeRegion(resp.getRegion()), resp.getLeader());
+      return new Pair<>(decodeRegion(resp.getRegion()), resp.getLeader());
     } finally {
       requestTimer.observeDuration();
     }
@@ -806,35 +806,31 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
             .setRegionEpoch(region.getRegionEpoch())
             .addAllPeers(region.getPeersList());
 
-    if (region.getStartKey().isEmpty() || isRawRegion) {
+    if (conf.getApiVersion().isV1() && (region.getStartKey().isEmpty() || isRawRegion)) {
       builder.setStartKey(region.getStartKey());
     } else {
-      if (!conf.isTest()) {
+      try {
         byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
         builder.setStartKey(ByteString.copyFrom(decodedStartKey));
-      } else {
-        try {
-          byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
-          builder.setStartKey(ByteString.copyFrom(decodedStartKey));
-        } catch (Exception e) {
-          builder.setStartKey(region.getStartKey());
+      } catch (Exception e) {
+        if (!conf.isTest()) {
+          throw e;
         }
+        builder.setStartKey(region.getStartKey());
       }
     }
 
-    if (region.getEndKey().isEmpty() || isRawRegion) {
+    if (conf.getApiVersion().isV1() && (region.getEndKey().isEmpty() || isRawRegion)) {
       builder.setEndKey(region.getEndKey());
     } else {
-      if (!conf.isTest()) {
+      try {
         byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
         builder.setEndKey(ByteString.copyFrom(decodedEndKey));
-      } else {
-        try {
-          byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
-          builder.setEndKey(ByteString.copyFrom(decodedEndKey));
-        } catch (Exception e) {
-          builder.setEndKey(region.getEndKey());
+      } catch (Exception e) {
+        if (!conf.isTest()) {
+          throw e;
         }
+        builder.setEndKey(region.getEndKey());
       }
     }
 

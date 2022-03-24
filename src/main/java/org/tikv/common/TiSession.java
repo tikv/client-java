@@ -67,7 +67,6 @@ import org.tikv.txn.TxnKVClient;
  * contention
  */
 public class TiSession implements AutoCloseable {
-
   private static final Logger logger = LoggerFactory.getLogger(TiSession.class);
   private static final Map<String, TiSession> sessionCachedMap = new HashMap<>();
   private final TiConfiguration conf;
@@ -156,7 +155,7 @@ public class TiSession implements AutoCloseable {
       logger.info("enable grpc forward for high available");
     }
     if (conf.isWarmUpEnable() && conf.isRawKVMode()) {
-      warmUp();
+      warmup();
     }
     this.circuitBreaker = new CircuitBreakerImpl(conf);
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
@@ -177,7 +176,7 @@ public class TiSession implements AutoCloseable {
     return info;
   }
 
-  private synchronized void warmUp() {
+  private synchronized void warmup() {
     long warmUpStartTime = System.nanoTime();
     BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
     try {
