@@ -744,4 +744,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
     return builder.build();
   }
+
+  public long getClusterId() {
+    return header.getClusterId();
+  }
+
+  public List<URI> getPdAddrs() {
+    return pdAddrs;
+  }
 }

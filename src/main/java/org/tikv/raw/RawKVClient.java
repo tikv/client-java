@@ -15,13 +15,29 @@
 
 package org.tikv.raw;
 
-import static org.tikv.common.util.ClientUtils.*;
+import static org.tikv.common.util.ClientUtils.appendBatches;
+import static org.tikv.common.util.ClientUtils.getBatches;
+import static org.tikv.common.util.ClientUtils.getTasks;
+import static org.tikv.common.util.ClientUtils.getTasksWithOutput;
+import static org.tikv.common.util.ClientUtils.groupKeysByRegion;
 
 import com.google.protobuf.ByteString;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
-import java.util.*;
-import java.util.concurrent.*;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,10 +53,19 @@ import org.tikv.common.operation.iterator.RawScanIterator;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
-import org.tikv.common.util.*;
+import org.tikv.common.util.BackOffFunction;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.Batch;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.DeleteRange;
+import org.tikv.common.util.HistogramUtils;
+import org.tikv.common.util.Pair;
+import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClient implements RawKVClientBase {
+  private final Long clusterId;
+  private final List<URI> pdAddresses;
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
   private final ExecutorService batchGetThreadPool;
@@ -84,6 +109,8 @@ public class RawKVClient implements RawKVClientBase {
     this.batchDeleteThreadPool = session.getThreadPoolForBatchDelete();
     this.batchScanThreadPool = session.getThreadPoolForBatchScan();
     this.deleteRangeThreadPool = session.getThreadPoolForDeleteRange();
+    this.clusterId = session.getPDClient().getClusterId();
+    this.pdAddresses = session.getPDClient().getPdAddrs();
   }
 
   @Override
@@ -110,8 +137,10 @@ public class RawKVClient implements RawKVClientBase {
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVWriteSlowLogInMS(),
-            new HashMap<String, String>(2) {
+            new HashMap<String, Object>() {
               {
+                put("cluster_id", clusterId);
+                put("pd_addresses", pdAddresses);
                 put("func", "put");
                 put("key", KeyUtils.formatBytesUTF8(key));
               }
@@ -152,8 +181,10 @@ public class RawKVClient implements RawKVClientBase {
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVWriteSlowLogInMS(),
-            new HashMap<String, String>(2) {
+            new HashMap<String, Object>() {
               {
+                put("cluster_id", clusterId);
+                put("pd_addresses", pdAddresses);
                 put("func", "putIfAbsent");
                 put("key", KeyUtils.formatBytesUTF8(key));
               }
@@ -208,8 +239,10 @@ public class RawKVClient implements RawKVClientBase {
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVBatchWriteSlowLogInMS(),
-            new HashMap<String, String>(2) {
+            new HashMap<String, Object>() {
               {
+                put("cluster_id", clusterId);
+                put("pd_addresses", pdAddresses);
                 put("func", "batchPut");
                 put("keySize", String.valueOf(kvPairs.size()));
               }
@@ -237,8 +270,10 @@ public class RawKVClient implements RawKVClientBase {
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVReadSlowLogInMS(),
-            new HashMap<String, String>(2) {
+            new HashMap<String, Object>(2) {
               {
+                put("cluster_id", clusterId);
+                put("pd_addresses", pdAddresses);
                 put("func", "get");
                 put("key", KeyUtils.formatBytesUTF8(key));
               }
@@ -275,8 +310,10 @@ public class RawKVClient implements RawKVClientBase {
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVBatchReadSlowLogInMS(),
-            new HashMap<String, String>(2) {
+            new HashMap<String, Object>(2) {
               {
+                put("cluster_id", clusterId);
+                put("pd_addresses", pdAddresses);
                 put("func", "batchGet");
                 put("keySize", String.valueOf(keys.size()));
               }
@@ -314,8 +351,10 @@ public class RawKVClient implements RawKVClientBase {
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVBatchWriteSlowLogInMS(),
-            new HashMap<String, String>(2) {
+            new HashMap<String, Object>() {
               {
+                put("cluster_id", clusterId);
+                put("pd_addresses", pdAddresses);
                 put("func", "batchDelete");
                 put("keySize", String.valueOf(keys.size()));
               }
@@ -344,8 +383,10 @@ public class RawKVClient implements RawKVClientBase {
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVReadSlowLogInMS(),
-            new HashMap<String, String>(2) {
+            new HashMap<String, Object>() {
               {
+                put("cluster_id", clusterId);
+                put("pd_addresses", pdAddresses);
                 put("func", "getKeyTTL");
                 put("key", KeyUtils.formatBytesUTF8(key));
               }
@@ -437,8 +478,10 @@ public class RawKVClient implements RawKVClientBase {
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVScanSlowLogInMS(),
-            new HashMap<String, String>(5) {
+            new HashMap<String, Object>() {
               {
+                put("cluster_id", clusterId);
+                put("pd_addresses", pdAddresses);
                 put("func", "scan");
                 put("startKey", KeyUtils.formatBytesUTF8(startKey));
                 put("endKey", KeyUtils.formatBytesUTF8(endKey));
@@ -487,8 +530,10 @@ public class RawKVClient implements RawKVClientBase {
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVScanSlowLogInMS(),
-            new HashMap<String, String>(4) {
+            new HashMap<String, Object>() {
               {
+                put("cluster_id", clusterId);
+                put("pd_addresses", pdAddresses);
                 put("func", "scan");
                 put("startKey", KeyUtils.formatBytesUTF8(startKey));
                 put("endKey", KeyUtils.formatBytesUTF8(endKey));
@@ -567,8 +612,10 @@ public class RawKVClient implements RawKVClientBase {
     SlowLog slowLog =
         new SlowLogImpl(
             conf.getRawKVWriteSlowLogInMS(),
-            new HashMap<String, String>(3) {
+            new HashMap<String, Object>() {
               {
+                put("cluster_id", clusterId);
+                put("pd_addresses", pdAddresses);
                 put("func", "delete");
                 put("key", KeyUtils.formatBytesUTF8(key));
                 put("atomic", String.valueOf(atomic));
