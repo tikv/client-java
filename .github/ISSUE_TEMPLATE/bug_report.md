@@ -18,7 +18,7 @@ labels: type/bug
 
 ### 4. What did you expect to see? (Required)
 
-### 5. What is your Java Client and TiKV version? (Required)
+### 5. What are your Java Client and TiKV versions? (Required)
 
 - Client Java:
 - TiKV:

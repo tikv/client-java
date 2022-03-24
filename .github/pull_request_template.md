@@ -8,7 +8,7 @@ Issue Number: close #issue_number
 
 Problem Description: **TBD**
 
-### What is changed and how it works?
+### What is changed and how does it work?
 
 
 
@@ -17,13 +17,13 @@ Problem Description: **TBD**
 <!-- REMOVE the items that are not applicable -->
 - Has exported function/method change
 - Has exported variable/fields change
-- Has interface methods change
+- Has methods of interface change
 - Has persistent data change
 - No code
 
 ### Check List for Tests
 
-This PR has been tested by the at least one of the following methods:
+This PR has been tested by at least one of the following methods:
 - Unit test
 - Integration test
 - Manual test (add detailed scripts or steps below)
