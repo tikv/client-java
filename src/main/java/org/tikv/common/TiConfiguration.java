@@ -171,6 +171,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.pd.PDUtils;
 import org.tikv.common.replica.ReplicaSelector;
+import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.CommandPri;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
@@ -196,6 +197,17 @@ public class TiConfiguration implements Serializable {
 
     public boolean isV2() {
       return this == V2;
+    }
+
+    public Kvrpcpb.APIVersion toPb() {
+      switch (this) {
+        case V1:
+          return Kvrpcpb.APIVersion.V1;
+        case V2:
+          return Kvrpcpb.APIVersion.V2;
+        default:
+          throw new IllegalArgumentException("unknown api version " + this);
+      }
     }
   }
 

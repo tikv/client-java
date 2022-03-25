@@ -167,10 +167,10 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
       Supplier<Kvrpcpb.PessimisticRollbackRequest> factory =
           () ->
               Kvrpcpb.PessimisticRollbackRequest.newBuilder()
-                  .setContext(region.getLeaderContext())
+                  .setContext(makeContext())
+                  .addKeys(buildRequestKey(lock.getKey()))
                   .setStartVersion(lock.getTxnID())
                   .setForUpdateTs(forUpdateTS)
-                  .addKeys(lock.getKey())
                   .build();
 
       KVErrorHandler<Kvrpcpb.PessimisticRollbackResponse> handler =
@@ -285,8 +285,8 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
         () -> {
           TiRegion primaryKeyRegion = regionManager.getRegionByKey(primary);
           return Kvrpcpb.CheckTxnStatusRequest.newBuilder()
-              .setContext(primaryKeyRegion.getLeaderContext())
-              .setPrimaryKey(primary)
+              .setContext(withApiVersion(primaryKeyRegion.getLeaderContext()))
+              .setPrimaryKey(buildRequestKey(primary))
               .setLockTs(txnID)
               .setCallerStartTs(callerStartTS)
               .setCurrentTs(currentTS)
@@ -362,7 +362,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
 
       Kvrpcpb.ResolveLockRequest.Builder builder =
           Kvrpcpb.ResolveLockRequest.newBuilder()
-              .setContext(region.getLeaderContext())
+              .setContext(makeContext())
               .setStartVersion(lock.getTxnID());
 
       if (txnStatus.isCommitted()) {
@@ -373,7 +373,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
       if (lock.getTxnSize() < BIG_TXN_THRESHOLD) {
         // Only resolve specified keys when it is a small transaction,
         // prevent from scanning the whole region in this case.
-        builder.addKeys(lock.getKey());
+        builder.addKeys(buildRequestKey(lock.getKey()));
       }
 
       Supplier<Kvrpcpb.ResolveLockRequest> factory = builder::build;

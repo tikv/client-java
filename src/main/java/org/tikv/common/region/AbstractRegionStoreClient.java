@@ -104,7 +104,8 @@ public abstract class AbstractRegionStoreClient
   }
 
   @Override
-  public void close() throws GrpcException {}
+  public void close() throws GrpcException {
+  }
 
   /**
    * onNotLeader deals with NotLeaderError and returns whether re-splitting key range is needed
@@ -207,15 +208,27 @@ public abstract class AbstractRegionStoreClient
         .build();
   }
 
+  protected Kvrpcpb.Context withApiVersion(Kvrpcpb.Context context) {
+    return Kvrpcpb.Context.newBuilder(context).setApiVersion(conf.getApiVersion().toPb()).build();
+  }
+
   protected Kvrpcpb.Context makeContext(TiStoreType storeType, SlowLog slowLog) {
     Kvrpcpb.Context context = region.getReplicaContext(java.util.Collections.emptySet(), storeType);
-    return addTraceId(context, slowLog);
+    return withApiVersion(addTraceId(context, slowLog));
   }
 
   protected Kvrpcpb.Context makeContext(
       Set<Long> resolvedLocks, TiStoreType storeType, SlowLog slowLog) {
     Kvrpcpb.Context context = region.getReplicaContext(resolvedLocks, storeType);
-    return addTraceId(context, slowLog);
+    return withApiVersion(addTraceId(context, slowLog));
+  }
+
+  protected Kvrpcpb.Context makeContext() {
+    return withApiVersion(region.getLeaderContext());
+  }
+
+  protected Kvrpcpb.Context makeContext(Metapb.Peer peer) {
+    return withApiVersion(region.getReplicaContext(peer));
   }
 
   private void updateClientStub() {
@@ -323,8 +336,8 @@ public abstract class AbstractRegionStoreClient
             TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
         Kvrpcpb.RawGetRequest rawGetRequest =
             Kvrpcpb.RawGetRequest.newBuilder()
-                .setContext(region.getReplicaContext(peer))
-                .setKey(key)
+                .setContext(makeContext(peer))
+                .setKey(buildRequestKey(key))
                 .build();
         ListenableFuture<Kvrpcpb.RawGetResponse> task = stub.rawGet(rawGetRequest);
         responses.add(new SwitchLeaderTask(task, peer));
@@ -385,8 +398,8 @@ public abstract class AbstractRegionStoreClient
         header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
         Kvrpcpb.RawGetRequest rawGetRequest =
             Kvrpcpb.RawGetRequest.newBuilder()
-                .setContext(region.getReplicaContext(region.getLeader()))
-                .setKey(key)
+                .setContext(makeContext())
+                .setKey(buildRequestKey(key))
                 .build();
         ListenableFuture<Kvrpcpb.RawGetResponse> task =
             MetadataUtils.attachHeaders(stub, header).rawGet(rawGetRequest);
