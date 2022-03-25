@@ -30,6 +30,7 @@ public abstract class PDMockServerTest {
     setUp(LOCAL_ADDR);
   }
 
+<<<<<<< HEAD
   void setUp(String addr) throws IOException {
     pdServer = new PDMockServer();
     pdServer.start(CLUSTER_ID);
@@ -40,6 +41,37 @@ public abstract class PDMockServerTest {
             GrpcUtils.makeMember(2, "http://" + addr + ":" + (pdServer.port + 1)),
             GrpcUtils.makeMember(3, "http://" + addr + ":" + (pdServer.port + 2))));
     TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + pdServer.port);
+=======
+  void setup(String addr) throws IOException {
+    int[] ports = new int[3];
+    for (int i = 0; i < ports.length; i++) {
+      try (ServerSocket s = new ServerSocket(0)) {
+        ports[i] = s.getLocalPort();
+      }
+    }
+
+    for (int i = 0; i < ports.length; i++) {
+      PDMockServer server = new PDMockServer();
+      server.start(CLUSTER_ID, ports[i]);
+      server.addGetMembersListener(
+          (request) ->
+              GrpcUtils.makeGetMembersResponse(
+                  server.getClusterId(),
+                  GrpcUtils.makeMember(1, "http://" + addr + ":" + ports[0]),
+                  GrpcUtils.makeMember(2, "http://" + addr + ":" + ports[1]),
+                  GrpcUtils.makeMember(3, "http://" + addr + ":" + ports[2])));
+      pdServers.add(server);
+      if (i == 0) {
+        leader = server;
+      }
+    }
+
+    TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + ports[0]);
+    conf.setKvMode("RAW");
+    conf.setWarmUpEnable(false);
+    conf.setTimeout(2000);
+    conf.setEnableGrpcForward(true);
+>>>>>>> f4e7c302a... [close #570] mockserver: fix unstable mock server cluster setup (#571)
     session = TiSession.create(conf);
   }
 

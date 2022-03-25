@@ -28,7 +28,11 @@ import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.Pdpb.*;
 
 public class PDMockServer extends PDGrpc.PDImplBase {
+<<<<<<< HEAD
   public int port;
+=======
+  private int port;
+>>>>>>> f4e7c302a... [close #570] mockserver: fix unstable mock server cluster setup (#571)
   private long clusterId;
 
   private Server server;
@@ -135,5 +139,9 @@ public class PDMockServer extends PDGrpc.PDImplBase {
 
   public long getClusterId() {
     return clusterId;
+  }
+
+  public long getPort() {
+    return port;
   }
 }
