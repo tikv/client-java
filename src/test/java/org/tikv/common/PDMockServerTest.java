@@ -38,28 +38,30 @@ public abstract class PDMockServerTest {
   }
 
   void setup(String addr) throws IOException {
-    int basePort;
-    try (ServerSocket s = new ServerSocket(0)) {
-      basePort = s.getLocalPort();
+    int[] ports = new int[3];
+    for (int i = 0; i < ports.length; i++) {
+      try (ServerSocket s = new ServerSocket(0)) {
+        ports[i] = s.getLocalPort();
+      }
     }
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < ports.length; i++) {
       PDMockServer server = new PDMockServer();
-      server.start(CLUSTER_ID, basePort + i);
+      server.start(CLUSTER_ID, ports[i]);
       server.addGetMembersListener(
           (request) ->
               GrpcUtils.makeGetMembersResponse(
                   server.getClusterId(),
-                  GrpcUtils.makeMember(1, "http://" + addr + ":" + basePort),
-                  GrpcUtils.makeMember(2, "http://" + addr + ":" + (basePort + 1)),
-                  GrpcUtils.makeMember(3, "http://" + addr + ":" + (basePort + 2))));
+                  GrpcUtils.makeMember(1, "http://" + addr + ":" + ports[0]),
+                  GrpcUtils.makeMember(2, "http://" + addr + ":" + ports[1]),
+                  GrpcUtils.makeMember(3, "http://" + addr + ":" + ports[2])));
       pdServers.add(server);
       if (i == 0) {
         leader = server;
       }
     }
 
-    TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + leader.port);
+    TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + ports[0]);
     conf.setKvMode("RAW");
     conf.setWarmUpEnable(false);
     conf.setTimeout(2000);
