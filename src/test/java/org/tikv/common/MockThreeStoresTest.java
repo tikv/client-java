@@ -42,9 +42,11 @@ public class MockThreeStoresTest extends PDMockServerTest {
   public void setup() throws IOException {
     super.setup();
 
-    int basePort;
-    try (ServerSocket s = new ServerSocket(0)) {
-      basePort = s.getLocalPort();
+    int[] ports = new int[3];
+    for (int i = 0; i < ports.length; i++) {
+      try (ServerSocket s = new ServerSocket(0)) {
+        ports[i] = s.getLocalPort();
+      }
     }
 
     ImmutableList<Metapb.Peer> peers =
@@ -65,17 +67,17 @@ public class MockThreeStoresTest extends PDMockServerTest {
     stores =
         ImmutableList.of(
             Metapb.Store.newBuilder()
-                .setAddress("127.0.0.1:" + basePort)
+                .setAddress("127.0.0.1:" + ports[0])
                 .setVersion("5.0.0")
                 .setId(0x1)
                 .build(),
             Metapb.Store.newBuilder()
-                .setAddress("127.0.0.1:" + (basePort + 1))
+                .setAddress("127.0.0.1:" + ports[1])
                 .setVersion("5.0.0")
                 .setId(0x2)
                 .build(),
             Metapb.Store.newBuilder()
-                .setAddress("127.0.0.1:" + (basePort + 2))
+                .setAddress("127.0.0.1:" + ports[2])
                 .setVersion("5.0.0")
                 .setId(0x3)
                 .build());
@@ -101,9 +103,9 @@ public class MockThreeStoresTest extends PDMockServerTest {
             region.getPeers(0),
             region.getPeersList(),
             stores.stream().map(TiStore::new).collect(Collectors.toList()));
-    for (int i = 0; i < 3; i++) {
+    for (int port : ports) {
       KVMockServer server = new KVMockServer();
-      server.start(this.region, basePort + i);
+      server.start(this.region, port);
       servers.add(server);
     }
   }
