@@ -29,6 +29,7 @@ import java.io.ObjectOutputStream;
 import org.junit.Assert;
 import org.junit.Test;
 import org.tikv.common.TiConfiguration.ApiVersion;
+import org.tikv.kvproto.Kvrpcpb.APIVersion;
 
 public class TiConfigurationTest {
 
@@ -110,5 +111,11 @@ public class TiConfigurationTest {
     TiConfiguration conf = TiConfiguration.createDefault();
     assertTrue(conf.getApiVersion().isV1());
     assertTrue(conf.setApiVersion(ApiVersion.V2).getApiVersion().isV2());
+  }
+
+  @Test
+  public void testApiVersionToPb() {
+    assertEquals(APIVersion.V1, ApiVersion.V1.toPb());
+    assertEquals(APIVersion.V2, ApiVersion.V2.toPb());
   }
 }
