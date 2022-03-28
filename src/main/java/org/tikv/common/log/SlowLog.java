@@ -26,5 +26,16 @@ public interface SlowLog {
 
   void setError(Throwable err);
 
+<<<<<<< HEAD
+=======
+  SlowLog withFields(Map<String, Object> fields);
+
+  default SlowLog withField(String key, Object value) {
+    return withFields(ImmutableMap.of(key, value));
+  }
+
+  Object getField(String key);
+
+>>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
   void log();
 }

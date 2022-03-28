@@ -41,5 +41,18 @@ public class SlowLogEmptyImpl implements SlowLog {
   public void setError(Throwable err) {}
 
   @Override
+<<<<<<< HEAD
+=======
+  public SlowLog withFields(Map<String, Object> fields) {
+    return this;
+  }
+
+  @Override
+  public Object getField(String key) {
+    return null;
+  }
+
+  @Override
+>>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
   public void log() {}
 }

@@ -92,7 +92,9 @@ public class TTLManager {
   }
 
   private void doKeepAlive() {
-    BackOffer bo = ConcreteBackOffer.newCustomBackOff(MANAGED_LOCK_TTL);
+    BackOffer bo =
+        ConcreteBackOffer.newCustomBackOff(
+            MANAGED_LOCK_TTL, regionManager.getPDClient().getClusterId());
     long uptime = kvClient.getTimestamp().getPhysical() - TiTimestamp.extractPhysical(startTS);
     long ttl = uptime + MANAGED_LOCK_TTL;
 

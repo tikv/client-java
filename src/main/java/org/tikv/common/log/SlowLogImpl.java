@@ -82,6 +82,20 @@ public class SlowLogImpl implements SlowLog {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public SlowLog withFields(Map<String, Object> fields) {
+    this.fields.putAll(fields);
+    return this;
+  }
+
+  @Override
+  public Object getField(String key) {
+    return fields.get(key);
+  }
+
+  @Override
+>>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
   public void log() {
     recordTime();
     if (error != null || timeExceeded()) {
