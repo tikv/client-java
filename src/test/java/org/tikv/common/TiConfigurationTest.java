@@ -109,6 +109,6 @@ public class TiConfigurationTest {
   public void testApiVersion() {
     TiConfiguration conf = TiConfiguration.createDefault();
     assertTrue(conf.getApiVersion().isV1());
-    assertTrue(conf.setApiVersion(ApiVersion.V2).getApiVersion().isV1());
+    assertTrue(conf.setApiVersion(ApiVersion.V2).getApiVersion().isV2());
   }
 }
