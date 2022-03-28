@@ -259,7 +259,9 @@ public class ImporterClient {
     }
 
     Object writeResponse = clientLeader.getWriteResponse();
-    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.INGEST_BACKOFF);
+    BackOffer backOffer =
+        ConcreteBackOffer.newCustomBackOff(
+            BackOffer.INGEST_BACKOFF, tiSession.getPDClient().getClusterId());
     ingestWithRetry(writeResponse, backOffer);
   }
 

@@ -36,5 +36,7 @@ public interface SlowLog {
     return withFields(ImmutableMap.of(key, value));
   }
 
+  Object getField(String key);
+
   void log();
 }

@@ -48,5 +48,10 @@ public class SlowLogEmptyImpl implements SlowLog {
   }
 
   @Override
+  public Object getField(String key) {
+    return null;
+  }
+
+  @Override
   public void log() {}
 }
