@@ -18,7 +18,9 @@
 package org.tikv.common.region;
 
 import static org.tikv.common.region.RegionStoreClient.RequestTypes.REQ_TYPE_DAG;
-import static org.tikv.common.util.BackOffFunction.BackOffFuncType.*;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoRegionMiss;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLock;
+import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
@@ -29,7 +31,17 @@ import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import io.prometheus.client.Histogram;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,15 +49,64 @@ import org.tikv.common.PDClient;
 import org.tikv.common.StoreVersion;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.Version;
-import org.tikv.common.exception.*;
+import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.KeyException;
+import org.tikv.common.exception.RawCASConflictException;
+import org.tikv.common.exception.RegionException;
+import org.tikv.common.exception.SelectException;
+import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.exception.TiKVException;
 import org.tikv.common.log.SlowLogEmptyImpl;
 import org.tikv.common.operation.KVErrorHandler;
 import org.tikv.common.operation.RegionErrorHandler;
 import org.tikv.common.streaming.StreamingResponse;
-import org.tikv.common.util.*;
+import org.tikv.common.util.BackOffFunction;
+import org.tikv.common.util.BackOffer;
+import org.tikv.common.util.Batch;
+import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.HistogramUtils;
+import org.tikv.common.util.Pair;
+import org.tikv.common.util.RangeSplitter;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Errorpb;
-import org.tikv.kvproto.Kvrpcpb.*;
+import org.tikv.kvproto.Kvrpcpb.BatchGetRequest;
+import org.tikv.kvproto.Kvrpcpb.BatchGetResponse;
+import org.tikv.kvproto.Kvrpcpb.CommitRequest;
+import org.tikv.kvproto.Kvrpcpb.CommitResponse;
+import org.tikv.kvproto.Kvrpcpb.GetRequest;
+import org.tikv.kvproto.Kvrpcpb.GetResponse;
+import org.tikv.kvproto.Kvrpcpb.KeyError;
+import org.tikv.kvproto.Kvrpcpb.KvPair;
+import org.tikv.kvproto.Kvrpcpb.Mutation;
+import org.tikv.kvproto.Kvrpcpb.PrewriteRequest;
+import org.tikv.kvproto.Kvrpcpb.PrewriteResponse;
+import org.tikv.kvproto.Kvrpcpb.RawBatchDeleteRequest;
+import org.tikv.kvproto.Kvrpcpb.RawBatchDeleteResponse;
+import org.tikv.kvproto.Kvrpcpb.RawBatchGetRequest;
+import org.tikv.kvproto.Kvrpcpb.RawBatchGetResponse;
+import org.tikv.kvproto.Kvrpcpb.RawBatchPutRequest;
+import org.tikv.kvproto.Kvrpcpb.RawBatchPutResponse;
+import org.tikv.kvproto.Kvrpcpb.RawCASRequest;
+import org.tikv.kvproto.Kvrpcpb.RawCASResponse;
+import org.tikv.kvproto.Kvrpcpb.RawDeleteRangeRequest;
+import org.tikv.kvproto.Kvrpcpb.RawDeleteRangeResponse;
+import org.tikv.kvproto.Kvrpcpb.RawDeleteRequest;
+import org.tikv.kvproto.Kvrpcpb.RawDeleteResponse;
+import org.tikv.kvproto.Kvrpcpb.RawGetKeyTTLRequest;
+import org.tikv.kvproto.Kvrpcpb.RawGetKeyTTLResponse;
+import org.tikv.kvproto.Kvrpcpb.RawGetRequest;
+import org.tikv.kvproto.Kvrpcpb.RawGetResponse;
+import org.tikv.kvproto.Kvrpcpb.RawPutRequest;
+import org.tikv.kvproto.Kvrpcpb.RawPutResponse;
+import org.tikv.kvproto.Kvrpcpb.RawScanRequest;
+import org.tikv.kvproto.Kvrpcpb.RawScanResponse;
+import org.tikv.kvproto.Kvrpcpb.ScanRequest;
+import org.tikv.kvproto.Kvrpcpb.ScanResponse;
+import org.tikv.kvproto.Kvrpcpb.SplitRegionRequest;
+import org.tikv.kvproto.Kvrpcpb.SplitRegionResponse;
+import org.tikv.kvproto.Kvrpcpb.TxnHeartBeatRequest;
+import org.tikv.kvproto.Kvrpcpb.TxnHeartBeatResponse;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
@@ -78,7 +139,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       HistogramUtils.buildDuration()
           .name("client_java_grpc_raw_requests_latency")
           .help("grpc raw request latency.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
 
   private synchronized Boolean getIsV4() {
@@ -742,7 +803,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     StreamingResponse responseIterator =
         this.callServerStreamingWithRetry(
-            ConcreteBackOffer.newCopNextMaxBackOff(),
+            ConcreteBackOffer.newCopNextMaxBackOff(pdClient.getClusterId()),
             TikvGrpc.getCoprocessorStreamMethod(),
             reqToSend,
             handler);
@@ -778,7 +839,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     SplitRegionResponse resp =
         callWithRetry(
-            ConcreteBackOffer.newGetBackOff(), TikvGrpc.getSplitRegionMethod(), request, handler);
+            ConcreteBackOffer.newGetBackOff(pdClient.getClusterId()),
+            TikvGrpc.getSplitRegionMethod(),
+            request,
+            handler);
 
     if (resp == null) {
       this.regionManager.onRequestFail(region);
@@ -798,8 +862,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   // APIs for Raw Scan/Put/Get/Delete
 
   public Optional<ByteString> rawGet(BackOffer backOffer, ByteString key) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get").startTimer();
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get", clusterId.toString()).startTimer();
     try {
       Supplier<RawGetRequest> factory =
           () ->
@@ -837,8 +902,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public Optional<Long> rawGetKeyTTL(BackOffer backOffer, ByteString key) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get_key_ttl").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_get_key_ttl", clusterId.toString())
+            .startTimer();
     try {
       Supplier<RawGetKeyTTLRequest> factory =
           () ->
@@ -876,8 +944,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public void rawDelete(BackOffer backOffer, ByteString key, boolean atomicForCAS) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_delete", clusterId.toString())
+            .startTimer();
     try {
       Supplier<RawDeleteRequest> factory =
           () ->
@@ -914,8 +985,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public void rawPut(
       BackOffer backOffer, ByteString key, ByteString value, long ttl, boolean atomicForCAS) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put").startTimer();
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put", clusterId.toString()).startTimer();
     try {
       Supplier<RawPutRequest> factory =
           () ->
@@ -958,8 +1030,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       ByteString value,
       long ttl)
       throws RawCASConflictException {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put_if_absent").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_put_if_absent", clusterId.toString())
+            .startTimer();
     try {
       Supplier<RawCASRequest> factory =
           () ->
@@ -1008,8 +1083,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public List<KvPair> rawBatchGet(BackOffer backoffer, List<ByteString> keys) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_get").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_batch_get", clusterId.toString())
+            .startTimer();
     try {
       if (keys.isEmpty()) {
         return new ArrayList<>();
@@ -1044,8 +1122,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public void rawBatchPut(
       BackOffer backOffer, List<KvPair> kvPairs, long ttl, boolean atomicForCAS) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_put").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_batch_put", clusterId.toString())
+            .startTimer();
     try {
       if (kvPairs.isEmpty()) {
         return;
@@ -1097,8 +1178,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public void rawBatchDelete(BackOffer backoffer, List<ByteString> keys, boolean atomicForCAS) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_delete").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_batch_delete", clusterId.toString())
+            .startTimer();
     try {
       if (keys.isEmpty()) {
         return;
@@ -1145,8 +1229,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @return KvPair list
    */
   public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_scan").startTimer();
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_scan", clusterId.toString()).startTimer();
     try {
       Supplier<RawScanRequest> factory =
           () ->
@@ -1191,8 +1276,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param endKey endKey
    */
   public void rawDeleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete_range").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_delete_range", clusterId.toString())
+            .startTimer();
     try {
       Supplier<RawDeleteRangeRequest> factory =
           () ->
@@ -1349,7 +1437,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
 
     private BackOffer defaultBackOff() {
-      return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
+      BackOffer backoffer =
+          ConcreteBackOffer.newCustomBackOff(
+              conf.getRawKVDefaultBackoffInMS(), pdClient.getClusterId());
+      return backoffer;
     }
   }
 }

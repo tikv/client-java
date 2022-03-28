@@ -80,7 +80,9 @@ public class Snapshot {
     try (KVClient client = new KVClient(session, session.getRegionStoreClientBuilder())) {
       List<KvPair> kvPairList =
           client.batchGet(
-              ConcreteBackOffer.newCustomBackOff(backOffer), list, timestamp.getVersion());
+              ConcreteBackOffer.newCustomBackOff(backOffer, session.getPDClient().getClusterId()),
+              list,
+              timestamp.getVersion());
       return kvPairList
           .stream()
           .map(

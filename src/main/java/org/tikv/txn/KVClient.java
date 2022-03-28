@@ -77,7 +77,9 @@ public class KVClient implements AutoCloseable {
    * @return a ByteString value if key exists, ByteString.EMPTY if key does not exist
    */
   public ByteString get(ByteString key, long version) throws GrpcException {
-    BackOffer backOffer = ConcreteBackOffer.newGetBackOff();
+    BackOffer backOffer =
+        ConcreteBackOffer.newGetBackOff(
+            clientBuilder.getRegionManager().getPDClient().getClusterId());
     while (true) {
       RegionStoreClient client = clientBuilder.build(key);
       try {
@@ -178,7 +180,9 @@ public class KVClient implements AutoCloseable {
       List<ByteString> keyList = list.stream().map(pair -> pair.first).collect(Collectors.toList());
       Map<TiRegion, List<ByteString>> groupKeys =
           groupKeysByRegion(
-              clientBuilder.getRegionManager(), keyList, ConcreteBackOffer.newRawKVBackOff());
+              clientBuilder.getRegionManager(),
+              keyList,
+              ConcreteBackOffer.newRawKVBackOff(tiSession.getPDClient().getClusterId()));
 
       // ingest for each region
       for (Map.Entry<TiRegion, List<ByteString>> entry : groupKeys.entrySet()) {

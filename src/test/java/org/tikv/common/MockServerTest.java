@@ -29,6 +29,7 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
 
 public class MockServerTest extends PDMockServerTest {
+
   public KVMockServer server;
   public int port;
   public TiRegion region;

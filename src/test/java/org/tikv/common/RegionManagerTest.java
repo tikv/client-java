@@ -37,6 +37,7 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.StoreState;
 
 public class RegionManagerTest extends PDMockServerTest {
+
   private RegionManager mgr;
 
   @Before
