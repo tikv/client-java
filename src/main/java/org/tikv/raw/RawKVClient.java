@@ -48,11 +48,8 @@ import org.tikv.common.util.*;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClient implements RawKVClientBase {
-<<<<<<< HEAD
-=======
   private final Long clusterId;
   private final List<URI> pdAddresses;
->>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
   private final TiSession tiSession;
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
@@ -278,15 +275,10 @@ public class RawKVClient implements RawKVClientBase {
 
   @Override
   public List<KvPair> batchGet(List<ByteString> keys) {
-<<<<<<< HEAD
-    String label = "client_raw_batch_get";
-    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVBatchReadSlowLogInMS());
-=======
     String[] labels = withClusterId("client_raw_batch_get");
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(labels).startTimer();
+
     SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVBatchReadSlowLogInMS()));
->>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
     SlowLogSpan span = slowLog.start("batchGet");
     span.addProperty("keySize", String.valueOf(keys.size()));
     ConcreteBackOffer backOffer =
@@ -310,15 +302,10 @@ public class RawKVClient implements RawKVClientBase {
 
   @Override
   public void batchDelete(List<ByteString> keys) {
-<<<<<<< HEAD
-    String label = "client_raw_batch_delete";
-    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVBatchWriteSlowLogInMS());
-=======
     String[] labels = withClusterId("client_raw_batch_delete");
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(labels).startTimer();
+
     SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVBatchWriteSlowLogInMS()));
->>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
     SlowLogSpan span = slowLog.start("batchDelete");
     span.addProperty("keySize", String.valueOf(keys.size()));
     ConcreteBackOffer backOffer =
@@ -341,15 +328,10 @@ public class RawKVClient implements RawKVClientBase {
 
   @Override
   public Optional<Long> getKeyTTL(ByteString key) {
-<<<<<<< HEAD
-    String label = "client_raw_get_key_ttl";
-    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVReadSlowLogInMS());
-=======
     String[] labels = withClusterId("client_raw_get_key_ttl");
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(labels).startTimer();
+
     SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVReadSlowLogInMS()));
->>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
     SlowLogSpan span = slowLog.start("getKeyTTL");
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
     ConcreteBackOffer backOffer =
@@ -455,15 +437,10 @@ public class RawKVClient implements RawKVClientBase {
 
   @Override
   public List<KvPair> scan(ByteString startKey, ByteString endKey, int limit, boolean keyOnly) {
-<<<<<<< HEAD
-    String label = "client_raw_scan";
-    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVScanSlowLogInMS());
-=======
     String[] labels = withClusterId("client_raw_scan");
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(labels).startTimer();
+
     SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVScanSlowLogInMS()));
->>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
     SlowLogSpan span = slowLog.start("scan");
     span.addProperty("startKey", KeyUtils.formatBytesUTF8(startKey));
     span.addProperty("endKey", KeyUtils.formatBytesUTF8(endKey));
@@ -506,15 +483,10 @@ public class RawKVClient implements RawKVClientBase {
 
   @Override
   public List<KvPair> scan(ByteString startKey, ByteString endKey, boolean keyOnly) {
-<<<<<<< HEAD
-    String label = "client_raw_scan_without_limit";
-    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVScanSlowLogInMS());
-=======
     String[] labels = withClusterId("client_raw_scan_without_limit");
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(labels).startTimer();
+
     SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVScanSlowLogInMS()));
->>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
     SlowLogSpan span = slowLog.start("scan");
     span.addProperty("startKey", KeyUtils.formatBytesUTF8(startKey));
     span.addProperty("endKey", KeyUtils.formatBytesUTF8(endKey));
@@ -578,15 +550,10 @@ public class RawKVClient implements RawKVClientBase {
 
   @Override
   public void delete(ByteString key) {
-<<<<<<< HEAD
-    String label = "client_raw_delete";
-    Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(label).startTimer();
-    SlowLog slowLog = new SlowLogImpl(conf.getRawKVWriteSlowLogInMS());
-=======
     String[] labels = withClusterId("client_raw_delete");
     Histogram.Timer requestTimer = RAW_REQUEST_LATENCY.labels(labels).startTimer();
+
     SlowLog slowLog = withClusterInfo(new SlowLogImpl(conf.getRawKVWriteSlowLogInMS()));
->>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
     SlowLogSpan span = slowLog.start("delete");
     span.addProperty("key", KeyUtils.formatBytesUTF8(key));
     ConcreteBackOffer backOffer =

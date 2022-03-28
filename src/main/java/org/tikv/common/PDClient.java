@@ -842,8 +842,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
     return builder.build();
   }
-<<<<<<< HEAD
-=======
 
   public Long getClusterId() {
     return header.getClusterId();
@@ -852,5 +850,4 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   public List<URI> getPdAddrs() {
     return pdAddrs;
   }
->>>>>>> 6cbf56aed... [to #556] metrics: attach cluster label to metrics (#558)
 }
