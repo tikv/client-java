@@ -104,8 +104,7 @@ public abstract class AbstractRegionStoreClient
   }
 
   @Override
-  public void close() throws GrpcException {
-  }
+  public void close() throws GrpcException {}
 
   /**
    * onNotLeader deals with NotLeaderError and returns whether re-splitting key range is needed
