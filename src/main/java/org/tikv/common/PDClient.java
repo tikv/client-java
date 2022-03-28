@@ -113,6 +113,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       HistogramUtils.buildDuration()
           .name("client_java_pd_get_region_by_requests_latency")
           .help("pd getRegionByKey request latency.")
+          .labelNames("cluster")
           .register();
 
   private PDClient(TiConfiguration conf, ChannelFactory channelFactory) {
@@ -203,7 +204,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
         () -> GetOperatorRequest.newBuilder().setHeader(header).setRegionId(regionId).build();
     // get operator no need to handle error and no need back offer.
     return callWithRetry(
-        ConcreteBackOffer.newCustomBackOff(0),
+        ConcreteBackOffer.newCustomBackOff(0, getClusterId()),
         PDGrpc.getGetOperatorMethod(),
         request,
         new NoopHandler<>());
@@ -231,7 +232,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   @Override
   public Pair<Metapb.Region, Metapb.Peer> getRegionByKey(BackOffer backOffer, ByteString key) {
-    Histogram.Timer requestTimer = PD_GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
+    Histogram.Timer requestTimer =
+        PD_GET_REGION_BY_KEY_REQUEST_LATENCY.labels(getClusterId().toString()).startTimer();
     try {
       if (conf.getKvMode() == KVMode.TXN) {
         CodecDataOutput cdo = new CodecDataOutput();
@@ -745,7 +747,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return builder.build();
   }
 
-  public long getClusterId() {
+  @Override
+  public Long getClusterId() {
     return header.getClusterId();
   }
 

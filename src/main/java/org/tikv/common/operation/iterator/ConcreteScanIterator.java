@@ -74,7 +74,9 @@ public class ConcreteScanIterator extends ScanIterator {
     try (RegionStoreClient client = builder.build(startKey)) {
       client.setTimeout(conf.getScanTimeout());
       region = client.getRegion();
-      BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
+      BackOffer backOffer =
+          ConcreteBackOffer.newScannerNextMaxBackOff(
+              builder.getRegionManager().getPDClient().getClusterId());
       currentCache = client.scan(backOffer, startKey, version);
       return region;
     }
@@ -86,7 +88,8 @@ public class ConcreteScanIterator extends ScanIterator {
         builder.getRegionManager().getRegionStorePairByKey(current.getKey());
     TiRegion region = pair.first;
     TiStore store = pair.second;
-    BackOffer backOffer = ConcreteBackOffer.newGetBackOff();
+    BackOffer backOffer =
+        ConcreteBackOffer.newGetBackOff(builder.getRegionManager().getPDClient().getClusterId());
     try (RegionStoreClient client = builder.build(region, store)) {
       return client.get(backOffer, current.getKey(), version);
     } catch (Exception e) {

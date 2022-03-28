@@ -25,7 +25,8 @@ public class CircuitBreakerTest {
             errorThresholdPercentage,
             requestVolumeThreshold,
             sleepWindowInSeconds,
-            attemptRequestCount);
+            attemptRequestCount,
+            0);
     CircuitBreakerMetrics metrics = circuitBreaker.getMetrics();
 
     // initial state: CLOSE

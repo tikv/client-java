@@ -30,11 +30,14 @@ public class MetricsTest extends BaseRawKVTest {
     TiSession session = TiSession.create(conf);
     sessionList.add(session);
     RawKVClient client = session.createRawClient();
-    client.put(ByteString.copyFromUtf8("k"), ByteString.copyFromUtf8("v"));
-    ByteString result = client.get(ByteString.copyFromUtf8("k"));
-    assertEquals(result.toStringUtf8(), "v");
-    client.close();
-    session.close();
+    while(true) {
+      client.put(ByteString.copyFromUtf8("k"), ByteString.copyFromUtf8("v"));
+      ByteString result = client.get(ByteString.copyFromUtf8("k"));
+      assertEquals(result.toStringUtf8(), "v");
+      Thread.sleep(1000);
+    }
+//    client.close();
+//    session.close();
   }
 
   @Test

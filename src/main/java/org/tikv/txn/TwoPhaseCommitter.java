@@ -281,7 +281,9 @@ public class TwoPhaseCommitter {
           // consume one task if reaches task limit
           completionService.take().get();
         }
-        BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(maxBackOfferMS);
+        BackOffer backOffer =
+            ConcreteBackOffer.newCustomBackOff(
+                maxBackOfferMS, regionManager.getPDClient().getClusterId());
         completionService.submit(
             () -> {
               doPrewriteSecondaryKeysInBatchesWithRetry(
@@ -539,7 +541,9 @@ public class TwoPhaseCommitter {
           // consume one task if reaches task limit
           completionService.take().get();
         }
-        BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(commitBackOfferMS);
+        BackOffer backOffer =
+            ConcreteBackOffer.newCustomBackOff(
+                commitBackOfferMS, regionManager.getPDClient().getClusterId());
         completionService.submit(
             () -> {
               doCommitSecondaryKeysWithRetry(backOffer, keyBytes, curSize, commitTs);
