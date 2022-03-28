@@ -17,6 +17,8 @@
 
 package org.tikv.common.log;
 
+import java.util.Map;
+
 public class SlowLogEmptyImpl implements SlowLog {
   public static final SlowLogEmptyImpl INSTANCE = new SlowLogEmptyImpl();
 
@@ -39,6 +41,11 @@ public class SlowLogEmptyImpl implements SlowLog {
 
   @Override
   public void setError(Throwable err) {}
+
+  @Override
+  public SlowLog withFields(Map<String, Object> fields) {
+    return this;
+  }
 
   @Override
   public void log() {}
