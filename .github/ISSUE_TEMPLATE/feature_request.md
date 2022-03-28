@@ -18,6 +18,6 @@ frustrated when [...] -->
 you've considered. -->
 
 **Teachability, Documentation, Adoption, Migration Strategy:**
-<!-- If you can, explain some scenarios how users might use this, situations it
+<!-- If you can, explain some scenarios of how users might use this, situations it
 would be helpful in. Any API designs, mockups, or diagrams are also helpful.
 -->
