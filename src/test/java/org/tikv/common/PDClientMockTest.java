@@ -39,7 +39,7 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
 
-public class PDClientTest extends PDMockServerTest {
+public class PDClientMockTest extends PDMockServerTest {
 
   private static final String LOCAL_ADDR_IPV6 = "[::1]";
   public static final String HTTP = "http://";
