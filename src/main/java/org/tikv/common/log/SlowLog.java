@@ -17,7 +17,11 @@
 
 package org.tikv.common.log;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+
 public interface SlowLog {
+
   SlowLogSpan start(String name);
 
   long getTraceId();

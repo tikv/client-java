@@ -17,8 +17,11 @@
 
 package org.tikv.common.log;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -62,5 +65,25 @@ public class SlowLogImplTest {
     Assert.assertEquals("12345", SlowLogImpl.toUnsignedBigInteger(12345L).toString());
     Assert.assertEquals("18446744073709551615", SlowLogImpl.toUnsignedBigInteger(-1L).toString());
     Assert.assertEquals("18446744073709551614", SlowLogImpl.toUnsignedBigInteger(-2L).toString());
+  }
+
+  @Test
+  public void testWithFields() throws InterruptedException {
+    SlowLogImpl slowLog = new SlowLogImpl(1);
+    slowLog
+        .withField("key0", "value0")
+        .withField("key1", ImmutableList.of("value0", "value1"))
+        .withField("key2", ImmutableMap.of("key3", "value3"));
+
+    JsonObject object = slowLog.getSlowLogJson();
+    Assert.assertEquals("value0", object.get("key0").getAsString());
+
+    AtomicInteger i = new AtomicInteger();
+    object
+        .get("key1")
+        .getAsJsonArray()
+        .forEach(e -> Assert.assertEquals("value" + (i.getAndIncrement()), e.getAsString()));
+
+    Assert.assertEquals("value3", object.get("key2").getAsJsonObject().get("key3").getAsString());
   }
 }
