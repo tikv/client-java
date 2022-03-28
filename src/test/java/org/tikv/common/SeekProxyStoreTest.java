@@ -36,12 +36,12 @@ public class SeekProxyStoreTest extends MockThreeStoresTest {
     put(key, value);
 
     client.put(key, value);
-    Assert.assertEquals(value, client.get(key).get());
+    Assert.assertEquals(value, client.get(key));
     // Set the leader to state Fail, the request will route to peer 0x2, which is not the leader.
     // The state of three peers is the same.
     // Thus, with the correct context, the peer 0x2 will return normally.
     servers.get(0).setState(State.Fail);
 
-    Assert.assertEquals(value, client.get(key).get());
+    Assert.assertEquals(value, client.get(key));
   }
 }

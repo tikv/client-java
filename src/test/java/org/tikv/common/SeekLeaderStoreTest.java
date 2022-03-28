@@ -40,10 +40,10 @@ public class SeekLeaderStoreTest extends MockThreeStoresTest {
 
     put(key, value);
 
-    Assert.assertEquals(value, client.get(key).get());
+    Assert.assertEquals(value, client.get(key));
     servers.get(0).setState(State.Fail);
     servers.get(1).setRegion(region.switchPeer(stores.get(1).getId()));
-    Assert.assertEquals(value, client.get(key).get());
+    Assert.assertEquals(value, client.get(key));
 
     remove(key, value);
   }
@@ -70,7 +70,7 @@ public class SeekLeaderStoreTest extends MockThreeStoresTest {
           return Pdpb.GetStoreResponse.newBuilder().setStore(storeBuilder.build()).build();
         });
 
-    Assert.assertEquals(value, client.get(key).get());
+    Assert.assertEquals(value, client.get(key));
 
     remove(key, value);
   }
