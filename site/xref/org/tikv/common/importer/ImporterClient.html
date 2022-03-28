@@ -267,73 +267,75 @@
 <a class="jxr_linenumber" name="L259" href="#L259">259</a>     }
 <a class="jxr_linenumber" name="L260" href="#L260">260</a> 
 <a class="jxr_linenumber" name="L261" href="#L261">261</a>     Object writeResponse = clientLeader.getWriteResponse();
-<a class="jxr_linenumber" name="L262" href="#L262">262</a>     <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.INGEST_BACKOFF);
-<a class="jxr_linenumber" name="L263" href="#L263">263</a>     ingestWithRetry(writeResponse, backOffer);
-<a class="jxr_linenumber" name="L264" href="#L264">264</a>   }
-<a class="jxr_linenumber" name="L265" href="#L265">265</a> 
-<a class="jxr_linenumber" name="L266" href="#L266">266</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">void</strong> ingestWithRetry(Object writeResponse, <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
-<a class="jxr_linenumber" name="L267" href="#L267">267</a>     <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L268" href="#L268">268</a>       clientLeader.multiIngest(region.getLeaderContext(), writeResponse);
-<a class="jxr_linenumber" name="L269" href="#L269">269</a>     } <strong class="jxr_keyword">catch</strong> (<a name="RegionException" href="../../../../org/tikv/common/exception/RegionException.html#RegionException">RegionException</a> e) {
-<a class="jxr_linenumber" name="L270" href="#L270">270</a>       logger.warn(<span class="jxr_string">"ingest failed."</span>, e);
-<a class="jxr_linenumber" name="L271" href="#L271">271</a>       <strong class="jxr_keyword">boolean</strong> retry = false;
-<a class="jxr_linenumber" name="L272" href="#L272">272</a>       Error error = e.getRegionErr();
-<a class="jxr_linenumber" name="L273" href="#L273">273</a>       <strong class="jxr_keyword">if</strong> (error != <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L274" href="#L274">274</a>         <strong class="jxr_keyword">if</strong> (error.hasNotLeader()) {
-<a class="jxr_linenumber" name="L275" href="#L275">275</a>           retry = <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L276" href="#L276">276</a>           <strong class="jxr_keyword">long</strong> newStoreId = error.getNotLeader().getLeader().getStoreId();
-<a class="jxr_linenumber" name="L277" href="#L277">277</a> 
-<a class="jxr_linenumber" name="L278" href="#L278">278</a>           <em class="jxr_comment">// update Leader here</em>
-<a class="jxr_linenumber" name="L279" href="#L279">279</a>           logger.warn(
-<a class="jxr_linenumber" name="L280" href="#L280">280</a>               String.format(
-<a class="jxr_linenumber" name="L281" href="#L281">281</a>                   <span class="jxr_string">"NotLeader Error with region id %d and store id %d, new store id %d"</span>,
-<a class="jxr_linenumber" name="L282" href="#L282">282</a>                   region.getId(), region.getLeader().getStoreId(), newStoreId));
-<a class="jxr_linenumber" name="L283" href="#L283">283</a> 
-<a class="jxr_linenumber" name="L284" href="#L284">284</a>           BackOffFunction.BackOffFuncType backOffFuncType;
-<a class="jxr_linenumber" name="L285" href="#L285">285</a>           <strong class="jxr_keyword">if</strong> (newStoreId != NO_LEADER_STORE_ID) {
-<a class="jxr_linenumber" name="L286" href="#L286">286</a>             <strong class="jxr_keyword">long</strong> regionId = region.getId();
-<a class="jxr_linenumber" name="L287" href="#L287">287</a>             region = tiSession.getRegionManager().updateLeader(region, newStoreId);
-<a class="jxr_linenumber" name="L288" href="#L288">288</a>             <strong class="jxr_keyword">if</strong> (region == <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L289" href="#L289">289</a>               <em class="jxr_comment">// epoch is not changed, getRegionById is faster than getRegionByKey</em>
-<a class="jxr_linenumber" name="L290" href="#L290">290</a>               region = tiSession.getRegionManager().getRegionById(regionId);
-<a class="jxr_linenumber" name="L291" href="#L291">291</a>             }
-<a class="jxr_linenumber" name="L292" href="#L292">292</a>             backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
-<a class="jxr_linenumber" name="L293" href="#L293">293</a>           } <strong class="jxr_keyword">else</strong> {
-<a class="jxr_linenumber" name="L294" href="#L294">294</a>             logger.info(
-<a class="jxr_linenumber" name="L295" href="#L295">295</a>                 String.format(
-<a class="jxr_linenumber" name="L296" href="#L296">296</a>                     <span class="jxr_string">"Received zero store id, from region %d try next time"</span>, region.getId()));
-<a class="jxr_linenumber" name="L297" href="#L297">297</a>             tiSession.getRegionManager().invalidateRegion(region);
-<a class="jxr_linenumber" name="L298" href="#L298">298</a>             region = tiSession.getRegionManager().getRegionById(region.getId());
-<a class="jxr_linenumber" name="L299" href="#L299">299</a>             backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
-<a class="jxr_linenumber" name="L300" href="#L300">300</a>           }
-<a class="jxr_linenumber" name="L301" href="#L301">301</a> 
-<a class="jxr_linenumber" name="L302" href="#L302">302</a>           backOffer.doBackOff(backOffFuncType, e);
-<a class="jxr_linenumber" name="L303" href="#L303">303</a>           init();
-<a class="jxr_linenumber" name="L304" href="#L304">304</a>         } <strong class="jxr_keyword">else</strong> <strong class="jxr_keyword">if</strong> (error.hasServerIsBusy()) {
-<a class="jxr_linenumber" name="L305" href="#L305">305</a>           retry = <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L306" href="#L306">306</a>           <em class="jxr_comment">// this error is reported from kv:</em>
-<a class="jxr_linenumber" name="L307" href="#L307">307</a>           <em class="jxr_comment">// will occur when write pressure is high. Please try later.</em>
-<a class="jxr_linenumber" name="L308" href="#L308">308</a>           logger.warn(
-<a class="jxr_linenumber" name="L309" href="#L309">309</a>               String.format(
-<a class="jxr_linenumber" name="L310" href="#L310">310</a>                   <span class="jxr_string">"Server is busy for region [%s], reason: %s"</span>,
-<a class="jxr_linenumber" name="L311" href="#L311">311</a>                   region, error.getServerIsBusy().getReason()));
-<a class="jxr_linenumber" name="L312" href="#L312">312</a>           backOffer.doBackOff(
-<a class="jxr_linenumber" name="L313" href="#L313">313</a>               BackOffFunction.BackOffFuncType.BoServerBusy,
-<a class="jxr_linenumber" name="L314" href="#L314">314</a>               <strong class="jxr_keyword">new</strong> StatusRuntimeException(
-<a class="jxr_linenumber" name="L315" href="#L315">315</a>                   Status.fromCode(Status.Code.UNAVAILABLE).withDescription(error.toString())));
-<a class="jxr_linenumber" name="L316" href="#L316">316</a>         } <strong class="jxr_keyword">else</strong> {
-<a class="jxr_linenumber" name="L317" href="#L317">317</a>           tiSession.getRegionManager().invalidateRegion(region);
-<a class="jxr_linenumber" name="L318" href="#L318">318</a>         }
-<a class="jxr_linenumber" name="L319" href="#L319">319</a>       }
-<a class="jxr_linenumber" name="L320" href="#L320">320</a> 
-<a class="jxr_linenumber" name="L321" href="#L321">321</a>       <strong class="jxr_keyword">if</strong> (retry) {
-<a class="jxr_linenumber" name="L322" href="#L322">322</a>         ingestWithRetry(writeResponse, backOffer);
-<a class="jxr_linenumber" name="L323" href="#L323">323</a>       } <strong class="jxr_keyword">else</strong> {
-<a class="jxr_linenumber" name="L324" href="#L324">324</a>         <strong class="jxr_keyword">throw</strong> e;
-<a class="jxr_linenumber" name="L325" href="#L325">325</a>       }
-<a class="jxr_linenumber" name="L326" href="#L326">326</a>     }
-<a class="jxr_linenumber" name="L327" href="#L327">327</a>   }
-<a class="jxr_linenumber" name="L328" href="#L328">328</a> }
+<a class="jxr_linenumber" name="L262" href="#L262">262</a>     <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer =
+<a class="jxr_linenumber" name="L263" href="#L263">263</a>         ConcreteBackOffer.newCustomBackOff(
+<a class="jxr_linenumber" name="L264" href="#L264">264</a>             BackOffer.INGEST_BACKOFF, tiSession.getPDClient().getClusterId());
+<a class="jxr_linenumber" name="L265" href="#L265">265</a>     ingestWithRetry(writeResponse, backOffer);
+<a class="jxr_linenumber" name="L266" href="#L266">266</a>   }
+<a class="jxr_linenumber" name="L267" href="#L267">267</a> 
+<a class="jxr_linenumber" name="L268" href="#L268">268</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">void</strong> ingestWithRetry(Object writeResponse, <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
+<a class="jxr_linenumber" name="L269" href="#L269">269</a>     <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L270" href="#L270">270</a>       clientLeader.multiIngest(region.getLeaderContext(), writeResponse);
+<a class="jxr_linenumber" name="L271" href="#L271">271</a>     } <strong class="jxr_keyword">catch</strong> (<a name="RegionException" href="../../../../org/tikv/common/exception/RegionException.html#RegionException">RegionException</a> e) {
+<a class="jxr_linenumber" name="L272" href="#L272">272</a>       logger.warn(<span class="jxr_string">"ingest failed."</span>, e);
+<a class="jxr_linenumber" name="L273" href="#L273">273</a>       <strong class="jxr_keyword">boolean</strong> retry = false;
+<a class="jxr_linenumber" name="L274" href="#L274">274</a>       Error error = e.getRegionErr();
+<a class="jxr_linenumber" name="L275" href="#L275">275</a>       <strong class="jxr_keyword">if</strong> (error != <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L276" href="#L276">276</a>         <strong class="jxr_keyword">if</strong> (error.hasNotLeader()) {
+<a class="jxr_linenumber" name="L277" href="#L277">277</a>           retry = <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L278" href="#L278">278</a>           <strong class="jxr_keyword">long</strong> newStoreId = error.getNotLeader().getLeader().getStoreId();
+<a class="jxr_linenumber" name="L279" href="#L279">279</a> 
+<a class="jxr_linenumber" name="L280" href="#L280">280</a>           <em class="jxr_comment">// update Leader here</em>
+<a class="jxr_linenumber" name="L281" href="#L281">281</a>           logger.warn(
+<a class="jxr_linenumber" name="L282" href="#L282">282</a>               String.format(
+<a class="jxr_linenumber" name="L283" href="#L283">283</a>                   <span class="jxr_string">"NotLeader Error with region id %d and store id %d, new store id %d"</span>,
+<a class="jxr_linenumber" name="L284" href="#L284">284</a>                   region.getId(), region.getLeader().getStoreId(), newStoreId));
+<a class="jxr_linenumber" name="L285" href="#L285">285</a> 
+<a class="jxr_linenumber" name="L286" href="#L286">286</a>           BackOffFunction.BackOffFuncType backOffFuncType;
+<a class="jxr_linenumber" name="L287" href="#L287">287</a>           <strong class="jxr_keyword">if</strong> (newStoreId != NO_LEADER_STORE_ID) {
+<a class="jxr_linenumber" name="L288" href="#L288">288</a>             <strong class="jxr_keyword">long</strong> regionId = region.getId();
+<a class="jxr_linenumber" name="L289" href="#L289">289</a>             region = tiSession.getRegionManager().updateLeader(region, newStoreId);
+<a class="jxr_linenumber" name="L290" href="#L290">290</a>             <strong class="jxr_keyword">if</strong> (region == <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L291" href="#L291">291</a>               <em class="jxr_comment">// epoch is not changed, getRegionById is faster than getRegionByKey</em>
+<a class="jxr_linenumber" name="L292" href="#L292">292</a>               region = tiSession.getRegionManager().getRegionById(regionId);
+<a class="jxr_linenumber" name="L293" href="#L293">293</a>             }
+<a class="jxr_linenumber" name="L294" href="#L294">294</a>             backOffFuncType = BackOffFunction.BackOffFuncType.BoUpdateLeader;
+<a class="jxr_linenumber" name="L295" href="#L295">295</a>           } <strong class="jxr_keyword">else</strong> {
+<a class="jxr_linenumber" name="L296" href="#L296">296</a>             logger.info(
+<a class="jxr_linenumber" name="L297" href="#L297">297</a>                 String.format(
+<a class="jxr_linenumber" name="L298" href="#L298">298</a>                     <span class="jxr_string">"Received zero store id, from region %d try next time"</span>, region.getId()));
+<a class="jxr_linenumber" name="L299" href="#L299">299</a>             tiSession.getRegionManager().invalidateRegion(region);
+<a class="jxr_linenumber" name="L300" href="#L300">300</a>             region = tiSession.getRegionManager().getRegionById(region.getId());
+<a class="jxr_linenumber" name="L301" href="#L301">301</a>             backOffFuncType = BackOffFunction.BackOffFuncType.BoRegionMiss;
+<a class="jxr_linenumber" name="L302" href="#L302">302</a>           }
+<a class="jxr_linenumber" name="L303" href="#L303">303</a> 
+<a class="jxr_linenumber" name="L304" href="#L304">304</a>           backOffer.doBackOff(backOffFuncType, e);
+<a class="jxr_linenumber" name="L305" href="#L305">305</a>           init();
+<a class="jxr_linenumber" name="L306" href="#L306">306</a>         } <strong class="jxr_keyword">else</strong> <strong class="jxr_keyword">if</strong> (error.hasServerIsBusy()) {
+<a class="jxr_linenumber" name="L307" href="#L307">307</a>           retry = <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L308" href="#L308">308</a>           <em class="jxr_comment">// this error is reported from kv:</em>
+<a class="jxr_linenumber" name="L309" href="#L309">309</a>           <em class="jxr_comment">// will occur when write pressure is high. Please try later.</em>
+<a class="jxr_linenumber" name="L310" href="#L310">310</a>           logger.warn(
+<a class="jxr_linenumber" name="L311" href="#L311">311</a>               String.format(
+<a class="jxr_linenumber" name="L312" href="#L312">312</a>                   <span class="jxr_string">"Server is busy for region [%s], reason: %s"</span>,
+<a class="jxr_linenumber" name="L313" href="#L313">313</a>                   region, error.getServerIsBusy().getReason()));
+<a class="jxr_linenumber" name="L314" href="#L314">314</a>           backOffer.doBackOff(
+<a class="jxr_linenumber" name="L315" href="#L315">315</a>               BackOffFunction.BackOffFuncType.BoServerBusy,
+<a class="jxr_linenumber" name="L316" href="#L316">316</a>               <strong class="jxr_keyword">new</strong> StatusRuntimeException(
+<a class="jxr_linenumber" name="L317" href="#L317">317</a>                   Status.fromCode(Status.Code.UNAVAILABLE).withDescription(error.toString())));
+<a class="jxr_linenumber" name="L318" href="#L318">318</a>         } <strong class="jxr_keyword">else</strong> {
+<a class="jxr_linenumber" name="L319" href="#L319">319</a>           tiSession.getRegionManager().invalidateRegion(region);
+<a class="jxr_linenumber" name="L320" href="#L320">320</a>         }
+<a class="jxr_linenumber" name="L321" href="#L321">321</a>       }
+<a class="jxr_linenumber" name="L322" href="#L322">322</a> 
+<a class="jxr_linenumber" name="L323" href="#L323">323</a>       <strong class="jxr_keyword">if</strong> (retry) {
+<a class="jxr_linenumber" name="L324" href="#L324">324</a>         ingestWithRetry(writeResponse, backOffer);
+<a class="jxr_linenumber" name="L325" href="#L325">325</a>       } <strong class="jxr_keyword">else</strong> {
+<a class="jxr_linenumber" name="L326" href="#L326">326</a>         <strong class="jxr_keyword">throw</strong> e;
+<a class="jxr_linenumber" name="L327" href="#L327">327</a>       }
+<a class="jxr_linenumber" name="L328" href="#L328">328</a>     }
+<a class="jxr_linenumber" name="L329" href="#L329">329</a>   }
+<a class="jxr_linenumber" name="L330" href="#L330">330</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>

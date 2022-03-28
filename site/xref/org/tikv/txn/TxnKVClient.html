@@ -78,7 +78,7 @@
 <a class="jxr_linenumber" name="L70" href="#L70">70</a>    }
 <a class="jxr_linenumber" name="L71" href="#L71">71</a>  
 <a class="jxr_linenumber" name="L72" href="#L72">72</a>    <strong class="jxr_keyword">public</strong> <a name="TiTimestamp" href="../../../org/tikv/common/meta/TiTimestamp.html#TiTimestamp">TiTimestamp</a> getTimestamp() {
-<a class="jxr_linenumber" name="L73" href="#L73">73</a>      <a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> bo = ConcreteBackOffer.newTsoBackOff();
+<a class="jxr_linenumber" name="L73" href="#L73">73</a>      <a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> bo = ConcreteBackOffer.newTsoBackOff(pdClient.getClusterId());
 <a class="jxr_linenumber" name="L74" href="#L74">74</a>      <a name="TiTimestamp" href="../../../org/tikv/common/meta/TiTimestamp.html#TiTimestamp">TiTimestamp</a> timestamp = <strong class="jxr_keyword">new</strong> <a name="TiTimestamp" href="../../../org/tikv/common/meta/TiTimestamp.html#TiTimestamp">TiTimestamp</a>(0, 0);
 <a class="jxr_linenumber" name="L75" href="#L75">75</a>      <strong class="jxr_keyword">try</strong> {
 <a class="jxr_linenumber" name="L76" href="#L76">76</a>        <strong class="jxr_keyword">while</strong> (<strong class="jxr_keyword">true</strong>) {

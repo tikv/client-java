@@ -70,44 +70,45 @@
 <a class="jxr_linenumber" name="L62" href="#L62">62</a>    <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">boolean</strong> minTiKVVersion(String version, <a name="PDClient" href="../../../org/tikv/common/PDClient.html#PDClient">PDClient</a> pdClient) {
 <a class="jxr_linenumber" name="L63" href="#L63">63</a>      <a name="StoreVersion" href="../../../org/tikv/common/StoreVersion.html#StoreVersion">StoreVersion</a> storeVersion = <strong class="jxr_keyword">new</strong> <a name="StoreVersion" href="../../../org/tikv/common/StoreVersion.html#StoreVersion">StoreVersion</a>(version);
 <a class="jxr_linenumber" name="L64" href="#L64">64</a>  
-<a class="jxr_linenumber" name="L65" href="#L65">65</a>      <a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> bo = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
-<a class="jxr_linenumber" name="L66" href="#L66">66</a>      List&lt;Metapb.Store&gt; storeList =
-<a class="jxr_linenumber" name="L67" href="#L67">67</a>          pdClient
-<a class="jxr_linenumber" name="L68" href="#L68">68</a>              .getAllStores(bo)
-<a class="jxr_linenumber" name="L69" href="#L69">69</a>              .stream()
-<a class="jxr_linenumber" name="L70" href="#L70">70</a>              .filter(
-<a class="jxr_linenumber" name="L71" href="#L71">71</a>                  store -&gt;
-<a class="jxr_linenumber" name="L72" href="#L72">72</a>                      !isTiFlash(store)
-<a class="jxr_linenumber" name="L73" href="#L73">73</a>                          &amp;&amp; (store.getState() == Metapb.StoreState.Up
-<a class="jxr_linenumber" name="L74" href="#L74">74</a>                              || store.getState() == Metapb.StoreState.Offline))
-<a class="jxr_linenumber" name="L75" href="#L75">75</a>              .collect(Collectors.toList());
-<a class="jxr_linenumber" name="L76" href="#L76">76</a>  
-<a class="jxr_linenumber" name="L77" href="#L77">77</a>      <strong class="jxr_keyword">for</strong> (Metapb.Store store : storeList) {
-<a class="jxr_linenumber" name="L78" href="#L78">78</a>        <strong class="jxr_keyword">if</strong> (storeVersion.greatThan(<strong class="jxr_keyword">new</strong> <a name="StoreVersion" href="../../../org/tikv/common/StoreVersion.html#StoreVersion">StoreVersion</a>(store.getVersion()))) {
-<a class="jxr_linenumber" name="L79" href="#L79">79</a>          <strong class="jxr_keyword">return</strong> false;
-<a class="jxr_linenumber" name="L80" href="#L80">80</a>        }
-<a class="jxr_linenumber" name="L81" href="#L81">81</a>      }
-<a class="jxr_linenumber" name="L82" href="#L82">82</a>      <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L83" href="#L83">83</a>    }
-<a class="jxr_linenumber" name="L84" href="#L84">84</a>  
-<a class="jxr_linenumber" name="L85" href="#L85">85</a>    <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">boolean</strong> isTiFlash(Metapb.Store store) {
-<a class="jxr_linenumber" name="L86" href="#L86">86</a>      <strong class="jxr_keyword">for</strong> (Metapb.StoreLabel label : store.getLabelsList()) {
-<a class="jxr_linenumber" name="L87" href="#L87">87</a>        <strong class="jxr_keyword">if</strong> (label.getKey().equals(TiStoreType.TiFlash.getLabelKey())
-<a class="jxr_linenumber" name="L88" href="#L88">88</a>            &amp;&amp; label.getValue().equals(TiStoreType.TiFlash.getLabelValue())) {
-<a class="jxr_linenumber" name="L89" href="#L89">89</a>          <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L90" href="#L90">90</a>        }
-<a class="jxr_linenumber" name="L91" href="#L91">91</a>      }
-<a class="jxr_linenumber" name="L92" href="#L92">92</a>      <strong class="jxr_keyword">return</strong> false;
-<a class="jxr_linenumber" name="L93" href="#L93">93</a>    }
-<a class="jxr_linenumber" name="L94" href="#L94">94</a>  
-<a class="jxr_linenumber" name="L95" href="#L95">95</a>    <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">int</strong> toIntVersion() {
-<a class="jxr_linenumber" name="L96" href="#L96">96</a>      <strong class="jxr_keyword">return</strong> v0 * SCALE * SCALE + v1 * SCALE + v2;
-<a class="jxr_linenumber" name="L97" href="#L97">97</a>    }
-<a class="jxr_linenumber" name="L98" href="#L98">98</a>  
-<a class="jxr_linenumber" name="L99" href="#L99">99</a>    <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">boolean</strong> greatThan(<a name="StoreVersion" href="../../../org/tikv/common/StoreVersion.html#StoreVersion">StoreVersion</a> other) {
-<a class="jxr_linenumber" name="L100" href="#L100">100</a>     <strong class="jxr_keyword">return</strong> toIntVersion() &gt; other.toIntVersion();
-<a class="jxr_linenumber" name="L101" href="#L101">101</a>   }
-<a class="jxr_linenumber" name="L102" href="#L102">102</a> }
+<a class="jxr_linenumber" name="L65" href="#L65">65</a>      <a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> bo =
+<a class="jxr_linenumber" name="L66" href="#L66">66</a>          ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF, pdClient.getClusterId());
+<a class="jxr_linenumber" name="L67" href="#L67">67</a>      List&lt;Metapb.Store&gt; storeList =
+<a class="jxr_linenumber" name="L68" href="#L68">68</a>          pdClient
+<a class="jxr_linenumber" name="L69" href="#L69">69</a>              .getAllStores(bo)
+<a class="jxr_linenumber" name="L70" href="#L70">70</a>              .stream()
+<a class="jxr_linenumber" name="L71" href="#L71">71</a>              .filter(
+<a class="jxr_linenumber" name="L72" href="#L72">72</a>                  store -&gt;
+<a class="jxr_linenumber" name="L73" href="#L73">73</a>                      !isTiFlash(store)
+<a class="jxr_linenumber" name="L74" href="#L74">74</a>                          &amp;&amp; (store.getState() == Metapb.StoreState.Up
+<a class="jxr_linenumber" name="L75" href="#L75">75</a>                              || store.getState() == Metapb.StoreState.Offline))
+<a class="jxr_linenumber" name="L76" href="#L76">76</a>              .collect(Collectors.toList());
+<a class="jxr_linenumber" name="L77" href="#L77">77</a>  
+<a class="jxr_linenumber" name="L78" href="#L78">78</a>      <strong class="jxr_keyword">for</strong> (Metapb.Store store : storeList) {
+<a class="jxr_linenumber" name="L79" href="#L79">79</a>        <strong class="jxr_keyword">if</strong> (storeVersion.greatThan(<strong class="jxr_keyword">new</strong> <a name="StoreVersion" href="../../../org/tikv/common/StoreVersion.html#StoreVersion">StoreVersion</a>(store.getVersion()))) {
+<a class="jxr_linenumber" name="L80" href="#L80">80</a>          <strong class="jxr_keyword">return</strong> false;
+<a class="jxr_linenumber" name="L81" href="#L81">81</a>        }
+<a class="jxr_linenumber" name="L82" href="#L82">82</a>      }
+<a class="jxr_linenumber" name="L83" href="#L83">83</a>      <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L84" href="#L84">84</a>    }
+<a class="jxr_linenumber" name="L85" href="#L85">85</a>  
+<a class="jxr_linenumber" name="L86" href="#L86">86</a>    <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">boolean</strong> isTiFlash(Metapb.Store store) {
+<a class="jxr_linenumber" name="L87" href="#L87">87</a>      <strong class="jxr_keyword">for</strong> (Metapb.StoreLabel label : store.getLabelsList()) {
+<a class="jxr_linenumber" name="L88" href="#L88">88</a>        <strong class="jxr_keyword">if</strong> (label.getKey().equals(TiStoreType.TiFlash.getLabelKey())
+<a class="jxr_linenumber" name="L89" href="#L89">89</a>            &amp;&amp; label.getValue().equals(TiStoreType.TiFlash.getLabelValue())) {
+<a class="jxr_linenumber" name="L90" href="#L90">90</a>          <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L91" href="#L91">91</a>        }
+<a class="jxr_linenumber" name="L92" href="#L92">92</a>      }
+<a class="jxr_linenumber" name="L93" href="#L93">93</a>      <strong class="jxr_keyword">return</strong> false;
+<a class="jxr_linenumber" name="L94" href="#L94">94</a>    }
+<a class="jxr_linenumber" name="L95" href="#L95">95</a>  
+<a class="jxr_linenumber" name="L96" href="#L96">96</a>    <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">int</strong> toIntVersion() {
+<a class="jxr_linenumber" name="L97" href="#L97">97</a>      <strong class="jxr_keyword">return</strong> v0 * SCALE * SCALE + v1 * SCALE + v2;
+<a class="jxr_linenumber" name="L98" href="#L98">98</a>    }
+<a class="jxr_linenumber" name="L99" href="#L99">99</a>  
+<a class="jxr_linenumber" name="L100" href="#L100">100</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">boolean</strong> greatThan(<a name="StoreVersion" href="../../../org/tikv/common/StoreVersion.html#StoreVersion">StoreVersion</a> other) {
+<a class="jxr_linenumber" name="L101" href="#L101">101</a>     <strong class="jxr_keyword">return</strong> toIntVersion() &gt; other.toIntVersion();
+<a class="jxr_linenumber" name="L102" href="#L102">102</a>   }
+<a class="jxr_linenumber" name="L103" href="#L103">103</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>
