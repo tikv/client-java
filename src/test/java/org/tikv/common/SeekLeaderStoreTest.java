@@ -28,7 +28,6 @@ import org.tikv.kvproto.Pdpb;
 import org.tikv.raw.RawKVClient;
 
 public class SeekLeaderStoreTest extends MockThreeStoresTest {
-
   private RawKVClient createClient() {
     return session.createRawClient();
   }
