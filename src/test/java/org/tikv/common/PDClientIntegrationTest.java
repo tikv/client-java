@@ -27,7 +27,6 @@ import org.junit.Test;
 import org.tikv.BaseRawKVTest;
 
 public class PDClientIntegrationTest extends BaseRawKVTest {
-
   private TiSession session;
 
   @Before

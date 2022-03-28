@@ -29,7 +29,7 @@ import io.prometheus.client.Histogram;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
@@ -230,6 +230,7 @@ public abstract class AbstractRegionStoreClient
             // switch to leader store
             store = currentLeaderStore;
             updateClientStub();
+            return true;
           }
           return false;
         }
@@ -275,19 +276,27 @@ public abstract class AbstractRegionStoreClient
     List<SwitchLeaderTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
-      TiStore peerStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
-      ManagedChannel channel =
-          channelFactory.getChannel(
-              peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
-      TikvGrpc.TikvFutureStub stub =
-          TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
-      Kvrpcpb.RawGetRequest rawGetRequest =
-          Kvrpcpb.RawGetRequest.newBuilder()
-              .setContext(region.getReplicaContext(peer))
-              .setKey(key)
-              .build();
-      ListenableFuture<Kvrpcpb.RawGetResponse> task = stub.rawGet(rawGetRequest);
-      responses.add(new SwitchLeaderTask(task, peer));
+      try {
+        TiStore peerStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
+        ManagedChannel channel =
+            channelFactory.getChannel(
+                peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
+        TikvGrpc.TikvFutureStub stub =
+            TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+        Kvrpcpb.RawGetRequest rawGetRequest =
+            Kvrpcpb.RawGetRequest.newBuilder()
+                .setContext(region.getReplicaContext(peer))
+                .setKey(key)
+                .build();
+        ListenableFuture<Kvrpcpb.RawGetResponse> task = stub.rawGet(rawGetRequest);
+        responses.add(new SwitchLeaderTask(task, peer));
+      } catch (Exception e) {
+        logger.warn(
+            "switch region[{}] leader store to {} failed: {}",
+            region.getId(),
+            peer.getStoreId(),
+            e);
+      }
     }
     while (true) {
       try {
@@ -326,22 +335,31 @@ public abstract class AbstractRegionStoreClient
     List<ForwardCheckTask> responses = new LinkedList<>();
     for (Metapb.Peer peer : region.getFollowerList()) {
       ByteString key = region.getStartKey();
-      TiStore peerStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
-      ManagedChannel channel =
-          channelFactory.getChannel(
-              peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
-      TikvGrpc.TikvFutureStub stub =
-          TikvGrpc.newFutureStub(channel).withDeadlineAfter(forwardTimeout, TimeUnit.MILLISECONDS);
-      Metadata header = new Metadata();
-      header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
-      Kvrpcpb.RawGetRequest rawGetRequest =
-          Kvrpcpb.RawGetRequest.newBuilder()
-              .setContext(region.getReplicaContext(region.getLeader()))
-              .setKey(key)
-              .build();
-      ListenableFuture<Kvrpcpb.RawGetResponse> task =
-          MetadataUtils.attachHeaders(stub, header).rawGet(rawGetRequest);
-      responses.add(new ForwardCheckTask(task, peerStore.getStore()));
+      try {
+        TiStore peerStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
+        ManagedChannel channel =
+            channelFactory.getChannel(
+                peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
+        TikvGrpc.TikvFutureStub stub =
+            TikvGrpc.newFutureStub(channel)
+                .withDeadlineAfter(forwardTimeout, TimeUnit.MILLISECONDS);
+        Metadata header = new Metadata();
+        header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
+        Kvrpcpb.RawGetRequest rawGetRequest =
+            Kvrpcpb.RawGetRequest.newBuilder()
+                .setContext(region.getReplicaContext(region.getLeader()))
+                .setKey(key)
+                .build();
+        ListenableFuture<Kvrpcpb.RawGetResponse> task =
+            MetadataUtils.attachHeaders(stub, header).rawGet(rawGetRequest);
+        responses.add(new ForwardCheckTask(task, peerStore.getStore()));
+      } catch (Exception e) {
+        logger.warn(
+            "switch region[{}] leader store to {} failed: {}",
+            region.getId(),
+            peer.getStoreId(),
+            e);
+      }
     }
     while (true) {
       try {
