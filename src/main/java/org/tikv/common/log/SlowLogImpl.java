@@ -24,15 +24,18 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SlowLogImpl implements SlowLog {
+
   private static final Logger logger = LoggerFactory.getLogger(SlowLogImpl.class);
 
   private static final int MAX_SPAN_SIZE = 1024;
 
   private final List<SlowLogSpan> slowLogSpans = new ArrayList<>();
+  private final HashMap<String, Object> fields = new HashMap<>();
   private Throwable error = null;
 
   private final long startMS;
@@ -44,13 +47,17 @@ public class SlowLogImpl implements SlowLog {
   private final long slowThresholdMS;
 
   /** Key-Value pairs which will be logged, e.g. function name, key, region, etc. */
-  private final Map<String, String> properties;
+  private final Map<String, Object> properties;
 
-  public SlowLogImpl(long slowThresholdMS, Map<String, String> properties) {
+  public SlowLogImpl(long slowThresholdMS, Map<String, Object> properties) {
     this.startMS = System.currentTimeMillis();
     this.startNS = System.nanoTime();
     this.slowThresholdMS = slowThresholdMS;
     this.properties = new HashMap<>(properties);
+  }
+
+  public SlowLogImpl(long slowThresholdMS) {
+    this(slowThresholdMS, new HashMap<>());
   }
 
   @Override
@@ -93,8 +100,23 @@ public class SlowLogImpl implements SlowLog {
       jsonObject.addProperty("error", error.getMessage());
     }
 
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      jsonObject.addProperty(entry.getKey(), entry.getValue());
+    for (Entry<String, Object> entry : properties.entrySet()) {
+      Object value = entry.getValue();
+      if (value instanceof List) {
+        JsonArray field = new JsonArray();
+        for (Object o : (List<?>) value) {
+          field.add(o.toString());
+        }
+        jsonObject.add(entry.getKey(), field);
+      } else if (value instanceof Map) {
+        JsonObject field = new JsonObject();
+        for (Entry<?, ?> e : ((Map<?, ?>) value).entrySet()) {
+          field.addProperty(e.getKey().toString(), e.getValue().toString());
+        }
+        jsonObject.add(entry.getKey(), field);
+      } else {
+        jsonObject.addProperty(entry.getKey(), value.toString());
+      }
     }
 
     JsonArray jsonArray = new JsonArray();
