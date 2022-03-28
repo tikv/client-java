@@ -35,19 +35,19 @@ public abstract class RetryPolicy<RespT> {
       HistogramUtils.buildDuration()
           .name("client_java_grpc_single_requests_latency")
           .help("grpc request latency.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
   public static final Histogram CALL_WITH_RETRY_DURATION =
       HistogramUtils.buildDuration()
           .name("client_java_call_with_retry_duration")
           .help("callWithRetry duration.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
   public static final Counter GRPC_REQUEST_RETRY_NUM =
       Counter.build()
           .name("client_java_grpc_requests_retry_num")
           .help("grpc request retry num.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
 
   // handles PD and TiKV's error.
@@ -72,7 +72,8 @@ public abstract class RetryPolicy<RespT> {
   }
 
   public RespT callWithRetry(Callable<RespT> proc, String methodName, BackOffer backOffer) {
-    Histogram.Timer callWithRetryTimer = CALL_WITH_RETRY_DURATION.labels(methodName).startTimer();
+    String[] labels = new String[] {methodName, backOffer.getClusterId().toString()};
+    Histogram.Timer callWithRetryTimer = CALL_WITH_RETRY_DURATION.labels(labels).startTimer();
     SlowLogSpan callWithRetrySlowLogSpan = backOffer.getSlowLog().start("callWithRetry");
     callWithRetrySlowLogSpan.addProperty("method", methodName);
     try {
@@ -80,8 +81,7 @@ public abstract class RetryPolicy<RespT> {
         RespT result = null;
         try {
           // add single request duration histogram
-          Histogram.Timer requestTimer =
-              GRPC_SINGLE_REQUEST_LATENCY.labels(methodName).startTimer();
+          Histogram.Timer requestTimer = GRPC_SINGLE_REQUEST_LATENCY.labels(labels).startTimer();
           SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("gRPC");
           slowLogSpan.addProperty("method", methodName);
           try {
@@ -96,7 +96,7 @@ public abstract class RetryPolicy<RespT> {
           backOffer.checkTimeout();
           boolean retry = handler.handleRequestError(backOffer, e);
           if (retry) {
-            GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
+            GRPC_REQUEST_RETRY_NUM.labels(labels).inc();
             continue;
           } else {
             return result;
@@ -107,7 +107,7 @@ public abstract class RetryPolicy<RespT> {
         if (handler != null) {
           boolean retry = handler.handleResponseError(backOffer, result);
           if (retry) {
-            GRPC_REQUEST_RETRY_NUM.labels(methodName).inc();
+            GRPC_REQUEST_RETRY_NUM.labels(labels).inc();
             continue;
           }
         }

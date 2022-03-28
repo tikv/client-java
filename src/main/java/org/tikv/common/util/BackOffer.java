@@ -70,4 +70,6 @@ public interface BackOffer {
   }
 
   SlowLog getSlowLog();
+
+  Long getClusterId();
 }

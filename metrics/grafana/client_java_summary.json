@@ -113,7 +113,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(rate(client_java_raw_requests_latency_count{instance=~\"$instance\"}[$__rate_interval])) by (type)",
+          "expr": "sum(rate(client_java_raw_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -214,7 +214,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(rate(client_java_raw_requests_failure_total{instance=~\"$instance\"}[$__rate_interval])) by (type)",
+          "expr": "sum(rate(client_java_raw_requests_failure_total{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -315,7 +315,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "histogram_quantile(0.99, sum(rate(client_java_raw_requests_latency_bucket{instance=~\"$instance\"}[$__rate_interval])) by (le, type))",
+          "expr": "histogram_quantile(0.99, sum(rate(client_java_raw_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le, type))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -325,7 +325,7 @@
         },
         {
           "exemplar": true,
-          "expr": "histogram_quantile(1, sum(rate(client_java_raw_requests_latency_bucket{instance=~\"$instance\"}[$__rate_interval])) by (le, type))",
+          "expr": "histogram_quantile(1, sum(rate(client_java_raw_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le, type))",
           "hide": false,
           "interval": "",
           "legendFormat": "{{type}} - max",
@@ -435,7 +435,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(rate(client_java_raw_requests_latency_sum{instance=~\"$instance\"}[$__rate_interval])) by (type) / sum(rate(client_java_raw_requests_latency_count{instance=~\"$instance\"}[$__rate_interval])) by (type)",
+          "expr": "sum(rate(client_java_raw_requests_latency_sum{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type) / sum(rate(client_java_raw_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type)",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -561,7 +561,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "histogram_quantile(1, sum(rate(client_java_grpc_raw_requests_latency_bucket{instance=~\"$instance\"}[$__rate_interval])) by (le, type))",
+              "expr": "histogram_quantile(1, sum(rate(client_java_grpc_raw_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le, type))",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -572,7 +572,7 @@
             },
             {
               "exemplar": true,
-              "expr": "histogram_quantile(0.99, sum(rate(client_java_grpc_raw_requests_latency_bucket{instance=~\"$instance\"}[$__rate_interval])) by (le, type))",
+              "expr": "histogram_quantile(0.99, sum(rate(client_java_grpc_raw_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le, type))",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -686,7 +686,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_grpc_raw_requests_latency_sum{instance=~\"$instance\"}[$__rate_interval])) by (type) / sum(rate(client_java_grpc_raw_requests_latency_count{instance=~\"$instance\"}[$__rate_interval])) by (type)",
+              "expr": "sum(rate(client_java_grpc_raw_requests_latency_sum{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type) / sum(rate(client_java_grpc_raw_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -796,7 +796,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "histogram_quantile(1,sum(rate(client_java_grpc_single_requests_latency_bucket{instance=~\"$instance\", type!=\"pdpb.PD/GetRegion\", type!=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (le, type))",
+              "expr": "histogram_quantile(1,sum(rate(client_java_grpc_single_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\", type!=\"pdpb.PD/GetRegion\", type!=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (le, type))",
               "interval": "",
               "legendFormat": "{{ type }} -- max",
               "queryType": "randomWalk",
@@ -804,7 +804,7 @@
             },
             {
               "exemplar": true,
-              "expr": "histogram_quantile(0.99,sum(rate(client_java_grpc_single_requests_latency_bucket{instance=~\"$instance\", type!=\"pdpb.PD/GetRegion\", type!=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (le, type))",
+              "expr": "histogram_quantile(0.99,sum(rate(client_java_grpc_single_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\", type!=\"pdpb.PD/GetRegion\", type!=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (le, type))",
               "hide": false,
               "interval": "",
               "legendFormat": "{{ type }} -- 99",
@@ -914,7 +914,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_grpc_single_requests_latency_sum{instance=~\"$instance\", type!=\"pdpb.PD/GetRegion\", type!=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (type) / sum(rate(client_java_grpc_single_requests_latency_count{instance=~\"$instance\", type!=\"pdpb.PD/GetRegion\", type!=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (type)",
+              "expr": "sum(rate(client_java_grpc_single_requests_latency_sum{instance=~\"$instance\", cluster=~\"$cluster\", type!=\"pdpb.PD/GetRegion\", type!=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (type) / sum(rate(client_java_grpc_single_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\", type!=\"pdpb.PD/GetRegion\", type!=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (type)",
               "interval": "",
               "legendFormat": "{{ type }}",
               "queryType": "randomWalk",
@@ -1023,7 +1023,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_seek_leader_store_duration_sum{instance=~\"$instance\"}[$__rate_interval])) by (le) / sum(rate(client_java_seek_leader_store_duration_count{instance=~\"$instance\"}[$__rate_interval])) by (le)",
+              "expr": "sum(rate(client_java_seek_leader_store_duration_sum{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le) / sum(rate(client_java_seek_leader_store_duration_count{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le)",
               "interval": "",
               "legendFormat": "seek-leader-store-avg",
               "queryType": "randomWalk",
@@ -1031,7 +1031,7 @@
             },
             {
               "exemplar": true,
-              "expr": "histogram_quantile(0.99,sum(rate(client_java_seek_leader_store_duration_bucket{instance=~\"$instance\"}[$__rate_interval])) by (le, type))",
+              "expr": "histogram_quantile(0.99,sum(rate(client_java_seek_leader_store_duration_bucket{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le, type))",
               "hide": false,
               "interval": "",
               "legendFormat": "seek-leader-store-99",
@@ -1140,7 +1140,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_seek_proxy_store_duration_sum{instance=~\"$instance\"}[$__rate_interval])) by (le) / sum(rate(client_java_seek_proxy_store_duration_count{instance=~\"$instance\"}[$__rate_interval])) by (le)",
+              "expr": "sum(rate(client_java_seek_proxy_store_duration_sum{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le) / sum(rate(client_java_seek_proxy_store_duration_count{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le)",
               "interval": "",
               "legendFormat": "seek-proxy-store-avg",
               "queryType": "randomWalk",
@@ -1148,7 +1148,7 @@
             },
             {
               "exemplar": true,
-              "expr": "histogram_quantile(0.99,sum(rate(client_java_seek_proxy_store_duration_bucket{instance=~\"$instance\"}[$__rate_interval])) by (le, type))",
+              "expr": "histogram_quantile(0.99,sum(rate(client_java_seek_proxy_store_duration_bucket{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le, type))",
               "hide": false,
               "interval": "",
               "legendFormat": "seek-proxy-store-99",
@@ -1259,7 +1259,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_backoff_duration_sum{instance=~\"$instance\", type!=\"BoPDRPC\"}[$__rate_interval])) by (le, type)",
+              "expr": "sum(rate(client_java_backoff_duration_sum{instance=~\"$instance\", cluster=~\"$cluster\", type!=\"BoPDRPC\"}[$__rate_interval])) by (le, type)",
               "hide": false,
               "interval": "",
               "legendFormat": "{{type}}-total",
@@ -1358,7 +1358,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_backoff_duration_count{instance=~\"$instance\"}[$__rate_interval])) by (le, type)",
+              "expr": "sum(rate(client_java_backoff_duration_count{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le, type)",
               "interval": "",
               "legendFormat": "{{type}}-count",
               "queryType": "randomWalk",
@@ -1459,7 +1459,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_backoff_duration_sum{instance=~\"$instance\", type!=\"BoPDRPC\"}[$__rate_interval])) by (le, type) / sum(rate(client_java_backoff_duration_count{instance=~\"$instance\", type!=\"BoPDRPC\"}[$__rate_interval])) by (le, type)",
+              "expr": "sum(rate(client_java_backoff_duration_sum{instance=~\"$instance\", cluster=~\"$cluster\", type!=\"BoPDRPC\"}[$__rate_interval])) by (le, type) / sum(rate(client_java_backoff_duration_count{instance=~\"$instance\", cluster=~\"$cluster\", type!=\"BoPDRPC\"}[$__rate_interval])) by (le, type)",
               "interval": "",
               "legendFormat": "{{type}}-avg",
               "queryType": "randomWalk",
@@ -1573,7 +1573,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_get_region_by_requests_latency_sum{instance=~\"$instance\"}[$__rate_interval])) / sum(rate(client_java_get_region_by_requests_latency_count{instance=~\"$instance\"}[$__rate_interval]))",
+              "expr": "sum(rate(client_java_get_region_by_requests_latency_sum{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) / sum(rate(client_java_get_region_by_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval]))",
               "interval": "",
               "legendFormat": "avg",
               "queryType": "randomWalk",
@@ -1581,7 +1581,7 @@
             },
             {
               "exemplar": true,
-              "expr": "histogram_quantile(0.99, sum(rate(client_java_get_region_by_requests_latency_bucket{instance=~\"$instance\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(client_java_get_region_by_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "interval": "",
               "legendFormat": "99th",
@@ -1680,7 +1680,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "1 - sum(rate(client_java_grpc_single_requests_latency_count{instance=~\"$instance\", type=\"pdpb.PD/GetRegion\"}[$__rate_interval])) / sum(rate(client_java_get_region_by_requests_latency_count{instance=~\"$instance\"}[$__rate_interval]))",
+              "expr": "1 - sum(rate(client_java_grpc_single_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\", type=\"pdpb.PD/GetRegion\"}[$__rate_interval])) / sum(rate(client_java_get_region_by_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval]))",
               "interval": "",
               "legendFormat": "hit ratio",
               "queryType": "randomWalk",
@@ -1788,7 +1788,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "histogram_quantile(0.99,sum(rate(client_java_grpc_single_requests_latency_bucket{instance=~\"$instance\", type=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (le, type))",
+              "expr": "histogram_quantile(0.99,sum(rate(client_java_grpc_single_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\", type=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (le, type))",
               "interval": "",
               "legendFormat": "{{ type }}-99th",
               "queryType": "randomWalk",
@@ -1796,7 +1796,7 @@
             },
             {
               "exemplar": true,
-              "expr": "histogram_quantile(0.99,sum(rate(client_java_grpc_single_requests_latency_bucket{instance=~\"$instance\", type=\"pdpb.PD/GetRegion\"}[$__rate_interval])) by (le, type))",
+              "expr": "histogram_quantile(0.99,sum(rate(client_java_grpc_single_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\", type=\"pdpb.PD/GetRegion\"}[$__rate_interval])) by (le, type))",
               "hide": false,
               "interval": "",
               "legendFormat": "{{ type }}-99th",
@@ -1804,7 +1804,7 @@
             },
             {
               "exemplar": true,
-              "expr": "histogram_quantile(0.99,sum(rate(client_java_grpc_single_requests_latency_bucket{instance=~\"$instance\", type=\"pdpb.PD/GetMembers\"}[$__rate_interval])) by (le, type))",
+              "expr": "histogram_quantile(0.99,sum(rate(client_java_grpc_single_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\", type=\"pdpb.PD/GetMembers\"}[$__rate_interval])) by (le, type))",
               "hide": false,
               "interval": "",
               "legendFormat": "{{ type }}-99th",
@@ -1904,7 +1904,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_grpc_single_requests_latency_count{instance=~\"$instance\", type=\"pdpb.PD/GetRegion\"}[$__rate_interval])) by (type)",
+              "expr": "sum(rate(client_java_grpc_single_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\", type=\"pdpb.PD/GetRegion\"}[$__rate_interval])) by (type)",
               "hide": false,
               "interval": "",
               "legendFormat": "{{type}}",
@@ -1912,7 +1912,7 @@
             },
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_grpc_single_requests_latency_count{instance=~\"$instance\", type=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (type)",
+              "expr": "sum(rate(client_java_grpc_single_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\", type=\"pdpb.PD/GetStore\"}[$__rate_interval])) by (type)",
               "hide": false,
               "interval": "",
               "legendFormat": "{{type}}",
@@ -1920,7 +1920,7 @@
             },
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_grpc_single_requests_latency_count{instance=~\"$instance\", type=\"pdpb.PD/GetMembers\"}[$__rate_interval])) by (type)",
+              "expr": "sum(rate(client_java_grpc_single_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\", type=\"pdpb.PD/GetMembers\"}[$__rate_interval])) by (type)",
               "hide": false,
               "interval": "",
               "legendFormat": "{{type}}",
@@ -2021,7 +2021,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_backoff_duration_sum{instance=~\"$instance\", type=\"BoPDRPC\"}[$__rate_interval])) by (le, type) / sum(rate(client_java_backoff_duration_count{instance=~\"$instance\", type=\"BoPDRPC\"}[$__rate_interval])) by (le, type)",
+              "expr": "sum(rate(client_java_backoff_duration_sum{instance=~\"$instance\", cluster=~\"$cluster\", type=\"BoPDRPC\"}[$__rate_interval])) by (le, type) / sum(rate(client_java_backoff_duration_count{instance=~\"$instance\", cluster=~\"$cluster\", type=\"BoPDRPC\"}[$__rate_interval])) by (le, type)",
               "interval": "",
               "legendFormat": "{{type}}-avg",
               "queryType": "randomWalk",
@@ -2029,7 +2029,7 @@
             },
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_backoff_duration_sum{instance=~\"$instance\", type=\"BoPDRPC\"}[$__rate_interval])) by (le, type)",
+              "expr": "sum(rate(client_java_backoff_duration_sum{instance=~\"$instance\", cluster=~\"$cluster\", type=\"BoPDRPC\"}[$__rate_interval])) by (le, type)",
               "hide": false,
               "interval": "",
               "legendFormat": "{{type}}-sum",
@@ -2128,7 +2128,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_backoff_duration_count{instance=~\"$instance\", type=\"BoPDRPC\"}[$__rate_interval])) by (le, type)",
+              "expr": "sum(rate(client_java_backoff_duration_count{instance=~\"$instance\", cluster=~\"$cluster\", type=\"BoPDRPC\"}[$__rate_interval])) by (le, type)",
               "interval": "",
               "legendFormat": "{{type}}",
               "queryType": "randomWalk",
@@ -2350,7 +2350,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_smart_raw_requests_latency_count{instance=~\"$instance\"}[$__rate_interval])) by (type)",
+              "expr": "sum(rate(client_java_smart_raw_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2451,7 +2451,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_smart_raw_requests_failure_total{instance=~\"$instance\"}[$__rate_interval])) by (type)",
+              "expr": "sum(rate(client_java_smart_raw_requests_failure_total{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2592,7 +2592,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "histogram_quantile(0.99, sum(rate(client_java_smart_raw_requests_latency_bucket{instance=~\"$instance\"}[$__rate_interval])) by (le, type))",
+              "expr": "histogram_quantile(0.99, sum(rate(client_java_smart_raw_requests_latency_bucket{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (le, type))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2742,7 +2742,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_smart_raw_requests_latency_sum{instance=~\"$instance\"}[$__rate_interval])) by (type) / sum(rate(client_java_smart_raw_requests_latency_count{instance=~\"$instance\"}[$__rate_interval])) by (type)",
+              "expr": "sum(rate(client_java_smart_raw_requests_latency_sum{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type) / sum(rate(client_java_smart_raw_requests_latency_count{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type)",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -2853,7 +2853,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_smart_raw_circuit_breaker_opened_total{instance=~\"$instance\"}[$__rate_interval])) by (type)",
+              "expr": "sum(rate(client_java_smart_raw_circuit_breaker_opened_total{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2954,7 +2954,7 @@
           "targets": [
             {
               "exemplar": true,
-              "expr": "sum(rate(client_java_circuit_breaker_attempt_counter_total{instance=~\"$instance\"}[$__rate_interval])) by (type)",
+              "expr": "sum(rate(client_java_circuit_breaker_attempt_counter_total{instance=~\"$instance\", cluster=~\"$cluster\"}[$__rate_interval])) by (type)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -5140,6 +5140,37 @@
         "options": [],
         "query": {
           "query": "label_values(client_java_raw_requests_latency_count, instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "tagValuesQuery": "",
+        "tags": [],
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": "${DS_TEST-CLUSTER}",
+        "definition": "label_values(client_java_raw_requests_latency_count, cluster)",
+        "description": null,
+        "error": null,
+        "hide": 0,
+        "includeAll": true,
+        "label": "cluster",
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "query": "label_values(client_java_raw_requests_latency_count, cluster)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,

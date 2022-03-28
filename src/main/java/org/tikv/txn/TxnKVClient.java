@@ -70,7 +70,7 @@ public class TxnKVClient implements AutoCloseable {
   }
 
   public TiTimestamp getTimestamp() {
-    BackOffer bo = ConcreteBackOffer.newTsoBackOff();
+    BackOffer bo = ConcreteBackOffer.newTsoBackOff(pdClient.getClusterId());
     TiTimestamp timestamp = new TiTimestamp(0, 0);
     try {
       while (true) {
