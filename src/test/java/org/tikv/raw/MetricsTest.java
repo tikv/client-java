@@ -33,6 +33,7 @@ public class MetricsTest extends BaseRawKVTest {
     client.put(ByteString.copyFromUtf8("k"), ByteString.copyFromUtf8("v"));
     ByteString result = client.get(ByteString.copyFromUtf8("k"));
     assertEquals(result.toStringUtf8(), "v");
+    Thread.sleep(1000);
     client.close();
     session.close();
   }

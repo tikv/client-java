@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.TiSession;
 import org.tikv.common.exception.CircuitBreakerOpenException;
 import org.tikv.common.util.HistogramUtils;
 import org.tikv.common.util.ScanOption;
@@ -35,28 +36,28 @@ public class SmartRawKVClient implements RawKVClientBase {
       HistogramUtils.buildDuration()
           .name("client_java_smart_raw_requests_latency")
           .help("client smart raw request latency.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
 
   private static final Counter REQUEST_SUCCESS =
       Counter.build()
           .name("client_java_smart_raw_requests_success")
           .help("client smart raw request success.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
 
   private static final Counter REQUEST_FAILURE =
       Counter.build()
           .name("client_java_smart_raw_requests_failure")
           .help("client smart raw request failure.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
 
   private static final Counter CIRCUIT_BREAKER_OPENED =
       Counter.build()
           .name("client_java_smart_raw_circuit_breaker_opened")
           .help("client smart raw circuit breaker opened.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
 
   private final RawKVClientBase client;
@@ -208,14 +209,21 @@ public class SmartRawKVClient implements RawKVClientBase {
     callWithCircuitBreaker("deletePrefix", () -> client.deletePrefix(key));
   }
 
+  @Override
+  public TiSession getSession() {
+    return client.getSession();
+  }
+
   <T> T callWithCircuitBreaker(String funcName, Function1<T> func) {
-    Histogram.Timer requestTimer = REQUEST_LATENCY.labels(funcName).startTimer();
+    String[] labels = new String[] {funcName, getSession().getPDClient().getClusterId().toString()};
+
+    Histogram.Timer requestTimer = REQUEST_LATENCY.labels(labels).startTimer();
     try {
       T result = callWithCircuitBreaker0(funcName, func);
-      REQUEST_SUCCESS.labels(funcName).inc();
+      REQUEST_SUCCESS.labels(labels).inc();
       return result;
     } catch (Exception e) {
-      REQUEST_FAILURE.labels(funcName).inc();
+      REQUEST_FAILURE.labels(labels).inc();
       throw e;
     } finally {
       requestTimer.observeDuration();
@@ -248,7 +256,9 @@ public class SmartRawKVClient implements RawKVClientBase {
       }
     } else {
       logger.debug("Circuit Breaker Opened");
-      CIRCUIT_BREAKER_OPENED.labels(funcName).inc();
+      CIRCUIT_BREAKER_OPENED
+          .labels(funcName, getSession().getPDClient().getClusterId().toString())
+          .inc();
       throw new CircuitBreakerOpenException();
     }
   }

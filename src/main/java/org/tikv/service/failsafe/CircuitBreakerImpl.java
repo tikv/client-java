@@ -30,9 +30,10 @@ public class CircuitBreakerImpl implements CircuitBreaker {
       Counter.build()
           .name("client_java_circuit_breaker_attempt_counter")
           .help("client circuit breaker attempt counter.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
 
+  private final Long clusterId;
   private final boolean enable;
   private final int windowInSeconds;
   private final int errorThresholdPercentage;
@@ -47,14 +48,15 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   private final CircuitBreakerMetrics metrics;
 
-  public CircuitBreakerImpl(TiConfiguration conf) {
+  public CircuitBreakerImpl(TiConfiguration conf, long clusterId) {
     this(
         conf.isCircuitBreakEnable(),
         conf.getCircuitBreakAvailabilityWindowInSeconds(),
         conf.getCircuitBreakAvailabilityErrorThresholdPercentage(),
         conf.getCircuitBreakAvailabilityRequestVolumnThreshold(),
         conf.getCircuitBreakSleepWindowInSeconds(),
-        conf.getCircuitBreakAttemptRequestCount());
+        conf.getCircuitBreakAttemptRequestCount(),
+        clusterId);
   }
 
   public CircuitBreakerImpl(
@@ -63,8 +65,10 @@ public class CircuitBreakerImpl implements CircuitBreaker {
       int errorThresholdPercentage,
       int requestVolumeThreshold,
       int sleepWindowInSeconds,
-      int attemptRequestCount) {
+      int attemptRequestCount,
+      long clusterId) {
     this.enable = enable;
+    this.clusterId = clusterId;
     this.windowInSeconds = windowInSeconds;
     this.errorThresholdPercentage = errorThresholdPercentage;
     this.requestVolumeThreshold = requestVolumeThreshold;
@@ -123,7 +127,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   @Override
   public void recordAttemptSuccess() {
-    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("success").inc();
+    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("success", clusterId.toString()).inc();
     if (attemptSuccessCount.incrementAndGet() >= this.attemptRequestCount) {
       halfOpen2Close();
     }
@@ -131,7 +135,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   @Override
   public void recordAttemptFailure() {
-    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("failure").inc();
+    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("failure", clusterId.toString()).inc();
     halfOpen2Open();
   }
 

@@ -18,6 +18,7 @@ package org.tikv.raw;
 import com.google.protobuf.ByteString;
 import java.util.List;
 import java.util.Map;
+import org.tikv.common.TiSession;
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
@@ -254,4 +255,6 @@ public interface RawKVClientBase extends AutoCloseable {
    * @param key prefix of keys to be deleted
    */
   void deletePrefix(ByteString key);
+
+  TiSession getSession();
 }

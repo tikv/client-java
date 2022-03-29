@@ -91,13 +91,13 @@ public class TiSession implements AutoCloseable {
     if (conf.isWarmUpEnable() && conf.isRawKVMode()) {
       warmUp();
     }
-    this.circuitBreaker = new CircuitBreakerImpl(conf);
+    this.circuitBreaker = new CircuitBreakerImpl(conf, getPDClient().getClusterId());
     logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
   }
 
   private synchronized void warmUp() {
     long warmUpStartTime = System.nanoTime();
-    BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff();
+    BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff(getPDClient().getClusterId());
 
     try {
       // let JVM ClassLoader load gRPC error related classes
@@ -128,7 +128,9 @@ public class TiSession implements AutoCloseable {
         }
         for (Pdpb.Region region : regions) {
           regionManager.insertRegionToCache(
-              regionManager.createRegion(region.getRegion(), ConcreteBackOffer.newGetBackOff()));
+              regionManager.createRegion(
+                  region.getRegion(),
+                  ConcreteBackOffer.newGetBackOff(getPDClient().getClusterId())));
         }
         startKey = regions.get(regions.size() - 1).getRegion().getEndKey();
       } while (!startKey.isEmpty());
@@ -226,7 +228,8 @@ public class TiSession implements AutoCloseable {
   public TiTimestamp getTimestamp() {
     checkIsClosed();
 
-    return getPDClient().getTimestamp(ConcreteBackOffer.newTsoBackOff());
+    return getPDClient()
+        .getTimestamp(ConcreteBackOffer.newTsoBackOff(getPDClient().getClusterId()));
   }
 
   public Snapshot createSnapshot() {
@@ -459,7 +462,7 @@ public class TiSession implements AutoCloseable {
                 .stream()
                 .map(k -> Key.toRawKey(k).next().toByteString())
                 .collect(Collectors.toList()),
-            ConcreteBackOffer.newCustomBackOff(splitRegionBackoffMS));
+            ConcreteBackOffer.newCustomBackOff(splitRegionBackoffMS, getPDClient().getClusterId()));
 
     // scatter region
     for (Metapb.Region newRegion : newRegions) {
@@ -482,7 +485,9 @@ public class TiSession implements AutoCloseable {
           return;
         }
         getPDClient()
-            .waitScatterRegionFinish(newRegion, ConcreteBackOffer.newCustomBackOff((int) remainMS));
+            .waitScatterRegionFinish(
+                newRegion,
+                ConcreteBackOffer.newCustomBackOff((int) remainMS, getPDClient().getClusterId()));
       }
     } else {
       logger.info("skip to wait scatter region finish");
