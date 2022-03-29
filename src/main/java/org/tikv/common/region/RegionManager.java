@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
@@ -47,16 +46,19 @@ import org.tikv.kvproto.Pdpb;
 
 @SuppressWarnings("UnstableApiUsage")
 public class RegionManager {
+
   private static final Logger logger = LoggerFactory.getLogger(RegionManager.class);
   public static final Histogram GET_REGION_BY_KEY_REQUEST_LATENCY =
       HistogramUtils.buildDuration()
           .name("client_java_get_region_by_requests_latency")
           .help("getRegionByKey request latency.")
+          .labelNames("cluster")
           .register();
   public static final Histogram SCAN_REGIONS_REQUEST_LATENCY =
       HistogramUtils.buildDuration()
           .name("client_java_scan_regions_request_latency")
           .help("scanRegions request latency.")
+          .labelNames("cluster")
           .register();
 
   // TODO: the region cache logic need rewrite.
@@ -105,7 +107,9 @@ public class RegionManager {
 
   public List<Pdpb.Region> scanRegions(
       BackOffer backOffer, ByteString startKey, ByteString endKey, int limit) {
-    Histogram.Timer requestTimer = SCAN_REGIONS_REQUEST_LATENCY.startTimer();
+    Long clusterId = pdClient.getClusterId();
+    Histogram.Timer requestTimer =
+        SCAN_REGIONS_REQUEST_LATENCY.labels(clusterId.toString()).startTimer();
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("scanRegions");
     try {
       return pdClient.scanRegions(backOffer, startKey, endKey, limit);
@@ -122,7 +126,9 @@ public class RegionManager {
   }
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
-    Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
+    Long clusterId = pdClient.getClusterId();
+    Histogram.Timer requestTimer =
+        GET_REGION_BY_KEY_REQUEST_LATENCY.labels(clusterId.toString()).startTimer();
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("getRegionByKey");
     TiRegion region = cache.getRegionByKey(key, backOffer);
     try {
@@ -205,22 +211,23 @@ public class RegionManager {
   }
 
   public TiRegion createRegion(Metapb.Region region, BackOffer backOffer) {
-    List<Metapb.Peer> peers = region.getPeersList();
-    List<TiStore> stores = getRegionStore(peers, backOffer);
-    return new TiRegion(conf, region, null, peers, stores);
+    return createRegion(region, null, backOffer);
   }
 
   private TiRegion createRegion(Metapb.Region region, Metapb.Peer leader, BackOffer backOffer) {
-    List<Metapb.Peer> peers = region.getPeersList();
-    List<TiStore> stores = getRegionStore(peers, backOffer);
-    return new TiRegion(conf, region, leader, peers, stores);
-  }
-
-  private List<TiStore> getRegionStore(List<Metapb.Peer> peers, BackOffer backOffer) {
-    return peers
-        .stream()
-        .map(p -> getStoreById(p.getStoreId(), backOffer))
-        .collect(Collectors.toList());
+    List<Metapb.Peer> peers = new ArrayList<>();
+    List<TiStore> stores = new ArrayList<>();
+    for (Metapb.Peer peer : region.getPeersList()) {
+      try {
+        stores.add(getStoreById(peer.getStoreId(), backOffer));
+        peers.add(peer);
+      } catch (Exception e) {
+        logger.warn("Store {} not found: {}", peer.getStoreId(), e.toString());
+      }
+    }
+    Metapb.Region newRegion =
+        Metapb.Region.newBuilder().mergeFrom(region).clearPeers().addAllPeers(peers).build();
+    return new TiRegion(conf, newRegion, leader, peers, stores);
   }
 
   private TiStore getStoreByIdWithBackOff(long id, BackOffer backOffer) {
@@ -315,6 +322,7 @@ public class RegionManager {
   }
 
   private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
+    return ConcreteBackOffer.newCustomBackOff(
+        conf.getRawKVDefaultBackoffInMS(), pdClient.getClusterId());
   }
 }

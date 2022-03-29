@@ -22,12 +22,16 @@ import com.google.gson.JsonObject;
 import java.math.BigInteger;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SlowLogImpl implements SlowLog {
+
   private static final Logger logger = LoggerFactory.getLogger(SlowLogImpl.class);
 
   private static final int MAX_SPAN_SIZE = 1024;
@@ -35,6 +39,7 @@ public class SlowLogImpl implements SlowLog {
   private static final Random random = new Random();
 
   private final List<SlowLogSpan> slowLogSpans = new ArrayList<>();
+  private final HashMap<String, Object> fields = new HashMap<>();
   private Throwable error = null;
 
   private final long startMS;
@@ -82,6 +87,17 @@ public class SlowLogImpl implements SlowLog {
   }
 
   @Override
+  public SlowLog withFields(Map<String, Object> fields) {
+    this.fields.putAll(fields);
+    return this;
+  }
+
+  @Override
+  public Object getField(String key) {
+    return fields.get(key);
+  }
+
+  @Override
   public void log() {
     recordTime();
     if (error != null || timeExceeded()) {
@@ -119,6 +135,25 @@ public class SlowLogImpl implements SlowLog {
       jsonArray.add(slowLogSpan.toJsonElement());
     }
     jsonObject.add("spans", jsonArray);
+
+    for (Entry<String, Object> entry : fields.entrySet()) {
+      Object value = entry.getValue();
+      if (value instanceof List) {
+        JsonArray field = new JsonArray();
+        for (Object o : (List<?>) value) {
+          field.add(o.toString());
+        }
+        jsonObject.add(entry.getKey(), field);
+      } else if (value instanceof Map) {
+        JsonObject field = new JsonObject();
+        for (Entry<?, ?> e : ((Map<?, ?>) value).entrySet()) {
+          field.addProperty(e.getKey().toString(), e.getValue().toString());
+        }
+        jsonObject.add(entry.getKey(), field);
+      } else {
+        jsonObject.addProperty(entry.getKey(), value.toString());
+      }
+    }
 
     return jsonObject;
   }

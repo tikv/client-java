@@ -17,7 +17,11 @@
 
 package org.tikv.common.log;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+
 public interface SlowLog {
+
   SlowLogSpan start(String name);
 
   long getTraceId();
@@ -25,6 +29,14 @@ public interface SlowLog {
   long getThresholdMS();
 
   void setError(Throwable err);
+
+  SlowLog withFields(Map<String, Object> fields);
+
+  default SlowLog withField(String key, Object value) {
+    return withFields(ImmutableMap.of(key, value));
+  }
+
+  Object getField(String key);
 
   void log();
 }
