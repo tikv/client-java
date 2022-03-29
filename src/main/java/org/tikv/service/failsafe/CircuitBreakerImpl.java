@@ -127,7 +127,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   @Override
   public void recordAttemptSuccess() {
-    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("success").inc();
+    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("success", clusterId.toString()).inc();
     if (attemptSuccessCount.incrementAndGet() >= this.attemptRequestCount) {
       halfOpen2Close();
     }
@@ -135,7 +135,7 @@ public class CircuitBreakerImpl implements CircuitBreaker {
 
   @Override
   public void recordAttemptFailure() {
-    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("failure").inc();
+    CIRCUIT_BREAKER_ATTEMPT_COUNTER.labels("failure", clusterId.toString()).inc();
     halfOpen2Open();
   }
 
