@@ -256,7 +256,9 @@ public class SmartRawKVClient implements RawKVClientBase {
       }
     } else {
       logger.debug("Circuit Breaker Opened");
-      CIRCUIT_BREAKER_OPENED.labels(funcName, getSession().getPDClient().getClusterId().toString()).inc();
+      CIRCUIT_BREAKER_OPENED
+          .labels(funcName, getSession().getPDClient().getClusterId().toString())
+          .inc();
       throw new CircuitBreakerOpenException();
     }
   }
