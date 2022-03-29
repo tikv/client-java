@@ -40,14 +40,14 @@ import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
 
 public class PDClientMockTest extends PDMockServerTest {
-
   private static final String LOCAL_ADDR_IPV6 = "[::1]";
   public static final String HTTP = "http://";
 
   @Test
   public void testCreate() throws Exception {
     try (PDClient client = session.getPDClient()) {
-      assertEquals(LOCAL_ADDR + ":" + leader.port, client.getPdClientWrapper().getLeaderInfo());
+      assertEquals(
+          LOCAL_ADDR + ":" + leader.getPort(), client.getPdClientWrapper().getLeaderInfo());
       assertEquals(CLUSTER_ID, client.getHeader().getClusterId());
     }
   }
@@ -55,17 +55,19 @@ public class PDClientMockTest extends PDMockServerTest {
   @Test
   public void testSwitchLeader() throws Exception {
     try (PDClient client = session.getPDClient()) {
-      client.trySwitchLeader(HTTP + LOCAL_ADDR + ":" + (leader.port + 1));
+      // Switch leader to server 1
+      client.trySwitchLeader(HTTP + LOCAL_ADDR + ":" + pdServers.get(1).getPort());
       assertEquals(
-          client.getPdClientWrapper().getLeaderInfo(), HTTP + LOCAL_ADDR + ":" + (leader.port + 1));
+          client.getPdClientWrapper().getLeaderInfo(),
+          HTTP + LOCAL_ADDR + ":" + pdServers.get(1).getPort());
     }
     tearDown();
     setup(LOCAL_ADDR_IPV6);
     try (PDClient client = session.getPDClient()) {
-      client.trySwitchLeader(HTTP + LOCAL_ADDR_IPV6 + ":" + (leader.port + 2));
+      client.trySwitchLeader(HTTP + LOCAL_ADDR_IPV6 + ":" + pdServers.get(2).getPort());
       assertEquals(
           client.getPdClientWrapper().getLeaderInfo(),
-          HTTP + LOCAL_ADDR_IPV6 + ":" + (leader.port + 2));
+          HTTP + LOCAL_ADDR_IPV6 + ":" + pdServers.get(2).getPort());
     }
   }
 
