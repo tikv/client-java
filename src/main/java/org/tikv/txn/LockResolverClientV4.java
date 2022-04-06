@@ -168,7 +168,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
           () ->
               Kvrpcpb.PessimisticRollbackRequest.newBuilder()
                   .setContext(makeContext())
-                  .addKeys(buildRequestKey(lock.getKey()))
+                  .addKeys(conf.buildRequestKey(lock.getKey()))
                   .setStartVersion(lock.getTxnID())
                   .setForUpdateTs(forUpdateTS)
                   .build();
@@ -285,8 +285,8 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
         () -> {
           TiRegion primaryKeyRegion = regionManager.getRegionByKey(primary);
           return Kvrpcpb.CheckTxnStatusRequest.newBuilder()
-              .setContext(withApiVersion(primaryKeyRegion.getLeaderContext()))
-              .setPrimaryKey(buildRequestKey(primary))
+              .setContext(primaryKeyRegion.getLeaderContext())
+              .setPrimaryKey(conf.buildRequestKey(primary))
               .setLockTs(txnID)
               .setCallerStartTs(callerStartTS)
               .setCurrentTs(currentTS)
@@ -373,7 +373,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
       if (lock.getTxnSize() < BIG_TXN_THRESHOLD) {
         // Only resolve specified keys when it is a small transaction,
         // prevent from scanning the whole region in this case.
-        builder.addKeys(buildRequestKey(lock.getKey()));
+        builder.addKeys(conf.buildRequestKey(lock.getKey()));
       }
 
       Supplier<Kvrpcpb.ResolveLockRequest> factory = builder::build;

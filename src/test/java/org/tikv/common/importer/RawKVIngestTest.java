@@ -34,11 +34,11 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.key.Key;
 import org.tikv.common.util.Pair;
+import org.tikv.kvproto.Kvrpcpb.KvPair;
 import org.tikv.raw.RawKVClient;
 import org.tikv.util.TestUtils;
 
 public class RawKVIngestTest extends BaseRawKVTest {
-
   private TiSession session;
 
   private static final int KEY_NUMBER = 16;

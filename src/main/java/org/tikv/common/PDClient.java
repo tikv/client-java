@@ -311,6 +311,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   public Pair<Metapb.Region, Metapb.Peer> getRegionByKey(BackOffer backOffer, ByteString key) {
     Histogram.Timer requestTimer = PD_GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
     try {
+      key = conf.buildRequestKey(key);
       if (conf.isTxnKVMode() || conf.getApiVersion().isV2()) {
         CodecDataOutput cdo = new CodecDataOutput();
         BytesCodec.writeBytes(cdo, key.toByteArray());
@@ -806,12 +807,22 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
             .setRegionEpoch(region.getRegionEpoch())
             .addAllPeers(region.getPeersList());
 
-    if (conf.getApiVersion().isV1() && (region.getStartKey().isEmpty() || isRawRegion)) {
+    if (region.getStartKey().isEmpty() || (conf.getApiVersion().isV1() && isRawRegion)) {
       builder.setStartKey(region.getStartKey());
     } else {
       try {
-        byte[] decodedStartKey = BytesCodec.readBytes(new CodecDataInput(region.getStartKey()));
-        builder.setStartKey(ByteString.copyFrom(decodedStartKey));
+        ByteString decodedStartKey =
+            ByteString.copyFrom(BytesCodec.readBytes(new CodecDataInput(region.getStartKey())));
+        if (conf.getApiVersion().isV2()) {
+          if (ByteString.unsignedLexicographicalComparator()
+                  .compare(decodedStartKey, conf.getKeyPrefix())
+              < 0) {
+            decodedStartKey = ByteString.EMPTY;
+          } else {
+            decodedStartKey = decodedStartKey.substring(conf.getKeyPrefix().size());
+          }
+        }
+        builder.setStartKey(decodedStartKey);
       } catch (Exception e) {
         if (!conf.isTest()) {
           throw e;
@@ -820,12 +831,22 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       }
     }
 
-    if (conf.getApiVersion().isV1() && (region.getEndKey().isEmpty() || isRawRegion)) {
+    if (region.getEndKey().isEmpty() || (conf.getApiVersion().isV1() && isRawRegion)) {
       builder.setEndKey(region.getEndKey());
     } else {
       try {
-        byte[] decodedEndKey = BytesCodec.readBytes(new CodecDataInput(region.getEndKey()));
-        builder.setEndKey(ByteString.copyFrom(decodedEndKey));
+        ByteString decodedEndKey =
+            ByteString.copyFrom(BytesCodec.readBytes(new CodecDataInput(region.getEndKey())));
+        if (conf.getApiVersion().isV2()) {
+          if (ByteString.unsignedLexicographicalComparator()
+                  .compare(decodedEndKey, conf.getEndKey())
+              >= 0) {
+            decodedEndKey = ByteString.EMPTY;
+          } else {
+            decodedEndKey = decodedEndKey.substring(conf.getKeyPrefix().size());
+          }
+        }
+        builder.setEndKey(decodedEndKey);
       } catch (Exception e) {
         if (!conf.isTest()) {
           throw e;

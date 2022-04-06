@@ -325,7 +325,7 @@ public class RawKVClientTest extends BaseRawKVTest {
 
   @Test
   public void deleteRangeTest() {
-    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+    checkDeleteRange(ByteString.EMPTY, ByteString.EMPTY);
   }
 
   @Test
@@ -534,7 +534,6 @@ public class RawKVClientTest extends BaseRawKVTest {
         rawDeleteTest(deleteCases, benchmark);
       }
 
-      // TODO: check whether cluster supports ttl
       long ttl = 10;
       rawTTLTest(10, ttl, benchmark);
 

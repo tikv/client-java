@@ -34,7 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
-import org.tikv.common.TiConfiguration.KVMode;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.log.SlowLog;
 import org.tikv.common.log.SlowLogSpan;
@@ -156,42 +155,6 @@ public abstract class AbstractRegionStoreClient
     return false;
   }
 
-  public ByteString buildRequestKey(ByteString key) {
-    switch (conf.getApiVersion()) {
-      case V1:
-        return key;
-      case V2:
-        if (conf.getKvMode() == KVMode.RAW) {
-          return ByteString.copyFromUtf8(TiConfiguration.API_V2_RAW_PREFIX).concat(key);
-        } else if (conf.getKvMode() == KVMode.TXN) {
-          return ByteString.copyFromUtf8(TiConfiguration.API_V2_TXN_PREFIX).concat(key);
-        }
-      default:
-        throw new IllegalArgumentException("unknown api version or kv mode");
-    }
-  }
-
-  public ByteString unwrapResponseKey(ByteString key) {
-    switch (conf.getApiVersion()) {
-      case V1:
-        return key;
-      case V2:
-        if (conf.getKvMode() == KVMode.RAW) {
-          if (!key.startsWith(ByteString.copyFromUtf8(TiConfiguration.API_V2_RAW_PREFIX))) {
-            throw new IllegalArgumentException("key corrupted, wrong prefix");
-          }
-          return key.substring(1);
-        } else if (conf.getKvMode() == KVMode.TXN) {
-          if (!key.startsWith(ByteString.copyFromUtf8(TiConfiguration.API_V2_TXN_PREFIX))) {
-            throw new IllegalArgumentException("key corrupted, wrong prefix");
-          }
-          return key.substring(1);
-        }
-      default:
-        throw new IllegalArgumentException("unknown api version or kv mode");
-    }
-  }
-
   private Kvrpcpb.Context addTraceId(Kvrpcpb.Context context, SlowLog slowLog) {
     if (slowLog.getThresholdMS() < 0) {
       // disable tikv tracing
@@ -207,27 +170,23 @@ public abstract class AbstractRegionStoreClient
         .build();
   }
 
-  protected Kvrpcpb.Context withApiVersion(Kvrpcpb.Context context) {
-    return Kvrpcpb.Context.newBuilder(context).setApiVersion(conf.getApiVersion().toPb()).build();
-  }
-
   protected Kvrpcpb.Context makeContext(TiStoreType storeType, SlowLog slowLog) {
     Kvrpcpb.Context context = region.getReplicaContext(java.util.Collections.emptySet(), storeType);
-    return withApiVersion(addTraceId(context, slowLog));
+    return addTraceId(context, slowLog);
   }
 
   protected Kvrpcpb.Context makeContext(
       Set<Long> resolvedLocks, TiStoreType storeType, SlowLog slowLog) {
     Kvrpcpb.Context context = region.getReplicaContext(resolvedLocks, storeType);
-    return withApiVersion(addTraceId(context, slowLog));
+    return addTraceId(context, slowLog);
   }
 
   protected Kvrpcpb.Context makeContext() {
-    return withApiVersion(region.getLeaderContext());
+    return region.getLeaderContext();
   }
 
   protected Kvrpcpb.Context makeContext(Metapb.Peer peer) {
-    return withApiVersion(region.getReplicaContext(peer));
+    return region.getReplicaContext(peer);
   }
 
   private void updateClientStub() {
@@ -336,7 +295,7 @@ public abstract class AbstractRegionStoreClient
         Kvrpcpb.RawGetRequest rawGetRequest =
             Kvrpcpb.RawGetRequest.newBuilder()
                 .setContext(makeContext(peer))
-                .setKey(buildRequestKey(key))
+                .setKey(conf.buildRequestKey(key))
                 .build();
         ListenableFuture<Kvrpcpb.RawGetResponse> task = stub.rawGet(rawGetRequest);
         responses.add(new SwitchLeaderTask(task, peer));
@@ -398,7 +357,7 @@ public abstract class AbstractRegionStoreClient
         Kvrpcpb.RawGetRequest rawGetRequest =
             Kvrpcpb.RawGetRequest.newBuilder()
                 .setContext(makeContext())
-                .setKey(buildRequestKey(key))
+                .setKey(conf.buildRequestKey(key))
                 .build();
         ListenableFuture<Kvrpcpb.RawGetResponse> task =
             MetadataUtils.attachHeaders(stub, header).rawGet(rawGetRequest);

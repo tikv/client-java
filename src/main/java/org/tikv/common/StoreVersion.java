@@ -27,7 +27,6 @@ import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Metapb;
 
 public class StoreVersion {
-
   private static final int SCALE = 10000;
   private final Logger logger = LoggerFactory.getLogger(this.getClass());
   private int v0 = 9999;

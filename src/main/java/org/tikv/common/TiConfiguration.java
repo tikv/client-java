@@ -152,6 +152,7 @@ import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW
 import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_ENABLE;
 import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS;
 
+import com.google.protobuf.ByteString;
 import io.grpc.Metadata;
 import java.io.IOException;
 import java.io.InputStream;
@@ -176,49 +177,14 @@ import org.tikv.kvproto.Kvrpcpb.CommandPri;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
 public class TiConfiguration implements Serializable {
-  public static enum ApiVersion {
-    V1,
-    V2;
-
-    public static ApiVersion fromInt(int version) {
-      switch (version) {
-        case 1:
-          return V1;
-        case 2:
-          return V2;
-        default:
-          throw new IllegalArgumentException("unknown api version " + version);
-      }
-    }
-
-    public boolean isV1() {
-      return this == V1;
-    }
-
-    public boolean isV2() {
-      return this == V2;
-    }
-
-    public Kvrpcpb.APIVersion toPb() {
-      switch (this) {
-        case V1:
-          return Kvrpcpb.APIVersion.V1;
-        case V2:
-          return Kvrpcpb.APIVersion.V2;
-        default:
-          throw new IllegalArgumentException("unknown api version " + this);
-      }
-    }
-  }
-
   private static final Logger logger = LoggerFactory.getLogger(TiConfiguration.class);
   private static final ConcurrentHashMap<String, String> settings = new ConcurrentHashMap<>();
   public static final Metadata.Key<String> FORWARD_META_DATA_KEY =
       Metadata.Key.of("tikv-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
   public static final Metadata.Key<String> PD_FORWARD_META_DATA_KEY =
       Metadata.Key.of("pd-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
-  public static final String API_V2_RAW_PREFIX = "r";
-  public static final String API_V2_TXN_PREFIX = "x";
+  public static final ByteString API_V2_RAW_PREFIX = ByteString.copyFromUtf8("r");
+  public static final ByteString API_V2_TXN_PREFIX = ByteString.copyFromUtf8("x");
 
   static {
     // priority: system environment > config file > default
@@ -334,7 +300,7 @@ public class TiConfiguration implements Serializable {
   }
 
   public static void listAll() {
-    logger.info("static configurations are:" + new ArrayList<>(settings.entrySet()).toString());
+    logger.info("static configurations are:" + new ArrayList<>(settings.entrySet()));
   }
 
   private static void set(String key, String value) {
@@ -562,7 +528,7 @@ public class TiConfiguration implements Serializable {
   private String jksTrustPath = getOption(TIKV_JKS_TRUST_PATH).orElse(null);
   private String jksTrustPassword = getOption(TIKV_JKS_TRUST_PASSWORD).orElse(null);
 
-  private boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
+  private final boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
   private boolean warmUpEnable = getBoolean(TIKV_WARM_UP_ENABLE);
 
   private boolean isTest = false;
@@ -1265,5 +1231,95 @@ public class TiConfiguration implements Serializable {
   public TiConfiguration setApiVersion(ApiVersion version) {
     this.apiVersion = version;
     return this;
+  }
+
+  public ByteString getKeyPrefix() {
+    if (apiVersion.isV2()) {
+      return isRawKVMode() ? API_V2_RAW_PREFIX : API_V2_TXN_PREFIX;
+    }
+    return ByteString.EMPTY;
+  }
+
+  public ByteString getEndKey() {
+    if (apiVersion.isV2()) {
+      byte end = (byte) (getKeyPrefix().toByteArray()[0] + 1);
+      return ByteString.copyFrom(new byte[] {end});
+    }
+    return ByteString.EMPTY;
+  }
+
+  public ByteString buildRequestKey(ByteString key, boolean isEndKey) {
+    switch (apiVersion) {
+      case V1:
+        return key;
+      case V2:
+        if (isEndKey && key.isEmpty()) {
+          return getEndKey();
+        }
+        return getKeyPrefix().concat(key);
+      default:
+        throw new IllegalArgumentException("unknown api version or kv mode");
+    }
+  }
+
+  public ByteString buildRequestKey(ByteString key) {
+    return buildRequestKey(key, false);
+  }
+
+  public ByteString unwrapResponseKey(ByteString key) {
+    return unwrapResponseKey(key, false);
+  }
+
+  public ByteString unwrapResponseKey(ByteString key, boolean isEndKey) {
+    switch (apiVersion) {
+      case V1:
+        return key;
+      case V2:
+        if (isEndKey && key.equals(getEndKey())) {
+          return ByteString.EMPTY;
+        }
+        // TODO: empty key is not always scan back!!!!
+        if (!key.isEmpty() && !key.startsWith(getKeyPrefix())) {
+          throw new IllegalArgumentException("key corrupted, wrong prefix");
+        }
+        return key.substring(key.isEmpty() ? 0 : 1);
+      default:
+        throw new IllegalArgumentException("unknown api version or kv mode");
+    }
+  }
+
+  public enum ApiVersion {
+    V1,
+    V2;
+
+    public static ApiVersion fromInt(int version) {
+      switch (version) {
+        case 1:
+          return V1;
+        case 2:
+          return V2;
+        default:
+          throw new IllegalArgumentException("unknown api version " + version);
+      }
+    }
+
+    public boolean isV1() {
+      return this == V1;
+    }
+
+    public boolean isV2() {
+      return this == V2;
+    }
+
+    public Kvrpcpb.APIVersion toPb() {
+      switch (this) {
+        case V1:
+          return Kvrpcpb.APIVersion.V1;
+        case V2:
+          return Kvrpcpb.APIVersion.V2;
+        default:
+          throw new IllegalArgumentException("unknown api version " + this);
+      }
+    }
   }
 }

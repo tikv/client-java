@@ -158,7 +158,8 @@ public class TiSession implements AutoCloseable {
       warmup();
     }
     this.circuitBreaker = new CircuitBreakerImpl(conf);
-    logger.info("TiSession initialized in " + conf.getKvMode() + " mode");
+    logger.info("TiSession initialized in " + conf.getKvMode() + " mode in API version: "
+        + conf.getApiVersion());
   }
 
   private static VersionInfo getVersionInfo() {
@@ -182,10 +183,7 @@ public class TiSession implements AutoCloseable {
     try {
       // let JVM ClassLoader load gRPC error related classes
       // this operation may cost 100ms
-      Errorpb.Error.newBuilder()
-          .setNotLeader(Errorpb.NotLeader.newBuilder().build())
-          .build()
-          .toString();
+      Errorpb.Error.newBuilder().setNotLeader(Errorpb.NotLeader.newBuilder().build()).build();
 
       this.client = getPDClient();
       this.regionManager = getRegionManager();

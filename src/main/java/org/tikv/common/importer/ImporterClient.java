@@ -43,18 +43,19 @@ import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Errorpb.Error;
 import org.tikv.kvproto.ImportSstpb;
+import org.tikv.kvproto.ImportSstpb.RawWriteBatch;
 import org.tikv.kvproto.Metapb;
 
 public class ImporterClient {
   private static final Logger logger = LoggerFactory.getLogger(ImporterClient.class);
 
-  private TiConfiguration tiConf;
-  private TiSession tiSession;
-  private ByteString uuid;
-  private Key minKey;
-  private Key maxKey;
+  private final TiConfiguration tiConf;
+  private final TiSession tiSession;
+  private final ByteString uuid;
+  private final Key minKey;
+  private final Key maxKey;
   private TiRegion region;
-  private Long ttl;
+  private final Long ttl;
 
   private boolean deduplicate = false;
 
@@ -108,9 +109,13 @@ public class ImporterClient {
                   String.format("duplicate key found, key = %s", preKey.toStringUtf8()));
             }
           } else {
+            ByteString key = tiConf.buildRequestKey(pair.first);
             pairs.add(
-                ImportSstpb.Pair.newBuilder().setKey(pair.first).setValue(pair.second).build());
-            totalBytes += (pair.first.size() + pair.second.size());
+                ImportSstpb.Pair.newBuilder()
+                    .setKey(key)
+                    .setValue(pair.second)
+                    .build());
+            totalBytes += (key.size() + pair.second.size());
             preKey = pair.first;
           }
         }
@@ -138,10 +143,10 @@ public class ImporterClient {
     long regionId = region.getId();
     Metapb.RegionEpoch regionEpoch = region.getRegionEpoch();
     ImportSstpb.Range range =
-        tiConf.isTxnKVMode()
+        tiConf.isTxnKVMode() || tiConf.getApiVersion().isV2()
             ? ImportSstpb.Range.newBuilder()
-                .setStart(encode(minKey.toByteString()))
-                .setEnd(encode(maxKey.toByteString()))
+                .setStart(encode(tiConf.buildRequestKey(minKey.toByteString())))
+                .setEnd(encode(tiConf.buildRequestKey(maxKey.toByteString(), true)))
                 .build()
             : ImportSstpb.Range.newBuilder()
                 .setStart(minKey.toByteString())
@@ -150,6 +155,7 @@ public class ImporterClient {
 
     sstMeta =
         ImportSstpb.SSTMeta.newBuilder()
+            .setApiVersion(tiConf.getApiVersion().toPb())
             .setUuid(uuid)
             .setRegionId(regionId)
             .setRegionEpoch(regionEpoch)
@@ -216,11 +222,14 @@ public class ImporterClient {
     } else {
       ImportSstpb.RawWriteBatch batch;
 
-      if (ttl == null || ttl <= 0) {
-        batch = ImportSstpb.RawWriteBatch.newBuilder().addAllPairs(pairs).build();
-      } else {
-        batch = ImportSstpb.RawWriteBatch.newBuilder().addAllPairs(pairs).setTtl(ttl).build();
+      RawWriteBatch.Builder batchBuilder = RawWriteBatch.newBuilder().addAllPairs(pairs);
+      if (ttl != null && ttl > 0) {
+        batchBuilder.setTtl(ttl);
       }
+      if (tiConf.getApiVersion().isV2()) {
+        batchBuilder.setTs(tiSession.getTimestamp().getVersion());
+      }
+      batch = batchBuilder.build();
 
       ImportSstpb.RawWriteRequest request =
           ImportSstpb.RawWriteRequest.newBuilder().setBatch(batch).build();
