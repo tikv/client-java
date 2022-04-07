@@ -37,8 +37,7 @@ import org.tikv.kvproto.Pdpb.TsoRequest;
 import org.tikv.kvproto.Pdpb.TsoResponse;
 
 public class PDMockServer extends PDGrpc.PDImplBase {
-
-  public int port;
+  private int port;
   private long clusterId;
   private Server server;
 
@@ -147,5 +146,9 @@ public class PDMockServer extends PDGrpc.PDImplBase {
 
   public long getClusterId() {
     return clusterId;
+  }
+
+  public long getPort() {
+    return port;
   }
 }
