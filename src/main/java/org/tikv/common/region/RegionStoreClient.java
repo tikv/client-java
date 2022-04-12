@@ -124,17 +124,12 @@ import org.tikv.txn.exception.LockException;
 //  need to be re-split across regions/stores, region info outdated, e.t.c., you
 //  should retry it in an upper client logic (KVClient, TxnClient, e.t.c.)
 
-/**
- * Note that RegionStoreClient itself is not thread-safe
- */
+/** Note that RegionStoreClient itself is not thread-safe */
 public class RegionStoreClient extends AbstractRegionStoreClient {
   private static final Logger logger = LoggerFactory.getLogger(RegionStoreClient.class);
-  @VisibleForTesting
-  public final AbstractLockResolverClient lockResolverClient;
+  @VisibleForTesting public final AbstractLockResolverClient lockResolverClient;
   private final TiStoreType storeType;
-  /**
-   * startTS -> List(locks)
-   */
+  /** startTS -> List(locks) */
   private final Map<Long, Set<Long>> resolvedLocks = new HashMap<>();
 
   private final PDClient pdClient;
@@ -231,7 +226,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param version key version
    * @return value
    * @throws TiClientInternalException TiSpark Client exception, unexpected
-   * @throws KeyException              Key may be locked
+   * @throws KeyException Key may be locked
    */
   public ByteString get(BackOffer backOffer, ByteString key, long version)
       throws TiClientInternalException, KeyException {
@@ -265,7 +260,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   /**
    * @param resp GetResponse
    * @throws TiClientInternalException TiSpark Client exception, unexpected
-   * @throws KeyException              Key may be locked
+   * @throws KeyException Key may be locked
    */
   private void handleGetResponse(GetResponse resp) throws TiClientInternalException, KeyException {
     if (resp == null) {
@@ -421,8 +416,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param startTs startTs of prewrite
    * @param lockTTL lock ttl
    * @throws TiClientInternalException TiSpark Client exception, unexpected
-   * @throws KeyException              Key may be locked
-   * @throws RegionException           region error occurs
+   * @throws KeyException Key may be locked
+   * @throws RegionException region error occurs
    */
   public void prewrite(
       BackOffer backOffer, ByteString primary, List<Mutation> mutations, long startTs, long lockTTL)
@@ -449,23 +444,23 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               getIsV4()
                   ? PrewriteRequest.newBuilder()
-                  .setContext(makeContext(storeType, bo.getSlowLog()))
-                  .setStartVersion(startTs)
-                  .setPrimaryLock(conf.buildRequestKey(primaryLock))
-                  .addAllMutations(
-                      mutations
-                          .stream()
-                          .map(
-                              mutation ->
-                                  Mutation.newBuilder(mutation)
-                                      .setKey(conf.buildRequestKey(mutation.getKey()))
-                                      .build())
-                          .collect(Collectors.toList()))
-                  .setLockTtl(ttl)
-                  .setSkipConstraintCheck(skipConstraintCheck)
-                  .setMinCommitTs(startTs)
-                  .setTxnSize(16)
-                  .build()
+                      .setContext(makeContext(storeType, bo.getSlowLog()))
+                      .setStartVersion(startTs)
+                      .setPrimaryLock(conf.buildRequestKey(primaryLock))
+                      .addAllMutations(
+                          mutations
+                              .stream()
+                              .map(
+                                  mutation ->
+                                      Mutation.newBuilder(mutation)
+                                          .setKey(conf.buildRequestKey(mutation.getKey()))
+                                          .build())
+                              .collect(Collectors.toList()))
+                      .setLockTtl(ttl)
+                      .setSkipConstraintCheck(skipConstraintCheck)
+                      .setMinCommitTs(startTs)
+                      .setTxnSize(16)
+                      .build()
                   : PrewriteRequest.newBuilder()
                       .setContext(makeContext(storeType, bo.getSlowLog()))
                       .setStartVersion(startTs)
@@ -497,8 +492,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param backOffer backOffer
    * @param resp response
    * @return Return true means the rpc call success. Return false means the rpc call fail,
-   * RegionStoreClient should retry. Throw an Exception means the rpc call fail, RegionStoreClient
-   * cannot handle this kind of error
+   *     RegionStoreClient should retry. Throw an Exception means the rpc call fail,
+   *     RegionStoreClient cannot handle this kind of error
    * @throws TiClientInternalException
    * @throws RegionException
    * @throws KeyException
@@ -540,9 +535,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return false;
   }
 
-  /**
-   * TXN Heart Beat: update primary key ttl
-   */
+  /** TXN Heart Beat: update primary key ttl */
   public void txnHeartBeat(BackOffer bo, ByteString primaryLock, long startTs, long ttl) {
     boolean forWrite = false;
     while (true) {
@@ -1256,11 +1249,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return resp.getKvsList()
         .stream()
         .map(
-            kvPair -> KvPair.newBuilder()
-                .setKey(conf.unwrapResponseKey(kvPair.getKey()))
-                .setValue(kvPair.getValue())
-                .build()
-        )
+            kvPair ->
+                KvPair.newBuilder()
+                    .setKey(conf.unwrapResponseKey(kvPair.getKey()))
+                    .setValue(kvPair.getValue())
+                    .build())
         .collect(Collectors.toList());
   }
 

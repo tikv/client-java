@@ -110,11 +110,7 @@ public class ImporterClient {
             }
           } else {
             ByteString key = tiConf.buildRequestKey(pair.first);
-            pairs.add(
-                ImportSstpb.Pair.newBuilder()
-                    .setKey(key)
-                    .setValue(pair.second)
-                    .build());
+            pairs.add(ImportSstpb.Pair.newBuilder().setKey(key).setValue(pair.second).build());
             totalBytes += (key.size() + pair.second.size());
             preKey = pair.first;
           }

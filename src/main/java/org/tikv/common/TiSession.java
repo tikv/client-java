@@ -158,8 +158,11 @@ public class TiSession implements AutoCloseable {
       warmup();
     }
     this.circuitBreaker = new CircuitBreakerImpl(conf);
-    logger.info("TiSession initialized in " + conf.getKvMode() + " mode in API version: "
-        + conf.getApiVersion());
+    logger.info(
+        "TiSession initialized in "
+            + conf.getKvMode()
+            + " mode in API version: "
+            + conf.getApiVersion());
   }
 
   private static VersionInfo getVersionInfo() {
