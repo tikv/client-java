@@ -201,7 +201,8 @@ public class RawKVClientTest extends BaseRawKVTest {
   public void testDeadlineBackOff() {
     int timeout = 2000;
     int sleep = 150;
-    BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(timeout, SlowLogEmptyImpl.INSTANCE);
+    BackOffer backOffer =
+        ConcreteBackOffer.newDeadlineBackOff(timeout, SlowLogEmptyImpl.INSTANCE, 0);
     long s = System.currentTimeMillis();
     try {
       while (true) {

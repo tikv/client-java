@@ -52,11 +52,13 @@ public class RegionManager {
       HistogramUtils.buildDuration()
           .name("client_java_get_region_by_requests_latency")
           .help("getRegionByKey request latency.")
+          .labelNames("cluster")
           .register();
   public static final Histogram SCAN_REGIONS_REQUEST_LATENCY =
       HistogramUtils.buildDuration()
           .name("client_java_scan_regions_request_latency")
           .help("scanRegions request latency.")
+          .labelNames("cluster")
           .register();
 
   // TODO: the region cache logic need rewrite.
@@ -105,7 +107,9 @@ public class RegionManager {
 
   public List<Pdpb.Region> scanRegions(
       BackOffer backOffer, ByteString startKey, ByteString endKey, int limit) {
-    Histogram.Timer requestTimer = SCAN_REGIONS_REQUEST_LATENCY.startTimer();
+    Long clusterId = pdClient.getClusterId();
+    Histogram.Timer requestTimer =
+        SCAN_REGIONS_REQUEST_LATENCY.labels(clusterId.toString()).startTimer();
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("scanRegions");
     try {
       return pdClient.scanRegions(backOffer, startKey, endKey, limit);
@@ -122,7 +126,9 @@ public class RegionManager {
   }
 
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
-    Histogram.Timer requestTimer = GET_REGION_BY_KEY_REQUEST_LATENCY.startTimer();
+    Long clusterId = pdClient.getClusterId();
+    Histogram.Timer requestTimer =
+        GET_REGION_BY_KEY_REQUEST_LATENCY.labels(clusterId.toString()).startTimer();
     SlowLogSpan slowLogSpan = backOffer.getSlowLog().start("getRegionByKey");
     TiRegion region = cache.getRegionByKey(key, backOffer);
     try {
@@ -316,6 +322,7 @@ public class RegionManager {
   }
 
   private BackOffer defaultBackOff() {
-    return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
+    return ConcreteBackOffer.newCustomBackOff(
+        conf.getRawKVDefaultBackoffInMS(), pdClient.getClusterId());
   }
 }

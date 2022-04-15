@@ -139,7 +139,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       HistogramUtils.buildDuration()
           .name("client_java_grpc_raw_requests_latency")
           .help("grpc raw request latency.")
-          .labelNames("type")
+          .labelNames("type", "cluster")
           .register();
 
   private synchronized Boolean getIsV4() {
@@ -807,7 +807,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     StreamingResponse responseIterator =
         this.callServerStreamingWithRetry(
-            ConcreteBackOffer.newCopNextMaxBackOff(),
+            ConcreteBackOffer.newCopNextMaxBackOff(pdClient.getClusterId()),
             TikvGrpc.getCoprocessorStreamMethod(),
             reqToSend,
             handler);
@@ -844,7 +844,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     SplitRegionResponse resp =
         callWithRetry(
-            ConcreteBackOffer.newGetBackOff(), TikvGrpc.getSplitRegionMethod(), request, handler);
+            ConcreteBackOffer.newGetBackOff(pdClient.getClusterId()),
+            TikvGrpc.getSplitRegionMethod(),
+            request,
+            handler);
 
     if (resp == null) {
       this.regionManager.onRequestFail(region);
@@ -863,8 +866,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   // APIs for Raw Scan/Put/Get/Delete
 
   public Optional<ByteString> rawGet(BackOffer backOffer, ByteString key) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get").startTimer();
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get", clusterId.toString()).startTimer();
     try {
       Supplier<RawGetRequest> factory =
           () ->
@@ -902,8 +906,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public Optional<Long> rawGetKeyTTL(BackOffer backOffer, ByteString key) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_get_key_ttl").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_get_key_ttl", clusterId.toString())
+            .startTimer();
     try {
       Supplier<RawGetKeyTTLRequest> factory =
           () ->
@@ -941,8 +948,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public void rawDelete(BackOffer backOffer, ByteString key, boolean atomicForCAS) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_delete", clusterId.toString())
+            .startTimer();
     try {
       Supplier<RawDeleteRequest> factory =
           () ->
@@ -979,8 +989,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public void rawPut(
       BackOffer backOffer, ByteString key, ByteString value, long ttl, boolean atomicForCAS) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put").startTimer();
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put", clusterId.toString()).startTimer();
     try {
       Supplier<RawPutRequest> factory =
           () ->
@@ -1023,8 +1034,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       ByteString value,
       long ttl)
       throws RawCASConflictException {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_put_if_absent").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_put_if_absent", clusterId.toString())
+            .startTimer();
     try {
       Supplier<RawCASRequest> factory =
           () ->
@@ -1073,8 +1087,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public List<KvPair> rawBatchGet(BackOffer backoffer, List<ByteString> keys) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_get").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_batch_get", clusterId.toString())
+            .startTimer();
     try {
       if (keys.isEmpty()) {
         return new ArrayList<>();
@@ -1109,8 +1126,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public void rawBatchPut(
       BackOffer backOffer, List<KvPair> kvPairs, long ttl, boolean atomicForCAS) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_put").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_batch_put", clusterId.toString())
+            .startTimer();
     try {
       if (kvPairs.isEmpty()) {
         return;
@@ -1162,8 +1182,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public void rawBatchDelete(BackOffer backoffer, List<ByteString> keys, boolean atomicForCAS) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_batch_delete").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_batch_delete", clusterId.toString())
+            .startTimer();
     try {
       if (keys.isEmpty()) {
         return;
@@ -1210,8 +1233,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @return KvPair list
    */
   public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_scan").startTimer();
+        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_scan", clusterId.toString()).startTimer();
     try {
       Supplier<RawScanRequest> factory =
           () ->
@@ -1265,8 +1289,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param endKey endKey
    */
   public void rawDeleteRange(BackOffer backOffer, ByteString startKey, ByteString endKey) {
+    Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
-        GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_delete_range").startTimer();
+        GRPC_RAW_REQUEST_LATENCY
+            .labels("client_grpc_raw_delete_range", clusterId.toString())
+            .startTimer();
     try {
       Supplier<RawDeleteRangeRequest> factory =
           () ->
@@ -1423,7 +1450,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
 
     private BackOffer defaultBackOff() {
-      return ConcreteBackOffer.newCustomBackOff(conf.getRawKVDefaultBackoffInMS());
+      BackOffer backoffer =
+          ConcreteBackOffer.newCustomBackOff(
+              conf.getRawKVDefaultBackoffInMS(), pdClient.getClusterId());
+      return backoffer;
     }
   }
 }

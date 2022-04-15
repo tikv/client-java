@@ -61,7 +61,8 @@ public class StoreVersion {
   public static boolean minTiKVVersion(String version, PDClient pdClient) {
     StoreVersion storeVersion = new StoreVersion(version);
 
-    BackOffer bo = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
+    BackOffer bo =
+        ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF, pdClient.getClusterId());
     List<Metapb.Store> storeList =
         pdClient
             .getAllStores(bo)

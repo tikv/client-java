@@ -93,6 +93,11 @@ public class SlowLogImpl implements SlowLog {
   }
 
   @Override
+  public Object getField(String key) {
+    return fields.get(key);
+  }
+
+  @Override
   public void log() {
     recordTime();
     if (error != null || timeExceeded()) {
