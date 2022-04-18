@@ -17,6 +17,7 @@
 
 package org.tikv.common.util;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
@@ -28,6 +29,7 @@ import java.net.URI;
 import java.security.KeyStore;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -45,6 +47,7 @@ public class ChannelFactory implements AutoCloseable {
   private final int idleTimeout;
   private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
   private final CertContext certContext;
+  private final AtomicReference<SslContextBuilder> sslContextBuilder = new AtomicReference<>();
   private static final String PUB_KEY_INFRA = "PKIX";
 
   private abstract static class CertContext {
@@ -54,6 +57,7 @@ public class ChannelFactory implements AutoCloseable {
 
     public SslContextBuilder reload() {
       if (isModified()) {
+        logger.info("reload ssl context");
         return createSslContextBuilder();
       }
       return null;
@@ -211,17 +215,24 @@ public class ChannelFactory implements AutoCloseable {
     this.certContext = new JksContext(jksKeyPath, jksKeyPassword, jksTrustPath, jksTrustPassword);
   }
 
-  public ManagedChannel getChannel(String addressStr, HostMapping hostMapping) {
-    SslContextBuilder contextBuilder = null;
+  @VisibleForTesting
+  public boolean reloadSslContext() {
     if (certContext != null) {
       SslContextBuilder newBuilder = certContext.reload();
       if (newBuilder != null) {
-        contextBuilder = newBuilder;
-        connPool.clear();
+        sslContextBuilder.set(newBuilder);
+        return true;
       }
     }
+    return false;
+  }
 
-    final SslContextBuilder sslContextBuilder = contextBuilder;
+  public ManagedChannel getChannel(String addressStr, HostMapping hostMapping) {
+    if (reloadSslContext()) {
+      logger.info("invalidate connection pool");
+      connPool.clear();
+    }
+
     return connPool.computeIfAbsent(
         addressStr,
         key -> {
@@ -248,12 +259,12 @@ public class ChannelFactory implements AutoCloseable {
                   .keepAliveWithoutCalls(true)
                   .idleTimeout(idleTimeout, TimeUnit.SECONDS);
 
-          if (sslContextBuilder == null) {
+          if (certContext == null) {
             return builder.usePlaintext().build();
           } else {
-            SslContext sslContext = null;
+            SslContext sslContext;
             try {
-              sslContext = sslContextBuilder.build();
+              sslContext = sslContextBuilder.get().build();
             } catch (SSLException e) {
               logger.error("create ssl context failed!", e);
               return null;
