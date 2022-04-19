@@ -18,10 +18,9 @@
 package org.tikv;
 
 import org.tikv.common.PDClient;
-import org.tikv.common.StoreApiVersion;
+import org.tikv.common.StoreConfig;
 import org.tikv.common.StoreVersion;
 import org.tikv.common.TiConfiguration;
-import org.tikv.common.TiConfiguration.ApiVersion;
 import org.tikv.common.TiSession;
 import org.tikv.util.TestUtils;
 
@@ -49,7 +48,7 @@ public class BaseRawKVTest {
     conf.setWarmUpEnable(false);
     try (TiSession session = TiSession.create(conf)) {
       PDClient pdClient = session.getPDClient();
-      conf.setApiVersion(ApiVersion.fromInt(StoreApiVersion.acquire(pdClient).get()));
+      conf.setApiVersion(StoreConfig.acquireApiVersion(pdClient));
     } catch (Exception ignore) {
     }
 

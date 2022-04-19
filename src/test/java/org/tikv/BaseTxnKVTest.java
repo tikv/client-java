@@ -17,9 +17,8 @@
 
 package org.tikv;
 
-import org.tikv.common.StoreApiVersion;
+import org.tikv.common.StoreConfig;
 import org.tikv.common.TiConfiguration;
-import org.tikv.common.TiConfiguration.ApiVersion;
 import org.tikv.common.TiSession;
 import org.tikv.util.TestUtils;
 
@@ -35,8 +34,7 @@ public class BaseTxnKVTest {
     conf.setEnableGrpcForward(false);
 
     try (TiSession session = TiSession.create(conf)) {
-      int version = StoreApiVersion.acquire(session.getPDClient()).get();
-      conf.setApiVersion(ApiVersion.fromInt(version));
+      conf.setApiVersion(StoreConfig.acquireApiVersion(session.getPDClient()));
     } catch (Exception ignore) {
     }
     return conf;

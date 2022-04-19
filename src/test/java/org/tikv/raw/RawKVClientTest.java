@@ -50,6 +50,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.BaseRawKVTest;
+import org.tikv.common.StoreConfig;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.codec.KeyUtils;
@@ -899,7 +900,7 @@ public class RawKVClientTest extends BaseRawKVTest {
   }
 
   public void rawTTLTest(int cases, long ttl, boolean benchmark) {
-    Assume.assumeTrue(tikvVersionNewerThan("v5.0.0"));
+    Assume.assumeTrue(StoreConfig.ifTllEnable(session.getPDClient()));
     logger.info("ttl testing");
     if (benchmark) {
       for (int i = 0; i < cases; i++) {
