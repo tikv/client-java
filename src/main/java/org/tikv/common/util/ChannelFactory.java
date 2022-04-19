@@ -17,6 +17,7 @@
 
 package org.tikv.common.util;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
@@ -28,6 +29,7 @@ import java.net.URI;
 import java.security.KeyStore;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -44,8 +46,133 @@ public class ChannelFactory implements AutoCloseable {
   private final int keepaliveTimeout;
   private final int idleTimeout;
   private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
-  private final SslContextBuilder sslContextBuilder;
+  private final CertContext certContext;
+  private final AtomicReference<SslContextBuilder> sslContextBuilder = new AtomicReference<>();
   private static final String PUB_KEY_INFRA = "PKIX";
+
+  private abstract static class CertContext {
+    protected abstract boolean isModified();
+
+    protected abstract SslContextBuilder createSslContextBuilder();
+
+    public SslContextBuilder reload() {
+      if (isModified()) {
+        logger.info("reload ssl context");
+        return createSslContextBuilder();
+      }
+      return null;
+    }
+  }
+
+  private static class JksContext extends CertContext {
+    private long keyLastModified;
+    private long trustLastModified;
+
+    private final String keyPath;
+    private final String keyPassword;
+    private final String trustPath;
+    private final String trustPassword;
+
+    public JksContext(String keyPath, String keyPassword, String trustPath, String trustPassword) {
+      this.keyLastModified = 0;
+      this.trustLastModified = 0;
+
+      this.keyPath = keyPath;
+      this.keyPassword = keyPassword;
+      this.trustPath = trustPath;
+      this.trustPassword = trustPassword;
+    }
+
+    @Override
+    protected synchronized boolean isModified() {
+      long a = new File(keyPath).lastModified();
+      long b = new File(trustPath).lastModified();
+
+      boolean changed = this.keyLastModified != a || this.trustLastModified != b;
+
+      if (changed) {
+        this.keyLastModified = a;
+        this.trustLastModified = b;
+      }
+
+      return changed;
+    }
+
+    @Override
+    protected SslContextBuilder createSslContextBuilder() {
+      SslContextBuilder builder = GrpcSslContexts.forClient();
+      try {
+        if (keyPath != null && keyPassword != null) {
+          KeyStore keyStore = KeyStore.getInstance("JKS");
+          keyStore.load(new FileInputStream(keyPath), keyPassword.toCharArray());
+          KeyManagerFactory keyManagerFactory =
+              KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+          keyManagerFactory.init(keyStore, keyPassword.toCharArray());
+          builder.keyManager(keyManagerFactory);
+        }
+        if (trustPath != null && trustPassword != null) {
+          KeyStore trustStore = KeyStore.getInstance("JKS");
+          trustStore.load(new FileInputStream(trustPath), trustPassword.toCharArray());
+          TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(PUB_KEY_INFRA);
+          trustManagerFactory.init(trustStore);
+          builder.trustManager(trustManagerFactory);
+        }
+      } catch (Exception e) {
+        logger.error("JKS SSL context builder failed!", e);
+      }
+      return builder;
+    }
+  }
+
+  private static class OpenSslContext extends CertContext {
+    private long trustLastModified;
+    private long chainLastModified;
+    private long keyLastModified;
+
+    private final String trustPath;
+    private final String chainPath;
+    private final String keyPath;
+
+    public OpenSslContext(String trustPath, String chainPath, String keyPath) {
+      this.trustLastModified = 0;
+      this.chainLastModified = 0;
+      this.keyLastModified = 0;
+
+      this.trustPath = trustPath;
+      this.chainPath = chainPath;
+      this.keyPath = keyPath;
+    }
+
+    @Override
+    protected synchronized boolean isModified() {
+      long a = new File(trustPath).lastModified();
+      long b = new File(chainPath).lastModified();
+      long c = new File(keyPath).lastModified();
+
+      boolean changed =
+          this.trustLastModified != a || this.chainLastModified != b || this.keyLastModified != c;
+
+      if (changed) {
+        this.trustLastModified = a;
+        this.chainLastModified = b;
+        this.keyLastModified = c;
+      }
+
+      return changed;
+    }
+
+    @Override
+    protected SslContextBuilder createSslContextBuilder() {
+      SslContextBuilder builder = GrpcSslContexts.forClient();
+      if (trustPath != null) {
+        builder.trustManager(new File(trustPath));
+      }
+      if (chainPath != null && keyPath != null) {
+        builder.keyManager(new File(chainPath), new File(keyPath));
+      }
+      return builder;
+    }
+  }
 
   public ChannelFactory(
       int maxFrameSize, int keepaliveTime, int keepaliveTimeout, int idleTimeout) {
@@ -53,7 +180,7 @@ public class ChannelFactory implements AutoCloseable {
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
     this.idleTimeout = idleTimeout;
-    this.sslContextBuilder = null;
+    this.certContext = null;
   }
 
   public ChannelFactory(
@@ -68,8 +195,8 @@ public class ChannelFactory implements AutoCloseable {
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
     this.idleTimeout = idleTimeout;
-    this.sslContextBuilder =
-        getSslContextBuilder(trustCertCollectionFilePath, keyCertChainFilePath, keyFilePath);
+    this.certContext =
+        new OpenSslContext(trustCertCollectionFilePath, keyCertChainFilePath, keyFilePath);
   }
 
   public ChannelFactory(
@@ -79,54 +206,33 @@ public class ChannelFactory implements AutoCloseable {
       int idleTimeout,
       String jksKeyPath,
       String jksKeyPassword,
-      String jkstrustPath,
+      String jksTrustPath,
       String jksTrustPassword) {
     this.maxFrameSize = maxFrameSize;
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
     this.idleTimeout = idleTimeout;
-    this.sslContextBuilder =
-        getSslContextBuilder(jksKeyPath, jksKeyPassword, jkstrustPath, jksTrustPassword);
+    this.certContext = new JksContext(jksKeyPath, jksKeyPassword, jksTrustPath, jksTrustPassword);
   }
 
-  private SslContextBuilder getSslContextBuilder(
-      String jksKeyPath, String jksKeyPassword, String jksTrustPath, String jksTrustPassword) {
-    SslContextBuilder builder = GrpcSslContexts.forClient();
-    try {
-      if (jksKeyPath != null && jksKeyPassword != null) {
-        KeyStore keyStore = KeyStore.getInstance("JKS");
-        keyStore.load(new FileInputStream(jksKeyPath), jksKeyPassword.toCharArray());
-        KeyManagerFactory keyManagerFactory =
-            KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        keyManagerFactory.init(keyStore, jksKeyPassword.toCharArray());
-        builder.keyManager(keyManagerFactory);
+  @VisibleForTesting
+  public boolean reloadSslContext() {
+    if (certContext != null) {
+      SslContextBuilder newBuilder = certContext.reload();
+      if (newBuilder != null) {
+        sslContextBuilder.set(newBuilder);
+        return true;
       }
-      if (jksTrustPath != null && jksTrustPassword != null) {
-        KeyStore trustStore = KeyStore.getInstance("JKS");
-        trustStore.load(new FileInputStream(jksTrustPath), jksTrustPassword.toCharArray());
-        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(PUB_KEY_INFRA);
-        trustManagerFactory.init(trustStore);
-        builder.trustManager(trustManagerFactory);
-      }
-    } catch (Exception e) {
-      logger.error("JKS SSL context builder failed!", e);
     }
-    return builder;
-  }
-
-  private SslContextBuilder getSslContextBuilder(
-      String trustCertCollectionFilePath, String keyCertChainFilePath, String keyFilePath) {
-    SslContextBuilder builder = GrpcSslContexts.forClient();
-    if (trustCertCollectionFilePath != null) {
-      builder.trustManager(new File(trustCertCollectionFilePath));
-    }
-    if (keyCertChainFilePath != null && keyFilePath != null) {
-      builder.keyManager(new File(keyCertChainFilePath), new File(keyFilePath));
-    }
-    return builder;
+    return false;
   }
 
   public ManagedChannel getChannel(String addressStr, HostMapping hostMapping) {
+    if (reloadSslContext()) {
+      logger.info("invalidate connection pool");
+      connPool.clear();
+    }
+
     return connPool.computeIfAbsent(
         addressStr,
         key -> {
@@ -153,12 +259,12 @@ public class ChannelFactory implements AutoCloseable {
                   .keepAliveWithoutCalls(true)
                   .idleTimeout(idleTimeout, TimeUnit.SECONDS);
 
-          if (sslContextBuilder == null) {
+          if (certContext == null) {
             return builder.usePlaintext().build();
           } else {
-            SslContext sslContext = null;
+            SslContext sslContext;
             try {
-              sslContext = sslContextBuilder.build();
+              sslContext = sslContextBuilder.get().build();
             } catch (SSLException e) {
               logger.error("create ssl context failed!", e);
               return null;
