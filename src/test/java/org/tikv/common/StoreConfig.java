@@ -18,6 +18,7 @@
 package org.tikv.common;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.List;
 import org.apache.http.HttpEntity;
@@ -60,12 +61,12 @@ public class StoreConfig {
   }
 
   public static ApiVersion acquireApiVersion(PDClient client) {
-    return getConfig(client).get("storage").getAsJsonObject().get("api-version").getAsInt() == 1
-        ? ApiVersion.V1
-        : ApiVersion.V2;
+    JsonElement version = getConfig(client).get("storage").getAsJsonObject().get("api-version");
+    return version == null ? ApiVersion.V1 : ApiVersion.fromInt(version.getAsInt());
   }
 
   public static boolean ifTllEnable(PDClient client) {
-    return getConfig(client).get("storage").getAsJsonObject().get("enable-ttl").getAsBoolean();
+    JsonElement ttlEnabled = getConfig(client).get("storage").getAsJsonObject().get("enable-ttl");
+    return ttlEnabled != null && ttlEnabled.getAsBoolean();
   }
 }
