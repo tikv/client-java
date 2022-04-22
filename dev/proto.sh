@@ -24,20 +24,38 @@ raft_rs_hash=b9891b673573fad77ebcf9bbe0969cf945841926
 
 tipb_hash=c4d518eb1d60c21f05b028b36729e64610346dac
 
+<<<<<<< HEAD
 if [ -d "kvproto" ]; then
 	cd kvproto; git fetch -p; git checkout ${kvproto_hash}; cd ..
+=======
+if [ -d "$kvproto_dir" ]; then
+	git -C ${kvproto_dir} fetch -p
+	git pull --all
+>>>>>>> 7a123a07e... [close #591] update all the branch of proto while precompiling to avoid commit miss (#592)
 else
 	git clone https://github.com/pingcap/kvproto; cd kvproto; git checkout ${kvproto_hash}; cd ..
 fi
 
+<<<<<<< HEAD
 if [ -d "raft-rs" ]; then
 	cd raft-rs; git fetch -p; git checkout ${raft_rs_hash}; cd ..
+=======
+if [ -d "$raft_rs_dir" ]; then
+	git -C ${raft_rs_dir} fetch -p
+	git pull --all
+>>>>>>> 7a123a07e... [close #591] update all the branch of proto while precompiling to avoid commit miss (#592)
 else
 	git clone https://github.com/pingcap/raft-rs; cd raft-rs; git checkout ${raft_rs_hash}; cd ..
 fi
 
+<<<<<<< HEAD
 if [ -d "tipb" ]; then
 	cd tipb; git fetch -p; git checkout ${tipb_hash}; cd ..
+=======
+if [ -d "$tipb_dir" ]; then
+	git -C ${tipb_dir} fetch -p
+	git pull --all
+>>>>>>> 7a123a07e... [close #591] update all the branch of proto while precompiling to avoid commit miss (#592)
 else
 	git clone https://github.com/pingcap/tipb; cd tipb; git checkout ${tipb_hash}; cd ..
 fi
