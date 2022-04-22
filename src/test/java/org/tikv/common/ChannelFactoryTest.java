@@ -50,28 +50,32 @@ public class ChannelFactoryTest {
     List<Thread> tasks = new ArrayList<>(8);
     for (int i = 0; i < 8; i++) {
       ChannelFactory finalFactory = factory;
-      Thread t = new Thread(() -> {
-        for (int j = 0; j < 8; j++) {
-          finalFactory.getChannel("127.0.0.1:2379", mapping);
-          try {
-            Thread.sleep(1000);
-          } catch (InterruptedException ignored) {
-          }
-        }
-      });
+      Thread t =
+          new Thread(
+              () -> {
+                for (int j = 0; j < 8; j++) {
+                  finalFactory.getChannel("127.0.0.1:2379", mapping);
+                  try {
+                    Thread.sleep(1000);
+                  } catch (InterruptedException ignored) {
+                  }
+                }
+              });
       t.start();
       tasks.add(t);
     }
 
-    Thread modify = new Thread(() -> {
-      for (int i = 0; i < 8; i++) {
-        assertTrue(new File(clientKeyPath).setLastModified(System.currentTimeMillis()));
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException ignored) {
-        }
-      }
-    });
+    Thread modify =
+        new Thread(
+            () -> {
+              for (int i = 0; i < 8; i++) {
+                assertTrue(new File(clientKeyPath).setLastModified(System.currentTimeMillis()));
+                try {
+                  Thread.sleep(1000);
+                } catch (InterruptedException ignored) {
+                }
+              }
+            });
     modify.start();
 
     for (Thread t : tasks) {
