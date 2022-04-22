@@ -197,6 +197,7 @@ public class ChannelFactory implements AutoCloseable {
     this.idleTimeout = idleTimeout;
     this.certContext =
         new OpenSslContext(trustCertCollectionFilePath, keyCertChainFilePath, keyFilePath);
+    reloadSslContext();
   }
 
   public ChannelFactory(
@@ -213,6 +214,7 @@ public class ChannelFactory implements AutoCloseable {
     this.keepaliveTimeout = keepaliveTimeout;
     this.idleTimeout = idleTimeout;
     this.certContext = new JksContext(jksKeyPath, jksKeyPassword, jksTrustPath, jksTrustPassword);
+    reloadSslContext();
   }
 
   @VisibleForTesting
@@ -220,7 +222,7 @@ public class ChannelFactory implements AutoCloseable {
     if (certContext != null) {
       SslContextBuilder newBuilder = certContext.reload();
       if (newBuilder != null) {
-        sslContextBuilder.set(newBuilder);
+        sslContextBuilder.getAndSet(newBuilder);
         return true;
       }
     }
