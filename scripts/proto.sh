@@ -31,7 +31,6 @@ cd "$TIKV_CLIENT_HOME" || exit
 
 if [ -d "$kvproto_dir" ]; then
 	git -C ${kvproto_dir} fetch -p
-	git pull --all
 else
 	git clone https://github.com/pingcap/kvproto ${kvproto_dir}
 fi
@@ -39,7 +38,6 @@ git -C ${kvproto_dir} checkout ${kvproto_hash}
 
 if [ -d "$raft_rs_dir" ]; then
 	git -C ${raft_rs_dir} fetch -p
-	git pull --all
 else
 	git clone https://github.com/pingcap/raft-rs ${raft_rs_dir}
 fi
@@ -47,7 +45,6 @@ git -C ${raft_rs_dir} checkout ${raft_rs_hash}
 
 if [ -d "$tipb_dir" ]; then
 	git -C ${tipb_dir} fetch -p
-	git pull --all
 else
 	git clone https://github.com/pingcap/tipb ${tipb_dir}
 fi
