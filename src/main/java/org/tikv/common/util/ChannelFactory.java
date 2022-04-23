@@ -148,7 +148,6 @@ public class ChannelFactory implements AutoCloseable {
     }
   }
 
-
   @VisibleForTesting
   public static class OpenSslContext extends CertContext {
     private long trustLastModified;

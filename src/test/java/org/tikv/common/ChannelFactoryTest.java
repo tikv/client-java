@@ -89,16 +89,17 @@ public class ChannelFactoryTest {
     for (int i = 0; i < 8; i++) {
       int threadId = i;
       Thread t =
-          new Thread(() -> {
-            certContext.reload(null);
-            SslContextBuilder builder = certContext.getSslContextBuilder();
-            map.put(threadId, builder);
-            assertNotNull(builder);
-            try {
-              Thread.sleep(1000);
-            } catch (InterruptedException ignored) {
-            }
-          });
+          new Thread(
+              () -> {
+                certContext.reload(null);
+                SslContextBuilder builder = certContext.getSslContextBuilder();
+                map.put(threadId, builder);
+                assertNotNull(builder);
+                try {
+                  Thread.sleep(1000);
+                } catch (InterruptedException ignored) {
+                }
+              });
       t.start();
       tasks.add(t);
     }
