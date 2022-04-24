@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #
 #   Copyright 2017 PingCAP, Inc.
 #
@@ -12,8 +13,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-
-#!/usr/bin/env bash
 
 proto_dir="proto"
 
