@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 #   Copyright 2017 PingCAP, Inc.
 #
@@ -14,43 +13,29 @@
 #   limitations under the License.
 #
 
-kvproto_hash=58f2ac94aa38f49676dd628fbcc1d669a77a62ac
-raft_rs_hash=b9891b673573fad77ebcf9bbe0969cf945841926
-tipb_hash=c4d518eb1d60c21f05b028b36729e64610346dac
+#!/usr/bin/env bash
 
-kvproto_dir="kvproto"
-raft_rs_dir="raft-rs"
-tipb_dir="tipb"
+proto_dir="proto"
 
-CURRENT_DIR=$(pwd)
-TIKV_CLIENT_HOME="$(
-	cd "$(dirname "$0")"/.. || exit
-	pwd
-)"
-cd "$TIKV_CLIENT_HOME" || exit
-
-if [ -d "$kvproto_dir" ]; then
-	git -C ${kvproto_dir} fetch -p
-	git pull --all
-else
-	git clone https://github.com/pingcap/kvproto ${kvproto_dir}
+if [ -d $proto_dir ]; then
+	rm -r $proto_dir
 fi
-git -C ${kvproto_dir} checkout ${kvproto_hash}
 
-if [ -d "$raft_rs_dir" ]; then
-	git -C ${raft_rs_dir} fetch -p
-	git pull --all
-else
-	git clone https://github.com/pingcap/raft-rs ${raft_rs_dir}
-fi
-git -C ${raft_rs_dir} checkout ${raft_rs_hash}
+repos=("https://github.com/pingcap/kvproto" "https://github.com/pingcap/raft-rs" "https://github.com/pingcap/tipb")
+commits=(58f2ac94aa38f49676dd628fbcc1d669a77a62ac b9891b673573fad77ebcf9bbe0969cf945841926 c4d518eb1d60c21f05b028b36729e64610346dac)
 
-if [ -d "$tipb_dir" ]; then
-	git -C ${tipb_dir} fetch -p
-	git pull --all
-else
-	git clone https://github.com/pingcap/tipb ${tipb_dir}
-fi
-git -C ${tipb_dir} checkout ${tipb_hash}
+for i in "${!repos[@]}"; do 
+	repo_name=$(basename ${repos[$i]})
+	git_command="git -C $repo_name"
 
-cd "$CURRENT_DIR" || exit
+	if [ -d "$repo_name" ]; then
+		$git_command checkout `basename $($git_command symbolic-ref --short refs/remotes/origin/HEAD)`
+		$git_command fetch --all
+		$git_command pull --all
+	else
+		git clone ${repos[$i]} $repo_name
+		$git_command fetch -p
+	fi
+
+	$git_command checkout ${commits[$i]}
+done
