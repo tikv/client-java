@@ -17,20 +17,16 @@
 
 package org.tikv.common;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import com.google.common.collect.ImmutableMap;
+import io.grpc.ManagedChannel;
 import io.netty.handler.ssl.SslContextBuilder;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Test;
 import org.tikv.common.util.ChannelFactory;
@@ -40,6 +36,13 @@ public class ChannelFactoryTest {
   private final AtomicLong ts = new AtomicLong(System.currentTimeMillis());
   private final String tlsPath = "src/test/resources/tls/";
   private final String caPath = tlsPath + "ca.crt";
+
+  private ChannelFactory createFactory() {
+    int v = 1024;
+    String clientCertPath = tlsPath + "client.crt";
+    String clientKeyPath = tlsPath + "client.pem";
+    return new ChannelFactory(v, v, v, v, caPath, clientCertPath, clientKeyPath);
+  }
 
   private CertContext createCertContext() {
     String clientCertPath = tlsPath + "client.crt";
@@ -53,65 +56,63 @@ public class ChannelFactoryTest {
   }
 
   @Test
-  public void testSingleThreadTlsReload() throws InterruptedException {
-    CertContext certContext = createCertContext();
-
-    // The first time reloading.
-    certContext.reload(null);
-    SslContextBuilder a = certContext.getSslContextBuilder();
+  public void testSingleThreadTlsReload() {
+    CertContext context = createCertContext();
+    SslContextBuilder a = context.createSslContextBuilder();
     assertNotNull(a);
-    assertEquals(a, certContext.getSslContextBuilder());
+    assertTrue(context.isModified());
+
+    assertFalse(context.isModified());
+    SslContextBuilder b = context.createSslContextBuilder();
+    assertNotEquals(b, a);
 
     touchCert();
-
-    // The second time reloading.
-    certContext.reload(null);
-    SslContextBuilder b = certContext.getSslContextBuilder();
-    assertNotNull(b);
-    // Should get a new SslContextBuilder.
-    assertNotEquals(a, b);
-
-    Map<String, String> map = new HashMap<>(ImmutableMap.of("key", "value"));
-    certContext.reload(map);
-    assertFalse(map.isEmpty());
-
-    touchCert();
-
-    certContext.reload(map);
-    assertTrue(map.isEmpty());
+    assertTrue(context.isModified());
+    SslContextBuilder c = context.createSslContextBuilder();
+    assertNotEquals(c, b);
+    assertNotEquals(c, a);
   }
 
   @Test
   public void testMultiThreadTlsReload() throws InterruptedException {
-    CertContext certContext = createCertContext();
-    Map<Integer, SslContextBuilder> map = new ConcurrentHashMap<>();
-    List<Thread> tasks = new ArrayList<>(8);
-    for (int i = 0; i < 8; i++) {
-      int threadId = i;
+    ChannelFactory factory = createFactory();
+    HostMapping hostMapping = uri -> uri;
+
+    int taskCount = 16;
+    List<Thread> tasks = new ArrayList<>(taskCount);
+    for (int i = 0; i < taskCount; i++) {
       Thread t =
           new Thread(
               () -> {
-                certContext.reload(null);
-                SslContextBuilder builder = certContext.getSslContextBuilder();
-                map.put(threadId, builder);
-                assertNotNull(builder);
-                try {
-                  Thread.sleep(1000);
-                } catch (InterruptedException ignored) {
+                for (int j = 0; j < 100; j++) {
+                  ManagedChannel c = factory.getChannel("127.0.0.1:2379", hostMapping);
+                  assertNotNull(c);
+                  c.shutdown();
+                  try {
+                    Thread.sleep(100);
+                  } catch (InterruptedException ignore) {
+                  }
                 }
               });
       t.start();
       tasks.add(t);
     }
+    Thread reactor =
+        new Thread(
+            () -> {
+              for (int i = 0; i < 100; i++) {
+                touchCert();
+                try {
+                  Thread.sleep(100);
+                } catch (InterruptedException ignore) {
+                }
+              }
+            });
+    reactor.start();
 
     for (Thread t : tasks) {
       t.join();
     }
-
-    // All the threads should get the same SslContextBuilder.
-    SslContextBuilder unit = map.get(0);
-    for (SslContextBuilder v : map.values()) {
-      assertEquals(unit, v);
-    }
+    reactor.join();
   }
 }

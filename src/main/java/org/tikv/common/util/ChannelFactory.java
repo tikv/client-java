@@ -27,14 +27,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.net.URI;
 import java.security.KeyStore;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.HostMapping;
@@ -42,48 +41,25 @@ import org.tikv.common.pd.PDUtils;
 
 public class ChannelFactory implements AutoCloseable {
   private static final Logger logger = LoggerFactory.getLogger(ChannelFactory.class);
+  private static final String PUB_KEY_INFRA = "PKIX";
 
   private final int maxFrameSize;
   private final int keepaliveTime;
   private final int keepaliveTimeout;
   private final int idleTimeout;
-  private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
   private final CertContext certContext;
-  private static final String PUB_KEY_INFRA = "PKIX";
+
+  @VisibleForTesting
+  public final ConcurrentHashMap<Pair<SslContextBuilder, String>, ManagedChannel> connPool =
+      new ConcurrentHashMap<>();
+
+  private final AtomicReference<SslContextBuilder> sslContextBuilder = new AtomicReference<>();
 
   @VisibleForTesting
   public abstract static class CertContext {
-    private final ReadWriteLock lock = new ReentrantReadWriteLock();
-    private SslContextBuilder sslContextBuilder;
+    public abstract boolean isModified();
 
-    protected abstract boolean isModified();
-
-    protected abstract SslContextBuilder createSslContextBuilder();
-
-    public void reload(Map<?, ?> connPool) {
-      try {
-        lock.writeLock().lock();
-        if (isModified()) {
-          logger.info("reload ssl context");
-          sslContextBuilder = createSslContextBuilder();
-          if (connPool != null) {
-            logger.info("invalidate connection pool");
-            connPool.clear();
-          }
-        }
-      } finally {
-        lock.writeLock().unlock();
-      }
-    }
-
-    public SslContextBuilder getSslContextBuilder() {
-      try {
-        lock.readLock().lock();
-        return sslContextBuilder;
-      } finally {
-        lock.readLock().unlock();
-      }
-    }
+    public abstract SslContextBuilder createSslContextBuilder();
   }
 
   @VisibleForTesting
@@ -107,7 +83,7 @@ public class ChannelFactory implements AutoCloseable {
     }
 
     @Override
-    protected boolean isModified() {
+    public boolean isModified() {
       long a = new File(keyPath).lastModified();
       long b = new File(trustPath).lastModified();
 
@@ -122,7 +98,7 @@ public class ChannelFactory implements AutoCloseable {
     }
 
     @Override
-    protected SslContextBuilder createSslContextBuilder() {
+    public SslContextBuilder createSslContextBuilder() {
       SslContextBuilder builder = GrpcSslContexts.forClient();
       try {
         if (keyPath != null && keyPassword != null) {
@@ -169,7 +145,7 @@ public class ChannelFactory implements AutoCloseable {
     }
 
     @Override
-    protected boolean isModified() {
+    public boolean isModified() {
       long a = new File(trustPath).lastModified();
       long b = new File(chainPath).lastModified();
       long c = new File(keyPath).lastModified();
@@ -187,7 +163,7 @@ public class ChannelFactory implements AutoCloseable {
     }
 
     @Override
-    protected SslContextBuilder createSslContextBuilder() {
+    public SslContextBuilder createSslContextBuilder() {
       SslContextBuilder builder = GrpcSslContexts.forClient();
       if (trustPath != null) {
         builder.trustManager(new File(trustPath));
@@ -240,53 +216,69 @@ public class ChannelFactory implements AutoCloseable {
     this.certContext = new JksContext(jksKeyPath, jksKeyPassword, jksTrustPath, jksTrustPassword);
   }
 
-  public ManagedChannel getChannel(String addressStr, HostMapping hostMapping) {
-    SslContextBuilder sslContextBuilder = null;
-    if (certContext != null) {
-      certContext.reload(connPool);
-      sslContextBuilder = certContext.getSslContextBuilder();
+  private ManagedChannel createChannel(
+      SslContextBuilder sslContextBuilder, String address, HostMapping mapping) {
+    URI uri, mapped;
+    try {
+      uri = PDUtils.addrToUri(address);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("failed to form address " + address, e);
+    }
+    try {
+      mapped = mapping.getMappedURI(uri);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("failed to get mapped address " + uri, e);
     }
 
-    SslContextBuilder finalSslContextBuilder = sslContextBuilder;
+    // Channel should be lazy without actual connection until first call
+    // So a coarse grain lock is ok here
+    NettyChannelBuilder builder =
+        NettyChannelBuilder.forAddress(mapped.getHost(), mapped.getPort())
+            .maxInboundMessageSize(maxFrameSize)
+            .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
+            .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
+            .keepAliveWithoutCalls(true)
+            .idleTimeout(idleTimeout, TimeUnit.SECONDS);
+
+    if (sslContextBuilder == null) {
+      return builder.usePlaintext().build();
+    } else {
+      SslContext sslContext;
+      try {
+        sslContext = sslContextBuilder.build();
+      } catch (SSLException e) {
+        logger.error("create ssl context failed!", e);
+        return null;
+      }
+      return builder.sslContext(sslContext).build();
+    }
+  }
+
+  @VisibleForTesting
+  public synchronized ManagedChannel reload(String address, HostMapping mapping) {
+    assert certContext != null;
+    // TODO: use WatchService to detect file change.
+    if (certContext.isModified()) {
+      logger.info("certificate file changed, reloading");
+      sslContextBuilder.set(certContext.createSslContextBuilder());
+      connPool.clear();
+      return connPool.computeIfAbsent(
+          Pair.of(sslContextBuilder.get(), address),
+          key -> createChannel(key.getLeft(), key.getRight(), mapping));
+    }
+    return null;
+  }
+
+  public ManagedChannel getChannel(String address, HostMapping mapping) {
+    if (certContext != null) {
+      ManagedChannel channel = reload(address, mapping);
+      if (channel != null) {
+        return channel;
+      }
+    }
     return connPool.computeIfAbsent(
-        addressStr,
-        key -> {
-          URI address;
-          URI mappedAddr;
-          try {
-            address = PDUtils.addrToUri(key);
-          } catch (Exception e) {
-            throw new IllegalArgumentException("failed to form address " + key, e);
-          }
-          try {
-            mappedAddr = hostMapping.getMappedURI(address);
-          } catch (Exception e) {
-            throw new IllegalArgumentException("failed to get mapped address " + address, e);
-          }
-
-          // Channel should be lazy without actual connection until first call
-          // So a coarse grain lock is ok here
-          NettyChannelBuilder builder =
-              NettyChannelBuilder.forAddress(mappedAddr.getHost(), mappedAddr.getPort())
-                  .maxInboundMessageSize(maxFrameSize)
-                  .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
-                  .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
-                  .keepAliveWithoutCalls(true)
-                  .idleTimeout(idleTimeout, TimeUnit.SECONDS);
-
-          if (certContext == null) {
-            return builder.usePlaintext().build();
-          } else {
-            SslContext sslContext;
-            try {
-              sslContext = finalSslContextBuilder.build();
-            } catch (SSLException e) {
-              logger.error("create ssl context failed!", e);
-              return null;
-            }
-            return builder.sslContext(sslContext).build();
-          }
-        });
+        Pair.of(sslContextBuilder.get(), address),
+        key -> createChannel(key.getLeft(), key.getRight(), mapping));
   }
 
   public void close() {
