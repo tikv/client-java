@@ -118,7 +118,7 @@ public class ChannelFactory implements AutoCloseable {
         }
       } catch (Exception e) {
         logger.error("JKS SSL context builder failed!", e);
-        throw new RuntimeException(e);
+        throw new IllegalArgumentException(e);
       }
       return builder;
     }
@@ -248,7 +248,7 @@ public class ChannelFactory implements AutoCloseable {
         sslContext = sslContextBuilder.build();
       } catch (SSLException e) {
         logger.error("create ssl context failed!", e);
-        return null;
+        throw new IllegalArgumentException(e);
       }
       return builder.sslContext(sslContext).build();
     }
@@ -260,8 +260,18 @@ public class ChannelFactory implements AutoCloseable {
     // TODO: use WatchService to detect file change.
     if (certContext.isModified()) {
       logger.info("certificate file changed, reloading");
+
       sslContextBuilder.set(certContext.createSslContextBuilder());
+
+      // Try to clear invalid channel, write might not be seen by the other thread.
       connPool.clear();
+
+      // The `connPool` use (sslContextBuilder, address) as key, for the following reason:
+      // When the `sslContextBuilder` is changed, the `connPool` will compute a new key for the
+      // address. If the previous thread doesn't see the change of the sslContextBuilder, it will
+      // use the old key to retrieve a broken channel without breaking the current thread's
+      // computation. Otherwise, it will use the new key(with the latest sslContextBuilder) to
+      // retrieve a new channel, then the current thread can still read the new channel.
       return connPool.computeIfAbsent(
           Pair.of(sslContextBuilder.get(), address),
           key -> createChannel(key.getLeft(), key.getRight(), mapping));
