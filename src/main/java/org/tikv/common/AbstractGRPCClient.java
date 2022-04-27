@@ -43,8 +43,8 @@ import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
 
 public abstract class AbstractGRPCClient<
-    BlockingStubT extends AbstractStub<BlockingStubT>,
-    FutureStubT extends AbstractFutureStub<FutureStubT>>
+        BlockingStubT extends AbstractStub<BlockingStubT>,
+        FutureStubT extends AbstractFutureStub<FutureStubT>>
     implements AutoCloseable {
   protected final Logger logger = LoggerFactory.getLogger(this.getClass());
   protected final ChannelFactory channelFactory;

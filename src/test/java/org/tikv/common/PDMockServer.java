@@ -71,12 +71,10 @@ public class PDMockServer extends PDGrpc.PDImplBase {
       private int logical = 0;
 
       @Override
-      public void onNext(TsoRequest value) {
-      }
+      public void onNext(TsoRequest value) {}
 
       @Override
-      public void onError(Throwable t) {
-      }
+      public void onError(Throwable t) {}
 
       @Override
       public void onCompleted() {
@@ -149,8 +147,8 @@ public class PDMockServer extends PDGrpc.PDImplBase {
   public void start(long clusterId, int port) throws IOException {
     this.clusterId = clusterId;
     this.port = port;
-    server = ServerBuilder.forPort(port).addService(new HealCheck()).addService(this).build()
-        .start();
+    server =
+        ServerBuilder.forPort(port).addService(new HealCheck()).addService(this).build().start();
 
     Runtime.getRuntime().addShutdownHook(new Thread(PDMockServer.this::stop));
   }
