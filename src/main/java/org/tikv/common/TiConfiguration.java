@@ -17,14 +17,156 @@
 
 package org.tikv.common;
 
-import static org.tikv.common.ConfigUtils.*;
+import static org.tikv.common.ConfigUtils.DEF_BATCH_DELETE_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.DEF_BATCH_GET_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.DEF_BATCH_PUT_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.DEF_BATCH_SCAN_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.DEF_CHECK_HEALTH_TIMEOUT;
+import static org.tikv.common.ConfigUtils.DEF_CONN_RECYCLE_TIME;
+import static org.tikv.common.ConfigUtils.DEF_DB_PREFIX;
+import static org.tikv.common.ConfigUtils.DEF_DELETE_RANGE_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.DEF_FORWARD_TIMEOUT;
+import static org.tikv.common.ConfigUtils.DEF_GRPC_FORWARD_ENABLE;
+import static org.tikv.common.ConfigUtils.DEF_HEALTH_CHECK_PERIOD_DURATION;
+import static org.tikv.common.ConfigUtils.DEF_INDEX_SCAN_BATCH_SIZE;
+import static org.tikv.common.ConfigUtils.DEF_INDEX_SCAN_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.DEF_KV_CLIENT_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.DEF_MAX_FRAME_SIZE;
+import static org.tikv.common.ConfigUtils.DEF_METRICS_ENABLE;
+import static org.tikv.common.ConfigUtils.DEF_METRICS_PORT;
+import static org.tikv.common.ConfigUtils.DEF_PD_ADDRESSES;
+import static org.tikv.common.ConfigUtils.DEF_REPLICA_READ;
+import static org.tikv.common.ConfigUtils.DEF_SCAN_BATCH_SIZE;
+import static org.tikv.common.ConfigUtils.DEF_SCAN_TIMEOUT;
+import static org.tikv.common.ConfigUtils.DEF_SHOW_ROWID;
+import static org.tikv.common.ConfigUtils.DEF_TABLE_SCAN_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.DEF_TIFLASH_ENABLE;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_BO_REGION_MISS_BASE_IN_MS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_ENABLE_ATOMIC_FOR_CAS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_GRPC_IDLE_TIMEOUT;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_GRPC_INGEST_TIMEOUT;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_GRPC_KEEPALIVE_TIME;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_GRPC_KEEPALIVE_TIMEOUT;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_GRPC_WARM_UP_TIMEOUT;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_IMPORTER_MAX_KV_BATCH_BYTES;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_IMPORTER_MAX_KV_BATCH_SIZE;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_NETWORK_MAPPING_NAME;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_PD_FIRST_GET_MEMBER_TIMEOUT;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_RAWKV_READ_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_RAWKV_SCAN_SLOWLOG_IN_MS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_RAWKV_SCAN_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_SCAN_REGIONS_LIMIT;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_SCATTER_WAIT_SECONDS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_TLS_ENABLE;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_USE_JKS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_WARM_UP_ENABLE;
+import static org.tikv.common.ConfigUtils.DEF_TIMEOUT;
+import static org.tikv.common.ConfigUtils.DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT;
+import static org.tikv.common.ConfigUtils.DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE;
+import static org.tikv.common.ConfigUtils.DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUST_VOLUMN_THRESHOLD;
+import static org.tikv.common.ConfigUtils.DEF_TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS;
+import static org.tikv.common.ConfigUtils.DEF_TiKV_CIRCUIT_BREAK_ENABLE;
+import static org.tikv.common.ConfigUtils.DEF_TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS;
+import static org.tikv.common.ConfigUtils.FOLLOWER;
+import static org.tikv.common.ConfigUtils.HIGH_COMMAND_PRIORITY;
+import static org.tikv.common.ConfigUtils.LEADER_AND_FOLLOWER;
+import static org.tikv.common.ConfigUtils.LOW_COMMAND_PRIORITY;
+import static org.tikv.common.ConfigUtils.NORMAL_COMMAND_PRIORITY;
+import static org.tikv.common.ConfigUtils.RAW_KV_MODE;
+import static org.tikv.common.ConfigUtils.READ_COMMITTED_ISOLATION_LEVEL;
+import static org.tikv.common.ConfigUtils.SNAPSHOT_ISOLATION_LEVEL;
+import static org.tikv.common.ConfigUtils.TIFLASH_ENABLE;
+import static org.tikv.common.ConfigUtils.TIKV_BATCH_DELETE_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.TIKV_BATCH_GET_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.TIKV_BATCH_PUT_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.TIKV_BATCH_SCAN_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.TIKV_BO_REGION_MISS_BASE_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_CONN_RECYCLE_TIME;
+import static org.tikv.common.ConfigUtils.TIKV_DB_PREFIX;
+import static org.tikv.common.ConfigUtils.TIKV_DELETE_RANGE_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.TIKV_ENABLE_ATOMIC_FOR_CAS;
+import static org.tikv.common.ConfigUtils.TIKV_ENABLE_GRPC_FORWARD;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_FORWARD_TIMEOUT;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_HEALTH_CHECK_TIMEOUT;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_IDLE_TIMEOUT;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_INGEST_TIMEOUT;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_KEEPALIVE_TIME;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_KEEPALIVE_TIMEOUT;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_MAX_FRAME_SIZE;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_SCAN_BATCH_SIZE;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_SCAN_TIMEOUT;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_TIMEOUT;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_WARM_UP_TIMEOUT;
+import static org.tikv.common.ConfigUtils.TIKV_HEALTH_CHECK_PERIOD_DURATION;
+import static org.tikv.common.ConfigUtils.TIKV_IMPORTER_MAX_KV_BATCH_BYTES;
+import static org.tikv.common.ConfigUtils.TIKV_IMPORTER_MAX_KV_BATCH_SIZE;
+import static org.tikv.common.ConfigUtils.TIKV_INDEX_SCAN_BATCH_SIZE;
+import static org.tikv.common.ConfigUtils.TIKV_INDEX_SCAN_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.TIKV_JKS_KEY_PASSWORD;
+import static org.tikv.common.ConfigUtils.TIKV_JKS_KEY_PATH;
+import static org.tikv.common.ConfigUtils.TIKV_JKS_TRUST_PASSWORD;
+import static org.tikv.common.ConfigUtils.TIKV_JKS_TRUST_PATH;
+import static org.tikv.common.ConfigUtils.TIKV_KEY_CERT_CHAIN;
+import static org.tikv.common.ConfigUtils.TIKV_KEY_FILE;
+import static org.tikv.common.ConfigUtils.TIKV_KV_CLIENT_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.TIKV_KV_MODE;
+import static org.tikv.common.ConfigUtils.TIKV_METRICS_ENABLE;
+import static org.tikv.common.ConfigUtils.TIKV_METRICS_PORT;
+import static org.tikv.common.ConfigUtils.TIKV_NETWORK_MAPPING_NAME;
+import static org.tikv.common.ConfigUtils.TIKV_PD_ADDRESSES;
+import static org.tikv.common.ConfigUtils.TIKV_PD_FIRST_GET_MEMBER_TIMEOUT;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_BATCH_READ_SLOWLOG_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_BATCH_READ_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_BATCH_WRITE_SLOWLOG_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_BATCH_WRITE_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_CLEAN_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_DEFAULT_BACKOFF_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_READ_SLOWLOG_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_READ_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_SCAN_SLOWLOG_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_SCAN_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_SERVER_SLOWLOG_FACTOR;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_WRITE_SLOWLOG_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_RAWKV_WRITE_TIMEOUT_IN_MS;
+import static org.tikv.common.ConfigUtils.TIKV_REPLICA_READ;
+import static org.tikv.common.ConfigUtils.TIKV_REQUEST_COMMAND_PRIORITY;
+import static org.tikv.common.ConfigUtils.TIKV_REQUEST_ISOLATION_LEVEL;
+import static org.tikv.common.ConfigUtils.TIKV_SCAN_REGIONS_LIMIT;
+import static org.tikv.common.ConfigUtils.TIKV_SCATTER_WAIT_SECONDS;
+import static org.tikv.common.ConfigUtils.TIKV_SHOW_ROWID;
+import static org.tikv.common.ConfigUtils.TIKV_TABLE_SCAN_CONCURRENCY;
+import static org.tikv.common.ConfigUtils.TIKV_TLS_BASE_PATH;
+import static org.tikv.common.ConfigUtils.TIKV_TLS_ENABLE;
+import static org.tikv.common.ConfigUtils.TIKV_TRUST_CERT_COLLECTION;
+import static org.tikv.common.ConfigUtils.TIKV_USE_JKS;
+import static org.tikv.common.ConfigUtils.TIKV_WARM_UP_ENABLE;
+import static org.tikv.common.ConfigUtils.TXN_KV_MODE;
+import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT;
+import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_AVAILABILITY_ERROR_THRESHOLD_PERCENTAGE;
+import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_AVAILABILITY_REQUEST_VOLUMN_THRESHOLD;
+import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW_IN_SECONDS;
+import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_ENABLE;
+import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS;
 
 import io.grpc.Metadata;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,6 +235,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_SCAN_TIMEOUT, DEF_SCAN_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_BATCH_SIZE, DEF_SCAN_BATCH_SIZE);
     setIfMissing(TIKV_GRPC_MAX_FRAME_SIZE, DEF_MAX_FRAME_SIZE);
+    setIfMissing(TIKV_CONN_RECYCLE_TIME, DEF_CONN_RECYCLE_TIME);
     setIfMissing(TIKV_INDEX_SCAN_BATCH_SIZE, DEF_INDEX_SCAN_BATCH_SIZE);
     setIfMissing(TIKV_INDEX_SCAN_CONCURRENCY, DEF_INDEX_SCAN_CONCURRENCY);
     setIfMissing(TIKV_TABLE_SCAN_CONCURRENCY, DEF_TABLE_SCAN_CONCURRENCY);
@@ -154,7 +297,7 @@ public class TiConfiguration implements Serializable {
   }
 
   public static void listAll() {
-    logger.info("static configurations are:" + new ArrayList<>(settings.entrySet()).toString());
+    logger.info("static configurations are:" + new ArrayList<>(settings.entrySet()));
   }
 
   private static void set(String key, String value) {
@@ -318,6 +461,7 @@ public class TiConfiguration implements Serializable {
   private long pdFirstGetMemberTimeout = getTimeAsMs(TIKV_PD_FIRST_GET_MEMBER_TIMEOUT);
   private long scanTimeout = getTimeAsMs(TIKV_GRPC_SCAN_TIMEOUT);
   private int maxFrameSize = getInt(TIKV_GRPC_MAX_FRAME_SIZE);
+  private int connRecycleTime = getInt(TIKV_CONN_RECYCLE_TIME);
   private List<URI> pdAddrs = getPdAddrs(TIKV_PD_ADDRESSES);
   private int indexScanBatchSize = getInt(TIKV_INDEX_SCAN_BATCH_SIZE);
   private int indexScanConcurrency = getInt(TIKV_INDEX_SCAN_CONCURRENCY);
@@ -372,6 +516,8 @@ public class TiConfiguration implements Serializable {
   private double rawKVServerSlowLogFactor = getDouble(TIKV_RAWKV_SERVER_SLOWLOG_FACTOR, 0.5);
 
   private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
+  private String tlsBasePath = getOption(TIKV_TLS_BASE_PATH).orElse(null);
+
   private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
   private String keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN).orElse(null);
   private String keyFile = getOption(TIKV_KEY_FILE).orElse(null);
@@ -382,7 +528,7 @@ public class TiConfiguration implements Serializable {
   private String jksTrustPath = getOption(TIKV_JKS_TRUST_PATH).orElse(null);
   private String jksTrustPassword = getOption(TIKV_JKS_TRUST_PASSWORD).orElse(null);
 
-  private boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
+  private final boolean tiFlashEnable = getBoolean(TIFLASH_ENABLE);
   private boolean warmUpEnable = getBoolean(TIKV_WARM_UP_ENABLE);
 
   private boolean isTest = false;
@@ -535,6 +681,15 @@ public class TiConfiguration implements Serializable {
 
   public TiConfiguration setMaxFrameSize(int maxFrameSize) {
     this.maxFrameSize = maxFrameSize;
+    return this;
+  }
+
+  public int getConnRecycleTime() {
+    return connRecycleTime;
+  }
+
+  public TiConfiguration setConnRecycleTime(int connRecycleTime) {
+    this.connRecycleTime = connRecycleTime;
     return this;
   }
 
@@ -850,6 +1005,15 @@ public class TiConfiguration implements Serializable {
 
   public void setTlsEnable(boolean tlsEnable) {
     this.tlsEnable = tlsEnable;
+  }
+
+  public String getTlsBasePath() {
+    return tlsBasePath;
+  }
+
+  public TiConfiguration setTlsBasePath(String path) {
+    this.tlsBasePath = path;
+    return this;
   }
 
   public String getTrustCertCollectionFile() {

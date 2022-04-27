@@ -26,8 +26,24 @@ import io.netty.handler.ssl.SslContextBuilder;
 import java.io.File;
 import java.io.FileInputStream;
 import java.net.URI;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.security.KeyStore;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.KeyManagerFactory;
@@ -43,6 +59,7 @@ public class ChannelFactory implements AutoCloseable {
   private static final Logger logger = LoggerFactory.getLogger(ChannelFactory.class);
   private static final String PUB_KEY_INFRA = "PKIX";
 
+  private int connRecycleTime;
   private final int maxFrameSize;
   private final int keepaliveTime;
   private final int keepaliveTimeout;
@@ -55,46 +72,110 @@ public class ChannelFactory implements AutoCloseable {
 
   private final AtomicReference<SslContextBuilder> sslContextBuilder = new AtomicReference<>();
 
-  @VisibleForTesting
-  public abstract static class CertContext {
-    public abstract boolean isModified();
+  private final ScheduledExecutorService recycler = Executors.newScheduledThreadPool(1);
 
-    public abstract SslContextBuilder createSslContextBuilder();
+  @VisibleForTesting
+  public static class CertWatcher implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(CertWatcher.class);
+    private final String path;
+    private final ArrayList<String> targets = new ArrayList<>();
+    private final BlockingDeque<Boolean> notify = new LinkedBlockingDeque<>();
+    private final ExecutorService executorService = Executors.newFixedThreadPool(2);
+
+    public CertWatcher(String path) {
+      if (path == null) {
+        throw new IllegalArgumentException("the base path of certs is missing");
+      }
+      this.path = path;
+      notify.push(true);
+      start();
+    }
+
+    private void watchLoop() {
+      try {
+        WatchService watchService = FileSystems.getDefault().newWatchService();
+        Path p = Paths.get(path);
+        p.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
+
+        WatchKey key;
+        while ((key = watchService.take()) != null) {
+          boolean changed = false;
+          OUTER:
+          for (WatchEvent<?> event : key.pollEvents()) {
+            for (String target : targets) {
+              logger.info("detected file change: {}", event.context());
+              if (event.context().toString().equals(target)) {
+                changed = true;
+                break OUTER;
+              }
+            }
+          }
+          if (changed) {
+            notify.offer(true);
+          }
+          key.reset();
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    private void start() {
+      executorService.submit(this::watchLoop);
+    }
+
+    public CertWatcher addTarget(String target) {
+      targets.add(target);
+      return this;
+    }
+
+    public boolean isModified() throws Exception {
+      boolean modified = !notify.isEmpty();
+      if (modified) {
+        notify.take();
+      }
+
+      return modified;
+    }
+
+    @Override
+    public void close() {
+      executorService.shutdownNow();
+    }
   }
 
   @VisibleForTesting
-  public static class JksContext extends CertContext {
-    private long keyLastModified;
-    private long trustLastModified;
+  public abstract static class CertContext implements AutoCloseable {
+    public CertWatcher certWatcher;
 
+    public abstract boolean isModified() throws Exception;
+
+    public abstract SslContextBuilder createSslContextBuilder();
+
+    @Override
+    public void close() {
+      certWatcher.close();
+    }
+  }
+
+  public static class JksContext extends CertContext {
     private final String keyPath;
     private final String keyPassword;
     private final String trustPath;
     private final String trustPassword;
 
-    public JksContext(String keyPath, String keyPassword, String trustPath, String trustPassword) {
-      this.keyLastModified = 0;
-      this.trustLastModified = 0;
-
-      this.keyPath = keyPath;
+    public JksContext(
+        String base, String keyPath, String keyPassword, String trustPath, String trustPassword) {
+      this.keyPath = base + keyPath;
       this.keyPassword = keyPassword;
-      this.trustPath = trustPath;
+      this.trustPath = base + trustPath;
       this.trustPassword = trustPassword;
+      certWatcher = new CertWatcher(base).addTarget(keyPath).addTarget(trustPath);
     }
 
     @Override
-    public boolean isModified() {
-      long a = new File(keyPath).lastModified();
-      long b = new File(trustPath).lastModified();
-
-      boolean changed = this.keyLastModified != a || this.trustLastModified != b;
-
-      if (changed) {
-        this.keyLastModified = a;
-        this.trustLastModified = b;
-      }
-
-      return changed;
+    public boolean isModified() throws Exception {
+      return certWatcher.isModified();
     }
 
     @Override
@@ -126,40 +207,22 @@ public class ChannelFactory implements AutoCloseable {
 
   @VisibleForTesting
   public static class OpenSslContext extends CertContext {
-    private long trustLastModified;
-    private long chainLastModified;
-    private long keyLastModified;
-
     private final String trustPath;
     private final String chainPath;
     private final String keyPath;
 
-    public OpenSslContext(String trustPath, String chainPath, String keyPath) {
-      this.trustLastModified = 0;
-      this.chainLastModified = 0;
-      this.keyLastModified = 0;
+    public OpenSslContext(String base, String trustPath, String chainPath, String keyPath) {
+      this.trustPath = base + trustPath;
+      this.chainPath = base + chainPath;
+      this.keyPath = base + keyPath;
 
-      this.trustPath = trustPath;
-      this.chainPath = chainPath;
-      this.keyPath = keyPath;
+      certWatcher =
+          new CertWatcher(base).addTarget(trustPath).addTarget(chainPath).addTarget(keyPath);
     }
 
     @Override
-    public boolean isModified() {
-      long a = new File(trustPath).lastModified();
-      long b = new File(chainPath).lastModified();
-      long c = new File(keyPath).lastModified();
-
-      boolean changed =
-          this.trustLastModified != a || this.chainLastModified != b || this.keyLastModified != c;
-
-      if (changed) {
-        this.trustLastModified = a;
-        this.chainLastModified = b;
-        this.keyLastModified = c;
-      }
-
-      return changed;
+    public boolean isModified() throws Exception {
+      return certWatcher.isModified();
     }
 
     @Override
@@ -189,6 +252,8 @@ public class ChannelFactory implements AutoCloseable {
       int keepaliveTime,
       int keepaliveTimeout,
       int idleTimeout,
+      int connRecycleTime,
+      String path,
       String trustCertCollectionFilePath,
       String keyCertChainFilePath,
       String keyFilePath) {
@@ -196,8 +261,9 @@ public class ChannelFactory implements AutoCloseable {
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
     this.idleTimeout = idleTimeout;
+    this.connRecycleTime = connRecycleTime;
     this.certContext =
-        new OpenSslContext(trustCertCollectionFilePath, keyCertChainFilePath, keyFilePath);
+        new OpenSslContext(path, trustCertCollectionFilePath, keyCertChainFilePath, keyFilePath);
   }
 
   public ChannelFactory(
@@ -205,6 +271,8 @@ public class ChannelFactory implements AutoCloseable {
       int keepaliveTime,
       int keepaliveTimeout,
       int idleTimeout,
+      int connRecycleTime,
+      String path,
       String jksKeyPath,
       String jksKeyPassword,
       String jksTrustPath,
@@ -213,7 +281,9 @@ public class ChannelFactory implements AutoCloseable {
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
     this.idleTimeout = idleTimeout;
-    this.certContext = new JksContext(jksKeyPath, jksKeyPassword, jksTrustPath, jksTrustPassword);
+    this.connRecycleTime = connRecycleTime;
+    this.certContext =
+        new JksContext(path, jksKeyPath, jksKeyPassword, jksTrustPath, jksTrustPassword);
   }
 
   private ManagedChannel createChannel(
@@ -254,17 +324,38 @@ public class ChannelFactory implements AutoCloseable {
     }
   }
 
-  @VisibleForTesting
-  public synchronized ManagedChannel reload(String address, HostMapping mapping) {
+  private void cleanExpireConn(Collection<ManagedChannel> pending) {
+    for (ManagedChannel channel : pending) {
+      logger.info("cleaning expire channels");
+      channel.shutdownNow();
+      while (!channel.isShutdown()) {
+        try {
+          channel.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+          logger.info("recycle channels timeout:", e);
+        }
+      }
+    }
+  }
+
+  private synchronized ManagedChannel reload(String address, HostMapping mapping) throws Exception {
     assert certContext != null;
-    // TODO: use WatchService to detect file change.
     if (certContext.isModified()) {
       logger.info("certificate file changed, reloading");
 
       sslContextBuilder.set(certContext.createSslContextBuilder());
 
-      // Try to clear invalid channel, write might not be seen by the other thread.
-      connPool.clear();
+      Collection<ManagedChannel> pending = new HashSet<>();
+      for (Map.Entry<Pair<SslContextBuilder, String>, ManagedChannel> pair : connPool.entrySet()) {
+        SslContextBuilder b = pair.getKey().getLeft();
+        if (b != sslContextBuilder.get()) {
+          pending.add(pair.getValue());
+          connPool.remove(pair.getKey());
+          connPool.computeIfAbsent(Pair.of(sslContextBuilder.get(), pair.getKey().getRight()),
+              key -> createChannel(key.getLeft(), key.getRight(), mapping));
+        }
+      }
+      recycler.schedule(() -> cleanExpireConn(pending), connRecycleTime, TimeUnit.SECONDS);
 
       // The `connPool` use (sslContextBuilder, address) as key, for the following reason:
       // When the `sslContextBuilder` is changed, the `connPool` will compute a new key for the
@@ -281,9 +372,13 @@ public class ChannelFactory implements AutoCloseable {
 
   public ManagedChannel getChannel(String address, HostMapping mapping) {
     if (certContext != null) {
-      ManagedChannel channel = reload(address, mapping);
-      if (channel != null) {
-        return channel;
+      try {
+        ManagedChannel channel = reload(address, mapping);
+        if (channel != null) {
+          return channel;
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
     }
     return connPool.computeIfAbsent(
@@ -296,5 +391,10 @@ public class ChannelFactory implements AutoCloseable {
       ch.shutdown();
     }
     connPool.clear();
+
+    if (certContext != null) {
+      recycler.shutdownNow();
+      certContext.close();
+    }
   }
 }

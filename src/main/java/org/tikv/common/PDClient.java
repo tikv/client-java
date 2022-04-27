@@ -436,22 +436,25 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   private GetMembersResponse getMembers(URI uri) {
-    try {
-      ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
-      PDGrpc.PDBlockingStub stub =
-          PDGrpc.newBlockingStub(probChan).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
-      GetMembersRequest request =
-          GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
-      GetMembersResponse resp = stub.getMembers(request);
-      // check if the response contains a valid leader
-      if (resp != null && resp.getLeader().getMemberId() == 0) {
-        return null;
+    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
+    while (true) {
+      try {
+        ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
+        PDGrpc.PDBlockingStub stub =
+            PDGrpc.newBlockingStub(probChan).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+        GetMembersRequest request =
+            GetMembersRequest.newBuilder().setHeader(RequestHeader.getDefaultInstance()).build();
+        GetMembersResponse resp = stub.getMembers(request);
+        // check if the response contains a valid leader
+        if (resp != null && resp.getLeader().getMemberId() == 0) {
+          return null;
+        }
+        return resp;
+      } catch (Exception e) {
+        logger.warn("failed to get member from pd server.", e);
       }
-      return resp;
-    } catch (Exception e) {
-      logger.warn("failed to get member from pd server.", e);
+      backOffer.checkTimeout();
     }
-    return null;
   }
 
   // return whether the leader has changed to target address `leaderUrlStr`.
@@ -463,7 +466,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
           return true;
         }
       }
-      // If leader has transfered to another member, we can create another leaderwrapper.
+      // If leader has transferred to another member, we can create another leaderWrapper.
     }
     // switch leader
     return createLeaderClientWrapper(leaderUrlStr);
@@ -502,7 +505,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return true;
   }
 
-  public synchronized void updateLeaderOrforwardFollower() {
+  public synchronized void updateLeaderOrForwardFollower() {
     if (System.currentTimeMillis() - lastUpdateLeaderTime < MIN_TRY_UPDATE_DURATION) {
       return;
     }
@@ -520,7 +523,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
 
       // if leader is switched, just return.
-      if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
+      if (checkHealth(leaderUrlStr, hostMapping) && createLeaderClientWrapper(leaderUrlStr)) {
         lastUpdateLeaderTime = System.currentTimeMillis();
         return;
       }

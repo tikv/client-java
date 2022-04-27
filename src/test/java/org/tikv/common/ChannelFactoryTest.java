@@ -35,28 +35,26 @@ import org.tikv.common.util.ChannelFactory.CertContext;
 public class ChannelFactoryTest {
   private final AtomicLong ts = new AtomicLong(System.currentTimeMillis());
   private final String tlsPath = "src/test/resources/tls/";
-  private final String caPath = tlsPath + "ca.crt";
+  private final String caPath = "ca.crt";
+  private final String clientCertPath = "client.crt";
+  private final String clientKeyPath = "client.pem";
 
   private ChannelFactory createFactory() {
     int v = 1024;
-    String clientCertPath = tlsPath + "client.crt";
-    String clientKeyPath = tlsPath + "client.pem";
-    return new ChannelFactory(v, v, v, v, caPath, clientCertPath, clientKeyPath);
+    return new ChannelFactory(v, v, v, v, 5, tlsPath, caPath, clientCertPath, clientKeyPath);
   }
 
   private CertContext createCertContext() {
-    String clientCertPath = tlsPath + "client.crt";
-    String clientKeyPath = tlsPath + "client.pem";
-    return new ChannelFactory.OpenSslContext(caPath, clientCertPath, clientKeyPath);
+    return new ChannelFactory.OpenSslContext(tlsPath, caPath, clientCertPath, clientKeyPath);
   }
 
   private void touchCert() {
     ts.addAndGet(100_000_000);
-    assertTrue(new File(caPath).setLastModified(ts.get()));
+    assertTrue(new File(tlsPath + caPath).setLastModified(ts.get()));
   }
 
   @Test
-  public void testSingleThreadTlsReload() {
+  public void testSingleThreadTlsReload() throws Exception {
     CertContext context = createCertContext();
     SslContextBuilder a = context.createSslContextBuilder();
     assertNotNull(a);
@@ -67,6 +65,8 @@ public class ChannelFactoryTest {
     assertNotEquals(b, a);
 
     touchCert();
+
+    Thread.sleep(100);
     assertTrue(context.isModified());
     SslContextBuilder c = context.createSslContextBuilder();
     assertNotEquals(c, b);
@@ -78,16 +78,17 @@ public class ChannelFactoryTest {
     ChannelFactory factory = createFactory();
     HostMapping hostMapping = uri -> uri;
 
-    int taskCount = 16;
+    int taskCount = Runtime.getRuntime().availableProcessors() * 2;
     List<Thread> tasks = new ArrayList<>(taskCount);
     for (int i = 0; i < taskCount; i++) {
       Thread t =
           new Thread(
               () -> {
                 for (int j = 0; j < 100; j++) {
-                  ManagedChannel c = factory.getChannel("127.0.0.1:2379", hostMapping);
+                  String addr = "127.0.0.1:237" + (j % 2 == 0 ? 9 : 8);
+                  ManagedChannel c = factory.getChannel(addr, hostMapping);
                   assertNotNull(c);
-                  c.shutdown();
+                  c.shutdownNow();
                   try {
                     Thread.sleep(100);
                   } catch (InterruptedException ignore) {
@@ -114,5 +115,8 @@ public class ChannelFactoryTest {
       t.join();
     }
     reactor.join();
+
+    factory.close();
+    assertTrue(factory.connPool.isEmpty());
   }
 }

@@ -39,6 +39,7 @@ import org.tikv.common.policy.RetryPolicy;
 import org.tikv.common.streaming.StreamingResponse;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.ConcreteBackOffer;
 
 public abstract class AbstractGRPCClient<
         BlockingStubT extends AbstractStub<BlockingStubT>,
@@ -180,18 +181,20 @@ public abstract class AbstractGRPCClient<
   protected abstract FutureStubT getAsyncStub();
 
   protected boolean checkHealth(String addressStr, HostMapping hostMapping) {
-    ManagedChannel channel = channelFactory.getChannel(addressStr, hostMapping);
-    HealthGrpc.HealthBlockingStub stub =
-        HealthGrpc.newBlockingStub(channel).withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
-    HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
-    try {
-      HealthCheckResponse resp = stub.check(req);
-      if (resp.getStatus() != HealthCheckResponse.ServingStatus.SERVING) {
-        return false;
+    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff((int) (timeout * 2));
+    while (true) {
+      try {
+        ManagedChannel channel = channelFactory.getChannel(addressStr, hostMapping);
+        HealthGrpc.HealthBlockingStub stub =
+            HealthGrpc.newBlockingStub(channel)
+                .withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+        HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
+        HealthCheckResponse resp = stub.check(req);
+        return resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING;
+      } catch (Exception e) {
+        logger.warn(e.toString());
       }
-    } catch (Exception e) {
-      return false;
+      backOffer.checkTimeout();
     }
-    return true;
   }
 }
