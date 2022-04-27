@@ -435,8 +435,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return pdClientWrapper;
   }
 
-  private GetMembersResponse getMembers(URI uri) {
-    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
+  private GetMembersResponse doGetMembers(BackOffer backOffer, URI uri) {
     while (true) {
       try {
         ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
@@ -452,8 +451,17 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
         return resp;
       } catch (Exception e) {
         logger.warn("failed to get member from pd server.", e);
+        backOffer.doBackOff(BackOffFuncType.BoPDRPC, e);
       }
-      backOffer.checkTimeout();
+    }
+  }
+
+  private GetMembersResponse getMembers(URI uri) {
+    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
+    try {
+      return doGetMembers(backOffer, uri);
+    } catch (Exception e) {
+      return null;
     }
   }
 

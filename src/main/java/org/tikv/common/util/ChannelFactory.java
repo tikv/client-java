@@ -351,7 +351,8 @@ public class ChannelFactory implements AutoCloseable {
         if (b != sslContextBuilder.get()) {
           pending.add(pair.getValue());
           connPool.remove(pair.getKey());
-          connPool.computeIfAbsent(Pair.of(sslContextBuilder.get(), pair.getKey().getRight()),
+          connPool.computeIfAbsent(
+              Pair.of(sslContextBuilder.get(), pair.getKey().getRight()),
               key -> createChannel(key.getLeft(), key.getRight(), mapping));
         }
       }
