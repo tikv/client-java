@@ -43,8 +43,8 @@ import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
 
 public abstract class AbstractGRPCClient<
-        BlockingStubT extends AbstractStub<BlockingStubT>,
-        FutureStubT extends AbstractFutureStub<FutureStubT>>
+    BlockingStubT extends AbstractStub<BlockingStubT>,
+    FutureStubT extends AbstractFutureStub<FutureStubT>>
     implements AutoCloseable {
   protected final Logger logger = LoggerFactory.getLogger(this.getClass());
   protected final ChannelFactory channelFactory;
@@ -192,7 +192,7 @@ public abstract class AbstractGRPCClient<
         HealthCheckResponse resp = stub.check(req);
         return resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING;
       } catch (Exception e) {
-        logger.warn("check health failed {}", e.toString());
+        logger.warn("check health failed.", e);
         backOffer.doBackOff(BackOffFuncType.BoCheckHealth, e);
       }
     }
