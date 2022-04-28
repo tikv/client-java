@@ -67,11 +67,13 @@ public class ChannelFactory implements AutoCloseable {
   private final CertContext certContext;
 
   private int epoch = 0;
+
   @VisibleForTesting
   public final ConcurrentHashMap<Pair<Epoch<SslContextBuilder>, String>, ManagedChannel> connPool =
       new ConcurrentHashMap<>();
 
-  private final AtomicReference<Epoch<SslContextBuilder>> sslContextBuilder = new AtomicReference<>();
+  private final AtomicReference<Epoch<SslContextBuilder>> sslContextBuilder =
+      new AtomicReference<>();
 
   private final ScheduledExecutorService recycler = Executors.newScheduledThreadPool(1);
 
@@ -379,11 +381,11 @@ public class ChannelFactory implements AutoCloseable {
     if (certContext.isModified()) {
       logger.info("certificate file changed, reloading");
 
-      sslContextBuilder.set(
-          new Epoch<>(certContext.createSslContextBuilder(), epoch++));
+      sslContextBuilder.set(new Epoch<>(certContext.createSslContextBuilder(), epoch++));
 
       Collection<ManagedChannel> pending = new HashSet<>();
-      for (Map.Entry<Pair<Epoch<SslContextBuilder>, String>, ManagedChannel> pair : connPool.entrySet()) {
+      for (Map.Entry<Pair<Epoch<SslContextBuilder>, String>, ManagedChannel> pair :
+          connPool.entrySet()) {
         Epoch<SslContextBuilder> b = pair.getKey().getLeft();
         if (b != sslContextBuilder.get()) {
           pending.add(pair.getValue());
