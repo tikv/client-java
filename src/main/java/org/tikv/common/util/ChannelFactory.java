@@ -72,8 +72,8 @@ public class ChannelFactory implements AutoCloseable {
   public final ConcurrentHashMap<Pair<Epoch<SslContextBuilder>, String>, ManagedChannel> connPool =
       new ConcurrentHashMap<>();
 
-  private final AtomicReference<Epoch<SslContextBuilder>> sslContextBuilder =
-      new AtomicReference<>();
+  private final AtomicReference<Epoch<SslContextBuilder>> sslContextBuilder = new AtomicReference<>(
+      new Epoch<>(null, epoch));
 
   private final ScheduledExecutorService recycler = Executors.newScheduledThreadPool(1);
 
