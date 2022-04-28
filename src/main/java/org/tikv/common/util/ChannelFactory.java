@@ -66,13 +66,45 @@ public class ChannelFactory implements AutoCloseable {
   private final int idleTimeout;
   private final CertContext certContext;
 
+  private int epoch = 0;
   @VisibleForTesting
-  public final ConcurrentHashMap<Pair<SslContextBuilder, String>, ManagedChannel> connPool =
+  public final ConcurrentHashMap<Pair<Epoch<SslContextBuilder>, String>, ManagedChannel> connPool =
       new ConcurrentHashMap<>();
 
-  private final AtomicReference<SslContextBuilder> sslContextBuilder = new AtomicReference<>();
+  private final AtomicReference<Epoch<SslContextBuilder>> sslContextBuilder = new AtomicReference<>();
 
   private final ScheduledExecutorService recycler = Executors.newScheduledThreadPool(1);
+
+  private static class Epoch<T> {
+    private final T inner;
+    private final int epoch;
+
+    public Epoch(T inner, int epoch) {
+      this.inner = inner;
+      this.epoch = epoch;
+    }
+
+    public T get() {
+      return inner;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (other == this) {
+        return true;
+      } else if (other instanceof Epoch) {
+        Epoch<?> o = (Epoch<?>) other;
+        return o.epoch == epoch;
+      } else {
+        return false;
+      }
+    }
+
+    @Override
+    public int hashCode() {
+      return epoch;
+    }
+  }
 
   @VisibleForTesting
   public static class CertWatcher implements AutoCloseable {
@@ -97,8 +129,8 @@ public class ChannelFactory implements AutoCloseable {
         Path p = Paths.get(path);
         p.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
 
-        WatchKey key;
-        while ((key = watchService.take()) != null) {
+        while (true) {
+          WatchKey key = watchService.take();
           boolean changed = false;
           OUTER:
           for (WatchEvent<?> event : key.pollEvents()) {
@@ -113,7 +145,11 @@ public class ChannelFactory implements AutoCloseable {
           if (changed) {
             notify.offer(true);
           }
-          key.reset();
+          if (!key.reset()) {
+            String msg = "fail to reset watch key";
+            logger.warn(msg);
+            throw new RuntimeException(msg);
+          }
         }
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -343,17 +379,18 @@ public class ChannelFactory implements AutoCloseable {
     if (certContext.isModified()) {
       logger.info("certificate file changed, reloading");
 
-      sslContextBuilder.set(certContext.createSslContextBuilder());
+      sslContextBuilder.set(
+          new Epoch<>(certContext.createSslContextBuilder(), epoch++));
 
       Collection<ManagedChannel> pending = new HashSet<>();
-      for (Map.Entry<Pair<SslContextBuilder, String>, ManagedChannel> pair : connPool.entrySet()) {
-        SslContextBuilder b = pair.getKey().getLeft();
+      for (Map.Entry<Pair<Epoch<SslContextBuilder>, String>, ManagedChannel> pair : connPool.entrySet()) {
+        Epoch<SslContextBuilder> b = pair.getKey().getLeft();
         if (b != sslContextBuilder.get()) {
           pending.add(pair.getValue());
           connPool.remove(pair.getKey());
           connPool.computeIfAbsent(
               Pair.of(sslContextBuilder.get(), pair.getKey().getRight()),
-              key -> createChannel(key.getLeft(), key.getRight(), mapping));
+              key -> createChannel(key.getLeft().get(), key.getRight(), mapping));
         }
       }
       recycler.schedule(() -> cleanExpireConn(pending), connRecycleTime, TimeUnit.SECONDS);
@@ -366,7 +403,7 @@ public class ChannelFactory implements AutoCloseable {
       // retrieve a new channel, then the current thread can still read the new channel.
       return connPool.computeIfAbsent(
           Pair.of(sslContextBuilder.get(), address),
-          key -> createChannel(key.getLeft(), key.getRight(), mapping));
+          key -> createChannel(key.getLeft().get(), key.getRight(), mapping));
     }
     return null;
   }
@@ -384,7 +421,7 @@ public class ChannelFactory implements AutoCloseable {
     }
     return connPool.computeIfAbsent(
         Pair.of(sslContextBuilder.get(), address),
-        key -> createChannel(key.getLeft(), key.getRight(), mapping));
+        key -> createChannel(key.getLeft().get(), key.getRight(), mapping));
   }
 
   public void close() {
