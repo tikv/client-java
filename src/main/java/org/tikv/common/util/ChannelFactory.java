@@ -83,8 +83,8 @@ public class ChannelFactory implements AutoCloseable {
         lastReload.add(0L);
       }
 
-      executorService.scheduleAtFixedRate(this::tryReload, pollInterval, pollInterval,
-          TimeUnit.SECONDS);
+      executorService.scheduleAtFixedRate(
+          this::tryReload, pollInterval, pollInterval, TimeUnit.SECONDS);
     }
 
     private void tryReload() {
