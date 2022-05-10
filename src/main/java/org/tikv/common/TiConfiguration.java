@@ -22,7 +22,6 @@ import static org.tikv.common.ConfigUtils.DEF_BATCH_GET_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.DEF_BATCH_PUT_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.DEF_BATCH_SCAN_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.DEF_CHECK_HEALTH_TIMEOUT;
-import static org.tikv.common.ConfigUtils.DEF_CONN_RECYCLE_TIME;
 import static org.tikv.common.ConfigUtils.DEF_DB_PREFIX;
 import static org.tikv.common.ConfigUtils.DEF_DELETE_RANGE_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.DEF_FORWARD_TIMEOUT;
@@ -42,6 +41,7 @@ import static org.tikv.common.ConfigUtils.DEF_SHOW_ROWID;
 import static org.tikv.common.ConfigUtils.DEF_TABLE_SCAN_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.DEF_TIFLASH_ENABLE;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_BO_REGION_MISS_BASE_IN_MS;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_CONN_RECYCLE_TIME;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_ENABLE_ATOMIC_FOR_CAS;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_GRPC_IDLE_TIMEOUT;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_GRPC_INGEST_TIMEOUT;
@@ -63,6 +63,7 @@ import static org.tikv.common.ConfigUtils.DEF_TIKV_RAWKV_WRITE_TIMEOUT_IN_MS;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_SCAN_REGIONS_LIMIT;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_SCATTER_WAIT_SECONDS;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_TLS_ENABLE;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_TLS_RELOAD_INTERVAL;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_USE_JKS;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_WARM_UP_ENABLE;
 import static org.tikv.common.ConfigUtils.DEF_TIMEOUT;
@@ -140,8 +141,8 @@ import static org.tikv.common.ConfigUtils.TIKV_SCAN_REGIONS_LIMIT;
 import static org.tikv.common.ConfigUtils.TIKV_SCATTER_WAIT_SECONDS;
 import static org.tikv.common.ConfigUtils.TIKV_SHOW_ROWID;
 import static org.tikv.common.ConfigUtils.TIKV_TABLE_SCAN_CONCURRENCY;
-import static org.tikv.common.ConfigUtils.TIKV_TLS_BASE_PATH;
 import static org.tikv.common.ConfigUtils.TIKV_TLS_ENABLE;
+import static org.tikv.common.ConfigUtils.TIKV_TLS_RELOAD_INTERVAL;
 import static org.tikv.common.ConfigUtils.TIKV_TRUST_CERT_COLLECTION;
 import static org.tikv.common.ConfigUtils.TIKV_USE_JKS;
 import static org.tikv.common.ConfigUtils.TIKV_WARM_UP_ENABLE;
@@ -235,7 +236,8 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_SCAN_TIMEOUT, DEF_SCAN_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_BATCH_SIZE, DEF_SCAN_BATCH_SIZE);
     setIfMissing(TIKV_GRPC_MAX_FRAME_SIZE, DEF_MAX_FRAME_SIZE);
-    setIfMissing(TIKV_CONN_RECYCLE_TIME, DEF_CONN_RECYCLE_TIME);
+    setIfMissing(TIKV_CONN_RECYCLE_TIME, DEF_TIKV_CONN_RECYCLE_TIME);
+    setIfMissing(TIKV_TLS_RELOAD_INTERVAL, DEF_TIKV_TLS_RELOAD_INTERVAL);
     setIfMissing(TIKV_INDEX_SCAN_BATCH_SIZE, DEF_INDEX_SCAN_BATCH_SIZE);
     setIfMissing(TIKV_INDEX_SCAN_CONCURRENCY, DEF_INDEX_SCAN_CONCURRENCY);
     setIfMissing(TIKV_TABLE_SCAN_CONCURRENCY, DEF_TABLE_SCAN_CONCURRENCY);
@@ -516,7 +518,7 @@ public class TiConfiguration implements Serializable {
   private double rawKVServerSlowLogFactor = getDouble(TIKV_RAWKV_SERVER_SLOWLOG_FACTOR, 0.5);
 
   private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
-  private String tlsBasePath = getOption(TIKV_TLS_BASE_PATH).orElse(null);
+  private long certReloadInterval = getLong(TIKV_TLS_RELOAD_INTERVAL);
 
   private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
   private String keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN).orElse(null);
@@ -1003,17 +1005,17 @@ public class TiConfiguration implements Serializable {
     return tlsEnable;
   }
 
+  public long getCertReloadInterval() {
+    return certReloadInterval;
+  }
+
+  public TiConfiguration setCertReloadInterval(long interval) {
+    this.certReloadInterval = interval;
+    return this;
+  }
+
   public void setTlsEnable(boolean tlsEnable) {
     this.tlsEnable = tlsEnable;
-  }
-
-  public String getTlsBasePath() {
-    return tlsBasePath;
-  }
-
-  public TiConfiguration setTlsBasePath(String path) {
-    this.tlsBasePath = path;
-    return this;
   }
 
   public String getTrustCertCollectionFile() {

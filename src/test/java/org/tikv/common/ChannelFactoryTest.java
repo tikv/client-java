@@ -17,60 +17,46 @@
 
 package org.tikv.common;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import io.grpc.ManagedChannel;
-import io.netty.handler.ssl.SslContextBuilder;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Test;
 import org.tikv.common.util.ChannelFactory;
-import org.tikv.common.util.ChannelFactory.CertContext;
+import org.tikv.common.util.ChannelFactory.CertWatcher;
 
 public class ChannelFactoryTest {
   private final AtomicLong ts = new AtomicLong(System.currentTimeMillis());
   private final String tlsPath = "src/test/resources/tls/";
-  private final String caPath = "ca.crt";
-  private final String clientCertPath = "client.crt";
-  private final String clientKeyPath = "client.pem";
+  private final String caPath = tlsPath + "ca.crt";
+  private final String clientCertPath = tlsPath + "client.crt";
+  private final String clientKeyPath = tlsPath + "client.pem";
 
   private ChannelFactory createFactory() {
     int v = 1024;
-    return new ChannelFactory(v, v, v, v, 5, tlsPath, caPath, clientCertPath, clientKeyPath);
-  }
-
-  private CertContext createCertContext() {
-    return new ChannelFactory.OpenSslContext(tlsPath, caPath, clientCertPath, clientKeyPath);
+    return new ChannelFactory(v, v, v, v, 5, 10, caPath, clientCertPath, clientKeyPath);
   }
 
   private void touchCert() {
     ts.addAndGet(100_000_000);
-    assertTrue(new File(tlsPath + caPath).setLastModified(ts.get()));
+    assertTrue(new File(caPath).setLastModified(ts.get()));
   }
 
   @Test
-  public void testSingleThreadTlsReload() throws Exception {
-    CertContext context = createCertContext();
-    SslContextBuilder a = context.createSslContextBuilder();
-    assertNotNull(a);
-    assertTrue(context.isModified());
-
-    assertFalse(context.isModified());
-    SslContextBuilder b = context.createSslContextBuilder();
-    assertNotEquals(b, a);
-
-    touchCert();
-
-    Thread.sleep(100);
-    assertTrue(context.isModified());
-    SslContextBuilder c = context.createSslContextBuilder();
-    assertNotEquals(c, b);
-    assertNotEquals(c, a);
+  public void testCertWatcher() throws InterruptedException {
+    AtomicBoolean changed = new AtomicBoolean(false);
+    File a = new File(caPath);
+    File b = new File(clientCertPath);
+    File c = new File(clientKeyPath);
+    new CertWatcher(2, ImmutableList.of(a, b, c), () -> changed.set(true));
+    Thread.sleep(5000);
+    assertTrue(changed.get());
   }
 
   @Test

@@ -127,7 +127,7 @@ public class TiSession implements AutoCloseable {
                 conf.getKeepaliveTimeout(),
                 conf.getIdleTimeout(),
                 conf.getConnRecycleTime(),
-                conf.getTlsBasePath(),
+                conf.getCertReloadInterval(),
                 conf.getJksKeyPath(),
                 conf.getJksKeyPassword(),
                 conf.getJksTrustPath(),
@@ -140,7 +140,7 @@ public class TiSession implements AutoCloseable {
                 conf.getKeepaliveTimeout(),
                 conf.getIdleTimeout(),
                 conf.getConnRecycleTime(),
-                conf.getTlsBasePath(),
+                conf.getCertReloadInterval(),
                 conf.getTrustCertCollectionFile(),
                 conf.getKeyCertChainFile(),
                 conf.getKeyFile());
