@@ -49,7 +49,7 @@ public class ChannelFactory implements AutoCloseable {
   private static final Logger logger = LoggerFactory.getLogger(ChannelFactory.class);
   private static final String PUB_KEY_INFRA = "PKIX";
 
-  private int connRecycleTime;
+  private long connRecycleTime;
   private final int maxFrameSize;
   private final int keepaliveTime;
   private final int keepaliveTimeout;
@@ -197,7 +197,7 @@ public class ChannelFactory implements AutoCloseable {
       int keepaliveTime,
       int keepaliveTimeout,
       int idleTimeout,
-      int connRecycleTime,
+      long connRecycleTime,
       long certReloadInterval,
       String trustCertCollectionFilePath,
       String keyCertChainFilePath,
@@ -228,7 +228,7 @@ public class ChannelFactory implements AutoCloseable {
       int keepaliveTime,
       int keepaliveTimeout,
       int idleTimeout,
-      int connRecycleTime,
+      long connRecycleTime,
       long certReloadInterval,
       String jksKeyPath,
       String jksKeyPassword,

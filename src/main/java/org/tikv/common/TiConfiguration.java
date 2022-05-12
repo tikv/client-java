@@ -463,7 +463,7 @@ public class TiConfiguration implements Serializable {
   private long pdFirstGetMemberTimeout = getTimeAsMs(TIKV_PD_FIRST_GET_MEMBER_TIMEOUT);
   private long scanTimeout = getTimeAsMs(TIKV_GRPC_SCAN_TIMEOUT);
   private int maxFrameSize = getInt(TIKV_GRPC_MAX_FRAME_SIZE);
-  private int connRecycleTime = getInt(TIKV_CONN_RECYCLE_TIME);
+  private long connRecycleTime = getTimeAsSeconds(TIKV_CONN_RECYCLE_TIME);
   private List<URI> pdAddrs = getPdAddrs(TIKV_PD_ADDRESSES);
   private int indexScanBatchSize = getInt(TIKV_INDEX_SCAN_BATCH_SIZE);
   private int indexScanConcurrency = getInt(TIKV_INDEX_SCAN_CONCURRENCY);
@@ -518,7 +518,7 @@ public class TiConfiguration implements Serializable {
   private double rawKVServerSlowLogFactor = getDouble(TIKV_RAWKV_SERVER_SLOWLOG_FACTOR, 0.5);
 
   private boolean tlsEnable = getBoolean(TIKV_TLS_ENABLE);
-  private long certReloadInterval = getLong(TIKV_TLS_RELOAD_INTERVAL);
+  private long certReloadInterval = getTimeAsSeconds(TIKV_TLS_RELOAD_INTERVAL);
 
   private String trustCertCollectionFile = getOption(TIKV_TRUST_CERT_COLLECTION).orElse(null);
   private String keyCertChainFile = getOption(TIKV_KEY_CERT_CHAIN).orElse(null);
@@ -686,11 +686,11 @@ public class TiConfiguration implements Serializable {
     return this;
   }
 
-  public int getConnRecycleTime() {
+  public long getConnRecycleTimeInSeconds() {
     return connRecycleTime;
   }
 
-  public TiConfiguration setConnRecycleTime(int connRecycleTime) {
+  public TiConfiguration setConnRecycleTimeInSeconds(int connRecycleTime) {
     this.connRecycleTime = connRecycleTime;
     return this;
   }
@@ -1005,11 +1005,11 @@ public class TiConfiguration implements Serializable {
     return tlsEnable;
   }
 
-  public long getCertReloadInterval() {
+  public long getCertReloadIntervalInSeconds() {
     return certReloadInterval;
   }
 
-  public TiConfiguration setCertReloadInterval(long interval) {
+  public TiConfiguration setCertReloadIntervalInSeconds(long interval) {
     this.certReloadInterval = interval;
     return this;
   }

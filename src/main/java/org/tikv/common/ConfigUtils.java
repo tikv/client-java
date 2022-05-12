@@ -132,8 +132,8 @@ public class ConfigUtils {
   public static final int DEF_HEALTH_CHECK_PERIOD_DURATION = 300;
   public static final int DEF_SCAN_BATCH_SIZE = 10240;
   public static final int DEF_MAX_FRAME_SIZE = 268435456 * 2; // 256 * 2 MB
-  public static final int DEF_TIKV_CONN_RECYCLE_TIME = 60; // 10s
-  public static final int DEF_TIKV_TLS_RELOAD_INTERVAL = 10; // 10s
+  public static final String DEF_TIKV_CONN_RECYCLE_TIME = "60s";
+  public static final String DEF_TIKV_TLS_RELOAD_INTERVAL = "10s";
   public static final int DEF_INDEX_SCAN_BATCH_SIZE = 20000;
   public static final int DEF_REGION_SCAN_DOWNGRADE_THRESHOLD = 10000000;
   // if keyRange size per request exceeds this limit, the request might be too large to be accepted
