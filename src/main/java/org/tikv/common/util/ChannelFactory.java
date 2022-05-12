@@ -95,6 +95,8 @@ public class ChannelFactory implements AutoCloseable {
 
     private boolean needReload() {
       boolean needReload = false;
+      // Check all the modification of the `targets`.
+      // If one of them changed, means to need reload.
       for (int i = 0; i < targets.size(); i++) {
         long lastModified = targets.get(i).lastModified();
         if (lastModified != lastReload.get(i)) {
