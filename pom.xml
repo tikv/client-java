@@ -70,6 +70,10 @@
         <proto.folder>${basedir}/proto</proto.folder>
         <gpg.keyname>fake gpg key name</gpg.keyname>
         <gpg.skip>true</gpg.skip>
+        <classesShadedDir>${project.build.directory}/classes-shaded</classesShadedDir>
+        <classesShadedNativeDir>${classesShadedDir}/META-INF/native</classesShadedNativeDir>
+        <shadingPackagePrefix>org.tikv.shade</shadingPackagePrefix>
+        <shadingFilePrefix>org_tikv_shade</shadingFilePrefix>
     </properties>
     <dependencies>
         <dependency>
@@ -494,6 +498,36 @@
                                     <shadedPattern>org.tikv.shade.com.fasterxml.jackson</shadedPattern>
                                 </relocation>
                             </relocations>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Add shading prefix to libnetty_tcnative_xxx -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>unpack-jar-features</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <unzip dest="${classesShadedDir}/">
+                                    <fileset dir="${project.build.directory}/">
+                                        <include name="${project.build.finalName}.${project.packaging}"/>
+                                    </fileset>
+                                </unzip>
+                                <move file="${classesShadedNativeDir}/libnetty_tcnative_linux_aarch64.so" tofile="${classesShadedNativeDir}/lib${shadingFilePrefix}_netty_tcnative_linux_aarch64.so"/>
+                                <move file="${classesShadedNativeDir}/libnetty_tcnative_linux_x86_64.so" tofile="${classesShadedNativeDir}/lib${shadingFilePrefix}_netty_tcnative_linux_x86_64.so"/>
+                                <move file="${classesShadedNativeDir}/libnetty_tcnative_osx_x86_64.jnilib" tofile="${classesShadedNativeDir}/lib${shadingFilePrefix}_netty_tcnative_osx_x86_64.jnilib"/>
+                                <move file="${classesShadedNativeDir}/netty_tcnative_windows_x86_64.dll" tofile="${classesShadedNativeDir}/${shadingFilePrefix}_netty_tcnative_windows_x86_64.dll"/>
+                                <jar destfile="${project.build.directory}/${project.build.finalName}.${project.packaging}" basedir="${classesShadedDir}"/>
+                                <delete dir="${classesShadedDir}"/>
+                            </target>
                         </configuration>
                     </execution>
                 </executions>
