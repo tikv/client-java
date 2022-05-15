@@ -219,7 +219,7 @@ public class ChannelFactory implements AutoCloseable {
     if (certReloadInterval > 0) {
       onCertChange();
       this.certWatcher =
-          new CertWatcher(1, ImmutableList.of(trustCert, keyCert, key), this::onCertChange);
+          new CertWatcher(certReloadInterval, ImmutableList.of(trustCert, keyCert, key), this::onCertChange);
     } else {
       this.certWatcher = null;
     }
