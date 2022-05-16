@@ -49,6 +49,8 @@ public class ChannelFactory implements AutoCloseable {
   private static final Logger logger = LoggerFactory.getLogger(ChannelFactory.class);
   private static final String PUB_KEY_INFRA = "PKIX";
 
+  // After `connRecycleTime` seconds elapses, the old channels will be forced to shut down,
+  // to avoid using the old context all the time including potential channel leak.
   private long connRecycleTime;
   private final int maxFrameSize;
   private final int keepaliveTime;
@@ -98,11 +100,15 @@ public class ChannelFactory implements AutoCloseable {
       // Check all the modification of the `targets`.
       // If one of them changed, means to need reload.
       for (int i = 0; i < targets.size(); i++) {
-        long lastModified = targets.get(i).lastModified();
-        if (lastModified != lastReload.get(i)) {
-          lastReload.set(i, lastModified);
-          logger.warn("detected cert changes: {}", targets.get(i));
-          needReload = true;
+        try {
+          long lastModified = targets.get(i).lastModified();
+          if (lastModified != lastReload.get(i)) {
+            lastReload.set(i, lastModified);
+            logger.warn("detected ssl context changes: {}", targets.get(i));
+            needReload = true;
+          }
+        } catch (Exception e) {
+          logger.error("fail to check the status of ssl context files", e);
         }
       }
       return needReload;
@@ -219,7 +225,8 @@ public class ChannelFactory implements AutoCloseable {
     if (certReloadInterval > 0) {
       onCertChange();
       this.certWatcher =
-          new CertWatcher(certReloadInterval, ImmutableList.of(trustCert, keyCert, key), this::onCertChange);
+          new CertWatcher(
+              certReloadInterval, ImmutableList.of(trustCert, keyCert, key), this::onCertChange);
     } else {
       this.certWatcher = null;
     }
@@ -329,7 +336,7 @@ public class ChannelFactory implements AutoCloseable {
         try {
           channel.awaitTermination(5, TimeUnit.SECONDS);
         } catch (Exception e) {
-          logger.info("recycle channels timeout:", e);
+          logger.warn("recycle channels timeout:", e);
         }
       }
     }

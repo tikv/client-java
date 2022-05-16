@@ -96,7 +96,7 @@ public class StoreHealthyChecker implements Runnable {
         return true;
       }
     } catch (Exception e) {
-      logger.info("fail to check tombstone stores {}", e.toString());
+      logger.info("fail to check tombstone stores", e);
       return false;
     }
     return false;
