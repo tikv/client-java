@@ -25,7 +25,6 @@ import org.junit.After;
 import org.junit.Before;
 
 public abstract class PDMockServerTest {
-
   protected static final String LOCAL_ADDR = "127.0.0.1";
   static final long CLUSTER_ID = 1024;
   protected TiSession session;
@@ -40,9 +39,7 @@ public abstract class PDMockServerTest {
   void setup(String addr) throws IOException {
     int[] ports = new int[3];
     for (int i = 0; i < ports.length; i++) {
-      try (ServerSocket s = new ServerSocket(0)) {
-        ports[i] = s.getLocalPort();
-      }
+      ports[i] = GrpcUtils.getFreePort();
     }
 
     for (int i = 0; i < ports.length; i++) {
