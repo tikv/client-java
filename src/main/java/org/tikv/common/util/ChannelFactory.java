@@ -51,7 +51,7 @@ public class ChannelFactory implements AutoCloseable {
 
   // After `connRecycleTime` seconds elapses, the old channels will be forced to shut down,
   // to avoid using the old context all the time including potential channel leak.
-  private long connRecycleTime;
+  private final long connRecycleTime;
   private final int maxFrameSize;
   private final int keepaliveTime;
   private final int keepaliveTimeout;
@@ -198,6 +198,7 @@ public class ChannelFactory implements AutoCloseable {
     this.idleTimeout = idleTimeout;
     this.certWatcher = null;
     this.certContext = null;
+    this.connRecycleTime = 0;
   }
 
   public ChannelFactory(
