@@ -402,32 +402,31 @@
 <a class="jxr_linenumber" name="L394" href="#L394">394</a>   }
 <a class="jxr_linenumber" name="L395" href="#L395">395</a> 
 <a class="jxr_linenumber" name="L396" href="#L396">396</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">class</strong> HealCheck <strong class="jxr_keyword">extends</strong> HealthImplBase {
-<a class="jxr_linenumber" name="L397" href="#L397">397</a> 
-<a class="jxr_linenumber" name="L398" href="#L398">398</a>     @Override
-<a class="jxr_linenumber" name="L399" href="#L399">399</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> check(
-<a class="jxr_linenumber" name="L400" href="#L400">400</a>         HealthCheckRequest request, StreamObserver&lt;HealthCheckResponse&gt; responseObserver) {
-<a class="jxr_linenumber" name="L401" href="#L401">401</a>       responseObserver.onNext(
-<a class="jxr_linenumber" name="L402" href="#L402">402</a>           HealthCheckResponse.newBuilder().setStatus(ServingStatus.SERVING).build());
-<a class="jxr_linenumber" name="L403" href="#L403">403</a>       responseObserver.onCompleted();
-<a class="jxr_linenumber" name="L404" href="#L404">404</a>     }
-<a class="jxr_linenumber" name="L405" href="#L405">405</a>   }
-<a class="jxr_linenumber" name="L406" href="#L406">406</a> 
-<a class="jxr_linenumber" name="L407" href="#L407">407</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> start(TiRegion region, <strong class="jxr_keyword">int</strong> port) <strong class="jxr_keyword">throws</strong> IOException {
-<a class="jxr_linenumber" name="L408" href="#L408">408</a>     <strong class="jxr_keyword">this</strong>.port = port;
-<a class="jxr_linenumber" name="L409" href="#L409">409</a>     <strong class="jxr_keyword">this</strong>.region = region;
-<a class="jxr_linenumber" name="L410" href="#L410">410</a> 
-<a class="jxr_linenumber" name="L411" href="#L411">411</a>     logger.info(<span class="jxr_string">"start mock server on port: "</span> + port);
-<a class="jxr_linenumber" name="L412" href="#L412">412</a>     server =
-<a class="jxr_linenumber" name="L413" href="#L413">413</a>         ServerBuilder.forPort(port).addService(<strong class="jxr_keyword">new</strong> HealCheck()).addService(<strong class="jxr_keyword">this</strong>).build().start();
-<a class="jxr_linenumber" name="L414" href="#L414">414</a>     Runtime.getRuntime().addShutdownHook(<strong class="jxr_keyword">new</strong> Thread(KVMockServer.<strong class="jxr_keyword">this</strong>::stop));
-<a class="jxr_linenumber" name="L415" href="#L415">415</a>   }
-<a class="jxr_linenumber" name="L416" href="#L416">416</a> 
-<a class="jxr_linenumber" name="L417" href="#L417">417</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> stop() {
-<a class="jxr_linenumber" name="L418" href="#L418">418</a>     <strong class="jxr_keyword">if</strong> (server != <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L419" href="#L419">419</a>       server.shutdown();
-<a class="jxr_linenumber" name="L420" href="#L420">420</a>     }
-<a class="jxr_linenumber" name="L421" href="#L421">421</a>   }
-<a class="jxr_linenumber" name="L422" href="#L422">422</a> }
+<a class="jxr_linenumber" name="L397" href="#L397">397</a>     @Override
+<a class="jxr_linenumber" name="L398" href="#L398">398</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> check(
+<a class="jxr_linenumber" name="L399" href="#L399">399</a>         HealthCheckRequest request, StreamObserver&lt;HealthCheckResponse&gt; responseObserver) {
+<a class="jxr_linenumber" name="L400" href="#L400">400</a>       responseObserver.onNext(
+<a class="jxr_linenumber" name="L401" href="#L401">401</a>           HealthCheckResponse.newBuilder().setStatus(ServingStatus.SERVING).build());
+<a class="jxr_linenumber" name="L402" href="#L402">402</a>       responseObserver.onCompleted();
+<a class="jxr_linenumber" name="L403" href="#L403">403</a>     }
+<a class="jxr_linenumber" name="L404" href="#L404">404</a>   }
+<a class="jxr_linenumber" name="L405" href="#L405">405</a> 
+<a class="jxr_linenumber" name="L406" href="#L406">406</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> start(TiRegion region, <strong class="jxr_keyword">int</strong> port) <strong class="jxr_keyword">throws</strong> IOException {
+<a class="jxr_linenumber" name="L407" href="#L407">407</a>     <strong class="jxr_keyword">this</strong>.port = port;
+<a class="jxr_linenumber" name="L408" href="#L408">408</a>     <strong class="jxr_keyword">this</strong>.region = region;
+<a class="jxr_linenumber" name="L409" href="#L409">409</a> 
+<a class="jxr_linenumber" name="L410" href="#L410">410</a>     logger.info(<span class="jxr_string">"start mock server on port: "</span> + port);
+<a class="jxr_linenumber" name="L411" href="#L411">411</a>     server =
+<a class="jxr_linenumber" name="L412" href="#L412">412</a>         ServerBuilder.forPort(port).addService(<strong class="jxr_keyword">new</strong> HealCheck()).addService(<strong class="jxr_keyword">this</strong>).build().start();
+<a class="jxr_linenumber" name="L413" href="#L413">413</a>     Runtime.getRuntime().addShutdownHook(<strong class="jxr_keyword">new</strong> Thread(KVMockServer.<strong class="jxr_keyword">this</strong>::stop));
+<a class="jxr_linenumber" name="L414" href="#L414">414</a>   }
+<a class="jxr_linenumber" name="L415" href="#L415">415</a> 
+<a class="jxr_linenumber" name="L416" href="#L416">416</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> stop() {
+<a class="jxr_linenumber" name="L417" href="#L417">417</a>     <strong class="jxr_keyword">if</strong> (server != <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L418" href="#L418">418</a>       server.shutdown();
+<a class="jxr_linenumber" name="L419" href="#L419">419</a>     }
+<a class="jxr_linenumber" name="L420" href="#L420">420</a>   }
+<a class="jxr_linenumber" name="L421" href="#L421">421</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>
