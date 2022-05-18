@@ -394,7 +394,6 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   }
 
   private static class HealCheck extends HealthImplBase {
-
     @Override
     public void check(
         HealthCheckRequest request, StreamObserver<HealthCheckResponse> responseObserver) {

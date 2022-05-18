@@ -18,6 +18,7 @@
 package org.tikv.common.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
@@ -27,9 +28,15 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.net.URI;
 import java.security.KeyStore;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
@@ -40,43 +47,91 @@ import org.tikv.common.pd.PDUtils;
 
 public class ChannelFactory implements AutoCloseable {
   private static final Logger logger = LoggerFactory.getLogger(ChannelFactory.class);
+  private static final String PUB_KEY_INFRA = "PKIX";
 
+  // After `connRecycleTime` seconds elapses, the old channels will be forced to shut down,
+  // to avoid using the old context all the time including potential channel leak.
+  private final long connRecycleTime;
   private final int maxFrameSize;
   private final int keepaliveTime;
   private final int keepaliveTimeout;
   private final int idleTimeout;
-  private final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
   private final CertContext certContext;
+  private final CertWatcher certWatcher;
+
+  @VisibleForTesting
+  public final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
+
   private final AtomicReference<SslContextBuilder> sslContextBuilder = new AtomicReference<>();
-  private static final String PUB_KEY_INFRA = "PKIX";
 
-  private abstract static class CertContext {
-    protected abstract boolean isModified();
+  private final ScheduledExecutorService recycler = Executors.newSingleThreadScheduledExecutor();
 
-    protected abstract SslContextBuilder createSslContextBuilder();
+  private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
-    public SslContextBuilder reload() {
-      if (isModified()) {
-        logger.info("reload ssl context");
-        return createSslContextBuilder();
+  @VisibleForTesting
+  public static class CertWatcher implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(CertWatcher.class);
+    private final List<File> targets;
+    private final List<Long> lastReload = new ArrayList<>();
+    private final ScheduledExecutorService executorService =
+        Executors.newSingleThreadScheduledExecutor();
+    private final Runnable onChange;
+
+    public CertWatcher(long pollInterval, List<File> targets, Runnable onChange) {
+      this.targets = targets;
+      this.onChange = onChange;
+
+      for (File ignored : targets) {
+        lastReload.add(0L);
       }
-      return null;
+
+      executorService.scheduleAtFixedRate(
+          this::tryReload, pollInterval, pollInterval, TimeUnit.SECONDS);
+    }
+
+    private void tryReload() {
+      if (needReload()) {
+        onChange.run();
+      }
+    }
+
+    private boolean needReload() {
+      boolean needReload = false;
+      // Check all the modification of the `targets`.
+      // If one of them changed, means to need reload.
+      for (int i = 0; i < targets.size(); i++) {
+        try {
+          long lastModified = targets.get(i).lastModified();
+          if (lastModified != lastReload.get(i)) {
+            lastReload.set(i, lastModified);
+            logger.warn("detected ssl context changes: {}", targets.get(i));
+            needReload = true;
+          }
+        } catch (Exception e) {
+          logger.error("fail to check the status of ssl context files", e);
+        }
+      }
+      return needReload;
+    }
+
+    @Override
+    public void close() {
+      executorService.shutdown();
     }
   }
 
-  private static class JksContext extends CertContext {
-    private long keyLastModified;
-    private long trustLastModified;
+  @VisibleForTesting
+  public abstract static class CertContext {
+    public abstract SslContextBuilder createSslContextBuilder();
+  }
 
+  public static class JksContext extends CertContext {
     private final String keyPath;
     private final String keyPassword;
     private final String trustPath;
     private final String trustPassword;
 
     public JksContext(String keyPath, String keyPassword, String trustPath, String trustPassword) {
-      this.keyLastModified = 0;
-      this.trustLastModified = 0;
-
       this.keyPath = keyPath;
       this.keyPassword = keyPassword;
       this.trustPath = trustPath;
@@ -84,22 +139,7 @@ public class ChannelFactory implements AutoCloseable {
     }
 
     @Override
-    protected synchronized boolean isModified() {
-      long a = new File(keyPath).lastModified();
-      long b = new File(trustPath).lastModified();
-
-      boolean changed = this.keyLastModified != a || this.trustLastModified != b;
-
-      if (changed) {
-        this.keyLastModified = a;
-        this.trustLastModified = b;
-      }
-
-      return changed;
-    }
-
-    @Override
-    protected SslContextBuilder createSslContextBuilder() {
+    public SslContextBuilder createSslContextBuilder() {
       SslContextBuilder builder = GrpcSslContexts.forClient();
       try {
         if (keyPath != null && keyPassword != null) {
@@ -119,50 +159,26 @@ public class ChannelFactory implements AutoCloseable {
         }
       } catch (Exception e) {
         logger.error("JKS SSL context builder failed!", e);
+        throw new IllegalArgumentException(e);
       }
       return builder;
     }
   }
 
-  private static class OpenSslContext extends CertContext {
-    private long trustLastModified;
-    private long chainLastModified;
-    private long keyLastModified;
-
+  @VisibleForTesting
+  public static class OpenSslContext extends CertContext {
     private final String trustPath;
     private final String chainPath;
     private final String keyPath;
 
     public OpenSslContext(String trustPath, String chainPath, String keyPath) {
-      this.trustLastModified = 0;
-      this.chainLastModified = 0;
-      this.keyLastModified = 0;
-
       this.trustPath = trustPath;
       this.chainPath = chainPath;
       this.keyPath = keyPath;
     }
 
     @Override
-    protected synchronized boolean isModified() {
-      long a = new File(trustPath).lastModified();
-      long b = new File(chainPath).lastModified();
-      long c = new File(keyPath).lastModified();
-
-      boolean changed =
-          this.trustLastModified != a || this.chainLastModified != b || this.keyLastModified != c;
-
-      if (changed) {
-        this.trustLastModified = a;
-        this.chainLastModified = b;
-        this.keyLastModified = c;
-      }
-
-      return changed;
-    }
-
-    @Override
-    protected SslContextBuilder createSslContextBuilder() {
+    public SslContextBuilder createSslContextBuilder() {
       SslContextBuilder builder = GrpcSslContexts.forClient();
       if (trustPath != null) {
         builder.trustManager(new File(trustPath));
@@ -180,7 +196,9 @@ public class ChannelFactory implements AutoCloseable {
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
     this.idleTimeout = idleTimeout;
+    this.certWatcher = null;
     this.certContext = null;
+    this.connRecycleTime = 0;
   }
 
   public ChannelFactory(
@@ -188,6 +206,8 @@ public class ChannelFactory implements AutoCloseable {
       int keepaliveTime,
       int keepaliveTimeout,
       int idleTimeout,
+      long connRecycleTime,
+      long certReloadInterval,
       String trustCertCollectionFilePath,
       String keyCertChainFilePath,
       String keyFilePath) {
@@ -195,8 +215,22 @@ public class ChannelFactory implements AutoCloseable {
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
     this.idleTimeout = idleTimeout;
+    this.connRecycleTime = connRecycleTime;
     this.certContext =
         new OpenSslContext(trustCertCollectionFilePath, keyCertChainFilePath, keyFilePath);
+
+    File trustCert = new File(trustCertCollectionFilePath);
+    File keyCert = new File(keyCertChainFilePath);
+    File key = new File(keyFilePath);
+
+    if (certReloadInterval > 0) {
+      onCertChange();
+      this.certWatcher =
+          new CertWatcher(
+              certReloadInterval, ImmutableList.of(trustCert, keyCert, key), this::onCertChange);
+    } else {
+      this.certWatcher = null;
+    }
   }
 
   public ChannelFactory(
@@ -204,6 +238,8 @@ public class ChannelFactory implements AutoCloseable {
       int keepaliveTime,
       int keepaliveTimeout,
       int idleTimeout,
+      long connRecycleTime,
+      long certReloadInterval,
       String jksKeyPath,
       String jksKeyPassword,
       String jksTrustPath,
@@ -212,66 +248,99 @@ public class ChannelFactory implements AutoCloseable {
     this.keepaliveTime = keepaliveTime;
     this.keepaliveTimeout = keepaliveTimeout;
     this.idleTimeout = idleTimeout;
+    this.connRecycleTime = connRecycleTime;
     this.certContext = new JksContext(jksKeyPath, jksKeyPassword, jksTrustPath, jksTrustPassword);
+
+    File jksKey = new File(jksKeyPath);
+    File jksTrust = new File(jksTrustPath);
+    if (certReloadInterval > 0) {
+      onCertChange();
+      this.certWatcher =
+          new CertWatcher(
+              certReloadInterval, ImmutableList.of(jksKey, jksTrust), this::onCertChange);
+    } else {
+      this.certWatcher = null;
+    }
   }
 
-  @VisibleForTesting
-  public boolean reloadSslContext() {
+  private void onCertChange() {
+    try {
+      SslContextBuilder newBuilder = certContext.createSslContextBuilder();
+      lock.writeLock().lock();
+      sslContextBuilder.set(newBuilder);
+
+      List<ManagedChannel> pending = new ArrayList<>(connPool.values());
+      recycler.schedule(() -> cleanExpiredConn(pending), connRecycleTime, TimeUnit.SECONDS);
+
+      connPool.clear();
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  public ManagedChannel getChannel(String address, HostMapping mapping) {
     if (certContext != null) {
-      SslContextBuilder newBuilder = certContext.reload();
-      if (newBuilder != null) {
-        sslContextBuilder.set(newBuilder);
-        return true;
+      try {
+        lock.readLock().lock();
+        return connPool.computeIfAbsent(
+            address, key -> createChannel(sslContextBuilder.get(), address, mapping));
+      } finally {
+        lock.readLock().unlock();
       }
     }
-    return false;
+    return connPool.computeIfAbsent(address, key -> createChannel(null, address, mapping));
   }
 
-  public ManagedChannel getChannel(String addressStr, HostMapping hostMapping) {
-    if (reloadSslContext()) {
-      logger.info("invalidate connection pool");
-      connPool.clear();
+  private ManagedChannel createChannel(
+      SslContextBuilder sslContextBuilder, String address, HostMapping mapping) {
+    URI uri, mapped;
+    try {
+      uri = PDUtils.addrToUri(address);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("failed to form address " + address, e);
+    }
+    try {
+      mapped = mapping.getMappedURI(uri);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("failed to get mapped address " + uri, e);
     }
 
-    return connPool.computeIfAbsent(
-        addressStr,
-        key -> {
-          URI address;
-          URI mappedAddr;
-          try {
-            address = PDUtils.addrToUri(key);
-          } catch (Exception e) {
-            throw new IllegalArgumentException("failed to form address " + key, e);
-          }
-          try {
-            mappedAddr = hostMapping.getMappedURI(address);
-          } catch (Exception e) {
-            throw new IllegalArgumentException("failed to get mapped address " + address, e);
-          }
+    // Channel should be lazy without actual connection until first call
+    // So a coarse grain lock is ok here
+    NettyChannelBuilder builder =
+        NettyChannelBuilder.forAddress(mapped.getHost(), mapped.getPort())
+            .maxInboundMessageSize(maxFrameSize)
+            .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
+            .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
+            .keepAliveWithoutCalls(true)
+            .idleTimeout(idleTimeout, TimeUnit.SECONDS);
 
-          // Channel should be lazy without actual connection until first call
-          // So a coarse grain lock is ok here
-          NettyChannelBuilder builder =
-              NettyChannelBuilder.forAddress(mappedAddr.getHost(), mappedAddr.getPort())
-                  .maxInboundMessageSize(maxFrameSize)
-                  .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
-                  .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
-                  .keepAliveWithoutCalls(true)
-                  .idleTimeout(idleTimeout, TimeUnit.SECONDS);
+    if (sslContextBuilder == null) {
+      return builder.usePlaintext().build();
+    } else {
+      SslContext sslContext;
+      try {
+        sslContext = sslContextBuilder.build();
+      } catch (SSLException e) {
+        logger.error("create ssl context failed!", e);
+        throw new IllegalArgumentException(e);
+      }
+      return builder.sslContext(sslContext).build();
+    }
+  }
 
-          if (certContext == null) {
-            return builder.usePlaintext().build();
-          } else {
-            SslContext sslContext;
-            try {
-              sslContext = sslContextBuilder.get().build();
-            } catch (SSLException e) {
-              logger.error("create ssl context failed!", e);
-              return null;
-            }
-            return builder.sslContext(sslContext).build();
-          }
-        });
+  private void cleanExpiredConn(List<ManagedChannel> pending) {
+    for (ManagedChannel channel : pending) {
+      logger.info("cleaning expire channels");
+      channel.shutdownNow();
+      while (!channel.isShutdown()) {
+        try {
+          channel.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+          logger.warn("recycle channels timeout:", e);
+        }
+      }
+    }
   }
 
   public void close() {
@@ -279,5 +348,10 @@ public class ChannelFactory implements AutoCloseable {
       ch.shutdown();
     }
     connPool.clear();
+
+    if (certContext != null) {
+      recycler.shutdown();
+      certWatcher.close();
+    }
   }
 }

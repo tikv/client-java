@@ -59,7 +59,7 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
         case PD_ERROR:
           backOffer.doBackOff(
               BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
-          client.updateLeaderOrforwardFollower();
+          client.updateLeaderOrForwardFollower();
           return true;
         case REGION_PEER_NOT_ELECTED:
           logger.debug(error.getMessage());
@@ -80,7 +80,7 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
       return false;
     }
     backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoPDRPC, e);
-    client.updateLeaderOrforwardFollower();
+    client.updateLeaderOrForwardFollower();
     return true;
   }
 }

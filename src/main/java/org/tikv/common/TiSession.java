@@ -83,7 +83,7 @@ public class TiSession implements AutoCloseable {
   private volatile ExecutorService batchScanThreadPool;
   private volatile ExecutorService deleteRangeThreadPool;
   private volatile RegionManager regionManager;
-  private volatile boolean enableGrpcForward;
+  private final boolean enableGrpcForward;
   private volatile RegionStoreClient.RegionStoreClientBuilder clientBuilder;
   private volatile ImporterStoreClient.ImporterStoreClientBuilder importerClientBuilder;
   private volatile boolean isClosed = false;
@@ -126,6 +126,8 @@ public class TiSession implements AutoCloseable {
                 conf.getKeepaliveTime(),
                 conf.getKeepaliveTimeout(),
                 conf.getIdleTimeout(),
+                conf.getConnRecycleTimeInSeconds(),
+                conf.getCertReloadIntervalInSeconds(),
                 conf.getJksKeyPath(),
                 conf.getJksKeyPassword(),
                 conf.getJksTrustPath(),
@@ -137,6 +139,8 @@ public class TiSession implements AutoCloseable {
                 conf.getKeepaliveTime(),
                 conf.getKeepaliveTimeout(),
                 conf.getIdleTimeout(),
+                conf.getConnRecycleTimeInSeconds(),
+                conf.getCertReloadIntervalInSeconds(),
                 conf.getTrustCertCollectionFile(),
                 conf.getKeyCertChainFile(),
                 conf.getKeyFile());

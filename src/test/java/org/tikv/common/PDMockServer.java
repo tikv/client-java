@@ -20,6 +20,10 @@ package org.tikv.common;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
+import io.grpc.health.v1.HealthCheckRequest;
+import io.grpc.health.v1.HealthCheckResponse;
+import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.health.v1.HealthGrpc.HealthImplBase;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -130,10 +134,21 @@ public class PDMockServer extends PDGrpc.PDImplBase {
     start(clusterId, port);
   }
 
+  private static class HealCheck extends HealthImplBase {
+    @Override
+    public void check(
+        HealthCheckRequest request, StreamObserver<HealthCheckResponse> responseObserver) {
+      responseObserver.onNext(
+          HealthCheckResponse.newBuilder().setStatus(ServingStatus.SERVING).build());
+      responseObserver.onCompleted();
+    }
+  }
+
   public void start(long clusterId, int port) throws IOException {
     this.clusterId = clusterId;
     this.port = port;
-    server = ServerBuilder.forPort(port).addService(this).build().start();
+    server =
+        ServerBuilder.forPort(port).addService(new HealCheck()).addService(this).build().start();
 
     Runtime.getRuntime().addShutdownHook(new Thread(PDMockServer.this::stop));
   }

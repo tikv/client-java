@@ -171,6 +171,9 @@ public class ConcreteBackOffer implements BackOffer {
       case BoCheckTimeout:
         backOffFunction = BackOffFunction.create(0, 0, BackOffStrategy.NoJitter);
         break;
+      case BoCheckHealth:
+        backOffFunction = BackOffFunction.create(100, 600, BackOffStrategy.EqualJitter);
+        break;
     }
     return backOffFunction;
   }
