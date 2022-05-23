@@ -801,7 +801,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     }
   }
 
-  private Metapb.Region decodeRegion(Metapb.Region region) {
+  @Override
+  public Metapb.Region decodeRegion(Metapb.Region region) {
     final boolean isRawRegion = conf.isRawKVMode();
     Metapb.Region.Builder builder =
         Metapb.Region.newBuilder()

@@ -64,6 +64,8 @@ public interface ReadOnlyPDClient {
    */
   Store getStore(BackOffer backOffer, long storeId);
 
+  Metapb.Region decodeRegion(Metapb.Region region);
+
   List<Store> getAllStores(BackOffer backOffer);
 
   TiConfiguration.ReplicaRead getReplicaRead();
