@@ -50,6 +50,9 @@ public class RegionErrorTest extends MockThreeStoresTest {
       ByteString requestKey = client.getSession().getConf().buildRequestKey(key);
       put(requestKey, value);
 
+      Assert.assertEquals(Optional.of(value), client.get(key));
+
+      // Increase the region epoch for the cluster
       TiRegion newRegion =
           new TiRegion(
               this.region.getConf(),
@@ -60,8 +63,6 @@ public class RegionErrorTest extends MockThreeStoresTest {
               this.region.getLeader(),
               this.region.getPeersList(),
               stores.stream().map(TiStore::new).collect(Collectors.toList()));
-
-      Assert.assertEquals(Optional.of(value), client.get(key));
 
       for (KVMockServer server : servers) {
         server.setRegion(newRegion);
