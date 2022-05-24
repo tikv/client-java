@@ -36,6 +36,7 @@ public class ConfigUtils {
   public static final String TIKV_GRPC_KEEPALIVE_TIME = "tikv.grpc.keepalive_time";
   public static final String TIKV_GRPC_KEEPALIVE_TIMEOUT = "tikv.grpc.keepalive_timeout";
   public static final String TIKV_GRPC_IDLE_TIMEOUT = "tikv.grpc.idle_timeout";
+  public static final String TIKV_CONN_RECYCLE_TIME = "tikv.conn.recycle_time";
 
   public static final String TIKV_INDEX_SCAN_BATCH_SIZE = "tikv.index.scan_batch_size";
   public static final String TIKV_INDEX_SCAN_CONCURRENCY = "tikv.index.scan_concurrency";
@@ -93,6 +94,7 @@ public class ConfigUtils {
   public static final String TIKV_RAWKV_SERVER_SLOWLOG_FACTOR = "tikv.rawkv.server_slowlog_factor";
 
   public static final String TIKV_TLS_ENABLE = "tikv.tls_enable";
+  public static final String TIKV_TLS_RELOAD_INTERVAL = "tikv.tls.reload_interval";
   public static final String TIKV_TRUST_CERT_COLLECTION = "tikv.trust_cert_collection";
   public static final String TIKV_KEY_CERT_CHAIN = "tikv.key_cert_chain";
   public static final String TIKV_KEY_FILE = "tikv.key_file";
@@ -133,6 +135,8 @@ public class ConfigUtils {
   public static final int DEF_HEALTH_CHECK_PERIOD_DURATION = 300;
   public static final int DEF_SCAN_BATCH_SIZE = 10240;
   public static final int DEF_MAX_FRAME_SIZE = 268435456 * 2; // 256 * 2 MB
+  public static final String DEF_TIKV_CONN_RECYCLE_TIME = "60s";
+  public static final String DEF_TIKV_TLS_RELOAD_INTERVAL = "10s";
   public static final int DEF_INDEX_SCAN_BATCH_SIZE = 20000;
   public static final int DEF_REGION_SCAN_DOWNGRADE_THRESHOLD = 10000000;
   // if keyRange size per request exceeds this limit, the request might be too large to be accepted

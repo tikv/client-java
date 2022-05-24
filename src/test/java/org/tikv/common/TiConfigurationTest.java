@@ -88,6 +88,16 @@ public class TiConfigurationTest {
   }
 
   @Test
+  public void certReloadTest() {
+    TiConfiguration conf = TiConfiguration.createDefault();
+    conf.setCertReloadIntervalInSeconds(10);
+    conf.setConnRecycleTimeInSeconds(10);
+
+    assertEquals(10, conf.getCertReloadIntervalInSeconds());
+    assertEquals(10, conf.getConnRecycleTimeInSeconds());
+  }
+
+  @Test
   public void slowLogDefaultValueTest() {
     TiConfiguration conf = TiConfiguration.createRawDefault();
     assertEquals(conf.getTimeout() * 2, conf.getRawKVReadSlowLogInMS().longValue());

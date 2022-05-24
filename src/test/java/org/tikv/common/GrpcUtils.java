@@ -19,6 +19,7 @@ package org.tikv.common;
 
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
+import java.net.ServerSocket;
 import java.util.Arrays;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
@@ -107,5 +108,14 @@ public class GrpcUtils {
         .setHeader(makeDefaultHeader(clusterId))
         .setStore(store)
         .build();
+  }
+
+  public static int getFreePort() {
+    while (true) {
+      try (ServerSocket s = new ServerSocket(0)) {
+        return s.getLocalPort();
+      } catch (Exception ignore) {
+      }
+    }
   }
 }
