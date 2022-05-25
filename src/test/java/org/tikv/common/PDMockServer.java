@@ -37,6 +37,8 @@ import org.tikv.kvproto.Pdpb.GetRegionRequest;
 import org.tikv.kvproto.Pdpb.GetRegionResponse;
 import org.tikv.kvproto.Pdpb.GetStoreRequest;
 import org.tikv.kvproto.Pdpb.GetStoreResponse;
+import org.tikv.kvproto.Pdpb.ScanRegionsRequest;
+import org.tikv.kvproto.Pdpb.ScanRegionsResponse;
 import org.tikv.kvproto.Pdpb.TsoRequest;
 import org.tikv.kvproto.Pdpb.TsoResponse;
 
@@ -49,6 +51,8 @@ public class PDMockServer extends PDGrpc.PDImplBase {
   private Function<GetStoreRequest, GetStoreResponse> getStoreListener;
   private Function<GetRegionRequest, GetRegionResponse> getRegionListener;
   private Function<GetRegionByIDRequest, GetRegionResponse> getRegionByIDListener;
+
+  private Function<ScanRegionsRequest, ScanRegionsResponse> scanRegionsListener;
 
   public void addGetMembersListener(Function<GetMembersRequest, GetMembersResponse> func) {
     getMembersListener = func;
@@ -71,10 +75,12 @@ public class PDMockServer extends PDGrpc.PDImplBase {
       private int logical = 0;
 
       @Override
-      public void onNext(TsoRequest value) {}
+      public void onNext(TsoRequest value) {
+      }
 
       @Override
-      public void onError(Throwable t) {}
+      public void onError(Throwable t) {
+      }
 
       @Override
       public void onCompleted() {
@@ -120,6 +126,16 @@ public class PDMockServer extends PDGrpc.PDImplBase {
   public void getStore(GetStoreRequest request, StreamObserver<GetStoreResponse> resp) {
     try {
       resp.onNext(Optional.ofNullable(getStoreListener.apply(request)).get());
+      resp.onCompleted();
+    } catch (Exception e) {
+      resp.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  @Override
+  public void scanRegions(ScanRegionsRequest request, StreamObserver<ScanRegionsResponse> resp) {
+    try {
+      resp.onNext(Optional.ofNullable(scanRegionsListener.apply(request)).get());
       resp.onCompleted();
     } catch (Exception e) {
       resp.onError(Status.INTERNAL.asRuntimeException());

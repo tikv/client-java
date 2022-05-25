@@ -157,9 +157,12 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         return;
       }
 
-      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.remove(key);
+      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(key);
       if (errProvider != null) {
-        builder.setRegionError(errProvider.get().build());
+        Error.Builder eb = errProvider.get();
+        if (eb != null) {
+          builder.setRegionError(eb.build());
+        }
       } else {
         ByteString value = dataMap.get(key);
         if (value == null) {
@@ -190,10 +193,14 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         return;
       }
 
-      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.remove(key);
+      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(key);
       if (errProvider != null) {
-        builder.setRegionError(errProvider.get().build());
+        Error.Builder eb = errProvider.get();
+        if (eb != null) {
+          builder.setRegionError(eb.build());
+        }
       }
+
       responseObserver.onNext(builder.build());
       responseObserver.onCompleted();
     } catch (Exception e) {
@@ -216,9 +223,12 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         return;
       }
 
-      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.remove(key);
+      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(key);
       if (errProvider != null) {
-        builder.setRegionError(errProvider.get().build());
+        Error.Builder eb = errProvider.get();
+        if (eb != null) {
+          builder.setRegionError(eb.build());
+        }
       }
       responseObserver.onNext(builder.build());
       responseObserver.onCompleted();
@@ -277,9 +287,12 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         return;
       }
 
-      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.remove(key);
+      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(key);
       if (errProvider != null) {
-        builder.setRegionError(errProvider.get().build());
+        Error.Builder eb = errProvider.get();
+        if (eb != null) {
+          builder.setRegionError(eb.build());
+        }
       } else {
         SortedMap<Key, ByteString> kvs = dataMap.tailMap(key);
         builder.addAllPairs(
@@ -321,14 +334,17 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       ImmutableList.Builder<Kvrpcpb.KvPair> resultList = ImmutableList.builder();
       for (ByteString key : keys) {
         Key rawKey = toRawKey(key);
-        Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.remove(rawKey);
+        Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(rawKey);
         if (errProvider != null) {
-          builder.setRegionError(errProvider.get().build());
-          break;
-        } else {
-          ByteString value = dataMap.get(rawKey);
-          resultList.add(Kvrpcpb.KvPair.newBuilder().setKey(key).setValue(value).build());
+          Error.Builder eb = errProvider.get();
+          if (eb != null) {
+            builder.setRegionError(eb.build());
+            break;
+          }
         }
+
+        ByteString value = dataMap.get(rawKey);
+        resultList.add(Kvrpcpb.KvPair.newBuilder().setKey(key).setValue(value).build());
       }
       builder.addAllPairs(resultList.build());
       responseObserver.onNext(builder.build());
@@ -361,20 +377,23 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       SelectResponse.Builder builder = SelectResponse.newBuilder();
       for (Coprocessor.KeyRange keyRange : keyRanges) {
         Key startKey = toRawKey(keyRange.getStart());
-        Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.remove(startKey);
+        Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(startKey);
         if (errProvider != null) {
-          builderWrap.setRegionError(errProvider.get().build());
-          break;
-        } else {
-          SortedMap<Key, ByteString> kvs = dataMap.tailMap(startKey);
-          builder.addAllChunks(
-              kvs.entrySet()
-                  .stream()
-                  .filter(Objects::nonNull)
-                  .filter(kv -> kv.getKey().compareTo(toRawKey(keyRange.getEnd())) <= 0)
-                  .map(kv -> Chunk.newBuilder().setRowsData(kv.getValue()).build())
-                  .collect(Collectors.toList()));
+          Error.Builder eb = errProvider.get();
+          if (eb != null) {
+            builderWrap.setRegionError(eb.build());
+            break;
+          }
         }
+
+        SortedMap<Key, ByteString> kvs = dataMap.tailMap(startKey);
+        builder.addAllChunks(
+            kvs.entrySet()
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(kv -> kv.getKey().compareTo(toRawKey(keyRange.getEnd())) <= 0)
+                .map(kv -> Chunk.newBuilder().setRowsData(kv.getValue()).build())
+                .collect(Collectors.toList()));
       }
 
       responseObserver.onNext(builderWrap.setData(builder.build().toByteString()).build());

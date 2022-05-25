@@ -184,7 +184,8 @@ public class TiSession implements AutoCloseable {
     return info;
   }
 
-  private synchronized void warmup() {
+  @VisibleForTesting
+  public synchronized void warmup() {
     long warmUpStartTime = System.nanoTime();
     BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff(getPDClient().getClusterId());
     try {
