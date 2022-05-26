@@ -18,6 +18,7 @@
 package org.tikv.common;
 
 import com.google.protobuf.ByteString;
+import java.util.List;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -25,6 +26,10 @@ import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Metapb;
+import org.tikv.kvproto.Pdpb;
+import org.tikv.kvproto.Pdpb.GetRegionResponse;
+import org.tikv.kvproto.Pdpb.Region;
+import org.tikv.kvproto.Pdpb.ScanRegionsResponse;
 
 public class PDClientV2MockTest extends PDClientMockTest {
   @Before
@@ -43,46 +48,59 @@ public class PDClientV2MockTest extends PDClientMockTest {
     return cdo.toByteString();
   }
 
+  private GetRegionResponse makeGetRegionResponse(String start, String end) {
+    return GrpcUtils.makeGetRegionResponse(leader.getClusterId(), makeRegion(start, end));
+  }
+
+  private Metapb.Region makeRegion(String start, String end) {
+    return GrpcUtils.makeRegion(
+        1,
+        encode(session.getConf().buildRequestKey(ByteString.copyFromUtf8(start))),
+        encode(session.getConf().buildRequestKey(ByteString.copyFromUtf8(end), true)),
+        GrpcUtils.makeRegionEpoch(2, 3),
+        GrpcUtils.makePeer(1, 10),
+        GrpcUtils.makePeer(2, 20));
+  }
+
   @Test
   public void testGetRegionById() throws Exception {
-    ByteString start = ByteString.copyFromUtf8("regionById");
-    ByteString end = ByteString.copyFromUtf8("regionById0");
+    String start = "getRegionById";
+    String end = "getRegionByIdEnd";
     leader.addGetRegionByIDListener(
-        request ->
-            GrpcUtils.makeGetRegionResponse(
-                leader.getClusterId(),
-                GrpcUtils.makeRegion(
-                    1,
-                    encode(session.getConf().buildRequestKey(start)),
-                    encode(session.getConf().buildRequestKey(end)),
-                    GrpcUtils.makeRegionEpoch(2, 3),
-                    GrpcUtils.makePeer(1, 10),
-                    GrpcUtils.makePeer(2, 20))));
+        request -> makeGetRegionResponse(start, end));
     try (PDClient client = createClient()) {
       Metapb.Region r = client.getRegionByID(ConcreteBackOffer.newRawKVBackOff(), 1).first;
-      Assert.assertEquals(start, r.getStartKey());
-      Assert.assertEquals(end, r.getEndKey());
+      Assert.assertEquals(start, r.getStartKey().toStringUtf8());
+      Assert.assertEquals(end, r.getEndKey().toStringUtf8());
     }
 
-    leader.addGetRegionByIDListener(
-        request ->
-            GrpcUtils.makeGetRegionResponse(
-                leader.getClusterId(),
-                GrpcUtils.makeRegion(
-                    1,
-                    encode(session.getConf().buildRequestKey(start)),
-                    encode(session.getConf().getEndKey()),
-                    GrpcUtils.makeRegionEpoch(2, 3),
-                    GrpcUtils.makePeer(1, 10),
-                    GrpcUtils.makePeer(2, 20))));
+    leader.addGetRegionByIDListener(request -> makeGetRegionResponse(start, ""));
     try (PDClient client = createClient()) {
       Metapb.Region r = client.getRegionByID(ConcreteBackOffer.newRawKVBackOff(), 1).first;
-      Assert.assertEquals(start, r.getStartKey());
-      Assert.assertEquals(ByteString.EMPTY, r.getEndKey());
+      Assert.assertEquals(start, r.getStartKey().toStringUtf8());
+      Assert.assertEquals("", r.getEndKey().toStringUtf8());
     }
   }
 
   @Test
-  public void testScanRegions() {
+  public void testScanRegions() throws Exception {
+    String start = "scanRegions";
+    String end = "scanRegionsEnd";
+
+    leader.addScanRegionsListener(request ->
+        ScanRegionsResponse.newBuilder()
+            .addRegions(Pdpb.Region.newBuilder().setRegion(makeRegion(start, end)).build())
+            .build());
+
+    try (PDClient client = createClient()) {
+      List<Region> regions = client.
+          scanRegions(ConcreteBackOffer.newRawKVBackOff(), ByteString.EMPTY, ByteString.EMPTY,
+              1);
+
+      for (Region r : regions) {
+        Assert.assertEquals(start, r.getRegion().getStartKey().toStringUtf8());
+        Assert.assertEquals(end, r.getRegion().getEndKey().toStringUtf8());
+      }
+    }
   }
 }

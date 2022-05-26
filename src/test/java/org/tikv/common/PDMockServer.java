@@ -132,6 +132,10 @@ public class PDMockServer extends PDGrpc.PDImplBase {
     }
   }
 
+  public void addScanRegionsListener(Function<ScanRegionsRequest, ScanRegionsResponse> func) {
+    scanRegionsListener = func;
+  }
+
   @Override
   public void scanRegions(ScanRegionsRequest request, StreamObserver<ScanRegionsResponse> resp) {
     try {
