@@ -41,7 +41,6 @@ public class PDClientV2MockTest extends PDClientMockTest {
     return session.getPDClient();
   }
 
-
   public static ByteString encode(ByteString key) {
     CodecDataOutput cdo = new CodecDataOutput();
     BytesCodec.writeBytes(cdo, key.toByteArray());
@@ -66,8 +65,7 @@ public class PDClientV2MockTest extends PDClientMockTest {
   public void testGetRegionById() throws Exception {
     String start = "getRegionById";
     String end = "getRegionByIdEnd";
-    leader.addGetRegionByIDListener(
-        request -> makeGetRegionResponse(start, end));
+    leader.addGetRegionByIDListener(request -> makeGetRegionResponse(start, end));
     try (PDClient client = createClient()) {
       Metapb.Region r = client.getRegionByID(ConcreteBackOffer.newRawKVBackOff(), 1).first;
       Assert.assertEquals(start, r.getStartKey().toStringUtf8());
@@ -87,15 +85,16 @@ public class PDClientV2MockTest extends PDClientMockTest {
     String start = "scanRegions";
     String end = "scanRegionsEnd";
 
-    leader.addScanRegionsListener(request ->
-        ScanRegionsResponse.newBuilder()
-            .addRegions(Pdpb.Region.newBuilder().setRegion(makeRegion(start, end)).build())
-            .build());
+    leader.addScanRegionsListener(
+        request ->
+            ScanRegionsResponse.newBuilder()
+                .addRegions(Pdpb.Region.newBuilder().setRegion(makeRegion(start, end)).build())
+                .build());
 
     try (PDClient client = createClient()) {
-      List<Region> regions = client.
-          scanRegions(ConcreteBackOffer.newRawKVBackOff(), ByteString.EMPTY, ByteString.EMPTY,
-              1);
+      List<Region> regions =
+          client.scanRegions(
+              ConcreteBackOffer.newRawKVBackOff(), ByteString.EMPTY, ByteString.EMPTY, 1);
 
       for (Region r : regions) {
         Assert.assertEquals(start, r.getRegion().getStartKey().toStringUtf8());

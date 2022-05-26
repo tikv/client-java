@@ -219,8 +219,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     try {
       ObjectMapper mapper = new ObjectMapper();
       HashMap<String, Boolean> status =
-          mapper.readValue(new URL(api), new TypeReference<HashMap<String, Boolean>>() {
-          });
+          mapper.readValue(new URL(api), new TypeReference<HashMap<String, Boolean>>() {});
       return status.get("paused");
     } catch (Exception e) {
       logger.error(String.format("failed to get %s checker status.", checker.apiName()), e);
@@ -366,10 +365,14 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     if (resp == null) {
       return null;
     }
-    return resp.getRegionsList().stream().map(r -> {
-      Metapb.Region decoded = decodeRegion(r.getRegion());
-      return Pdpb.Region.newBuilder().mergeFrom(r).setRegion(decoded).build();
-    }).collect(Collectors.toList());
+    return resp.getRegionsList()
+        .stream()
+        .map(
+            r -> {
+              Metapb.Region decoded = decodeRegion(r.getRegion());
+              return Pdpb.Region.newBuilder().mergeFrom(r).setRegion(decoded).build();
+            })
+        .collect(Collectors.toList());
   }
 
   private Supplier<GetStoreRequest> buildGetStoreReq(long storeId) {
@@ -402,12 +405,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   @Override
   public List<Store> getAllStores(BackOffer backOffer) {
     return callWithRetry(
-        backOffer,
-        PDGrpc.getGetAllStoresMethod(),
-        buildGetAllStoresReq(),
-        new PDErrorHandler<>(
-            r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
-            this))
+            backOffer,
+            PDGrpc.getGetAllStoresMethod(),
+            buildGetAllStoresReq(),
+            new PDErrorHandler<>(
+                r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
+                this))
         .getStoresList();
   }
 
@@ -833,7 +836,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
             ByteString.copyFrom(BytesCodec.readBytes(new CodecDataInput(region.getStartKey())));
         if (conf.getApiVersion().isV2()) {
           if (ByteString.unsignedLexicographicalComparator()
-              .compare(decodedStartKey, conf.getKeyPrefix())
+                  .compare(decodedStartKey, conf.getKeyPrefix())
               < 0) {
             decodedStartKey = ByteString.EMPTY;
           } else {
@@ -857,7 +860,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
             ByteString.copyFrom(BytesCodec.readBytes(new CodecDataInput(region.getEndKey())));
         if (conf.getApiVersion().isV2()) {
           if (ByteString.unsignedLexicographicalComparator()
-              .compare(decodedEndKey, conf.getEndKey())
+                  .compare(decodedEndKey, conf.getEndKey())
               >= 0) {
             decodedEndKey = ByteString.EMPTY;
           } else {
