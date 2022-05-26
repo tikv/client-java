@@ -72,9 +72,7 @@ public class RawScanIterator extends ScanIterator {
       return false;
     }
     ByteString lastKey = currentCache.get(index).getKey();
-    boolean a = !lastKey.isEmpty();
-    boolean b = Key.toRawKey(lastKey).compareTo(endKey) >= 0;
-    return a && b;
+    return !lastKey.isEmpty() && Key.toRawKey(lastKey).compareTo(endKey) >= 0;
   }
 
   boolean isCacheDrained() {
