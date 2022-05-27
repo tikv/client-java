@@ -17,27 +17,92 @@
 
 package org.tikv.common;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.ImmutableList;
+import io.grpc.ManagedChannel;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Test;
 import org.tikv.common.util.ChannelFactory;
+import org.tikv.common.util.ChannelFactory.CertWatcher;
 
 public class ChannelFactoryTest {
+  private final AtomicLong ts = new AtomicLong(System.currentTimeMillis());
+  private final String tlsPath = "src/test/resources/tls/";
+  private final String caPath = tlsPath + "ca.crt";
+  private final String clientCertPath = tlsPath + "client.crt";
+  private final String clientKeyPath = tlsPath + "client.pem";
+
+  private ChannelFactory createFactory() {
+    int v = 1024;
+    return new ChannelFactory(v, v, v, v, 5, 10, caPath, clientCertPath, clientKeyPath);
+  }
+
+  private void touchCert() {
+    ts.addAndGet(100_000_000);
+    assertTrue(new File(caPath).setLastModified(ts.get()));
+  }
+
   @Test
-  public void testTlsReload() {
-    final int v = 1024;
-    String tlsPath = "src/test/resources/tls/";
-    String caPath = tlsPath + "ca.crt";
-    String clientCertPath = tlsPath + "client.crt";
-    String clientKeyPath = tlsPath + "client.pem";
-    ChannelFactory factory = new ChannelFactory(v, v, v, v, caPath, clientCertPath, clientKeyPath);
-    HostMapping mapping = uri -> uri;
+  public void testCertWatcher() throws InterruptedException {
+    AtomicBoolean changed = new AtomicBoolean(false);
+    File a = new File(caPath);
+    File b = new File(clientCertPath);
+    File c = new File(clientKeyPath);
+    new CertWatcher(2, ImmutableList.of(a, b, c), () -> changed.set(true));
+    Thread.sleep(5000);
+    assertTrue(changed.get());
+  }
 
-    factory.getChannel("127.0.0.1:2379", mapping);
+  @Test
+  public void testMultiThreadTlsReload() throws InterruptedException {
+    ChannelFactory factory = createFactory();
+    HostMapping hostMapping = uri -> uri;
 
-    assertTrue(new File(clientKeyPath).setLastModified(System.currentTimeMillis()));
+    int taskCount = Runtime.getRuntime().availableProcessors() * 2;
+    List<Thread> tasks = new ArrayList<>(taskCount);
+    for (int i = 0; i < taskCount; i++) {
+      Thread t =
+          new Thread(
+              () -> {
+                for (int j = 0; j < 100; j++) {
+                  String addr = "127.0.0.1:237" + (j % 2 == 0 ? 9 : 8);
+                  ManagedChannel c = factory.getChannel(addr, hostMapping);
+                  assertNotNull(c);
+                  c.shutdownNow();
+                  try {
+                    Thread.sleep(100);
+                  } catch (InterruptedException ignore) {
+                  }
+                }
+              });
+      t.start();
+      tasks.add(t);
+    }
+    Thread reactor =
+        new Thread(
+            () -> {
+              for (int i = 0; i < 100; i++) {
+                touchCert();
+                try {
+                  Thread.sleep(100);
+                } catch (InterruptedException ignore) {
+                }
+              }
+            });
+    reactor.start();
 
-    assertTrue(factory.reloadSslContext());
+    for (Thread t : tasks) {
+      t.join();
+    }
+    reactor.join();
+
+    factory.close();
+    assertTrue(factory.connPool.isEmpty());
   }
 }
