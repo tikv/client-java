@@ -45,7 +45,7 @@ public class RegionErrorTest extends MockThreeStoresTest {
       ByteString key = ByteString.copyFromUtf8("key-test-epoch-not-match");
       ByteString value = ByteString.copyFromUtf8("value");
 
-      ByteString requestKey = client.getSession().getConf().buildRequestKey(key);
+      ByteString requestKey = client.getSession().getPDClient().getCodec().encodeKey(key);
       put(requestKey, value);
 
       Assert.assertEquals(Optional.of(value), client.get(key));

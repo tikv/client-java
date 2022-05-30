@@ -29,8 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
-import org.tikv.common.codec.Codec;
-import org.tikv.common.codec.CodecDataOutput;
+import org.tikv.common.apiversion.RequestKeyCodec;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiKVException;
@@ -64,6 +63,8 @@ public class ImporterClient {
   private List<ImporterStoreClient> clientList;
   private ImporterStoreClient clientLeader;
 
+  private final RequestKeyCodec codec;
+
   public ImporterClient(
       TiSession tiSession, ByteString uuid, Key minKey, Key maxKey, TiRegion region, Long ttl) {
     this.uuid = uuid;
@@ -73,6 +74,7 @@ public class ImporterClient {
     this.maxKey = maxKey;
     this.region = region;
     this.ttl = ttl;
+    this.codec = tiSession.getPDClient().getCodec();
   }
 
   public boolean isDeduplicate() {
@@ -109,7 +111,7 @@ public class ImporterClient {
                   String.format("duplicate key found, key = %s", preKey.toStringUtf8()));
             }
           } else {
-            ByteString key = tiConf.buildRequestKey(pair.first);
+            ByteString key = codec.encodeKey(pair.first);
             pairs.add(ImportSstpb.Pair.newBuilder().setKey(key).setValue(pair.second).build());
             totalBytes += (key.size() + pair.second.size());
             preKey = pair.first;
@@ -138,16 +140,14 @@ public class ImporterClient {
   private void init() {
     long regionId = region.getId();
     Metapb.RegionEpoch regionEpoch = region.getRegionEpoch();
+    org.apache.commons.lang3.tuple.Pair<ByteString, ByteString> keyRange =
+        codec.encodePdQueryRange(minKey.toByteString(), maxKey.toByteString());
+
     ImportSstpb.Range range =
-        tiConf.isTxnKVMode() || tiConf.getApiVersion().isV2()
-            ? ImportSstpb.Range.newBuilder()
-                .setStart(encode(tiConf.buildRequestKey(minKey.toByteString())))
-                .setEnd(encode(tiConf.buildRequestKey(maxKey.toByteString(), true)))
-                .build()
-            : ImportSstpb.Range.newBuilder()
-                .setStart(minKey.toByteString())
-                .setEnd(maxKey.toByteString())
-                .build();
+        ImportSstpb.Range.newBuilder()
+            .setStart(keyRange.getLeft())
+            .setEnd(keyRange.getRight())
+            .build();
 
     sstMeta =
         ImportSstpb.SSTMeta.newBuilder()
@@ -170,12 +170,6 @@ public class ImporterClient {
         clientLeader = importerStoreClient;
       }
     }
-  }
-
-  private ByteString encode(ByteString key) {
-    CodecDataOutput cdo = new CodecDataOutput();
-    Codec.BytesCodec.writeBytes(cdo, key.toByteArray());
-    return cdo.toByteString();
   }
 
   private void startWrite() {

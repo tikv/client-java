@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.AbstractGRPCClient;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.apiversion.RequestKeyCodec;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.log.SlowLog;
 import org.tikv.common.log.SlowLogSpan;
@@ -66,6 +67,7 @@ public abstract class AbstractRegionStoreClient
           .register();
 
   protected final RegionManager regionManager;
+  protected final RequestKeyCodec codec;
   protected TiRegion region;
   protected TiStore store;
 
@@ -84,6 +86,7 @@ public abstract class AbstractRegionStoreClient
     this.region = region;
     this.regionManager = regionManager;
     this.store = store;
+    this.codec = regionManager.getPDClient().getCodec();
     if (this.store.getProxyStore() != null) {
       this.timeout = conf.getForwardTimeout();
     }
@@ -303,7 +306,7 @@ public abstract class AbstractRegionStoreClient
         Kvrpcpb.RawGetRequest rawGetRequest =
             Kvrpcpb.RawGetRequest.newBuilder()
                 .setContext(makeContext(peer))
-                .setKey(conf.buildRequestKey(key))
+                .setKey(codec.encodeKey(key))
                 .build();
         ListenableFuture<Kvrpcpb.RawGetResponse> task = stub.rawGet(rawGetRequest);
         responses.add(new SwitchLeaderTask(task, peer));
@@ -365,7 +368,7 @@ public abstract class AbstractRegionStoreClient
         Kvrpcpb.RawGetRequest rawGetRequest =
             Kvrpcpb.RawGetRequest.newBuilder()
                 .setContext(makeContext())
-                .setKey(conf.buildRequestKey(key))
+                .setKey(codec.encodeKey(key))
                 .build();
         ListenableFuture<Kvrpcpb.RawGetResponse> task =
             MetadataUtils.attachHeaders(stub, header).rawGet(rawGetRequest);

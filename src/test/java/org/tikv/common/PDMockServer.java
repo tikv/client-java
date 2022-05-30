@@ -75,12 +75,10 @@ public class PDMockServer extends PDGrpc.PDImplBase {
       private int logical = 0;
 
       @Override
-      public void onNext(TsoRequest value) {
-      }
+      public void onNext(TsoRequest value) {}
 
       @Override
-      public void onError(Throwable t) {
-      }
+      public void onError(Throwable t) {}
 
       @Override
       public void onCompleted() {
@@ -130,6 +128,10 @@ public class PDMockServer extends PDGrpc.PDImplBase {
     } catch (Exception e) {
       resp.onError(Status.INTERNAL.asRuntimeException());
     }
+  }
+
+  public void addScanRegionsListener(Function<ScanRegionsRequest, ScanRegionsResponse> func) {
+    scanRegionsListener = func;
   }
 
   @Override

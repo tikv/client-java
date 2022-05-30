@@ -33,6 +33,11 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.apiversion.RequestKeyCodec;
+import org.tikv.common.apiversion.RequestKeyV1RawCodec;
+import org.tikv.common.apiversion.RequestKeyV1TxnCodec;
+import org.tikv.common.apiversion.RequestKeyV2RawCodec;
+import org.tikv.common.apiversion.RequestKeyV2TxnCodec;
 import org.tikv.common.catalog.Catalog;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.importer.ImporterStoreClient;
@@ -70,6 +75,7 @@ public class TiSession implements AutoCloseable {
   private static final Logger logger = LoggerFactory.getLogger(TiSession.class);
   private static final Map<String, TiSession> sessionCachedMap = new HashMap<>();
   private final TiConfiguration conf;
+  private final RequestKeyCodec keyCodec;
   private final ChannelFactory channelFactory;
   // below object creation is either heavy or making connection (pd), pending for lazy loading
   private volatile PDClient client;
@@ -117,6 +123,21 @@ public class TiSession implements AutoCloseable {
     this.metricsServer = MetricsServer.getInstance(conf);
 
     this.conf = conf;
+
+    if (conf.getApiVersion().isV1()) {
+      if (conf.isRawKVMode()) {
+        keyCodec = new RequestKeyV1RawCodec();
+      } else {
+        keyCodec = new RequestKeyV1TxnCodec();
+      }
+    } else {
+      if (conf.isRawKVMode()) {
+        keyCodec = new RequestKeyV2RawCodec();
+      } else {
+        keyCodec = new RequestKeyV2TxnCodec();
+      }
+    }
+
     if (conf.isTlsEnable()) {
       if (conf.isJksEnable()) {
         this.channelFactory =
@@ -153,7 +174,7 @@ public class TiSession implements AutoCloseable {
               conf.getIdleTimeout());
     }
 
-    this.client = PDClient.createRaw(conf, channelFactory);
+    this.client = PDClient.createRaw(conf, keyCodec, channelFactory);
     this.enableGrpcForward = conf.getEnableGrpcForward();
     if (this.enableGrpcForward) {
       logger.info("enable grpc forward for high available");
@@ -357,7 +378,7 @@ public class TiSession implements AutoCloseable {
     if (res == null) {
       synchronized (this) {
         if (client == null) {
-          client = PDClient.createRaw(this.getConf(), channelFactory);
+          client = PDClient.createRaw(this.getConf(), keyCodec, channelFactory);
         }
         res = client;
       }
