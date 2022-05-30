@@ -122,7 +122,7 @@ public class ConfigUtils {
   public static final String TIFLASH_ENABLE = "tiflash.enable";
   public static final String TIKV_WARM_UP_ENABLE = "tikv.warm_up.enable";
 
-  public static final String TIKV_API_VERSION = "tikv.api_version";;
+  public static final String TIKV_API_VERSION = "tikv.api_version";
 
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
