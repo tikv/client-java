@@ -213,7 +213,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     // If the region epoch is not ahead of TiKV's, replace region meta in region cache.
     for (Metapb.Region meta : currentRegions) {
       // The region needs to be decoded to plain format.
-      meta = regionManager.getPDClient().decodeRegion(meta);
+      meta = regionManager.getPDClient().getCodec().decodeRegion(meta);
       TiRegion region = regionManager.createRegion(meta, backOffer);
       newRegions.add(region);
       if (recv.getRegion().getVerID() == region.getVerID()) {

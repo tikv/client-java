@@ -18,6 +18,7 @@
 package org.tikv.txn;
 
 import com.google.protobuf.ByteString;
+import org.tikv.common.apiversion.RequestKeyCodec;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class Lock {
@@ -30,10 +31,10 @@ public class Lock {
   private final Kvrpcpb.Op lockType;
   private final long lockForUpdateTs;
 
-  public Lock(Kvrpcpb.LockInfo l) {
+  public Lock(Kvrpcpb.LockInfo l, RequestKeyCodec codec) {
     txnID = l.getLockVersion();
-    key = l.getKey();
-    primary = l.getPrimaryLock();
+    key = codec.decodeKey(l.getKey());
+    primary = codec.decodeKey(l.getPrimaryLock());
     ttl = l.getLockTtl() == 0 ? DEFAULT_LOCK_TTL : l.getLockTtl();
     txnSize = l.getTxnSize();
     lockType = l.getLockType();

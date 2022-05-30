@@ -62,9 +62,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.codec.Codec.BytesCodec;
-import org.tikv.common.codec.CodecDataInput;
-import org.tikv.common.codec.CodecDataOutput;
+import org.tikv.common.apiversion.RequestKeyCodec;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
@@ -110,7 +108,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private static final long MIN_TRY_UPDATE_DURATION = 50;
   private static final int PAUSE_CHECKER_TIMEOUT = 300; // in seconds
   private static final int KEEP_CHECKER_PAUSE_PERIOD = PAUSE_CHECKER_TIMEOUT / 5; // in seconds
-  private final Logger logger = LoggerFactory.getLogger(PDClient.class);
+  private static final Logger logger = LoggerFactory.getLogger(PDClient.class);
+
+  private final RequestKeyCodec codec;
   private RequestHeader header;
   private TsoRequest tsoReq;
   private volatile PDClientWrapper pdClientWrapper;
@@ -130,19 +130,22 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
           .labelNames("cluster")
           .register();
 
-  private PDClient(TiConfiguration conf, ChannelFactory channelFactory) {
+  private PDClient(TiConfiguration conf, RequestKeyCodec codec, ChannelFactory channelFactory) {
     super(conf, channelFactory);
     initCluster();
+    this.codec = codec;
     this.blockingStub = getBlockingStub();
     this.asyncStub = getAsyncStub();
   }
 
-  public static ReadOnlyPDClient create(TiConfiguration conf, ChannelFactory channelFactory) {
-    return createRaw(conf, channelFactory);
+  public static ReadOnlyPDClient create(
+      TiConfiguration conf, RequestKeyCodec codec, ChannelFactory channelFactory) {
+    return createRaw(conf, codec, channelFactory);
   }
 
-  static PDClient createRaw(TiConfiguration conf, ChannelFactory channelFactory) {
-    return new PDClient(conf, channelFactory);
+  static PDClient createRaw(
+      TiConfiguration conf, RequestKeyCodec codec, ChannelFactory channelFactory) {
+    return new PDClient(conf, codec, channelFactory);
   }
 
   public HostMapping getHostMapping() {
@@ -313,23 +316,19 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     Histogram.Timer requestTimer =
         PD_GET_REGION_BY_KEY_REQUEST_LATENCY.labels(getClusterId().toString()).startTimer();
     try {
-      key = conf.buildRequestKey(key);
-      if (conf.isTxnKVMode() || conf.getApiVersion().isV2()) {
-        CodecDataOutput cdo = new CodecDataOutput();
-        BytesCodec.writeBytes(cdo, key.toByteArray());
-        key = cdo.toByteString();
-      }
-      ByteString queryKey = key;
-
       Supplier<GetRegionRequest> request =
-          () -> GetRegionRequest.newBuilder().setHeader(header).setRegionKey(queryKey).build();
+          () ->
+              GetRegionRequest.newBuilder()
+                  .setHeader(header)
+                  .setRegionKey(codec.encodePdQuery(key))
+                  .build();
 
       PDErrorHandler<GetRegionResponse> handler =
           new PDErrorHandler<>(getRegionResponseErrorExtractor, this);
 
       GetRegionResponse resp =
           callWithRetry(backOffer, PDGrpc.getGetRegionMethod(), request, handler);
-      return new Pair<>(decodeRegion(resp.getRegion()), resp.getLeader());
+      return new Pair<>(codec.decodeRegion(resp.getRegion()), resp.getLeader());
     } finally {
       requestTimer.observeDuration();
     }
@@ -344,7 +343,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
     GetRegionResponse resp =
         callWithRetry(backOffer, PDGrpc.getGetRegionByIDMethod(), request, handler);
-    return new Pair<Metapb.Region, Metapb.Peer>(decodeRegion(resp.getRegion()), resp.getLeader());
+    return new Pair<Metapb.Region, Metapb.Peer>(
+        codec.decodeRegion(resp.getRegion()), resp.getLeader());
   }
 
   @Override
@@ -354,22 +354,29 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     // introduce a warm-up timeout for ScanRegions requests
     PDGrpc.PDBlockingStub stub =
         getBlockingStub().withDeadlineAfter(conf.getWarmUpTimeout(), TimeUnit.MILLISECONDS);
+    org.apache.commons.lang3.tuple.Pair<ByteString, ByteString> range =
+        codec.encodePdQueryRange(startKey, endKey);
     Pdpb.ScanRegionsRequest request =
         Pdpb.ScanRegionsRequest.newBuilder()
             .setHeader(header)
-            .setStartKey(conf.buildRequestKey(startKey))
-            .setEndKey(conf.buildRequestKey(startKey, true))
+            .setStartKey(range.getLeft())
+            .setEndKey(range.getRight())
             .setLimit(limit)
             .build();
     Pdpb.ScanRegionsResponse resp = stub.scanRegions(request);
     if (resp == null) {
       return null;
     }
+
+    if (conf.getApiVersion().isV1() && conf.isRawKVMode()) {
+      return resp.getRegionsList();
+    }
+
     return resp.getRegionsList()
         .stream()
         .map(
             r -> {
-              Metapb.Region decoded = decodeRegion(r.getRegion());
+              Metapb.Region decoded = codec.decodeRegion(r.getRegion());
               return Pdpb.Region.newBuilder().mergeFrom(r).setRegion(decoded).build();
             })
         .collect(Collectors.toList());
@@ -819,65 +826,64 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     }
   }
 
-  @Override
-  public Metapb.Region decodeRegion(Metapb.Region region) {
-    final boolean isRawRegion = conf.isRawKVMode();
-    Metapb.Region.Builder builder =
-        Metapb.Region.newBuilder()
-            .setId(region.getId())
-            .setRegionEpoch(region.getRegionEpoch())
-            .addAllPeers(region.getPeersList());
+  // public Metapb.Region decodeRegion(Metapb.Region region) {
+  //   final boolean isRawRegion = conf.isRawKVMode();
+  //   Metapb.Region.Builder builder =
+  //       Metapb.Region.newBuilder()
+  //           .setId(region.getId())
+  //           .setRegionEpoch(region.getRegionEpoch())
+  //           .addAllPeers(region.getPeersList());
 
-    if (region.getStartKey().isEmpty() || (conf.getApiVersion().isV1() && isRawRegion)) {
-      builder.setStartKey(region.getStartKey());
-    } else {
-      try {
-        ByteString decodedStartKey =
-            ByteString.copyFrom(BytesCodec.readBytes(new CodecDataInput(region.getStartKey())));
-        if (conf.getApiVersion().isV2()) {
-          if (ByteString.unsignedLexicographicalComparator()
-                  .compare(decodedStartKey, conf.getKeyPrefix())
-              < 0) {
-            decodedStartKey = ByteString.EMPTY;
-          } else {
-            decodedStartKey = decodedStartKey.substring(conf.getKeyPrefix().size());
-          }
-        }
-        builder.setStartKey(decodedStartKey);
-      } catch (Exception e) {
-        if (!conf.isTest()) {
-          throw e;
-        }
-        builder.setStartKey(region.getStartKey());
-      }
-    }
+  //   if (region.getStartKey().isEmpty() || (conf.getApiVersion().isV1() && isRawRegion)) {
+  //     builder.setStartKey(region.getStartKey());
+  //   } else {
+  //     try {
+  //       ByteString decodedStartKey =
+  //           ByteString.copyFrom(BytesCodec.readBytes(new CodecDataInput(region.getStartKey())));
+  //       if (conf.getApiVersion().isV2()) {
+  //         if (ByteString.unsignedLexicographicalComparator()
+  //             .compare(decodedStartKey, conf.getKeyPrefix())
+  //             < 0) {
+  //           decodedStartKey = ByteString.EMPTY;
+  //         } else {
+  //           decodedStartKey = decodedStartKey.substring(conf.getKeyPrefix().size());
+  //         }
+  //       }
+  //       builder.setStartKey(decodedStartKey);
+  //     } catch (Exception e) {
+  //       if (!conf.isTest()) {
+  //         throw e;
+  //       }
+  //       builder.setStartKey(region.getStartKey());
+  //     }
+  //   }
 
-    if (region.getEndKey().isEmpty() || (conf.getApiVersion().isV1() && isRawRegion)) {
-      builder.setEndKey(region.getEndKey());
-    } else {
-      try {
-        ByteString decodedEndKey =
-            ByteString.copyFrom(BytesCodec.readBytes(new CodecDataInput(region.getEndKey())));
-        if (conf.getApiVersion().isV2()) {
-          if (ByteString.unsignedLexicographicalComparator()
-                  .compare(decodedEndKey, conf.getEndKey())
-              >= 0) {
-            decodedEndKey = ByteString.EMPTY;
-          } else {
-            decodedEndKey = decodedEndKey.substring(conf.getKeyPrefix().size());
-          }
-        }
-        builder.setEndKey(decodedEndKey);
-      } catch (Exception e) {
-        if (!conf.isTest()) {
-          throw e;
-        }
-        builder.setEndKey(region.getEndKey());
-      }
-    }
+  //   if (region.getEndKey().isEmpty() || (conf.getApiVersion().isV1() && isRawRegion)) {
+  //     builder.setEndKey(region.getEndKey());
+  //   } else {
+  //     try {
+  //       ByteString decodedEndKey =
+  //           ByteString.copyFrom(BytesCodec.readBytes(new CodecDataInput(region.getEndKey())));
+  //       if (conf.getApiVersion().isV2()) {
+  //         if (ByteString.unsignedLexicographicalComparator()
+  //             .compare(decodedEndKey, conf.getEndKey())
+  //             >= 0) {
+  //           decodedEndKey = ByteString.EMPTY;
+  //         } else {
+  //           decodedEndKey = decodedEndKey.substring(conf.getKeyPrefix().size());
+  //         }
+  //       }
+  //       builder.setEndKey(decodedEndKey);
+  //     } catch (Exception e) {
+  //       if (!conf.isTest()) {
+  //         throw e;
+  //       }
+  //       builder.setEndKey(region.getEndKey());
+  //     }
+  //   }
 
-    return builder.build();
-  }
+  //   return builder.build();
+  // }
 
   public Long getClusterId() {
     return header.getClusterId();
@@ -885,5 +891,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   public List<URI> getPdAddrs() {
     return pdAddrs;
+  }
+
+  public RequestKeyCodec getCodec() {
+    return codec;
   }
 }

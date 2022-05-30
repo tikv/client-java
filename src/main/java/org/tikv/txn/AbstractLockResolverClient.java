@@ -22,6 +22,7 @@ import org.tikv.common.PDClient;
 import org.tikv.common.StoreVersion;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.Version;
+import org.tikv.common.apiversion.RequestKeyCodec;
 import org.tikv.common.exception.KeyException;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
@@ -39,9 +40,9 @@ public interface AbstractLockResolverClient {
   /** transaction involves keys exceed this threshold can be treated as `big transaction`. */
   long BIG_TXN_THRESHOLD = 16;
 
-  static Lock extractLockFromKeyErr(Kvrpcpb.KeyError keyError) {
+  static Lock extractLockFromKeyErr(Kvrpcpb.KeyError keyError, RequestKeyCodec codec) {
     if (keyError.hasLocked()) {
-      return new Lock(keyError.getLocked());
+      return new Lock(keyError.getLocked(), codec);
     }
 
     if (keyError.hasConflict()) {

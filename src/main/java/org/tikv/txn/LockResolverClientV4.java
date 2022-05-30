@@ -39,8 +39,12 @@ import org.tikv.common.exception.KeyException;
 import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.operation.KVErrorHandler;
-import org.tikv.common.region.*;
+import org.tikv.common.region.AbstractRegionStoreClient;
+import org.tikv.common.region.RegionManager;
+import org.tikv.common.region.RegionStoreClient;
+import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiRegion.RegionVerID;
+import org.tikv.common.region.TiStore;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.TsoUtils;
@@ -168,7 +172,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
           () ->
               Kvrpcpb.PessimisticRollbackRequest.newBuilder()
                   .setContext(makeContext())
-                  .addKeys(conf.buildRequestKey(lock.getKey()))
+                  .addKeys(codec.encodeKey(lock.getKey()))
                   .setStartVersion(lock.getTxnID())
                   .setForUpdateTs(forUpdateTS)
                   .build();
@@ -286,7 +290,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
           TiRegion primaryKeyRegion = regionManager.getRegionByKey(primary);
           return Kvrpcpb.CheckTxnStatusRequest.newBuilder()
               .setContext(primaryKeyRegion.getLeaderContext())
-              .setPrimaryKey(conf.buildRequestKey(primary))
+              .setPrimaryKey(codec.encodeKey(primary))
               .setLockTs(txnID)
               .setCallerStartTs(callerStartTS)
               .setCurrentTs(currentTS)
@@ -373,7 +377,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
       if (lock.getTxnSize() < BIG_TXN_THRESHOLD) {
         // Only resolve specified keys when it is a small transaction,
         // prevent from scanning the whole region in this case.
-        builder.addKeys(conf.buildRequestKey(lock.getKey()));
+        builder.addKeys(codec.encodeKey(lock.getKey()));
       }
 
       Supplier<Kvrpcpb.ResolveLockRequest> factory = builder::build;

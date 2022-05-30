@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.apiversion.RequestKeyCodec;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.KeyException;
 import org.tikv.common.region.RegionErrorReceiver;
@@ -44,6 +45,8 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
   private final boolean forWrite;
   private final RegionErrorHandler<RespT> regionHandler;
 
+  private final RequestKeyCodec codec;
+
   public KVErrorHandler(
       RegionManager regionManager,
       RegionErrorReceiver recv,
@@ -59,6 +62,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
     this.resolveLockResultCallback = resolveLockResultCallback;
     this.callerStartTS = callerStartTS;
     this.forWrite = forWrite;
+    this.codec = regionManager.getPDClient().getCodec();
   }
 
   private void resolveLock(BackOffer backOffer, Lock lock) {
@@ -100,7 +104,7 @@ public class KVErrorHandler<RespT> implements ErrorHandler<RespT> {
     Kvrpcpb.KeyError keyError = getKeyError.apply(resp);
     if (keyError != null) {
       try {
-        Lock lock = AbstractLockResolverClient.extractLockFromKeyErr(keyError);
+        Lock lock = AbstractLockResolverClient.extractLockFromKeyErr(keyError, codec);
         resolveLock(backOffer, lock);
         return true;
       } catch (KeyException e) {

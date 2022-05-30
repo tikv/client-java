@@ -19,6 +19,7 @@ package org.tikv.common;
 
 import com.google.protobuf.ByteString;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -52,10 +53,15 @@ public class PDClientV2MockTest extends PDClientMockTest {
   }
 
   private Metapb.Region makeRegion(String start, String end) {
+    Pair<ByteString, ByteString> range =
+        session
+            .getPDClient()
+            .getCodec()
+            .encodePdQueryRange(ByteString.copyFromUtf8(start), ByteString.copyFromUtf8(end));
     return GrpcUtils.makeRegion(
         1,
-        encode(session.getConf().buildRequestKey(ByteString.copyFromUtf8(start))),
-        encode(session.getConf().buildRequestKey(ByteString.copyFromUtf8(end), true)),
+        range.getLeft(),
+        range.getRight(),
         GrpcUtils.makeRegionEpoch(2, 3),
         GrpcUtils.makePeer(1, 10),
         GrpcUtils.makePeer(2, 20));
