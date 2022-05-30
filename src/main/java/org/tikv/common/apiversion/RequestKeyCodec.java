@@ -11,7 +11,6 @@ public interface RequestKeyCodec {
 
   Pair<ByteString, ByteString> encodeRange(ByteString start, ByteString end);
 
-
   ByteString encodePdQuery(ByteString key);
 
   default Pair<ByteString, ByteString> encodePdQueryRange(ByteString start, ByteString end) {

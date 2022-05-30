@@ -8,11 +8,11 @@ import org.tikv.kvproto.Metapb.Region;
 public class RequestKeyV2Codec implements RequestKeyCodec {
   protected static ByteString RAW_KEY_PREFIX = ByteString.copyFromUtf8("r");
   protected static ByteString RAW_END_KEY =
-      ByteString.copyFrom(new byte[]{(byte) (RAW_KEY_PREFIX.toByteArray()[0] + 1)});
+      ByteString.copyFrom(new byte[] {(byte) (RAW_KEY_PREFIX.toByteArray()[0] + 1)});
 
   protected static ByteString TXN_KEY_PREFIX = ByteString.copyFromUtf8("x");
   protected static ByteString TXN_END_KEY =
-      ByteString.copyFrom(new byte[]{(byte) (TXN_KEY_PREFIX.toByteArray()[0] + 1)});
+      ByteString.copyFrom(new byte[] {(byte) (TXN_KEY_PREFIX.toByteArray()[0] + 1)});
   protected ByteString keyPrefix;
 
   protected ByteString infiniteEndKey;

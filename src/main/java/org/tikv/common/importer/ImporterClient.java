@@ -30,8 +30,6 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.apiversion.RequestKeyCodec;
-import org.tikv.common.codec.Codec;
-import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiKVException;
