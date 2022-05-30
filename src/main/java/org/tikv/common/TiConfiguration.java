@@ -1260,61 +1260,6 @@ public class TiConfiguration implements Serializable {
     return this;
   }
 
-  public ByteString getKeyPrefix() {
-    if (apiVersion.isV2()) {
-      return isRawKVMode() ? API_V2_RAW_PREFIX : API_V2_TXN_PREFIX;
-    }
-    return ByteString.EMPTY;
-  }
-
-  public ByteString getEndKey() {
-    if (apiVersion.isV2()) {
-      byte end = (byte) (getKeyPrefix().toByteArray()[0] + 1);
-      return ByteString.copyFrom(new byte[] {end});
-    }
-    return ByteString.EMPTY;
-  }
-
-  public ByteString buildRequestKey(ByteString key, boolean isEndKey) {
-    switch (apiVersion) {
-      case V1:
-        return key;
-      case V2:
-        if (isEndKey && key.isEmpty()) {
-          return getEndKey();
-        }
-        return getKeyPrefix().concat(key);
-      default:
-        throw new IllegalArgumentException("unknown api version or kv mode");
-    }
-  }
-
-  public ByteString buildRequestKey(ByteString key) {
-    return buildRequestKey(key, false);
-  }
-
-  public ByteString unwrapResponseKey(ByteString key) {
-    return unwrapResponseKey(key, false);
-  }
-
-  public ByteString unwrapResponseKey(ByteString key, boolean isEndKey) {
-    switch (apiVersion) {
-      case V1:
-        return key;
-      case V2:
-        if (isEndKey && key.equals(getEndKey())) {
-          return ByteString.EMPTY;
-        }
-        // TODO: empty key is not always scan back!!!!
-        if (!key.isEmpty() && !key.startsWith(getKeyPrefix())) {
-          throw new IllegalArgumentException("key corrupted, wrong prefix");
-        }
-        return key.substring(key.isEmpty() ? 0 : 1);
-      default:
-        throw new IllegalArgumentException("unknown api version or kv mode");
-    }
-  }
-
   public enum ApiVersion {
     V1,
     V2;
