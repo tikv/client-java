@@ -826,65 +826,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     }
   }
 
-  // public Metapb.Region decodeRegion(Metapb.Region region) {
-  //   final boolean isRawRegion = conf.isRawKVMode();
-  //   Metapb.Region.Builder builder =
-  //       Metapb.Region.newBuilder()
-  //           .setId(region.getId())
-  //           .setRegionEpoch(region.getRegionEpoch())
-  //           .addAllPeers(region.getPeersList());
-
-  //   if (region.getStartKey().isEmpty() || (conf.getApiVersion().isV1() && isRawRegion)) {
-  //     builder.setStartKey(region.getStartKey());
-  //   } else {
-  //     try {
-  //       ByteString decodedStartKey =
-  //           ByteString.copyFrom(BytesCodec.readBytes(new CodecDataInput(region.getStartKey())));
-  //       if (conf.getApiVersion().isV2()) {
-  //         if (ByteString.unsignedLexicographicalComparator()
-  //             .compare(decodedStartKey, conf.getKeyPrefix())
-  //             < 0) {
-  //           decodedStartKey = ByteString.EMPTY;
-  //         } else {
-  //           decodedStartKey = decodedStartKey.substring(conf.getKeyPrefix().size());
-  //         }
-  //       }
-  //       builder.setStartKey(decodedStartKey);
-  //     } catch (Exception e) {
-  //       if (!conf.isTest()) {
-  //         throw e;
-  //       }
-  //       builder.setStartKey(region.getStartKey());
-  //     }
-  //   }
-
-  //   if (region.getEndKey().isEmpty() || (conf.getApiVersion().isV1() && isRawRegion)) {
-  //     builder.setEndKey(region.getEndKey());
-  //   } else {
-  //     try {
-  //       ByteString decodedEndKey =
-  //           ByteString.copyFrom(BytesCodec.readBytes(new CodecDataInput(region.getEndKey())));
-  //       if (conf.getApiVersion().isV2()) {
-  //         if (ByteString.unsignedLexicographicalComparator()
-  //             .compare(decodedEndKey, conf.getEndKey())
-  //             >= 0) {
-  //           decodedEndKey = ByteString.EMPTY;
-  //         } else {
-  //           decodedEndKey = decodedEndKey.substring(conf.getKeyPrefix().size());
-  //         }
-  //       }
-  //       builder.setEndKey(decodedEndKey);
-  //     } catch (Exception e) {
-  //       if (!conf.isTest()) {
-  //         throw e;
-  //       }
-  //       builder.setEndKey(region.getEndKey());
-  //     }
-  //   }
-
-  //   return builder.build();
-  // }
-
   public Long getClusterId() {
     return header.getClusterId();
   }
