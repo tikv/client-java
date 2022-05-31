@@ -50,6 +50,12 @@ public class RequestKeyV2Codec implements RequestKeyCodec {
   }
 
   @Override
+  public Pair<ByteString, ByteString> encodePdQueryRange(ByteString start, ByteString end) {
+    Pair<ByteString, ByteString> range = encodeRange(start, end);
+    return Pair.of(CodecUtils.encode(range.getLeft()), CodecUtils.encode(range.getRight()));
+  }
+
+  @Override
   public Region decodeRegion(Region region) {
     Metapb.Region.Builder builder = Metapb.Region.newBuilder().mergeFrom(region);
 

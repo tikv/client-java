@@ -44,6 +44,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.PDClient;
@@ -282,7 +283,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             BatchGetRequest.newBuilder()
                 .setContext(
                     makeContext(getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
-                .addAllKeys(keys.stream().map(codec::encodeKey).collect(Collectors.toList()))
+                .addAllKeys(codec.encodeKeys(keys))
                 .setVersion(version)
                 .build();
     KVErrorHandler<BatchGetResponse> handler =
@@ -458,15 +459,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                       .setContext(makeContext(storeType, bo.getSlowLog()))
                       .setStartVersion(startTs)
                       .setPrimaryLock(codec.encodeKey(primaryLock))
-                      .addAllMutations(
-                          mutations
-                              .stream()
-                              .map(
-                                  mutation ->
-                                      Mutation.newBuilder(mutation)
-                                          .setKey(codec.encodeKey(mutation.getKey()))
-                                          .build())
-                              .collect(Collectors.toList()))
+                      .addAllMutations(codec.encodeMutations(mutations))
                       .setLockTtl(ttl)
                       .setSkipConstraintCheck(skipConstraintCheck)
                       .setMinCommitTs(startTs)
@@ -602,7 +595,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param startTs start version
    * @param commitTs commit version
    */
-  public void commit(BackOffer backOffer, List<ByteString> keys, long startTs, long commitTs)
+  public void commit(BackOffer backOffer, Iterable<ByteString> keys, long startTs, long commitTs)
       throws KeyException {
     boolean forWrite = true;
     Supplier<CommitRequest> factory =
@@ -610,7 +603,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             CommitRequest.newBuilder()
                 .setStartVersion(startTs)
                 .setCommitVersion(commitTs)
-                .addAllKeys(keys.stream().map(codec::encodeKey).collect(Collectors.toList()))
+                .addAllKeys(
+                    StreamSupport.stream(keys.spliterator(), false)
+                        .map(codec::encodeKey)
+                        .collect(Collectors.toList()))
                 .setContext(makeContext(storeType, backOffer.getSlowLog()))
                 .build();
     KVErrorHandler<CommitResponse> handler =
@@ -837,8 +833,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
         () ->
             SplitRegionRequest.newBuilder()
                 .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
-                .addAllSplitKeys(
-                    splitKeys.stream().map(codec::encodeKey).collect(Collectors.toList()))
+                .addAllSplitKeys(codec.encodeKeys(splitKeys))
                 .setIsRawKv(conf.isRawKVMode())
                 .build();
 
@@ -1114,7 +1109,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawBatchGetRequest.newBuilder()
                   .setContext(makeContext(storeType, backoffer.getSlowLog()))
-                  .addAllKeys(keys.stream().map(codec::encodeKey).collect(Collectors.toList()))
+                  .addAllKeys(codec.encodeKeys(keys))
                   .build();
       RegionErrorHandler<RawBatchGetResponse> handler =
           new RegionErrorHandler<RawBatchGetResponse>(
@@ -1222,7 +1217,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawBatchDeleteRequest.newBuilder()
                   .setContext(makeContext(storeType, backoffer.getSlowLog()))
-                  .addAllKeys(keys.stream().map(codec::encodeKey).collect(Collectors.toList()))
+                  .addAllKeys(codec.encodeKeys(keys))
                   .setForCas(atomicForCAS)
                   .build();
       RegionErrorHandler<RawBatchDeleteResponse> handler =

@@ -4,27 +4,17 @@ import com.google.protobuf.ByteString;
 import org.apache.commons.lang3.tuple.Pair;
 import org.tikv.kvproto.Metapb;
 
-public class RequestKeyV1TxnCodec implements RequestKeyCodec {
+public class RequestKeyV1TxnCodec extends RequestKeyV1Codec implements RequestKeyCodec {
   public RequestKeyV1TxnCodec() {}
-
-  @Override
-  public ByteString encodeKey(ByteString key) {
-    return key;
-  }
-
-  @Override
-  public ByteString decodeKey(ByteString key) {
-    return key;
-  }
-
-  @Override
-  public Pair<ByteString, ByteString> encodeRange(ByteString start, ByteString end) {
-    return Pair.of(start, end);
-  }
 
   @Override
   public ByteString encodePdQuery(ByteString key) {
     return CodecUtils.encode(key);
+  }
+
+  @Override
+  public Pair<ByteString, ByteString> encodePdQueryRange(ByteString start, ByteString end) {
+    return Pair.of(CodecUtils.encode(start), CodecUtils.encode(end));
   }
 
   @Override
