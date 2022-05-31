@@ -46,9 +46,7 @@ public interface RequestKeyCodec {
   }
 
   default List<KvPair> decodeKvPairs(List<KvPair> pairs) {
-    return pairs.stream()
-        .map(this::decodeKvPair)
-        .collect(Collectors.toList());
+    return pairs.stream().map(this::decodeKvPair).collect(Collectors.toList());
   }
 
   Pair<ByteString, ByteString> encodeRange(ByteString start, ByteString end);
