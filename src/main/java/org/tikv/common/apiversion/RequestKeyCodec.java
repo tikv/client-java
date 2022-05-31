@@ -21,6 +21,7 @@ import com.google.protobuf.ByteString;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.tikv.kvproto.Kvrpcpb.KvPair;
 import org.tikv.kvproto.Kvrpcpb.Mutation;
 import org.tikv.kvproto.Metapb;
 
@@ -39,6 +40,16 @@ public interface RequestKeyCodec {
   }
 
   ByteString decodeKey(ByteString key);
+
+  default KvPair decodeKvPair(KvPair pair) {
+    return KvPair.newBuilder().mergeFrom(pair).setKey(decodeKey(pair.getKey())).build();
+  }
+
+  default List<KvPair> decodeKvPairs(List<KvPair> pairs) {
+    return pairs.stream()
+        .map(this::decodeKvPair)
+        .collect(Collectors.toList());
+  }
 
   Pair<ByteString, ByteString> encodeRange(ByteString start, ByteString end);
 

@@ -50,7 +50,7 @@ public interface AbstractLockResolverClient {
       throw new KeyException(
           String.format(
               "scan meet key conflict on primary key %s at commit ts %s",
-              conflict.getPrimary(), conflict.getConflictTs()));
+              codec.decodeKey(conflict.getPrimary()), conflict.getConflictTs()));
     }
 
     if (!keyError.getRetryable().isEmpty()) {

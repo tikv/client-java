@@ -20,6 +20,7 @@ package org.tikv.common.apiversion;
 import com.google.protobuf.ByteString;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
+import org.tikv.kvproto.Kvrpcpb.KvPair;
 import org.tikv.kvproto.Kvrpcpb.Mutation;
 import org.tikv.kvproto.Metapb.Region;
 
@@ -42,6 +43,16 @@ public class RequestKeyV1Codec implements RequestKeyCodec {
   @Override
   public ByteString decodeKey(ByteString key) {
     return key;
+  }
+
+  @Override
+  public KvPair decodeKvPair(KvPair pair) {
+    return pair;
+  }
+
+  @Override
+  public List<KvPair> decodeKvPairs(List<KvPair> pairs) {
+    return pairs;
   }
 
   @Override

@@ -330,20 +330,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       addResolvedLocks(version, resolveLockResult.getResolvedLocks());
       // resolveLocks already retried, just throw error to upper logic.
       throw new TiKVException("locks not resolved, retry");
-    } else {
-      if (conf.getApiVersion().isV1()) {
-        return resp.getPairsList();
-      }
-      return resp.getPairsList()
-          .stream()
-          .map(
-              kvPair ->
-                  KvPair.newBuilder()
-                      .mergeFrom(kvPair)
-                      .setKey(codec.decodeKey(kvPair.getKey()))
-                      .build())
-          .collect(Collectors.toList());
     }
+
+    return codec.decodeKvPairs(resp.getPairsList());
   }
 
   public List<KvPair> scan(
@@ -406,10 +395,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             KvPair.newBuilder()
                 .setError(kvPair.getError())
                 .setValue(kvPair.getValue())
-                .setKey(codec.decodeKey(lock.getKey()))
+                .setKey(lock.getKey())
                 .build());
       } else {
-        newKvPairs.add(kvPair);
+        newKvPairs.add(codec.decodeKvPair(kvPair));
       }
     }
     return Collections.unmodifiableList(newKvPairs);
@@ -1131,19 +1120,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       throw new RegionException(resp.getRegionError());
     }
 
-    if (conf.getApiVersion().isV1()) {
-      return resp.getPairsList();
-    }
-
-    return resp.getPairsList()
-        .stream()
-        .map(
-            kvPair ->
-                KvPair.newBuilder()
-                    .mergeFrom(kvPair)
-                    .setKey(codec.decodeKey(kvPair.getKey()))
-                    .build())
-        .collect(Collectors.toList());
+    return codec.decodeKvPairs(resp.getPairsList());
   }
 
   public void rawBatchPut(
@@ -1295,15 +1272,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
     }
-    return resp.getKvsList()
-        .stream()
-        .map(
-            kvPair ->
-                KvPair.newBuilder()
-                    .setKey(codec.decodeKey(kvPair.getKey()))
-                    .setValue(kvPair.getValue())
-                    .build())
-        .collect(Collectors.toList());
+    return codec.decodeKvPairs(resp.getKvsList());
   }
 
   /**
