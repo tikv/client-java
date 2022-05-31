@@ -82,8 +82,8 @@ public class PDClientMockTest extends PDMockServerTest {
 
   @Test
   public void testGetRegionByKey() throws Exception {
-    byte[] startKey = new byte[]{1, 0, 2, 4};
-    byte[] endKey = new byte[]{1, 0, 2, 5};
+    byte[] startKey = new byte[] {1, 0, 2, 4};
+    byte[] endKey = new byte[] {1, 0, 2, 5};
     int confVer = 1026;
     int ver = 1027;
     leader.addGetRegionListener(
@@ -108,16 +108,13 @@ public class PDClientMockTest extends PDMockServerTest {
       assertEquals(r.getRegionEpoch().getVersion(), ver);
       assertEquals(1, l.getId());
       assertEquals(10, l.getStoreId());
-    } catch (Exception e) {
-      e.printStackTrace();
-      throw e;
     }
   }
 
   @Test
   public void testGetRegionById() throws Exception {
-    byte[] startKey = new byte[]{1, 0, 2, 4};
-    byte[] endKey = new byte[]{1, 0, 2, 5};
+    byte[] startKey = new byte[] {1, 0, 2, 4};
+    byte[] endKey = new byte[] {1, 0, 2, 5};
     int confVer = 1026;
     int ver = 1027;
 

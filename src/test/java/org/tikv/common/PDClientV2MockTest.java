@@ -32,7 +32,7 @@ import org.tikv.kvproto.Pdpb.GetRegionResponse;
 import org.tikv.kvproto.Pdpb.Region;
 import org.tikv.kvproto.Pdpb.ScanRegionsResponse;
 
-public class PDClientV2MockTest extends PDClientMockTest {
+public class PDClientV2MockTest extends PDMockServerTest {
   @Before
   public void init() throws Exception {
     upgradeToV2Cluster();
