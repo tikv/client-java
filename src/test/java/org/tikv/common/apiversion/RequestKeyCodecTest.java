@@ -20,10 +20,13 @@ package org.tikv.common.apiversion;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Test;
 import org.tikv.kvproto.Metapb.Region;
+import org.tikv.kvproto.Pdpb;
 
 public class RequestKeyCodecTest {
   @Test
@@ -48,6 +51,13 @@ public class RequestKeyCodecTest {
 
     Region region = Region.newBuilder().setStartKey(start).setEndKey(end).build();
     assertEquals(region, v1.decodeRegion(region));
+
+    assertEquals(
+        ImmutableList.of(region),
+        v1.decodePdRegions(ImmutableList.of(Pdpb.Region.newBuilder().setRegion(region).build()))
+            .stream()
+            .map(Pdpb.Region::getRegion)
+            .collect(Collectors.toList()));
   }
 
   @Test

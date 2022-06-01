@@ -24,6 +24,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 import org.tikv.kvproto.Kvrpcpb.Mutation;
 import org.tikv.kvproto.Metapb;
+import org.tikv.kvproto.Pdpb;
 
 public interface RequestKeyCodec {
   ByteString encodeKey(ByteString key);
@@ -56,4 +57,16 @@ public interface RequestKeyCodec {
   Pair<ByteString, ByteString> encodePdQueryRange(ByteString start, ByteString end);
 
   Metapb.Region decodeRegion(Metapb.Region region);
+
+  default List<Pdpb.Region> decodePdRegions(List<Pdpb.Region> regions) {
+    return regions
+        .stream()
+        .map(
+            r ->
+                Pdpb.Region.newBuilder()
+                    .mergeFrom(r)
+                    .setRegion(this.decodeRegion(r.getRegion()))
+                    .build())
+        .collect(Collectors.toList());
+  }
 }

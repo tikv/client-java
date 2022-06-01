@@ -368,18 +368,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       return null;
     }
 
-    if (conf.getApiVersion().isV1() && conf.isRawKVMode()) {
-      return resp.getRegionsList();
-    }
-
-    return resp.getRegionsList()
-        .stream()
-        .map(
-            r -> {
-              Metapb.Region decoded = codec.decodeRegion(r.getRegion());
-              return Pdpb.Region.newBuilder().mergeFrom(r).setRegion(decoded).build();
-            })
-        .collect(Collectors.toList());
+    return codec.decodePdRegions(resp.getRegionsList());
   }
 
   private Supplier<GetStoreRequest> buildGetStoreReq(long storeId) {

@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 import org.tikv.kvproto.Kvrpcpb.Mutation;
 import org.tikv.kvproto.Metapb.Region;
+import org.tikv.kvproto.Pdpb;
 
 public class RequestKeyV1Codec implements RequestKeyCodec {
   @Override
@@ -73,5 +74,10 @@ public class RequestKeyV1Codec implements RequestKeyCodec {
   @Override
   public Region decodeRegion(Region region) {
     return region;
+  }
+
+  @Override
+  public List<Pdpb.Region> decodePdRegions(List<Pdpb.Region> regions) {
+    return regions;
   }
 }
