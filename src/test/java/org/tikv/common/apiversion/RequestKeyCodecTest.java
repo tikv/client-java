@@ -17,6 +17,7 @@
 
 package org.tikv.common.apiversion;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 import com.google.protobuf.ByteString;
@@ -47,5 +48,123 @@ public class RequestKeyCodecTest {
 
     Region region = Region.newBuilder().setStartKey(start).setEndKey(end).build();
     assertEquals(region, v1.decodeRegion(region));
+  }
+
+  @Test
+  public void testV1TxnCodec() {
+    RequestKeyCodec v1 = new RequestKeyV1TxnCodec();
+
+    ByteString key = ByteString.copyFromUtf8("testV1TxnCodec");
+
+    assertEquals(CodecUtils.encode(key), v1.encodePdQuery(key));
+
+    ByteString start = ByteString.copyFromUtf8("testV1TxnCodec_start");
+    ByteString end = ByteString.copyFromUtf8("testV1TxnCodec_end");
+
+    // Test start and end are both non-empty.
+    Pair<ByteString, ByteString> range = v1.encodePdQueryRange(start, end);
+    assertEquals(CodecUtils.encode(start), range.getLeft());
+    assertEquals(CodecUtils.encode(end), range.getRight());
+
+    Region region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(start))
+            .setEndKey(CodecUtils.encode(end))
+            .build();
+    Region decoded = v1.decodeRegion(region);
+    assertEquals(start, decoded.getStartKey());
+    assertEquals(end, decoded.getEndKey());
+
+    // Test start is empty.
+    start = ByteString.EMPTY;
+    region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(start))
+            .setEndKey(CodecUtils.encode(end))
+            .build();
+    decoded = v1.decodeRegion(region);
+    assertEquals(start, decoded.getStartKey());
+    assertEquals(end, decoded.getEndKey());
+
+    range = v1.encodePdQueryRange(start, end);
+    assertEquals(ByteString.EMPTY, range.getLeft());
+    assertEquals(CodecUtils.encode(end), range.getRight());
+
+    // Test end is empty.
+    end = ByteString.EMPTY;
+    region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(start))
+            .setEndKey(CodecUtils.encode(end))
+            .build();
+    decoded = v1.decodeRegion(region);
+    assertEquals(start, decoded.getStartKey());
+    assertEquals(ByteString.EMPTY, decoded.getEndKey());
+
+    range = v1.encodePdQueryRange(start, end);
+    assertEquals(start, range.getLeft());
+    assertEquals(ByteString.EMPTY, range.getRight());
+  }
+
+  @Test
+  public void testV2Codec() {
+    testV2Codec(new RequestKeyV2RawCodec());
+    testV2Codec(new RequestKeyV2TxnCodec());
+  }
+
+  void testV2Codec(RequestKeyV2Codec v2) {
+    ByteString key = ByteString.copyFromUtf8("testV2RawCodec");
+
+    assertEquals(key, v2.decodeKey(v2.encodeKey(key)));
+    assertEquals(CodecUtils.encode(v2.encodeKey(key)), v2.encodePdQuery(key));
+
+    ByteString start = ByteString.copyFromUtf8("testV1TxnCodec_start");
+    ByteString end = ByteString.copyFromUtf8("testV1TxnCodec_end");
+
+    // Test start and end are both non-empty.
+    Pair<ByteString, ByteString> range = v2.encodePdQueryRange(start, end);
+    assertEquals(CodecUtils.encode(v2.encodeKey(start)), range.getLeft());
+    assertEquals(CodecUtils.encode(v2.encodeKey(end)), range.getRight());
+
+    Region region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(v2.encodeKey(start)))
+            .setEndKey(CodecUtils.encode(v2.encodeKey(end)))
+            .build();
+    Region decoded = v2.decodeRegion(region);
+    assertEquals(start, decoded.getStartKey());
+    assertEquals(end, decoded.getEndKey());
+
+    // Test start is empty.
+    start = ByteString.EMPTY;
+    region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(v2.encodeKey(start)))
+            .setEndKey(CodecUtils.encode(v2.encodeKey(end)))
+            .build();
+    decoded = v2.decodeRegion(region);
+    assertEquals(start, decoded.getStartKey());
+    assertEquals(end, decoded.getEndKey());
+
+    range = v2.encodePdQueryRange(start, end);
+    assertEquals(CodecUtils.encode(v2.encodeKey(start)), range.getLeft());
+    assertEquals(CodecUtils.encode(v2.encodeKey(end)), range.getRight());
+
+    // Test end is empty.
+    end = ByteString.EMPTY;
+    range = v2.encodeRange(start, end);
+    assertEquals(v2.encodeKey(start), range.getLeft());
+    assertArrayEquals(
+        new byte[] {(byte) (v2.encodeKey(ByteString.EMPTY).byteAt(0) + 1)},
+        range.getRight().toByteArray());
+
+    region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(range.getLeft()))
+            .setEndKey(CodecUtils.encode(range.getRight()))
+            .build();
+    decoded = v2.decodeRegion(region);
+    assertEquals(start, decoded.getStartKey());
+    assertEquals(ByteString.EMPTY, decoded.getEndKey());
   }
 }

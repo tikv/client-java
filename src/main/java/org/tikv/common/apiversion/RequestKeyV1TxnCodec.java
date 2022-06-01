@@ -31,7 +31,15 @@ public class RequestKeyV1TxnCodec extends RequestKeyV1Codec implements RequestKe
 
   @Override
   public Pair<ByteString, ByteString> encodePdQueryRange(ByteString start, ByteString end) {
-    return Pair.of(CodecUtils.encode(start), CodecUtils.encode(end));
+    if (!start.isEmpty()) {
+      start = CodecUtils.encode(start);
+    }
+
+    if (!end.isEmpty()) {
+      end = CodecUtils.encode(end);
+    }
+
+    return Pair.of(start, end);
   }
 
   @Override
