@@ -1238,12 +1238,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     try {
       Supplier<RawScanRequest> factory =
           () -> {
-            org.apache.commons.lang3.tuple.Pair<ByteString, ByteString> range =
-                codec.encodeRange(key, ByteString.EMPTY);
+            Pair<ByteString, ByteString> range = codec.encodeRange(key, ByteString.EMPTY);
             return RawScanRequest.newBuilder()
                 .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                .setStartKey(range.getLeft())
-                .setEndKey(range.getRight())
+                .setStartKey(range.first)
+                .setEndKey(range.second)
                 .setKeyOnly(keyOnly)
                 .setLimit(limit)
                 .build();
@@ -1291,12 +1290,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     try {
       Supplier<RawDeleteRangeRequest> factory =
           () -> {
-            org.apache.commons.lang3.tuple.Pair<ByteString, ByteString> range =
-                codec.encodeRange(startKey, endKey);
+            Pair<ByteString, ByteString> range = codec.encodeRange(startKey, endKey);
             return RawDeleteRangeRequest.newBuilder()
                 .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                .setStartKey(range.getLeft())
-                .setEndKey(range.getRight())
+                .setStartKey(range.first)
+                .setEndKey(range.second)
                 .build();
           };
 

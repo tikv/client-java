@@ -18,7 +18,7 @@
 package org.tikv.common.apiversion;
 
 import com.google.protobuf.ByteString;
-import org.apache.commons.lang3.tuple.Pair;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Region;
 
@@ -58,7 +58,7 @@ public class RequestKeyV2Codec implements RequestKeyCodec {
 
     end = end.isEmpty() ? infiniteEndKey : encodeKey(end);
 
-    return Pair.of(start, end);
+    return Pair.create(start, end);
   }
 
   @Override
@@ -69,7 +69,7 @@ public class RequestKeyV2Codec implements RequestKeyCodec {
   @Override
   public Pair<ByteString, ByteString> encodePdQueryRange(ByteString start, ByteString end) {
     Pair<ByteString, ByteString> range = encodeRange(start, end);
-    return Pair.of(CodecUtils.encode(range.getLeft()), CodecUtils.encode(range.getRight()));
+    return Pair.create(CodecUtils.encode(range.first), CodecUtils.encode(range.second));
   }
 
   @Override

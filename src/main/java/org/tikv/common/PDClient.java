@@ -354,13 +354,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     // introduce a warm-up timeout for ScanRegions requests
     PDGrpc.PDBlockingStub stub =
         getBlockingStub().withDeadlineAfter(conf.getWarmUpTimeout(), TimeUnit.MILLISECONDS);
-    org.apache.commons.lang3.tuple.Pair<ByteString, ByteString> range =
-        codec.encodePdQueryRange(startKey, endKey);
+    Pair<ByteString, ByteString> range = codec.encodePdQueryRange(startKey, endKey);
     Pdpb.ScanRegionsRequest request =
         Pdpb.ScanRegionsRequest.newBuilder()
             .setHeader(header)
-            .setStartKey(range.getLeft())
-            .setEndKey(range.getRight())
+            .setStartKey(range.first)
+            .setEndKey(range.second)
             .setLimit(limit)
             .build();
     Pdpb.ScanRegionsResponse resp = stub.scanRegions(request);

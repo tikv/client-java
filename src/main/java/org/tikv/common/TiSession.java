@@ -180,7 +180,7 @@ public class TiSession implements AutoCloseable {
       logger.info("enable grpc forward for high available");
     }
     if (conf.isWarmUpEnable() && conf.isRawKVMode()) {
-      warmup();
+      warmUp();
     }
     this.circuitBreaker = new CircuitBreakerImpl(conf, client.getClusterId());
     logger.info(
@@ -206,7 +206,7 @@ public class TiSession implements AutoCloseable {
   }
 
   @VisibleForTesting
-  public synchronized void warmup() {
+  public synchronized void warmUp() {
     long warmUpStartTime = System.nanoTime();
     BackOffer backOffer = ConcreteBackOffer.newRawKVBackOff(getPDClient().getClusterId());
     try {

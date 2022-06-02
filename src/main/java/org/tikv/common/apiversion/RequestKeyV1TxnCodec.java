@@ -18,7 +18,7 @@
 package org.tikv.common.apiversion;
 
 import com.google.protobuf.ByteString;
-import org.apache.commons.lang3.tuple.Pair;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 
 public class RequestKeyV1TxnCodec extends RequestKeyV1Codec implements RequestKeyCodec {
@@ -39,7 +39,7 @@ public class RequestKeyV1TxnCodec extends RequestKeyV1Codec implements RequestKe
       end = CodecUtils.encode(end);
     }
 
-    return Pair.of(start, end);
+    return Pair.create(start, end);
   }
 
   @Override

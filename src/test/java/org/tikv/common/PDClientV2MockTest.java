@@ -19,13 +19,13 @@ package org.tikv.common;
 
 import com.google.protobuf.ByteString;
 import java.util.List;
-import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
 import org.tikv.kvproto.Pdpb.GetRegionResponse;
@@ -60,8 +60,8 @@ public class PDClientV2MockTest extends PDMockServerTest {
             .encodePdQueryRange(ByteString.copyFromUtf8(start), ByteString.copyFromUtf8(end));
     return GrpcUtils.makeRegion(
         1,
-        range.getLeft(),
-        range.getRight(),
+        range.first,
+        range.second,
         GrpcUtils.makeRegionEpoch(2, 3),
         GrpcUtils.makePeer(1, 10),
         GrpcUtils.makePeer(2, 20));

@@ -140,14 +140,11 @@ public class ImporterClient {
   private void init() {
     long regionId = region.getId();
     Metapb.RegionEpoch regionEpoch = region.getRegionEpoch();
-    org.apache.commons.lang3.tuple.Pair<ByteString, ByteString> keyRange =
+    Pair<ByteString, ByteString> keyRange =
         codec.encodePdQueryRange(minKey.toByteString(), maxKey.toByteString());
 
     ImportSstpb.Range range =
-        ImportSstpb.Range.newBuilder()
-            .setStart(keyRange.getLeft())
-            .setEnd(keyRange.getRight())
-            .build();
+        ImportSstpb.Range.newBuilder().setStart(keyRange.first).setEnd(keyRange.second).build();
 
     sstMeta =
         ImportSstpb.SSTMeta.newBuilder()

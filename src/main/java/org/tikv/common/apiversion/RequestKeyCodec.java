@@ -20,7 +20,7 @@ package org.tikv.common.apiversion;
 import com.google.protobuf.ByteString;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 import org.tikv.kvproto.Kvrpcpb.Mutation;
 import org.tikv.kvproto.Metapb;

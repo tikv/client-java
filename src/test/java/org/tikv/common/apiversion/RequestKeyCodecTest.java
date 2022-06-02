@@ -23,8 +23,8 @@ import static org.junit.Assert.assertEquals;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Test;
+import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb.Region;
 import org.tikv.kvproto.Pdpb;
 
@@ -42,12 +42,12 @@ public class RequestKeyCodecTest {
     ByteString start = ByteString.copyFromUtf8("testV1RawCodec_start");
     ByteString end = ByteString.copyFromUtf8("testV1RawCodec_end");
     Pair<ByteString, ByteString> range = v1.encodeRange(start, end);
-    assertEquals(start, range.getLeft());
-    assertEquals(end, range.getRight());
+    assertEquals(start, range.first);
+    assertEquals(end, range.second);
 
     range = v1.encodePdQueryRange(start, end);
-    assertEquals(start, range.getLeft());
-    assertEquals(end, range.getRight());
+    assertEquals(start, range.first);
+    assertEquals(end, range.second);
 
     Region region = Region.newBuilder().setStartKey(start).setEndKey(end).build();
     assertEquals(region, v1.decodeRegion(region));
@@ -73,8 +73,8 @@ public class RequestKeyCodecTest {
 
     // Test start and end are both non-empty.
     Pair<ByteString, ByteString> range = v1.encodePdQueryRange(start, end);
-    assertEquals(CodecUtils.encode(start), range.getLeft());
-    assertEquals(CodecUtils.encode(end), range.getRight());
+    assertEquals(CodecUtils.encode(start), range.first);
+    assertEquals(CodecUtils.encode(end), range.second);
 
     Region region =
         Region.newBuilder()
@@ -97,8 +97,8 @@ public class RequestKeyCodecTest {
     assertEquals(end, decoded.getEndKey());
 
     range = v1.encodePdQueryRange(start, end);
-    assertEquals(ByteString.EMPTY, range.getLeft());
-    assertEquals(CodecUtils.encode(end), range.getRight());
+    assertEquals(ByteString.EMPTY, range.first);
+    assertEquals(CodecUtils.encode(end), range.second);
 
     // Test end is empty.
     end = ByteString.EMPTY;
@@ -112,8 +112,8 @@ public class RequestKeyCodecTest {
     assertEquals(ByteString.EMPTY, decoded.getEndKey());
 
     range = v1.encodePdQueryRange(start, end);
-    assertEquals(start, range.getLeft());
-    assertEquals(ByteString.EMPTY, range.getRight());
+    assertEquals(start, range.first);
+    assertEquals(ByteString.EMPTY, range.second);
   }
 
   @Test
@@ -133,8 +133,8 @@ public class RequestKeyCodecTest {
 
     // Test start and end are both non-empty.
     Pair<ByteString, ByteString> range = v2.encodePdQueryRange(start, end);
-    assertEquals(CodecUtils.encode(v2.encodeKey(start)), range.getLeft());
-    assertEquals(CodecUtils.encode(v2.encodeKey(end)), range.getRight());
+    assertEquals(CodecUtils.encode(v2.encodeKey(start)), range.first);
+    assertEquals(CodecUtils.encode(v2.encodeKey(end)), range.second);
 
     Region region =
         Region.newBuilder()
@@ -157,21 +157,21 @@ public class RequestKeyCodecTest {
     assertEquals(end, decoded.getEndKey());
 
     range = v2.encodePdQueryRange(start, end);
-    assertEquals(CodecUtils.encode(v2.encodeKey(start)), range.getLeft());
-    assertEquals(CodecUtils.encode(v2.encodeKey(end)), range.getRight());
+    assertEquals(CodecUtils.encode(v2.encodeKey(start)), range.first);
+    assertEquals(CodecUtils.encode(v2.encodeKey(end)), range.second);
 
     // Test end is empty.
     end = ByteString.EMPTY;
     range = v2.encodeRange(start, end);
-    assertEquals(v2.encodeKey(start), range.getLeft());
+    assertEquals(v2.encodeKey(start), range.first);
     assertArrayEquals(
         new byte[] {(byte) (v2.encodeKey(ByteString.EMPTY).byteAt(0) + 1)},
-        range.getRight().toByteArray());
+        range.second.toByteArray());
 
     region =
         Region.newBuilder()
-            .setStartKey(CodecUtils.encode(range.getLeft()))
-            .setEndKey(CodecUtils.encode(range.getRight()))
+            .setStartKey(CodecUtils.encode(range.first))
+            .setEndKey(CodecUtils.encode(range.second))
             .build();
     decoded = v2.decodeRegion(region);
     assertEquals(start, decoded.getStartKey());
