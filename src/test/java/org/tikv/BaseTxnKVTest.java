@@ -17,7 +17,9 @@
 
 package org.tikv;
 
+import org.tikv.common.StoreConfig;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
 import org.tikv.util.TestUtils;
 
 public class BaseTxnKVTest {
@@ -30,6 +32,11 @@ public class BaseTxnKVTest {
             : TiConfiguration.createDefault(pdAddrsStr);
     conf.setTest(true);
     conf.setEnableGrpcForward(false);
+
+    try (TiSession session = TiSession.create(conf)) {
+      conf.setApiVersion(StoreConfig.acquireApiVersion(session.getPDClient()));
+    } catch (Exception ignore) {
+    }
     return conf;
   }
 }

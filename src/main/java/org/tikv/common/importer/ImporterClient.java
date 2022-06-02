@@ -29,8 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
-import org.tikv.common.codec.Codec;
-import org.tikv.common.codec.CodecDataOutput;
+import org.tikv.common.apiversion.RequestKeyCodec;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiKVException;
@@ -43,18 +42,19 @@ import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Errorpb.Error;
 import org.tikv.kvproto.ImportSstpb;
+import org.tikv.kvproto.ImportSstpb.RawWriteBatch;
 import org.tikv.kvproto.Metapb;
 
 public class ImporterClient {
   private static final Logger logger = LoggerFactory.getLogger(ImporterClient.class);
 
-  private TiConfiguration tiConf;
-  private TiSession tiSession;
-  private ByteString uuid;
-  private Key minKey;
-  private Key maxKey;
+  private final TiConfiguration tiConf;
+  private final TiSession tiSession;
+  private final ByteString uuid;
+  private final Key minKey;
+  private final Key maxKey;
   private TiRegion region;
-  private Long ttl;
+  private final Long ttl;
 
   private boolean deduplicate = false;
 
@@ -62,6 +62,8 @@ public class ImporterClient {
   private ImportSstpb.SSTMeta sstMeta;
   private List<ImporterStoreClient> clientList;
   private ImporterStoreClient clientLeader;
+
+  private final RequestKeyCodec codec;
 
   public ImporterClient(
       TiSession tiSession, ByteString uuid, Key minKey, Key maxKey, TiRegion region, Long ttl) {
@@ -72,6 +74,7 @@ public class ImporterClient {
     this.maxKey = maxKey;
     this.region = region;
     this.ttl = ttl;
+    this.codec = tiSession.getPDClient().getCodec();
   }
 
   public boolean isDeduplicate() {
@@ -108,9 +111,9 @@ public class ImporterClient {
                   String.format("duplicate key found, key = %s", preKey.toStringUtf8()));
             }
           } else {
-            pairs.add(
-                ImportSstpb.Pair.newBuilder().setKey(pair.first).setValue(pair.second).build());
-            totalBytes += (pair.first.size() + pair.second.size());
+            ByteString key = codec.encodeKey(pair.first);
+            pairs.add(ImportSstpb.Pair.newBuilder().setKey(key).setValue(pair.second).build());
+            totalBytes += (key.size() + pair.second.size());
             preKey = pair.first;
           }
         }
@@ -137,19 +140,15 @@ public class ImporterClient {
   private void init() {
     long regionId = region.getId();
     Metapb.RegionEpoch regionEpoch = region.getRegionEpoch();
+    Pair<ByteString, ByteString> keyRange =
+        codec.encodePdQueryRange(minKey.toByteString(), maxKey.toByteString());
+
     ImportSstpb.Range range =
-        tiConf.isTxnKVMode()
-            ? ImportSstpb.Range.newBuilder()
-                .setStart(encode(minKey.toByteString()))
-                .setEnd(encode(maxKey.toByteString()))
-                .build()
-            : ImportSstpb.Range.newBuilder()
-                .setStart(minKey.toByteString())
-                .setEnd(maxKey.toByteString())
-                .build();
+        ImportSstpb.Range.newBuilder().setStart(keyRange.first).setEnd(keyRange.second).build();
 
     sstMeta =
         ImportSstpb.SSTMeta.newBuilder()
+            .setApiVersion(tiConf.getApiVersion().toPb())
             .setUuid(uuid)
             .setRegionId(regionId)
             .setRegionEpoch(regionEpoch)
@@ -168,12 +167,6 @@ public class ImporterClient {
         clientLeader = importerStoreClient;
       }
     }
-  }
-
-  private ByteString encode(ByteString key) {
-    CodecDataOutput cdo = new CodecDataOutput();
-    Codec.BytesCodec.writeBytes(cdo, key.toByteArray());
-    return cdo.toByteString();
   }
 
   private void startWrite() {
@@ -216,11 +209,14 @@ public class ImporterClient {
     } else {
       ImportSstpb.RawWriteBatch batch;
 
-      if (ttl == null || ttl <= 0) {
-        batch = ImportSstpb.RawWriteBatch.newBuilder().addAllPairs(pairs).build();
-      } else {
-        batch = ImportSstpb.RawWriteBatch.newBuilder().addAllPairs(pairs).setTtl(ttl).build();
+      RawWriteBatch.Builder batchBuilder = RawWriteBatch.newBuilder().addAllPairs(pairs);
+      if (ttl != null && ttl > 0) {
+        batchBuilder.setTtl(ttl);
       }
+      if (tiConf.getApiVersion().isV2()) {
+        batchBuilder.setTs(tiSession.getTimestamp().getVersion());
+      }
+      batch = batchBuilder.build();
 
       ImportSstpb.RawWriteRequest request =
           ImportSstpb.RawWriteRequest.newBuilder().setBatch(batch).build();

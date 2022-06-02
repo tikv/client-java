@@ -121,6 +121,9 @@ public class ConfigUtils {
 
   public static final String TIFLASH_ENABLE = "tiflash.enable";
   public static final String TIKV_WARM_UP_ENABLE = "tikv.warm_up.enable";
+
+  public static final String TIKV_API_VERSION = "tikv.api_version";
+
   public static final String DEF_PD_ADDRESSES = "127.0.0.1:2379";
   public static final String DEF_TIMEOUT = "200ms";
   public static final String DEF_TIKV_GRPC_INGEST_TIMEOUT = "200s";
@@ -204,4 +207,6 @@ public class ConfigUtils {
   public static final int DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT = 10;
 
   public static final int DEF_TIKV_SCAN_REGIONS_LIMIT = 1000;
+
+  public static final int DEF_TIKV_API_VERSION = 1;
 }

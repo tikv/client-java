@@ -40,6 +40,7 @@ import static org.tikv.common.ConfigUtils.DEF_SCAN_TIMEOUT;
 import static org.tikv.common.ConfigUtils.DEF_SHOW_ROWID;
 import static org.tikv.common.ConfigUtils.DEF_TABLE_SCAN_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.DEF_TIFLASH_ENABLE;
+import static org.tikv.common.ConfigUtils.DEF_TIKV_API_VERSION;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_BO_REGION_MISS_BASE_IN_MS;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_CONN_RECYCLE_TIME;
 import static org.tikv.common.ConfigUtils.DEF_TIKV_ENABLE_ATOMIC_FOR_CAS;
@@ -82,6 +83,7 @@ import static org.tikv.common.ConfigUtils.RAW_KV_MODE;
 import static org.tikv.common.ConfigUtils.READ_COMMITTED_ISOLATION_LEVEL;
 import static org.tikv.common.ConfigUtils.SNAPSHOT_ISOLATION_LEVEL;
 import static org.tikv.common.ConfigUtils.TIFLASH_ENABLE;
+import static org.tikv.common.ConfigUtils.TIKV_API_VERSION;
 import static org.tikv.common.ConfigUtils.TIKV_BATCH_DELETE_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.TIKV_BATCH_GET_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.TIKV_BATCH_PUT_CONCURRENCY;
@@ -154,6 +156,7 @@ import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_AVAILABILITY_WINDOW
 import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_ENABLE;
 import static org.tikv.common.ConfigUtils.TiKV_CIRCUIT_BREAK_SLEEP_WINDOW_IN_SECONDS;
 
+import com.google.protobuf.ByteString;
 import io.grpc.Metadata;
 import java.io.IOException;
 import java.io.InputStream;
@@ -173,17 +176,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.pd.PDUtils;
 import org.tikv.common.replica.ReplicaSelector;
+import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.CommandPri;
 import org.tikv.kvproto.Kvrpcpb.IsolationLevel;
 
 public class TiConfiguration implements Serializable {
-
   private static final Logger logger = LoggerFactory.getLogger(TiConfiguration.class);
   private static final ConcurrentHashMap<String, String> settings = new ConcurrentHashMap<>();
   public static final Metadata.Key<String> FORWARD_META_DATA_KEY =
       Metadata.Key.of("tikv-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
   public static final Metadata.Key<String> PD_FORWARD_META_DATA_KEY =
       Metadata.Key.of("pd-forwarded-host", Metadata.ASCII_STRING_MARSHALLER);
+  public static final ByteString API_V2_RAW_PREFIX = ByteString.copyFromUtf8("r");
+  public static final ByteString API_V2_TXN_PREFIX = ByteString.copyFromUtf8("x");
 
   static {
     // priority: system environment > config file > default
@@ -296,6 +301,8 @@ public class TiConfiguration implements Serializable {
     setIfMissing(
         TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT, DEF_TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
     setIfMissing(TIKV_SCAN_REGIONS_LIMIT, DEF_TIKV_SCAN_REGIONS_LIMIT);
+
+    setIfMissing(TIKV_API_VERSION, DEF_TIKV_API_VERSION);
   }
 
   public static void listAll() {
@@ -550,6 +557,8 @@ public class TiConfiguration implements Serializable {
   private int circuitBreakAttemptRequestCount = getInt(TiKV_CIRCUIT_BREAK_ATTEMPT_REQUEST_COUNT);
 
   private int scanRegionsLimit = getInt(TIKV_SCAN_REGIONS_LIMIT);
+
+  private ApiVersion apiVersion = ApiVersion.fromInt(getInt(TIKV_API_VERSION));
 
   public enum KVMode {
     TXN,
@@ -1240,5 +1249,49 @@ public class TiConfiguration implements Serializable {
 
   public void setScanRegionsLimit(int scanRegionsLimit) {
     this.scanRegionsLimit = scanRegionsLimit;
+  }
+
+  public ApiVersion getApiVersion() {
+    return apiVersion;
+  }
+
+  public TiConfiguration setApiVersion(ApiVersion version) {
+    this.apiVersion = version;
+    return this;
+  }
+
+  public enum ApiVersion {
+    V1,
+    V2;
+
+    public static ApiVersion fromInt(int version) {
+      switch (version) {
+        case 1:
+          return V1;
+        case 2:
+          return V2;
+        default:
+          throw new IllegalArgumentException("unknown api version " + version);
+      }
+    }
+
+    public boolean isV1() {
+      return this == V1;
+    }
+
+    public boolean isV2() {
+      return this == V2;
+    }
+
+    public Kvrpcpb.APIVersion toPb() {
+      switch (this) {
+        case V1:
+          return Kvrpcpb.APIVersion.V1;
+        case V2:
+          return Kvrpcpb.APIVersion.V2;
+        default:
+          throw new IllegalArgumentException("unknown api version " + this);
+      }
+    }
   }
 }

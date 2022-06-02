@@ -19,6 +19,7 @@ package org.tikv.common;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.tikv.common.ConfigUtils.TIKV_GRPC_HEALTH_CHECK_TIMEOUT;
 import static org.tikv.common.ConfigUtils.TIKV_HEALTH_CHECK_PERIOD_DURATION;
 
@@ -27,6 +28,8 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import org.junit.Assert;
 import org.junit.Test;
+import org.tikv.common.TiConfiguration.ApiVersion;
+import org.tikv.kvproto.Kvrpcpb.APIVersion;
 
 public class TiConfigurationTest {
 
@@ -111,5 +114,18 @@ public class TiConfigurationTest {
       oos.writeObject(conf);
       oos.flush();
     }
+  }
+
+  @Test
+  public void testApiVersion() {
+    TiConfiguration conf = TiConfiguration.createDefault();
+    assertTrue(conf.getApiVersion().isV1());
+    assertTrue(conf.setApiVersion(ApiVersion.V2).getApiVersion().isV2());
+  }
+
+  @Test
+  public void testApiVersionToPb() {
+    assertEquals(APIVersion.V1, ApiVersion.V1.toPb());
+    assertEquals(APIVersion.V2, ApiVersion.V2.toPb());
   }
 }

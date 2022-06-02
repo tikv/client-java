@@ -38,7 +38,6 @@ import org.tikv.raw.RawKVClient;
 import org.tikv.util.TestUtils;
 
 public class RawKVIngestTest extends BaseRawKVTest {
-
   private TiSession session;
 
   private static final int KEY_NUMBER = 16;

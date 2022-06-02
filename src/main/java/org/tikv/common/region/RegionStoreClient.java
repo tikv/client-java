@@ -43,6 +43,8 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.PDClient;
@@ -125,7 +127,6 @@ import org.tikv.txn.exception.LockException;
 
 /** Note that RegionStoreClient itself is not thread-safe */
 public class RegionStoreClient extends AbstractRegionStoreClient {
-
   private static final Logger logger = LoggerFactory.getLogger(RegionStoreClient.class);
   @VisibleForTesting public final AbstractLockResolverClient lockResolverClient;
   private final TiStoreType storeType;
@@ -236,7 +237,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             GetRequest.newBuilder()
                 .setContext(
                     makeContext(getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
-                .setKey(key)
+                .setKey(codec.encodeKey(key))
                 .setVersion(version)
                 .build();
 
@@ -275,14 +276,14 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  public List<KvPair> batchGet(BackOffer backOffer, Iterable<ByteString> keys, long version) {
+  public List<KvPair> batchGet(BackOffer backOffer, List<ByteString> keys, long version) {
     boolean forWrite = false;
     Supplier<BatchGetRequest> request =
         () ->
             BatchGetRequest.newBuilder()
                 .setContext(
                     makeContext(getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
-                .addAllKeys(keys)
+                .addAllKeys(codec.encodeKeys(keys))
                 .setVersion(version)
                 .build();
     KVErrorHandler<BatchGetResponse> handler =
@@ -315,7 +316,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     for (KvPair pair : resp.getPairsList()) {
       if (pair.hasError()) {
         if (pair.getError().hasLocked()) {
-          Lock lock = new Lock(pair.getError().getLocked());
+          Lock lock = new Lock(pair.getError().getLocked(), codec);
           locks.add(lock);
         } else {
           throw new KeyException(pair.getError());
@@ -329,9 +330,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       addResolvedLocks(version, resolveLockResult.getResolvedLocks());
       // resolveLocks already retried, just throw error to upper logic.
       throw new TiKVException("locks not resolved, retry");
-    } else {
-      return resp.getPairsList();
     }
+
+    return codec.decodeKvPairs(resp.getPairsList());
   }
 
   public List<KvPair> scan(
@@ -347,7 +348,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setContext(
                       makeContext(
                           getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
-                  .setStartKey(startKey)
+                  .setStartKey(codec.encodeKey(startKey))
                   .setVersion(version)
                   .setKeyOnly(keyOnly)
                   .setLimit(getConf().getScanBatchSize())
@@ -389,7 +390,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     List<KvPair> newKvPairs = new ArrayList<>();
     for (KvPair kvPair : kvPairs) {
       if (kvPair.hasError()) {
-        Lock lock = AbstractLockResolverClient.extractLockFromKeyErr(kvPair.getError());
+        Lock lock = AbstractLockResolverClient.extractLockFromKeyErr(kvPair.getError(), codec);
         newKvPairs.add(
             KvPair.newBuilder()
                 .setError(kvPair.getError())
@@ -397,7 +398,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                 .setKey(lock.getKey())
                 .build());
       } else {
-        newKvPairs.add(kvPair);
+        newKvPairs.add(codec.decodeKvPair(kvPair));
       }
     }
     return Collections.unmodifiableList(newKvPairs);
@@ -420,11 +421,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @throws RegionException region error occurs
    */
   public void prewrite(
-      BackOffer backOffer,
-      ByteString primary,
-      Iterable<Mutation> mutations,
-      long startTs,
-      long lockTTL)
+      BackOffer backOffer, ByteString primary, List<Mutation> mutations, long startTs, long lockTTL)
       throws TiClientInternalException, KeyException, RegionException {
     this.prewrite(backOffer, primary, mutations, startTs, lockTTL, false);
   }
@@ -437,7 +434,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   public void prewrite(
       BackOffer bo,
       ByteString primaryLock,
-      Iterable<Mutation> mutations,
+      List<Mutation> mutations,
       long startTs,
       long ttl,
       boolean skipConstraintCheck)
@@ -450,8 +447,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   ? PrewriteRequest.newBuilder()
                       .setContext(makeContext(storeType, bo.getSlowLog()))
                       .setStartVersion(startTs)
-                      .setPrimaryLock(primaryLock)
-                      .addAllMutations(mutations)
+                      .setPrimaryLock(codec.encodeKey(primaryLock))
+                      .addAllMutations(codec.encodeMutations(mutations))
                       .setLockTtl(ttl)
                       .setSkipConstraintCheck(skipConstraintCheck)
                       .setMinCommitTs(startTs)
@@ -510,7 +507,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     for (KeyError err : resp.getErrorsList()) {
       if (err.hasLocked()) {
         isSuccess = false;
-        Lock lock = new Lock(err.getLocked());
+        Lock lock = new Lock(err.getLocked(), codec);
         locks.add(lock);
       } else {
         throw new KeyException(err.toString());
@@ -595,7 +592,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             CommitRequest.newBuilder()
                 .setStartVersion(startTs)
                 .setCommitVersion(commitTs)
-                .addAllKeys(keys)
+                .addAllKeys(
+                    StreamSupport.stream(keys.spliterator(), false)
+                        .map(codec::encodeKey)
+                        .collect(Collectors.toList()))
                 .setContext(makeContext(storeType, backOffer.getSlowLog()))
                 .build();
     KVErrorHandler<CommitResponse> handler =
@@ -714,7 +714,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
 
     if (response.hasLocked()) {
-      Lock lock = new Lock(response.getLocked());
+      Lock lock = new Lock(response.getLocked(), codec);
       logger.debug(String.format("coprocessor encounters locks: %s", lock));
       ResolveLockResult resolveLockResult =
           lockResolverClient.resolveLocks(
@@ -817,12 +817,12 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param splitKeys is the split points for a specific region.
    * @return a split region info.
    */
-  public List<Metapb.Region> splitRegion(Iterable<ByteString> splitKeys) {
+  public List<Metapb.Region> splitRegion(List<ByteString> splitKeys) {
     Supplier<SplitRegionRequest> request =
         () ->
             SplitRegionRequest.newBuilder()
                 .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
-                .addAllSplitKeys(splitKeys)
+                .addAllSplitKeys(codec.encodeKeys(splitKeys))
                 .setIsRawKv(conf.isRawKVMode())
                 .build();
 
@@ -852,11 +852,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new TiClientInternalException(
           String.format(
-              "failed to split region %d because %s",
-              region.getId(), resp.getRegionError().toString()));
+              "failed to split region %d because %s", region.getId(), resp.getRegionError()));
     }
 
-    return resp.getRegionsList();
+    if (conf.getApiVersion().isV1()) {
+      return resp.getRegionsList();
+    }
+    return resp.getRegionsList().stream().map(codec::decodeRegion).collect(Collectors.toList());
   }
 
   // APIs for Raw Scan/Put/Get/Delete
@@ -870,7 +872,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawGetRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setKey(key)
+                  .setKey(codec.encodeKey(key))
                   .build();
       RegionErrorHandler<RawGetResponse> handler =
           new RegionErrorHandler<RawGetResponse>(
@@ -912,7 +914,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawGetKeyTTLRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setKey(key)
+                  .setKey(codec.encodeKey(key))
                   .build();
       RegionErrorHandler<RawGetKeyTTLResponse> handler =
           new RegionErrorHandler<RawGetKeyTTLResponse>(
@@ -954,7 +956,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawDeleteRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setKey(key)
+                  .setKey(codec.encodeKey(key))
                   .setForCas(atomicForCAS)
                   .build();
 
@@ -993,7 +995,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawPutRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setKey(key)
+                  .setKey(codec.encodeKey(key))
                   .setValue(value)
                   .setTtl(ttl)
                   .setForCas(atomicForCAS)
@@ -1040,7 +1042,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawCASRequest.newBuilder()
                   .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setKey(key)
+                  .setKey(codec.encodeKey(key))
                   .setValue(value)
                   .setPreviousValue(prevValue.orElse(ByteString.EMPTY))
                   .setPreviousNotExist(!prevValue.isPresent())
@@ -1096,7 +1098,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawBatchGetRequest.newBuilder()
                   .setContext(makeContext(storeType, backoffer.getSlowLog()))
-                  .addAllKeys(keys)
+                  .addAllKeys(codec.encodeKeys(keys))
                   .build();
       RegionErrorHandler<RawBatchGetResponse> handler =
           new RegionErrorHandler<RawBatchGetResponse>(
@@ -1117,7 +1119,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
     }
-    return resp.getPairsList();
+
+    return codec.decodeKvPairs(resp.getPairsList());
   }
 
   public void rawBatchPut(
@@ -1156,7 +1159,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     for (int i = 0; i < batch.getKeys().size(); i++) {
       pairs.add(
           KvPair.newBuilder()
-              .setKey(batch.getKeys().get(i))
+              .setKey(codec.encodeKey(batch.getKeys().get(i)))
               .setValue(batch.getValues().get(i))
               .build());
     }
@@ -1191,7 +1194,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           () ->
               RawBatchDeleteRequest.newBuilder()
                   .setContext(makeContext(storeType, backoffer.getSlowLog()))
-                  .addAllKeys(keys)
+                  .addAllKeys(codec.encodeKeys(keys))
                   .setForCas(atomicForCAS)
                   .build();
       RegionErrorHandler<RawBatchDeleteResponse> handler =
@@ -1234,13 +1237,16 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_scan", clusterId.toString()).startTimer();
     try {
       Supplier<RawScanRequest> factory =
-          () ->
-              RawScanRequest.newBuilder()
-                  .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setStartKey(key)
-                  .setKeyOnly(keyOnly)
-                  .setLimit(limit)
-                  .build();
+          () -> {
+            Pair<ByteString, ByteString> range = codec.encodeRange(key, ByteString.EMPTY);
+            return RawScanRequest.newBuilder()
+                .setContext(makeContext(storeType, backOffer.getSlowLog()))
+                .setStartKey(range.first)
+                .setEndKey(range.second)
+                .setKeyOnly(keyOnly)
+                .setLimit(limit)
+                .build();
+          };
 
       RegionErrorHandler<RawScanResponse> handler =
           new RegionErrorHandler<RawScanResponse>(
@@ -1265,7 +1271,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
     }
-    return resp.getKvsList();
+    return codec.decodeKvPairs(resp.getKvsList());
   }
 
   /**
@@ -1283,12 +1289,14 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             .startTimer();
     try {
       Supplier<RawDeleteRangeRequest> factory =
-          () ->
-              RawDeleteRangeRequest.newBuilder()
-                  .setContext(makeContext(storeType, backOffer.getSlowLog()))
-                  .setStartKey(startKey)
-                  .setEndKey(endKey)
-                  .build();
+          () -> {
+            Pair<ByteString, ByteString> range = codec.encodeRange(startKey, endKey);
+            return RawDeleteRangeRequest.newBuilder()
+                .setContext(makeContext(storeType, backOffer.getSlowLog()))
+                .setStartKey(range.first)
+                .setEndKey(range.second)
+                .build();
+          };
 
       RegionErrorHandler<RawDeleteRangeResponse> handler =
           new RegionErrorHandler<RawDeleteRangeResponse>(

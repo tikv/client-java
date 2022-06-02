@@ -19,6 +19,7 @@ package org.tikv.common;
 
 import com.google.protobuf.ByteString;
 import java.util.List;
+import org.tikv.common.apiversion.RequestKeyCodec;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.Pair;
@@ -69,4 +70,6 @@ public interface ReadOnlyPDClient {
   TiConfiguration.ReplicaRead getReplicaRead();
 
   Long getClusterId();
+
+  RequestKeyCodec getCodec();
 }

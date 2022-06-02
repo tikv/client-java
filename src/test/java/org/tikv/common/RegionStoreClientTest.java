@@ -32,6 +32,10 @@ import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiStore;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
+import org.tikv.kvproto.Errorpb;
+import org.tikv.kvproto.Errorpb.EpochNotMatch;
+import org.tikv.kvproto.Errorpb.NotLeader;
+import org.tikv.kvproto.Errorpb.ServerIsBusy;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 
@@ -75,12 +79,15 @@ public class RegionStoreClientTest extends MockServerTest {
     Optional<ByteString> value = client.rawGet(defaultBackOff(), ByteString.copyFromUtf8("key1"));
     assertEquals(ByteString.copyFromUtf8("value1"), value.get());
 
-    server.putError("error1", KVMockServer.NOT_LEADER);
+    server.putError(
+        "error1", () -> Errorpb.Error.newBuilder().setNotLeader(NotLeader.getDefaultInstance()));
     // since not_leader is retryable, so the result should be correct.
     value = client.rawGet(defaultBackOff(), ByteString.copyFromUtf8("key1"));
     assertEquals(ByteString.copyFromUtf8("value1"), value.get());
 
-    server.putError("failure", KVMockServer.STALE_EPOCH);
+    server.putError(
+        "failure",
+        () -> Errorpb.Error.newBuilder().setEpochNotMatch(EpochNotMatch.getDefaultInstance()));
     try {
       // since stale epoch is not retryable, so the test should fail.
       client.rawGet(defaultBackOff(), ByteString.copyFromUtf8("failure"));
@@ -102,7 +109,9 @@ public class RegionStoreClientTest extends MockServerTest {
     ByteString value = client.get(defaultBackOff(), ByteString.copyFromUtf8("key1"), 1);
     assertEquals(ByteString.copyFromUtf8("value1"), value);
 
-    server.putError("error1", KVMockServer.ABORT);
+    server.putError(
+        "error1",
+        () -> Errorpb.Error.newBuilder().setServerIsBusy(ServerIsBusy.getDefaultInstance()));
     try {
       client.get(defaultBackOff(), ByteString.copyFromUtf8("error1"), 1);
       fail();
@@ -134,7 +143,9 @@ public class RegionStoreClientTest extends MockServerTest {
             assertEquals(
                 kv.getKey().toStringUtf8().replace("key", "value"), kv.getValue().toStringUtf8()));
 
-    server.putError("error1", KVMockServer.ABORT);
+    server.putError(
+        "error1",
+        () -> Errorpb.Error.newBuilder().setServerIsBusy(ServerIsBusy.getDefaultInstance()));
     try {
       client.batchGet(
           defaultBackOff(),
@@ -165,7 +176,9 @@ public class RegionStoreClientTest extends MockServerTest {
             assertEquals(
                 kv.getKey().toStringUtf8().replace("key", "value"), kv.getValue().toStringUtf8()));
 
-    server.putError("error1", KVMockServer.ABORT);
+    server.putError(
+        "error1",
+        () -> Errorpb.Error.newBuilder().setServerIsBusy(ServerIsBusy.getDefaultInstance()));
     try {
       client.scan(defaultBackOff(), ByteString.copyFromUtf8("error1"), 1);
       fail();

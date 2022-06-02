@@ -169,6 +169,7 @@ public class TiRegion implements Serializable {
 
     Kvrpcpb.Context.Builder builder = Kvrpcpb.Context.newBuilder();
     builder
+        .setApiVersion(conf.getApiVersion().toPb())
         .setIsolationLevel(this.isolationLevel)
         .setPriority(this.commandPri)
         .setRegionId(meta.getId())

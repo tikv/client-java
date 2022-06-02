@@ -18,13 +18,13 @@
 package org.tikv;
 
 import org.tikv.common.PDClient;
+import org.tikv.common.StoreConfig;
 import org.tikv.common.StoreVersion;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.util.TestUtils;
 
 public class BaseRawKVTest {
-
   protected boolean tikvVersionNewerThan(String expectedVersion) {
     TiConfiguration conf = createTiConfiguration();
     TiSession session = TiSession.create(conf);
@@ -43,6 +43,15 @@ public class BaseRawKVTest {
     conf.setEnableAtomicForCAS(true);
     conf.setEnableGrpcForward(false);
     conf.setEnableAtomicForCAS(true);
+    conf.setRawKVScanTimeoutInMS(1000000000);
+
+    conf.setWarmUpEnable(false);
+    try (TiSession session = TiSession.create(conf)) {
+      PDClient pdClient = session.getPDClient();
+      conf.setApiVersion(StoreConfig.acquireApiVersion(pdClient));
+    } catch (Exception ignore) {
+    }
+
     return conf;
   }
 }

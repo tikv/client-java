@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
+import org.tikv.common.TiConfiguration.ApiVersion;
 
 public abstract class PDMockServerTest {
   protected static final String LOCAL_ADDR = "127.0.0.1";
@@ -33,6 +34,21 @@ public abstract class PDMockServerTest {
   @Before
   public void setup() throws IOException {
     setup(LOCAL_ADDR);
+  }
+
+  void upgradeToV2Cluster() throws Exception {
+    if (session == null) {
+      throw new IllegalStateException("Cluster is not initialized");
+    }
+
+    if (session.getConf().getApiVersion().isV2()) {
+      return;
+    }
+
+    TiConfiguration conf = session.getConf().setApiVersion(ApiVersion.V2);
+    session.close();
+
+    session = TiSession.create(conf);
   }
 
   void setup(String addr) throws IOException {
@@ -62,6 +78,7 @@ public abstract class PDMockServerTest {
     conf.setWarmUpEnable(false);
     conf.setTimeout(2000);
     conf.setEnableGrpcForward(true);
+
     session = TiSession.create(conf);
   }
 

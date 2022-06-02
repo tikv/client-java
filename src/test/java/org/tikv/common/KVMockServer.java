@@ -34,12 +34,14 @@ import io.grpc.health.v1.HealthGrpc.HealthImplBase;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +51,6 @@ import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Errorpb.EpochNotMatch;
 import org.tikv.kvproto.Errorpb.Error;
-import org.tikv.kvproto.Errorpb.NotLeader;
-import org.tikv.kvproto.Errorpb.ServerIsBusy;
 import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.Context;
 import org.tikv.kvproto.TikvGrpc;
@@ -63,7 +63,9 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   private TiRegion region;
   private State state = State.Normal;
   private final TreeMap<Key, ByteString> dataMap = new TreeMap<>();
-  private final Map<ByteString, Integer> errorMap = new HashMap<>();
+  private final Map<Key, Supplier<Errorpb.Error.Builder>> regionErrMap = new HashMap<>();
+
+  private final Map<Key, Supplier<Kvrpcpb.KeyError.Builder>> keyErrMap = new HashMap<>();
 
   // for KV error
   public static final int ABORT = 1;
@@ -111,21 +113,28 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     put(ByteString.copyFromUtf8(key), data);
   }
 
-  public void putError(String key, int code) {
-    errorMap.put(ByteString.copyFromUtf8(key), code);
+  public void putError(String key, Supplier<Errorpb.Error.Builder> builder) {
+    regionErrMap.put(toRawKey(key.getBytes(StandardCharsets.UTF_8)), builder);
   }
 
   public void clearAllMap() {
     dataMap.clear();
-    errorMap.clear();
+    regionErrMap.clear();
   }
 
-  private void verifyContext(Context context) throws Exception {
-    if (context.getRegionId() != region.getId()
-        || !context.getRegionEpoch().equals(region.getRegionEpoch())
-        || !context.getPeer().equals(region.getLeader())) {
+  private Errorpb.Error verifyContext(Context context) throws Exception {
+    if (context.getRegionId() != region.getId() || !context.getPeer().equals(region.getLeader())) {
       throw new Exception("context doesn't match");
     }
+
+    Errorpb.Error.Builder errBuilder = Errorpb.Error.newBuilder();
+
+    if (!context.getRegionEpoch().equals(region.getRegionEpoch())) {
+      return errBuilder
+          .setEpochNotMatch(EpochNotMatch.newBuilder().addCurrentRegions(region.getMeta()).build())
+          .build();
+    }
+    return null;
   }
 
   @Override
@@ -138,18 +147,24 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
           throw new Exception(State.Fail.toString());
         default:
       }
-      verifyContext(request.getContext());
-      ByteString key = request.getKey();
-
+      Key key = toRawKey(request.getKey());
       Kvrpcpb.RawGetResponse.Builder builder = Kvrpcpb.RawGetResponse.newBuilder();
-      Integer errorCode = errorMap.remove(key);
-      Errorpb.Error.Builder errBuilder = Errorpb.Error.newBuilder();
-      if (errorCode != null) {
-        setErrorInfo(errorCode, errBuilder);
-        builder.setRegionError(errBuilder.build());
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(key);
+      if (errProvider != null) {
+        Error.Builder eb = errProvider.get();
+        if (eb != null) {
+          builder.setRegionError(eb.build());
+        }
       } else {
-        Key rawKey = toRawKey(key);
-        ByteString value = dataMap.get(rawKey);
+        ByteString value = dataMap.get(key);
         if (value == null) {
           value = ByteString.EMPTY;
         }
@@ -158,25 +173,34 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       responseObserver.onNext(builder.build());
       responseObserver.onCompleted();
     } catch (Exception e) {
+      logger.error("internal error", e);
       responseObserver.onError(Status.INTERNAL.asRuntimeException());
     }
   }
 
-  /** */
+  @Override
   public void rawPut(
       org.tikv.kvproto.Kvrpcpb.RawPutRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawPutResponse> responseObserver) {
     try {
-      verifyContext(request.getContext());
-      ByteString key = request.getKey();
-
+      Key key = toRawKey(request.getKey());
       Kvrpcpb.RawPutResponse.Builder builder = Kvrpcpb.RawPutResponse.newBuilder();
-      Integer errorCode = errorMap.remove(key);
-      Errorpb.Error.Builder errBuilder = Errorpb.Error.newBuilder();
-      if (errorCode != null) {
-        setErrorInfo(errorCode, errBuilder);
-        builder.setRegionError(errBuilder.build());
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
       }
+
+      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(key);
+      if (errProvider != null) {
+        Error.Builder eb = errProvider.get();
+        if (eb != null) {
+          builder.setRegionError(eb.build());
+        }
+      }
+
       responseObserver.onNext(builder.build());
       responseObserver.onCompleted();
     } catch (Exception e) {
@@ -184,40 +208,27 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     }
   }
 
-  private void setErrorInfo(int errorCode, Errorpb.Error.Builder errBuilder) {
-    if (errorCode == NOT_LEADER) {
-      errBuilder.setNotLeader(Errorpb.NotLeader.getDefaultInstance());
-    } else if (errorCode == REGION_NOT_FOUND) {
-      errBuilder.setRegionNotFound(Errorpb.RegionNotFound.getDefaultInstance());
-    } else if (errorCode == KEY_NOT_IN_REGION) {
-      errBuilder.setKeyNotInRegion(Errorpb.KeyNotInRegion.getDefaultInstance());
-    } else if (errorCode == STALE_EPOCH) {
-      errBuilder.setEpochNotMatch(Errorpb.EpochNotMatch.getDefaultInstance());
-    } else if (errorCode == STALE_COMMAND) {
-      errBuilder.setStaleCommand(Errorpb.StaleCommand.getDefaultInstance());
-    } else if (errorCode == SERVER_IS_BUSY) {
-      errBuilder.setServerIsBusy(Errorpb.ServerIsBusy.getDefaultInstance());
-    } else if (errorCode == STORE_NOT_MATCH) {
-      errBuilder.setStoreNotMatch(Errorpb.StoreNotMatch.getDefaultInstance());
-    } else if (errorCode == RAFT_ENTRY_TOO_LARGE) {
-      errBuilder.setRaftEntryTooLarge(Errorpb.RaftEntryTooLarge.getDefaultInstance());
-    }
-  }
-
-  /** */
+  @Override
   public void rawDelete(
       org.tikv.kvproto.Kvrpcpb.RawDeleteRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawDeleteResponse> responseObserver) {
     try {
-      verifyContext(request.getContext());
-      ByteString key = request.getKey();
-
+      Key key = toRawKey(request.getKey());
       Kvrpcpb.RawDeleteResponse.Builder builder = Kvrpcpb.RawDeleteResponse.newBuilder();
-      Integer errorCode = errorMap.remove(key);
-      Errorpb.Error.Builder errBuilder = Errorpb.Error.newBuilder();
-      if (errorCode != null) {
-        setErrorInfo(errorCode, errBuilder);
-        builder.setRegionError(errBuilder.build());
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(key);
+      if (errProvider != null) {
+        Error.Builder eb = errProvider.get();
+        if (eb != null) {
+          builder.setRegionError(eb.build());
+        }
       }
       responseObserver.onNext(builder.build());
       responseObserver.onCompleted();
@@ -231,24 +242,24 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       org.tikv.kvproto.Kvrpcpb.GetRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.GetResponse> responseObserver) {
     try {
-      verifyContext(request.getContext());
       if (request.getVersion() == 0) {
         throw new Exception();
       }
-      ByteString key = request.getKey();
-
+      Key key = toRawKey(request.getKey());
       Kvrpcpb.GetResponse.Builder builder = Kvrpcpb.GetResponse.newBuilder();
-      Integer errorCode = errorMap.remove(key);
-      Kvrpcpb.KeyError.Builder errBuilder = Kvrpcpb.KeyError.newBuilder();
-      if (errorCode != null) {
-        if (errorCode == ABORT) {
-          errBuilder.setAbort("ABORT");
-        } else if (errorCode == RETRY) {
-          errBuilder.setRetryable("Retry");
-        }
-        builder.setError(errBuilder);
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      Supplier<Kvrpcpb.KeyError.Builder> errProvider = keyErrMap.remove(key);
+      if (errProvider != null) {
+        builder.setError(errProvider.get().build());
       } else {
-        ByteString value = dataMap.get(toRawKey(key));
+        ByteString value = dataMap.get(key);
         builder.setValue(value);
       }
       responseObserver.onNext(builder.build());
@@ -263,23 +274,27 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       org.tikv.kvproto.Kvrpcpb.ScanRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.ScanResponse> responseObserver) {
     try {
-      verifyContext(request.getContext());
       if (request.getVersion() == 0) {
         throw new Exception();
       }
-      ByteString key = request.getStartKey();
-
+      Key key = toRawKey(request.getStartKey());
       Kvrpcpb.ScanResponse.Builder builder = Kvrpcpb.ScanResponse.newBuilder();
-      Error.Builder errBuilder = Error.newBuilder();
-      Integer errorCode = errorMap.remove(key);
-      if (errorCode != null) {
-        if (errorCode == ABORT) {
-          errBuilder.setServerIsBusy(Errorpb.ServerIsBusy.getDefaultInstance());
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(key);
+      if (errProvider != null) {
+        Error.Builder eb = errProvider.get();
+        if (eb != null) {
+          builder.setRegionError(eb.build());
         }
-        builder.setRegionError(errBuilder.build());
       } else {
-        ByteString startKey = request.getStartKey();
-        SortedMap<Key, ByteString> kvs = dataMap.tailMap(toRawKey(startKey));
+        SortedMap<Key, ByteString> kvs = dataMap.tailMap(key);
         builder.addAllPairs(
             kvs.entrySet()
                 .stream()
@@ -303,27 +318,33 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       org.tikv.kvproto.Kvrpcpb.BatchGetRequest request,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.BatchGetResponse> responseObserver) {
     try {
-      verifyContext(request.getContext());
       if (request.getVersion() == 0) {
         throw new Exception();
       }
       List<ByteString> keys = request.getKeysList();
 
       Kvrpcpb.BatchGetResponse.Builder builder = Kvrpcpb.BatchGetResponse.newBuilder();
-      Error.Builder errBuilder = Error.newBuilder();
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
       ImmutableList.Builder<Kvrpcpb.KvPair> resultList = ImmutableList.builder();
       for (ByteString key : keys) {
-        Integer errorCode = errorMap.remove(key);
-        if (errorCode != null) {
-          if (errorCode == ABORT) {
-            errBuilder.setServerIsBusy(Errorpb.ServerIsBusy.getDefaultInstance());
+        Key rawKey = toRawKey(key);
+        Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(rawKey);
+        if (errProvider != null) {
+          Error.Builder eb = errProvider.get();
+          if (eb != null) {
+            builder.setRegionError(eb.build());
+            break;
           }
-          builder.setRegionError(errBuilder.build());
-          break;
-        } else {
-          ByteString value = dataMap.get(toRawKey(key));
-          resultList.add(Kvrpcpb.KvPair.newBuilder().setKey(key).setValue(value).build());
         }
+
+        ByteString value = dataMap.get(rawKey);
+        resultList.add(Kvrpcpb.KvPair.newBuilder().setKey(key).setValue(value).build());
       }
       builder.addAllPairs(resultList.build());
       responseObserver.onNext(builder.build());
@@ -338,8 +359,6 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       org.tikv.kvproto.Coprocessor.Request requestWrap,
       io.grpc.stub.StreamObserver<org.tikv.kvproto.Coprocessor.Response> responseObserver) {
     try {
-      verifyContext(requestWrap.getContext());
-
       DAGRequest request = DAGRequest.parseFrom(requestWrap.getData());
       if (request.getStartTsFallback() == 0) {
         throw new Exception();
@@ -348,33 +367,33 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       List<Coprocessor.KeyRange> keyRanges = requestWrap.getRangesList();
 
       Coprocessor.Response.Builder builderWrap = Coprocessor.Response.newBuilder();
-      SelectResponse.Builder builder = SelectResponse.newBuilder();
-      org.tikv.kvproto.Errorpb.Error.Builder errBuilder =
-          org.tikv.kvproto.Errorpb.Error.newBuilder();
+      Error e = verifyContext(requestWrap.getContext());
+      if (e != null) {
+        responseObserver.onNext(builderWrap.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
 
+      SelectResponse.Builder builder = SelectResponse.newBuilder();
       for (Coprocessor.KeyRange keyRange : keyRanges) {
-        Integer errorCode = errorMap.remove(keyRange.getStart());
-        if (errorCode != null) {
-          if (STALE_EPOCH == errorCode) {
-            errBuilder.setEpochNotMatch(EpochNotMatch.getDefaultInstance());
-          } else if (NOT_LEADER == errorCode) {
-            errBuilder.setNotLeader(NotLeader.getDefaultInstance());
-          } else {
-            errBuilder.setServerIsBusy(ServerIsBusy.getDefaultInstance());
+        Key startKey = toRawKey(keyRange.getStart());
+        Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(startKey);
+        if (errProvider != null) {
+          Error.Builder eb = errProvider.get();
+          if (eb != null) {
+            builderWrap.setRegionError(eb.build());
+            break;
           }
-          builderWrap.setRegionError(errBuilder.build());
-          break;
-        } else {
-          ByteString startKey = keyRange.getStart();
-          SortedMap<Key, ByteString> kvs = dataMap.tailMap(toRawKey(startKey));
-          builder.addAllChunks(
-              kvs.entrySet()
-                  .stream()
-                  .filter(Objects::nonNull)
-                  .filter(kv -> kv.getKey().compareTo(toRawKey(keyRange.getEnd())) <= 0)
-                  .map(kv -> Chunk.newBuilder().setRowsData(kv.getValue()).build())
-                  .collect(Collectors.toList()));
         }
+
+        SortedMap<Key, ByteString> kvs = dataMap.tailMap(startKey);
+        builder.addAllChunks(
+            kvs.entrySet()
+                .stream()
+                .filter(Objects::nonNull)
+                .filter(kv -> kv.getKey().compareTo(toRawKey(keyRange.getEnd())) <= 0)
+                .map(kv -> Chunk.newBuilder().setRowsData(kv.getValue()).build())
+                .collect(Collectors.toList()));
       }
 
       responseObserver.onNext(builderWrap.setData(builder.build().toByteString()).build());

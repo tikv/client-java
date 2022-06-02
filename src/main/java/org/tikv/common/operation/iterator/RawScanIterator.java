@@ -30,7 +30,6 @@ import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawScanIterator extends ScanIterator {
-
   private final BackOffer scanBackOffer;
 
   public RawScanIterator(
