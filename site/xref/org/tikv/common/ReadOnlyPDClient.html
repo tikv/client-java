@@ -27,57 +27,60 @@
 <a class="jxr_linenumber" name="L19" href="#L19">19</a>  
 <a class="jxr_linenumber" name="L20" href="#L20">20</a>  <strong class="jxr_keyword">import</strong> com.google.protobuf.ByteString;
 <a class="jxr_linenumber" name="L21" href="#L21">21</a>  <strong class="jxr_keyword">import</strong> java.util.List;
-<a class="jxr_linenumber" name="L22" href="#L22">22</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.meta.TiTimestamp;
-<a class="jxr_linenumber" name="L23" href="#L23">23</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.util.BackOffer;
-<a class="jxr_linenumber" name="L24" href="#L24">24</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.util.Pair;
-<a class="jxr_linenumber" name="L25" href="#L25">25</a>  <strong class="jxr_keyword">import</strong> org.tikv.kvproto.Metapb;
-<a class="jxr_linenumber" name="L26" href="#L26">26</a>  <strong class="jxr_keyword">import</strong> org.tikv.kvproto.Metapb.Store;
-<a class="jxr_linenumber" name="L27" href="#L27">27</a>  <strong class="jxr_keyword">import</strong> org.tikv.kvproto.Pdpb;
-<a class="jxr_linenumber" name="L28" href="#L28">28</a>  
-<a class="jxr_linenumber" name="L29" href="#L29">29</a>  <em class="jxr_javadoccomment">/** Readonly PD client including only reading related interface Supposed for TiDB-like use cases */</em>
-<a class="jxr_linenumber" name="L30" href="#L30">30</a>  <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">interface</strong> <a name="ReadOnlyPDClient" href="../../../org/tikv/common/ReadOnlyPDClient.html#ReadOnlyPDClient">ReadOnlyPDClient</a> {
-<a class="jxr_linenumber" name="L31" href="#L31">31</a>    <em class="jxr_javadoccomment">/**</em>
-<a class="jxr_linenumber" name="L32" href="#L32">32</a>  <em class="jxr_javadoccomment">   * Get Timestamp from Placement Driver</em>
-<a class="jxr_linenumber" name="L33" href="#L33">33</a>  <em class="jxr_javadoccomment">   *</em>
-<a class="jxr_linenumber" name="L34" href="#L34">34</a>  <em class="jxr_javadoccomment">   * @return a timestamp object</em>
-<a class="jxr_linenumber" name="L35" href="#L35">35</a>  <em class="jxr_javadoccomment">   */</em>
-<a class="jxr_linenumber" name="L36" href="#L36">36</a>    <a name="TiTimestamp" href="../../../org/tikv/common/meta/TiTimestamp.html#TiTimestamp">TiTimestamp</a> getTimestamp(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer);
-<a class="jxr_linenumber" name="L37" href="#L37">37</a>  
-<a class="jxr_linenumber" name="L38" href="#L38">38</a>    <em class="jxr_javadoccomment">/**</em>
-<a class="jxr_linenumber" name="L39" href="#L39">39</a>  <em class="jxr_javadoccomment">   * Get Region from PD by key specified</em>
-<a class="jxr_linenumber" name="L40" href="#L40">40</a>  <em class="jxr_javadoccomment">   *</em>
-<a class="jxr_linenumber" name="L41" href="#L41">41</a>  <em class="jxr_javadoccomment">   * @param key key in bytes for locating a region</em>
-<a class="jxr_linenumber" name="L42" href="#L42">42</a>  <em class="jxr_javadoccomment">   * @return the region whose startKey and endKey range covers the given key</em>
-<a class="jxr_linenumber" name="L43" href="#L43">43</a>  <em class="jxr_javadoccomment">   */</em>
-<a class="jxr_linenumber" name="L44" href="#L44">44</a>    Pair&lt;Metapb.Region, Metapb.Peer&gt; getRegionByKey(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, ByteString key);
-<a class="jxr_linenumber" name="L45" href="#L45">45</a>  
-<a class="jxr_linenumber" name="L46" href="#L46">46</a>    <em class="jxr_javadoccomment">/**</em>
-<a class="jxr_linenumber" name="L47" href="#L47">47</a>  <em class="jxr_javadoccomment">   * Get Region by Region Id</em>
-<a class="jxr_linenumber" name="L48" href="#L48">48</a>  <em class="jxr_javadoccomment">   *</em>
-<a class="jxr_linenumber" name="L49" href="#L49">49</a>  <em class="jxr_javadoccomment">   * @param id Region Id</em>
-<a class="jxr_linenumber" name="L50" href="#L50">50</a>  <em class="jxr_javadoccomment">   * @return the region corresponding to the given Id</em>
-<a class="jxr_linenumber" name="L51" href="#L51">51</a>  <em class="jxr_javadoccomment">   */</em>
-<a class="jxr_linenumber" name="L52" href="#L52">52</a>    Pair&lt;Metapb.Region, Metapb.Peer&gt; getRegionByID(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, <strong class="jxr_keyword">long</strong> id);
-<a class="jxr_linenumber" name="L53" href="#L53">53</a>  
-<a class="jxr_linenumber" name="L54" href="#L54">54</a>    List&lt;Pdpb.Region&gt; scanRegions(
-<a class="jxr_linenumber" name="L55" href="#L55">55</a>        <a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, ByteString startKey, ByteString endKey, <strong class="jxr_keyword">int</strong> limit);
-<a class="jxr_linenumber" name="L56" href="#L56">56</a>  
-<a class="jxr_linenumber" name="L57" href="#L57">57</a>    <a name="HostMapping" href="../../../org/tikv/common/HostMapping.html#HostMapping">HostMapping</a> getHostMapping();
-<a class="jxr_linenumber" name="L58" href="#L58">58</a>  
-<a class="jxr_linenumber" name="L59" href="#L59">59</a>    <em class="jxr_javadoccomment">/**</em>
-<a class="jxr_linenumber" name="L60" href="#L60">60</a>  <em class="jxr_javadoccomment">   * Get Store by StoreId</em>
-<a class="jxr_linenumber" name="L61" href="#L61">61</a>  <em class="jxr_javadoccomment">   *</em>
-<a class="jxr_linenumber" name="L62" href="#L62">62</a>  <em class="jxr_javadoccomment">   * @param storeId StoreId</em>
-<a class="jxr_linenumber" name="L63" href="#L63">63</a>  <em class="jxr_javadoccomment">   * @return the Store corresponding to the given Id</em>
-<a class="jxr_linenumber" name="L64" href="#L64">64</a>  <em class="jxr_javadoccomment">   */</em>
-<a class="jxr_linenumber" name="L65" href="#L65">65</a>    Store getStore(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, <strong class="jxr_keyword">long</strong> storeId);
-<a class="jxr_linenumber" name="L66" href="#L66">66</a>  
-<a class="jxr_linenumber" name="L67" href="#L67">67</a>    List&lt;Store&gt; getAllStores(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer);
-<a class="jxr_linenumber" name="L68" href="#L68">68</a>  
-<a class="jxr_linenumber" name="L69" href="#L69">69</a>    TiConfiguration.ReplicaRead getReplicaRead();
-<a class="jxr_linenumber" name="L70" href="#L70">70</a>  
-<a class="jxr_linenumber" name="L71" href="#L71">71</a>    Long getClusterId();
-<a class="jxr_linenumber" name="L72" href="#L72">72</a>  }
+<a class="jxr_linenumber" name="L22" href="#L22">22</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.apiversion.RequestKeyCodec;
+<a class="jxr_linenumber" name="L23" href="#L23">23</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.meta.TiTimestamp;
+<a class="jxr_linenumber" name="L24" href="#L24">24</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.util.BackOffer;
+<a class="jxr_linenumber" name="L25" href="#L25">25</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.util.Pair;
+<a class="jxr_linenumber" name="L26" href="#L26">26</a>  <strong class="jxr_keyword">import</strong> org.tikv.kvproto.Metapb;
+<a class="jxr_linenumber" name="L27" href="#L27">27</a>  <strong class="jxr_keyword">import</strong> org.tikv.kvproto.Metapb.Store;
+<a class="jxr_linenumber" name="L28" href="#L28">28</a>  <strong class="jxr_keyword">import</strong> org.tikv.kvproto.Pdpb;
+<a class="jxr_linenumber" name="L29" href="#L29">29</a>  
+<a class="jxr_linenumber" name="L30" href="#L30">30</a>  <em class="jxr_javadoccomment">/** Readonly PD client including only reading related interface Supposed for TiDB-like use cases */</em>
+<a class="jxr_linenumber" name="L31" href="#L31">31</a>  <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">interface</strong> <a name="ReadOnlyPDClient" href="../../../org/tikv/common/ReadOnlyPDClient.html#ReadOnlyPDClient">ReadOnlyPDClient</a> {
+<a class="jxr_linenumber" name="L32" href="#L32">32</a>    <em class="jxr_javadoccomment">/**</em>
+<a class="jxr_linenumber" name="L33" href="#L33">33</a>  <em class="jxr_javadoccomment">   * Get Timestamp from Placement Driver</em>
+<a class="jxr_linenumber" name="L34" href="#L34">34</a>  <em class="jxr_javadoccomment">   *</em>
+<a class="jxr_linenumber" name="L35" href="#L35">35</a>  <em class="jxr_javadoccomment">   * @return a timestamp object</em>
+<a class="jxr_linenumber" name="L36" href="#L36">36</a>  <em class="jxr_javadoccomment">   */</em>
+<a class="jxr_linenumber" name="L37" href="#L37">37</a>    <a name="TiTimestamp" href="../../../org/tikv/common/meta/TiTimestamp.html#TiTimestamp">TiTimestamp</a> getTimestamp(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer);
+<a class="jxr_linenumber" name="L38" href="#L38">38</a>  
+<a class="jxr_linenumber" name="L39" href="#L39">39</a>    <em class="jxr_javadoccomment">/**</em>
+<a class="jxr_linenumber" name="L40" href="#L40">40</a>  <em class="jxr_javadoccomment">   * Get Region from PD by key specified</em>
+<a class="jxr_linenumber" name="L41" href="#L41">41</a>  <em class="jxr_javadoccomment">   *</em>
+<a class="jxr_linenumber" name="L42" href="#L42">42</a>  <em class="jxr_javadoccomment">   * @param key key in bytes for locating a region</em>
+<a class="jxr_linenumber" name="L43" href="#L43">43</a>  <em class="jxr_javadoccomment">   * @return the region whose startKey and endKey range covers the given key</em>
+<a class="jxr_linenumber" name="L44" href="#L44">44</a>  <em class="jxr_javadoccomment">   */</em>
+<a class="jxr_linenumber" name="L45" href="#L45">45</a>    Pair&lt;Metapb.Region, Metapb.Peer&gt; getRegionByKey(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, ByteString key);
+<a class="jxr_linenumber" name="L46" href="#L46">46</a>  
+<a class="jxr_linenumber" name="L47" href="#L47">47</a>    <em class="jxr_javadoccomment">/**</em>
+<a class="jxr_linenumber" name="L48" href="#L48">48</a>  <em class="jxr_javadoccomment">   * Get Region by Region Id</em>
+<a class="jxr_linenumber" name="L49" href="#L49">49</a>  <em class="jxr_javadoccomment">   *</em>
+<a class="jxr_linenumber" name="L50" href="#L50">50</a>  <em class="jxr_javadoccomment">   * @param id Region Id</em>
+<a class="jxr_linenumber" name="L51" href="#L51">51</a>  <em class="jxr_javadoccomment">   * @return the region corresponding to the given Id</em>
+<a class="jxr_linenumber" name="L52" href="#L52">52</a>  <em class="jxr_javadoccomment">   */</em>
+<a class="jxr_linenumber" name="L53" href="#L53">53</a>    Pair&lt;Metapb.Region, Metapb.Peer&gt; getRegionByID(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, <strong class="jxr_keyword">long</strong> id);
+<a class="jxr_linenumber" name="L54" href="#L54">54</a>  
+<a class="jxr_linenumber" name="L55" href="#L55">55</a>    List&lt;Pdpb.Region&gt; scanRegions(
+<a class="jxr_linenumber" name="L56" href="#L56">56</a>        <a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, ByteString startKey, ByteString endKey, <strong class="jxr_keyword">int</strong> limit);
+<a class="jxr_linenumber" name="L57" href="#L57">57</a>  
+<a class="jxr_linenumber" name="L58" href="#L58">58</a>    <a name="HostMapping" href="../../../org/tikv/common/HostMapping.html#HostMapping">HostMapping</a> getHostMapping();
+<a class="jxr_linenumber" name="L59" href="#L59">59</a>  
+<a class="jxr_linenumber" name="L60" href="#L60">60</a>    <em class="jxr_javadoccomment">/**</em>
+<a class="jxr_linenumber" name="L61" href="#L61">61</a>  <em class="jxr_javadoccomment">   * Get Store by StoreId</em>
+<a class="jxr_linenumber" name="L62" href="#L62">62</a>  <em class="jxr_javadoccomment">   *</em>
+<a class="jxr_linenumber" name="L63" href="#L63">63</a>  <em class="jxr_javadoccomment">   * @param storeId StoreId</em>
+<a class="jxr_linenumber" name="L64" href="#L64">64</a>  <em class="jxr_javadoccomment">   * @return the Store corresponding to the given Id</em>
+<a class="jxr_linenumber" name="L65" href="#L65">65</a>  <em class="jxr_javadoccomment">   */</em>
+<a class="jxr_linenumber" name="L66" href="#L66">66</a>    Store getStore(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, <strong class="jxr_keyword">long</strong> storeId);
+<a class="jxr_linenumber" name="L67" href="#L67">67</a>  
+<a class="jxr_linenumber" name="L68" href="#L68">68</a>    List&lt;Store&gt; getAllStores(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer);
+<a class="jxr_linenumber" name="L69" href="#L69">69</a>  
+<a class="jxr_linenumber" name="L70" href="#L70">70</a>    TiConfiguration.ReplicaRead getReplicaRead();
+<a class="jxr_linenumber" name="L71" href="#L71">71</a>  
+<a class="jxr_linenumber" name="L72" href="#L72">72</a>    Long getClusterId();
+<a class="jxr_linenumber" name="L73" href="#L73">73</a>  
+<a class="jxr_linenumber" name="L74" href="#L74">74</a>    <a name="RequestKeyCodec" href="../../../org/tikv/common/apiversion/RequestKeyCodec.html#RequestKeyCodec">RequestKeyCodec</a> getCodec();
+<a class="jxr_linenumber" name="L75" href="#L75">75</a>  }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>

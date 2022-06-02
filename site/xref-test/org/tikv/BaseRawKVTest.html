@@ -26,13 +26,13 @@
 <a class="jxr_linenumber" name="L18" href="#L18">18</a>  <strong class="jxr_keyword">package</strong> org.tikv;
 <a class="jxr_linenumber" name="L19" href="#L19">19</a>  
 <a class="jxr_linenumber" name="L20" href="#L20">20</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.PDClient;
-<a class="jxr_linenumber" name="L21" href="#L21">21</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.StoreVersion;
-<a class="jxr_linenumber" name="L22" href="#L22">22</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.TiConfiguration;
-<a class="jxr_linenumber" name="L23" href="#L23">23</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.TiSession;
-<a class="jxr_linenumber" name="L24" href="#L24">24</a>  <strong class="jxr_keyword">import</strong> org.tikv.util.TestUtils;
-<a class="jxr_linenumber" name="L25" href="#L25">25</a>  
-<a class="jxr_linenumber" name="L26" href="#L26">26</a>  <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">class</strong> <a name="BaseRawKVTest" href="../../org/tikv/BaseRawKVTest.html#BaseRawKVTest">BaseRawKVTest</a> {
-<a class="jxr_linenumber" name="L27" href="#L27">27</a>  
+<a class="jxr_linenumber" name="L21" href="#L21">21</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.StoreConfig;
+<a class="jxr_linenumber" name="L22" href="#L22">22</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.StoreVersion;
+<a class="jxr_linenumber" name="L23" href="#L23">23</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.TiConfiguration;
+<a class="jxr_linenumber" name="L24" href="#L24">24</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.TiSession;
+<a class="jxr_linenumber" name="L25" href="#L25">25</a>  <strong class="jxr_keyword">import</strong> org.tikv.util.TestUtils;
+<a class="jxr_linenumber" name="L26" href="#L26">26</a>  
+<a class="jxr_linenumber" name="L27" href="#L27">27</a>  <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">class</strong> <a name="BaseRawKVTest" href="../../org/tikv/BaseRawKVTest.html#BaseRawKVTest">BaseRawKVTest</a> {
 <a class="jxr_linenumber" name="L28" href="#L28">28</a>    <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> tikvVersionNewerThan(String expectedVersion) {
 <a class="jxr_linenumber" name="L29" href="#L29">29</a>      TiConfiguration conf = createTiConfiguration();
 <a class="jxr_linenumber" name="L30" href="#L30">30</a>      TiSession session = TiSession.create(conf);
@@ -51,9 +51,18 @@
 <a class="jxr_linenumber" name="L43" href="#L43">43</a>      conf.setEnableAtomicForCAS(<strong class="jxr_keyword">true</strong>);
 <a class="jxr_linenumber" name="L44" href="#L44">44</a>      conf.setEnableGrpcForward(false);
 <a class="jxr_linenumber" name="L45" href="#L45">45</a>      conf.setEnableAtomicForCAS(<strong class="jxr_keyword">true</strong>);
-<a class="jxr_linenumber" name="L46" href="#L46">46</a>      <strong class="jxr_keyword">return</strong> conf;
-<a class="jxr_linenumber" name="L47" href="#L47">47</a>    }
-<a class="jxr_linenumber" name="L48" href="#L48">48</a>  }
+<a class="jxr_linenumber" name="L46" href="#L46">46</a>      conf.setRawKVScanTimeoutInMS(1000000000);
+<a class="jxr_linenumber" name="L47" href="#L47">47</a>  
+<a class="jxr_linenumber" name="L48" href="#L48">48</a>      conf.setWarmUpEnable(false);
+<a class="jxr_linenumber" name="L49" href="#L49">49</a>      <strong class="jxr_keyword">try</strong> (TiSession session = TiSession.create(conf)) {
+<a class="jxr_linenumber" name="L50" href="#L50">50</a>        PDClient pdClient = session.getPDClient();
+<a class="jxr_linenumber" name="L51" href="#L51">51</a>        conf.setApiVersion(StoreConfig.acquireApiVersion(pdClient));
+<a class="jxr_linenumber" name="L52" href="#L52">52</a>      } <strong class="jxr_keyword">catch</strong> (Exception ignore) {
+<a class="jxr_linenumber" name="L53" href="#L53">53</a>      }
+<a class="jxr_linenumber" name="L54" href="#L54">54</a>  
+<a class="jxr_linenumber" name="L55" href="#L55">55</a>      <strong class="jxr_keyword">return</strong> conf;
+<a class="jxr_linenumber" name="L56" href="#L56">56</a>    }
+<a class="jxr_linenumber" name="L57" href="#L57">57</a>  }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>
