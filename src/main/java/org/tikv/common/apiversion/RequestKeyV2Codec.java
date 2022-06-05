@@ -23,13 +23,15 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Region;
 
 public class RequestKeyV2Codec implements RequestKeyCodec {
-  protected static final ByteString RAW_KEY_PREFIX = ByteString.copyFromUtf8("r");
+  protected static final ByteString RAW_KEY_PREFIX = ByteString.copyFromUtf8("r")
+      .concat(ByteString.copyFrom(new byte[]{0}));
   protected static final ByteString RAW_END_KEY =
-      ByteString.copyFrom(new byte[] {(byte) (RAW_KEY_PREFIX.toByteArray()[0] + 1)});
+      ByteString.copyFrom(new byte[]{(byte) (RAW_KEY_PREFIX.toByteArray()[0] + 1)});
 
-  protected static final ByteString TXN_KEY_PREFIX = ByteString.copyFromUtf8("x");
+  protected static final ByteString TXN_KEY_PREFIX = ByteString.copyFromUtf8("x")
+      .concat(ByteString.copyFrom(new byte[]{0}));
   protected static final ByteString TXN_END_KEY =
-      ByteString.copyFrom(new byte[] {(byte) (TXN_KEY_PREFIX.toByteArray()[0] + 1)});
+      ByteString.copyFrom(new byte[]{(byte) (TXN_KEY_PREFIX.toByteArray()[0] + 1)});
   protected ByteString keyPrefix;
 
   protected ByteString infiniteEndKey;
@@ -49,7 +51,7 @@ public class RequestKeyV2Codec implements RequestKeyCodec {
       throw new IllegalArgumentException("key corrupted, wrong prefix");
     }
 
-    return key.substring(1);
+    return key.substring(keyPrefix.size());
   }
 
   @Override
