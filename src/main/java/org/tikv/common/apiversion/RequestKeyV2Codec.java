@@ -23,17 +23,11 @@ import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Region;
 
 public class RequestKeyV2Codec implements RequestKeyCodec {
-  protected static final ByteString RAW_KEY_PREFIX =
-      ByteString.copyFromUtf8("r").concat(ByteString.copyFrom(new byte[] {0}));
-  protected static final ByteString RAW_END_KEY =
-      ByteString.copyFrom(new byte[] {(byte) (RAW_KEY_PREFIX.toByteArray()[0] + 1)});
-
-  protected static final ByteString TXN_KEY_PREFIX =
-      ByteString.copyFromUtf8("x").concat(ByteString.copyFrom(new byte[] {0}));
-  protected static final ByteString TXN_END_KEY =
-      ByteString.copyFrom(new byte[] {(byte) (TXN_KEY_PREFIX.toByteArray()[0] + 1)});
+  protected static final ByteString RAW_KEY_PREFIX = ByteString.copyFrom(new byte[] {'r', 0});
+  protected static final ByteString RAW_END_KEY = ByteString.copyFrom(new byte[] {'r', 1});
+  protected static final ByteString TXN_KEY_PREFIX = ByteString.copyFrom(new byte[] {'x', 0});
+  protected static final ByteString TXN_END_KEY = ByteString.copyFrom(new byte[] {'x', 1});
   protected ByteString keyPrefix;
-
   protected ByteString infiniteEndKey;
 
   @Override
