@@ -21,7 +21,7 @@ public class RequestKeyV2TxnCodec extends RequestKeyV2Codec {
   public RequestKeyV2TxnCodec() {
     super();
 
-    this.keyPrefix = TXN_KEY_PREFIX;
-    this.infiniteEndKey = TXN_END_KEY;
+    this.keyPrefix = TXN_DEFAULT_PREFIX;
+    this.infiniteEndKey = TXN_DEFAULT_END;
   }
 }

@@ -21,7 +21,7 @@ public class RequestKeyV2RawCodec extends RequestKeyV2Codec {
   public RequestKeyV2RawCodec() {
     super();
 
-    this.keyPrefix = RAW_KEY_PREFIX;
-    this.infiniteEndKey = RAW_END_KEY;
+    this.keyPrefix = RAW_DEFAULT_PREFIX;
+    this.infiniteEndKey = RAW_DEFAULT_END;
   }
 }
