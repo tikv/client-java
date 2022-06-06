@@ -31,15 +31,15 @@
 <a class="jxr_linenumber" name="L23" href="#L23">23</a>  <strong class="jxr_keyword">import</strong> org.tikv.kvproto.Metapb.Region;
 <a class="jxr_linenumber" name="L24" href="#L24">24</a>  
 <a class="jxr_linenumber" name="L25" href="#L25">25</a>  <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">class</strong> <a name="RequestKeyV2Codec" href="../../../../org/tikv/common/apiversion/RequestKeyV2Codec.html#RequestKeyV2Codec">RequestKeyV2Codec</a> <strong class="jxr_keyword">implements</strong> <a name="RequestKeyCodec" href="../../../../org/tikv/common/apiversion/RequestKeyCodec.html#RequestKeyCodec">RequestKeyCodec</a> {
-<a class="jxr_linenumber" name="L26" href="#L26">26</a>    <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> ByteString RAW_KEY_PREFIX = ByteString.copyFromUtf8(<span class="jxr_string">"r"</span>);
-<a class="jxr_linenumber" name="L27" href="#L27">27</a>    <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> ByteString RAW_END_KEY =
-<a class="jxr_linenumber" name="L28" href="#L28">28</a>        ByteString.copyFrom(<strong class="jxr_keyword">new</strong> byte[] {(byte) (RAW_KEY_PREFIX.toByteArray()[0] + 1)});
-<a class="jxr_linenumber" name="L29" href="#L29">29</a>  
-<a class="jxr_linenumber" name="L30" href="#L30">30</a>    <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> ByteString TXN_KEY_PREFIX = ByteString.copyFromUtf8(<span class="jxr_string">"x"</span>);
-<a class="jxr_linenumber" name="L31" href="#L31">31</a>    <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> ByteString TXN_END_KEY =
-<a class="jxr_linenumber" name="L32" href="#L32">32</a>        ByteString.copyFrom(<strong class="jxr_keyword">new</strong> byte[] {(byte) (TXN_KEY_PREFIX.toByteArray()[0] + 1)});
-<a class="jxr_linenumber" name="L33" href="#L33">33</a>    <strong class="jxr_keyword">protected</strong> ByteString keyPrefix;
-<a class="jxr_linenumber" name="L34" href="#L34">34</a>  
+<a class="jxr_linenumber" name="L26" href="#L26">26</a>    <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> ByteString RAW_DEFAULT_PREFIX =
+<a class="jxr_linenumber" name="L27" href="#L27">27</a>        ByteString.copyFrom(<strong class="jxr_keyword">new</strong> byte[] {'r', 0, 0, 0});
+<a class="jxr_linenumber" name="L28" href="#L28">28</a>    <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> ByteString RAW_DEFAULT_END =
+<a class="jxr_linenumber" name="L29" href="#L29">29</a>        ByteString.copyFrom(<strong class="jxr_keyword">new</strong> byte[] {'r', 0, 0, 1});
+<a class="jxr_linenumber" name="L30" href="#L30">30</a>    <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> ByteString TXN_DEFAULT_PREFIX =
+<a class="jxr_linenumber" name="L31" href="#L31">31</a>        ByteString.copyFrom(<strong class="jxr_keyword">new</strong> byte[] {'x', 0, 0, 0});
+<a class="jxr_linenumber" name="L32" href="#L32">32</a>    <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> ByteString TXN_DEFAULT_END =
+<a class="jxr_linenumber" name="L33" href="#L33">33</a>        ByteString.copyFrom(<strong class="jxr_keyword">new</strong> byte[] {'x', 0, 0, 1});
+<a class="jxr_linenumber" name="L34" href="#L34">34</a>    <strong class="jxr_keyword">protected</strong> ByteString keyPrefix;
 <a class="jxr_linenumber" name="L35" href="#L35">35</a>    <strong class="jxr_keyword">protected</strong> ByteString infiniteEndKey;
 <a class="jxr_linenumber" name="L36" href="#L36">36</a>  
 <a class="jxr_linenumber" name="L37" href="#L37">37</a>    @Override
@@ -57,7 +57,7 @@
 <a class="jxr_linenumber" name="L49" href="#L49">49</a>        <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> IllegalArgumentException(<span class="jxr_string">"key corrupted, wrong prefix"</span>);
 <a class="jxr_linenumber" name="L50" href="#L50">50</a>      }
 <a class="jxr_linenumber" name="L51" href="#L51">51</a>  
-<a class="jxr_linenumber" name="L52" href="#L52">52</a>      <strong class="jxr_keyword">return</strong> key.substring(1);
+<a class="jxr_linenumber" name="L52" href="#L52">52</a>      <strong class="jxr_keyword">return</strong> key.substring(keyPrefix.size());
 <a class="jxr_linenumber" name="L53" href="#L53">53</a>    }
 <a class="jxr_linenumber" name="L54" href="#L54">54</a>  
 <a class="jxr_linenumber" name="L55" href="#L55">55</a>    @Override
