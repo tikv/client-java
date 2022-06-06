@@ -164,8 +164,10 @@ public class RequestKeyCodecTest {
     end = ByteString.EMPTY;
     range = v2.encodeRange(start, end);
     assertEquals(v2.encodeKey(start), range.first);
-    byte[] min = v2.encodeKey(ByteString.EMPTY).toByteArray();
-    assertArrayEquals(new byte[] {min[0], (byte) (min[1] + 1)}, range.second.toByteArray());
+
+    byte[] max = v2.encodeKey(ByteString.EMPTY).toByteArray();
+    max[max.length - 1] += 1;
+    assertArrayEquals(max, range.second.toByteArray());
 
     region =
         Region.newBuilder()
