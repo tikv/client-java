@@ -89,12 +89,12 @@ The following includes ThreadPool related parameters, which can be passed in thr
 - default: null
 
 #### tikv.tls.reload_interval
-- The interval in seconds to poll the change of SSL context, if a change detected, the SSL context will be rebuilded.
-- default: `0`, means disable TLS context reload
+- The interval in seconds to poll the change of TLS context, if a change detected, the SSL context will be rebuilded.
+- default: `"10s"`, `"0s"` means disable TLS context reload.
 
 #### tikv.conn.recycle_time
 - After `tikv.conn.recycle_time` (in seconds) with a TLS context reloading, the old connections will be forced to shutdown.
-- default: `60s`.
+- default: `"60s"`.
 
 #### tikv.rawkv.read_timeout_in_ms
 - RawKV read timeout in milliseconds. This parameter controls the timeout of `get` `getKeyTTL`.
