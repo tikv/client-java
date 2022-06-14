@@ -57,14 +57,14 @@ public class ChannelFactory implements AutoCloseable {
   private final int keepaliveTimeout;
   private final int idleTimeout;
   private final CertContext certContext;
-  private final CertWatcher certWatcher;
+  private CertWatcher certWatcher;
 
   @VisibleForTesting
   public final ConcurrentHashMap<String, ManagedChannel> connPool = new ConcurrentHashMap<>();
 
   private final AtomicReference<SslContextBuilder> sslContextBuilder = new AtomicReference<>();
 
-  private final ScheduledExecutorService recycler = Executors.newSingleThreadScheduledExecutor();
+  private ScheduledExecutorService recycler;
 
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -122,7 +122,7 @@ public class ChannelFactory implements AutoCloseable {
 
     @Override
     public void close() {
-      executorService.shutdown();
+      executorService.shutdownNow();
     }
   }
 
@@ -209,6 +209,7 @@ public class ChannelFactory implements AutoCloseable {
     this.idleTimeout = idleTimeout;
     this.certWatcher = null;
     this.certContext = null;
+    this.recycler = null;
     this.connRecycleTime = 0;
   }
 
@@ -234,14 +235,7 @@ public class ChannelFactory implements AutoCloseable {
     File keyCert = new File(keyCertChainFilePath);
     File key = new File(keyFilePath);
 
-    if (certReloadInterval > 0) {
-      onCertChange();
-      this.certWatcher =
-          new CertWatcher(
-              certReloadInterval, ImmutableList.of(trustCert, keyCert, key), this::onCertChange);
-    } else {
-      this.certWatcher = null;
-    }
+    initReloadContext(certReloadInterval, ImmutableList.of(trustCert, keyCert, key));
   }
 
   public ChannelFactory(
@@ -264,13 +258,18 @@ public class ChannelFactory implements AutoCloseable {
 
     File jksKey = new File(jksKeyPath);
     File jksTrust = new File(jksTrustPath);
+
+    initReloadContext(certReloadInterval, ImmutableList.of(jksKey, jksTrust));
+  }
+
+  private void initReloadContext(long certReloadInterval, List<File> files) {
+    if (connRecycleTime > 0) {
+      recycler = Executors.newSingleThreadScheduledExecutor();
+    }
+
     if (certReloadInterval > 0) {
       onCertChange();
-      this.certWatcher =
-          new CertWatcher(
-              certReloadInterval, ImmutableList.of(jksKey, jksTrust), this::onCertChange);
-    } else {
-      this.certWatcher = null;
+      this.certWatcher = new CertWatcher(certReloadInterval, files, this::onCertChange);
     }
   }
 
@@ -281,7 +280,10 @@ public class ChannelFactory implements AutoCloseable {
       sslContextBuilder.set(newBuilder);
 
       List<ManagedChannel> pending = new ArrayList<>(connPool.values());
-      recycler.schedule(() -> cleanExpiredConn(pending), connRecycleTime, TimeUnit.SECONDS);
+
+      if (recycler != null) {
+        recycler.schedule(() -> cleanExpiredConn(pending), connRecycleTime, TimeUnit.SECONDS);
+      }
 
       connPool.clear();
     } finally {
@@ -360,11 +362,12 @@ public class ChannelFactory implements AutoCloseable {
     }
     connPool.clear();
 
-    if (certContext != null) {
+    if (recycler != null) {
       recycler.shutdown();
-      if (certWatcher != null) {
-        certWatcher.close();
-      }
+    }
+
+    if (certWatcher != null) {
+      certWatcher.close();
     }
   }
 }

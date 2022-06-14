@@ -17,6 +17,7 @@
 
 package org.tikv.common;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -39,9 +40,19 @@ public class ChannelFactoryTest {
   private final String clientCertPath = tlsPath + "client.crt";
   private final String clientKeyPath = tlsPath + "client.pem";
 
+  private final long certReloadInterval = 5;
+  private final long connRecycleTime = 1;
+
   private ChannelFactory createFactory() {
     int v = 1024;
-    return new ChannelFactory(v, v, v, v, 5, 10, caPath, clientCertPath, clientKeyPath);
+    return new ChannelFactory(
+        v, v, v, v, connRecycleTime, certReloadInterval, caPath, clientCertPath, clientKeyPath);
+  }
+
+  private ChannelFactory createFactoryWithoutRecycle() {
+    int v = 1024;
+    return new ChannelFactory(
+        v, v, v, v, 0, certReloadInterval, caPath, clientCertPath, clientKeyPath);
   }
 
   private void touchCert() {
@@ -55,25 +66,49 @@ public class ChannelFactoryTest {
     File a = new File(caPath);
     File b = new File(clientCertPath);
     File c = new File(clientKeyPath);
-    new CertWatcher(2, ImmutableList.of(a, b, c), () -> changed.set(true));
-    Thread.sleep(5000);
-    assertTrue(changed.get());
+    try (CertWatcher watcher =
+        new CertWatcher(2, ImmutableList.of(a, b, c), () -> changed.set(true))) {
+      Thread.sleep(5000);
+      assertTrue(changed.get());
+    }
+  }
+
+  @Test
+  public void testConnRecycle() throws InterruptedException {
+    HostMapping hostMapping = uri -> uri;
+    try (ChannelFactory factory = createFactory()) {
+      ManagedChannel c = factory.getChannel("127.0.0.1:2379", hostMapping);
+      assertFalse(c.isShutdown());
+      touchCert();
+      Thread.sleep((certReloadInterval + connRecycleTime) * 1000);
+      assertTrue(c.isShutdown());
+    }
+
+    try (ChannelFactory factory = createFactoryWithoutRecycle()) {
+      ManagedChannel c = factory.getChannel("127.0.0.1:2379", hostMapping);
+      assertFalse(c.isShutdown());
+      touchCert();
+      Thread.sleep((certReloadInterval + connRecycleTime) * 1000);
+      assertFalse(c.isShutdown());
+      c.shutdownNow();
+    }
   }
 
   @Test
   public void testCertWatcherWithExceptionTask() throws InterruptedException {
     AtomicInteger timesOfReloadTask = new AtomicInteger(0);
-    new CertWatcher(
-        1,
-        ImmutableList.of(new File(caPath), new File(clientCertPath), new File(clientKeyPath)),
-        () -> {
-          timesOfReloadTask.getAndIncrement();
-          touchCert();
-          throw new RuntimeException("Mock exception in reload task");
-        });
-
-    Thread.sleep(5000);
-    assertTrue(timesOfReloadTask.get() > 1);
+    try (CertWatcher watcher =
+        new CertWatcher(
+            1,
+            ImmutableList.of(new File(caPath), new File(clientCertPath), new File(clientKeyPath)),
+            () -> {
+              timesOfReloadTask.getAndIncrement();
+              touchCert();
+              throw new RuntimeException("Mock exception in reload task");
+            })) {
+      Thread.sleep(certReloadInterval * 1000);
+      assertTrue(timesOfReloadTask.get() > 1);
+    }
   }
 
   @Test
