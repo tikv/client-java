@@ -362,7 +362,9 @@ public class ChannelFactory implements AutoCloseable {
 
     if (certContext != null) {
       recycler.shutdown();
-      certWatcher.close();
+      if (certWatcher != null) {
+        certWatcher.close();
+      }
     }
   }
 }
