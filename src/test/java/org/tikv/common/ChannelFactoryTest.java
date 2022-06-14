@@ -65,18 +65,6 @@ public class ChannelFactoryTest {
   @Test
   public void testCertWatcherWithExceptionTask() throws InterruptedException {
     AtomicInteger timesOfReloadTask = new AtomicInteger(0);
-    AtomicInteger timesOfFakeTask = new AtomicInteger(0);
-
-    Executors.newSingleThreadScheduledExecutor()
-        .scheduleAtFixedRate(
-            () -> {
-              timesOfFakeTask.getAndIncrement();
-              throw new RuntimeException("Mock exception in fake task");
-            },
-            1,
-            1,
-            TimeUnit.SECONDS);
-
     new CertWatcher(
         1,
         ImmutableList.of(new File(caPath), new File(clientCertPath), new File(clientKeyPath)),
@@ -87,8 +75,6 @@ public class ChannelFactoryTest {
         });
 
     Thread.sleep(5000);
-
-    assertTrue(timesOfFakeTask.get() == 1);
     assertTrue(timesOfReloadTask.get() > 1);
   }
 
