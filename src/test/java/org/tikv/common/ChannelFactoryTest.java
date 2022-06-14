@@ -26,6 +26,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Test;
 import org.tikv.common.util.ChannelFactory;
@@ -57,6 +58,22 @@ public class ChannelFactoryTest {
     new CertWatcher(2, ImmutableList.of(a, b, c), () -> changed.set(true));
     Thread.sleep(5000);
     assertTrue(changed.get());
+  }
+
+  @Test
+  public void testCertWatcherWithExceptionTask() throws InterruptedException {
+    AtomicInteger timesOfReloadTask = new AtomicInteger(0);
+    new CertWatcher(
+        1,
+        ImmutableList.of(new File(caPath), new File(clientCertPath), new File(clientKeyPath)),
+        () -> {
+          timesOfReloadTask.getAndIncrement();
+          touchCert();
+          throw new RuntimeException("Mock exception in reload task");
+        });
+
+    Thread.sleep(5000);
+    assertTrue(timesOfReloadTask.get() > 1);
   }
 
   @Test
