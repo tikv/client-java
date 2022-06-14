@@ -71,7 +71,6 @@ public class ChannelFactoryTest {
         .scheduleAtFixedRate(
             () -> {
               timesOfFakeTask.getAndIncrement();
-              System.out.println("Execute fake task for the " + timesOfFakeTask.get() + " times.");
               throw new RuntimeException("Mock exception in fake task");
             },
             1,
@@ -84,7 +83,6 @@ public class ChannelFactoryTest {
         () -> {
           timesOfReloadTask.getAndIncrement();
           touchCert();
-          System.out.println("Execute reload task for the " + timesOfReloadTask.get() + " times.");
           throw new RuntimeException("Mock exception in reload task");
         });
 
