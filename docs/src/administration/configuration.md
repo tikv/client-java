@@ -93,7 +93,7 @@ The following includes ThreadPool related parameters, which can be passed in thr
 - default: `"10s"`, `"0s"` means disable TLS context reload.
 
 #### tikv.conn.recycle_time
-- After `tikv.conn.recycle_time` (in seconds) with a TLS context reloading, the old connections will be forced to shutdown.
+- After `tikv.conn.recycle_time` (in seconds) with a TLS context reloading, the old connections will be forced to shutdown preventing channel leak.
 - default: `"60s"`.
 
 #### tikv.rawkv.read_timeout_in_ms
