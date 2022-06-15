@@ -52,7 +52,7 @@ public class Main {
 
 
 ## API V2
-With TiKV version >= 6.1.0, we release a new feature called "TiKV API V2" which provides a new raw key-value storage format allowing the coexistence of transaction data and raw data. Please refer to [v6.10 release notes](https://docs.pingcap.com/tidb/stable/release-6.1.0#ease-of-use) for detail.
+With TiKV version >= 6.1.0, we release a new feature called "TiKV API V2" which provides a new raw key-value storage format allowing the coexistence of RawKV and TxnKV. Please refer to [v6.10 release notes](https://docs.pingcap.com/tidb/stable/release-6.1.0#ease-of-use) for detail.
 
 To enable the API V2 mode, users need to specify the API version of the client.
 
