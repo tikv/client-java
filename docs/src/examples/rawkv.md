@@ -49,3 +49,52 @@ public class Main {
   }
 }
 ```
+
+
+## API V2
+With TiKV version >= 6.1.0, we release a new feature called "TiKV API V2" which provides a new raw key-value storage format allowing the coexistence of RawKV and TxnKV. Please refer to [v6.10 release notes](https://docs.pingcap.com/tidb/stable/release-6.1.0#ease-of-use) for detail.
+
+To enable the API V2 mode, users need to specify the API version of the client.
+
+```java
+// import ...
+import org.tikv.common.TiConfiguration.ApiVersion;
+
+public class Main {
+  public static void main() {
+    TiConfiguration conf = TiConfiguration.createRawDefault("127.0.0.1:2379");
+    conf.setApiVersion(ApiVersion.V2);
+    try(TiSession session = TiSession.create(conf)) {
+      try(RawKVClient client = session.createRawClient()) {
+        // The client will read and write date in the format of API V2, which is
+        // transparent to the users.
+        client.put(ByteString.copyFromUtf8("hello"), ByteString.copyFromUtf8("world"));
+        // other client operations.
+      }
+    }
+  }
+}
+```
+
+### Compatibility
+
+The V2 Client should not access the cluster other than V2, this requires users to [enable the API V2](https://docs.pingcap.com/tidb/stable/tikv-configuration-file#api-version-new-in-v610) for the cluster:
+
+```toml
+[storage]
+# The V2 cluster must enable ttl for RawKV explicitly
+enable-ttl = true
+api-version = 2
+```
+
+If V2 client accesses a V1 cluster or V1 cluster accesses a V2 cluster, the requests will be denied by the cluster. You can check the compatibility via the following matrix.
+
+
+|                       | V1 Server | V1TTL Server | V2 Server |
+| --------------------- | --------- | ------------ | --------- |
+| V1 RawClient          | Raw       | Raw          | Error     |
+| V1 RawClient with TTL | Error     | Raw          | Error     |
+| V1 TxnClient          | Txn       | Error        | Error     |
+| V1 TiDB               | TiDB Data | Error        | TiDB Data |
+| V2 RawClient          | Error     | Error        | Raw       |
+| V2 TxnClient          | Error     | Error        | Txn       |
