@@ -267,6 +267,16 @@
 <li>a PKCS#8 private key file in PEM format. e.g. /home/tidb/client-key.pem.</li>
 <li>default: null</li>
 </ul>
+<h4 id="tikvtlsreload_interval"><a class="header" href="#tikvtlsreload_interval">tikv.tls.reload_interval</a></h4>
+<ul>
+<li>The interval in seconds to poll the change of TLS context, if a change is detected, the TLS context will be rebuilded.</li>
+<li>default: <code>&quot;10s&quot;</code>, <code>&quot;0s&quot;</code> means disable TLS context reload.</li>
+</ul>
+<h4 id="tikvconnrecycle_time"><a class="header" href="#tikvconnrecycle_time">tikv.conn.recycle_time</a></h4>
+<ul>
+<li>After a TLS context reloading, the old connections will be forced to shutdown after <code>tikv.conn.recycle_time</code> to prevent channel leak.</li>
+<li>default: <code>&quot;60s&quot;</code>.</li>
+</ul>
 <h4 id="tikvrawkvread_timeout_in_ms"><a class="header" href="#tikvrawkvread_timeout_in_ms">tikv.rawkv.read_timeout_in_ms</a></h4>
 <ul>
 <li>RawKV read timeout in milliseconds. This parameter controls the timeout of <code>get</code> <code>getKeyTTL</code>.</li>
