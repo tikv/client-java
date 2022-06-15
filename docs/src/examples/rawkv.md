@@ -52,7 +52,7 @@ public class Main {
 
 
 ## API V2
-With TiKV version >= 6.1.0, we release a new feature that allows the coexistence of transcation data and raw data. This feature could allow the [TiCDC](https://github.com/tikv/migration/tree/main/cdc) to capture the change of the data, and these events could be consumed by the downstream infrastructure like Kafka or another TiKV cluster for backup.
+With TiKV version >= 6.1.0, we release a new feature called "TiKV API V2" which provides a new raw key-value storage format allowing the coexistence of transaction data and raw data. Please refer to [v6.10 release notes](https://docs.pingcap.com/tidb/stable/release-6.1.0#ease-of-use) for detail.
 
 To enable the API V2 mode, users need to specify the API version of the client.
 
@@ -78,7 +78,7 @@ public class Main {
 
 ### Compatibility
 
-The V2 Client should not access the cluster other than V2, this requires users to enabel the API V2 for the cluster:
+The V2 Client should not access the cluster other than V2, this requires users to [enable the API V2](https://docs.pingcap.com/tidb/stable/tikv-configuration-file#api-version-new-in-v610) for the cluster:
 
 ```toml
 [storage]
@@ -87,7 +87,7 @@ enable-ttl = true
 api-version = 2
 ```
 
-If V2 client accesses a V1 cluster or V1 cluster accesses a V2 cluster, the requests will be denyed by the cluster. You can check the compatibility via the following matrix.
+If V2 client accesses a V1 cluster or V1 cluster accesses a V2 cluster, the requests will be denied by the cluster. You can check the compatibility via the following matrix.
 
 
 |                       | V1 Server | V1TTL Server | V2 Server |
