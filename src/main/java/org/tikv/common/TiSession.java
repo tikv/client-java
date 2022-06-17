@@ -175,6 +175,10 @@ public class TiSession implements AutoCloseable {
     }
 
     this.client = PDClient.createRaw(conf, keyCodec, channelFactory);
+    if (conf.getApiVersion().isV2() && !StoreVersion.minTiKVVersion(Version.API_V2, client)) {
+      throw new IllegalStateException("Store version should larger than " + Version.API_V2);
+    }
+
     this.enableGrpcForward = conf.getEnableGrpcForward();
     if (this.enableGrpcForward) {
       logger.info("enable grpc forward for high available");
