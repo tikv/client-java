@@ -64,7 +64,7 @@ public class ChannelFactory implements AutoCloseable {
 
   private final AtomicReference<SslContextBuilder> sslContextBuilder = new AtomicReference<>();
 
-  private final ScheduledExecutorService recycler = Executors.newSingleThreadScheduledExecutor();
+  private final ScheduledExecutorService recycler;
 
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -209,6 +209,7 @@ public class ChannelFactory implements AutoCloseable {
     this.idleTimeout = idleTimeout;
     this.certWatcher = null;
     this.certContext = null;
+    this.recycler = null;
     this.connRecycleTime = 0;
   }
 
@@ -229,6 +230,7 @@ public class ChannelFactory implements AutoCloseable {
     this.connRecycleTime = connRecycleTime;
     this.certContext =
         new OpenSslContext(trustCertCollectionFilePath, keyCertChainFilePath, keyFilePath);
+    this.recycler = Executors.newSingleThreadScheduledExecutor();
 
     File trustCert = new File(trustCertCollectionFilePath);
     File keyCert = new File(keyCertChainFilePath);
@@ -261,6 +263,7 @@ public class ChannelFactory implements AutoCloseable {
     this.idleTimeout = idleTimeout;
     this.connRecycleTime = connRecycleTime;
     this.certContext = new JksContext(jksKeyPath, jksKeyPassword, jksTrustPath, jksTrustPassword);
+    this.recycler = Executors.newSingleThreadScheduledExecutor();
 
     File jksKey = new File(jksKeyPath);
     File jksTrust = new File(jksTrustPath);
@@ -361,7 +364,7 @@ public class ChannelFactory implements AutoCloseable {
     connPool.clear();
 
     if (certContext != null) {
-      recycler.shutdown();
+      recycler.shutdownNow();
       if (certWatcher != null) {
         certWatcher.close();
       }
