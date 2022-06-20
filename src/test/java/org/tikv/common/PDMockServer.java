@@ -30,6 +30,8 @@ import java.net.ServerSocket;
 import java.util.Optional;
 import java.util.function.Function;
 import org.tikv.kvproto.PDGrpc;
+import org.tikv.kvproto.Pdpb.GetAllStoresRequest;
+import org.tikv.kvproto.Pdpb.GetAllStoresResponse;
 import org.tikv.kvproto.Pdpb.GetMembersRequest;
 import org.tikv.kvproto.Pdpb.GetMembersResponse;
 import org.tikv.kvproto.Pdpb.GetRegionByIDRequest;
@@ -53,6 +55,8 @@ public class PDMockServer extends PDGrpc.PDImplBase {
   private Function<GetRegionByIDRequest, GetRegionResponse> getRegionByIDListener;
 
   private Function<ScanRegionsRequest, ScanRegionsResponse> scanRegionsListener;
+
+  private Function<GetAllStoresRequest, GetAllStoresResponse> getAllStoresListener;
 
   public void addGetMembersListener(Function<GetMembersRequest, GetMembersResponse> func) {
     getMembersListener = func;
@@ -138,6 +142,20 @@ public class PDMockServer extends PDGrpc.PDImplBase {
   public void scanRegions(ScanRegionsRequest request, StreamObserver<ScanRegionsResponse> resp) {
     try {
       resp.onNext(Optional.ofNullable(scanRegionsListener.apply(request)).get());
+      resp.onCompleted();
+    } catch (Exception e) {
+      resp.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  public void addGetAllStoresListener(Function<GetAllStoresRequest, GetAllStoresResponse> func) {
+    getAllStoresListener = func;
+  }
+
+  @Override
+  public void getAllStores(GetAllStoresRequest request, StreamObserver<GetAllStoresResponse> resp) {
+    try {
+      resp.onNext(Optional.ofNullable(getAllStoresListener.apply(request)).get());
       resp.onCompleted();
     } catch (Exception e) {
       resp.onError(Status.INTERNAL.asRuntimeException());

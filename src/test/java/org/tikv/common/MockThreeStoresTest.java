@@ -30,6 +30,7 @@ import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
+import org.tikv.kvproto.Pdpb.GetAllStoresResponse;
 
 public class MockThreeStoresTest extends PDMockServerTest {
 
@@ -68,17 +69,17 @@ public class MockThreeStoresTest extends PDMockServerTest {
         ImmutableList.of(
             Metapb.Store.newBuilder()
                 .setAddress("127.0.0.1:" + ports[0])
-                .setVersion("5.0.0")
+                .setVersion(Version.API_V2)
                 .setId(0x1)
                 .build(),
             Metapb.Store.newBuilder()
                 .setAddress("127.0.0.1:" + ports[1])
-                .setVersion("5.0.0")
+                .setVersion(Version.API_V2)
                 .setId(0x2)
                 .build(),
             Metapb.Store.newBuilder()
                 .setAddress("127.0.0.1:" + ports[2])
-                .setVersion("5.0.0")
+                .setVersion(Version.API_V2)
                 .setId(0x3)
                 .build());
 
@@ -93,6 +94,10 @@ public class MockThreeStoresTest extends PDMockServerTest {
           (request) -> {
             int i = (int) request.getStoreId() - 1;
             return Pdpb.GetStoreResponse.newBuilder().setStore(stores.get(i)).build();
+          });
+      server.addGetAllStoresListener(
+          request -> {
+            return GetAllStoresResponse.newBuilder().addAllStores(stores).build();
           });
     }
 

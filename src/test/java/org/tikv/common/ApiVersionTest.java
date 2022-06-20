@@ -150,4 +150,15 @@ public class ApiVersionTest {
       Assert.assertNotNull(e);
     }
   }
+
+  @Test
+  public void testAccessOldVersionClusterWithV2() {
+    Assume.assumeFalse(minTiKVVersion("6.1.0"));
+
+    try (RawKVClient client = createRawClient(ApiVersion.V2)) {
+      Assert.fail("Should not create V2 client while store version is less than 6.1.0");
+    } catch (Exception e) {
+      Assert.assertNotNull(e);
+    }
+  }
 }
