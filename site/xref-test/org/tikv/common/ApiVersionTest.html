@@ -158,7 +158,18 @@
 <a class="jxr_linenumber" name="L150" href="#L150">150</a>       Assert.assertNotNull(e);
 <a class="jxr_linenumber" name="L151" href="#L151">151</a>     }
 <a class="jxr_linenumber" name="L152" href="#L152">152</a>   }
-<a class="jxr_linenumber" name="L153" href="#L153">153</a> }
+<a class="jxr_linenumber" name="L153" href="#L153">153</a> 
+<a class="jxr_linenumber" name="L154" href="#L154">154</a>   @Test
+<a class="jxr_linenumber" name="L155" href="#L155">155</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> testAccessOldVersionClusterWithV2() {
+<a class="jxr_linenumber" name="L156" href="#L156">156</a>     Assume.assumeFalse(minTiKVVersion(<span class="jxr_string">"6.1.0"</span>));
+<a class="jxr_linenumber" name="L157" href="#L157">157</a> 
+<a class="jxr_linenumber" name="L158" href="#L158">158</a>     <strong class="jxr_keyword">try</strong> (RawKVClient client = createRawClient(ApiVersion.V2)) {
+<a class="jxr_linenumber" name="L159" href="#L159">159</a>       Assert.fail(<span class="jxr_string">"Should not create V2 client while store version is less than 6.1.0"</span>);
+<a class="jxr_linenumber" name="L160" href="#L160">160</a>     } <strong class="jxr_keyword">catch</strong> (Exception e) {
+<a class="jxr_linenumber" name="L161" href="#L161">161</a>       Assert.assertNotNull(e);
+<a class="jxr_linenumber" name="L162" href="#L162">162</a>     }
+<a class="jxr_linenumber" name="L163" href="#L163">163</a>   }
+<a class="jxr_linenumber" name="L164" href="#L164">164</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>
