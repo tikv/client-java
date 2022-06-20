@@ -25,4 +25,6 @@ public class Version {
   public static final String RESOLVE_LOCK_V4 = "4.0.0";
 
   public static final String BATCH_WRITE = "3.0.14";
+
+  public static final String API_V2 = "6.1.0";
 }
