@@ -17,6 +17,7 @@
 
 package org.tikv.common;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.util.List;
 import org.junit.Assert;
@@ -27,7 +28,10 @@ import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
+import org.tikv.kvproto.Metapb.Store;
+import org.tikv.kvproto.Metapb.StoreState;
 import org.tikv.kvproto.Pdpb;
+import org.tikv.kvproto.Pdpb.GetAllStoresResponse;
 import org.tikv.kvproto.Pdpb.GetRegionResponse;
 import org.tikv.kvproto.Pdpb.Region;
 import org.tikv.kvproto.Pdpb.ScanRegionsResponse;
@@ -35,6 +39,18 @@ import org.tikv.kvproto.Pdpb.ScanRegionsResponse;
 public class PDClientV2MockTest extends PDMockServerTest {
   @Before
   public void init() throws Exception {
+    leader.addGetAllStoresListener(
+        request -> {
+          return GetAllStoresResponse.newBuilder()
+              .addAllStores(
+                  ImmutableList.of(
+                      Store.newBuilder()
+                          .setId(0x1)
+                          .setState(StoreState.Up)
+                          .setVersion(Version.API_V2)
+                          .build()))
+              .build();
+        });
     upgradeToV2Cluster();
   }
 
