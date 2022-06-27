@@ -75,9 +75,9 @@ public class ConcreteScanIterator extends ScanIterator {
     TiRegion region;
     try (RegionStoreClient client = builder.build(startKey)) {
       client.setTimeout(conf.getScanTimeout());
-      region = client.getRegion();
       BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
       currentCache = client.scan(backOffer, startKey, version);
+      region = client.getRegion();
       return region;
     }
   }
