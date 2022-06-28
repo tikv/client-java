@@ -65,6 +65,8 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
    *
    * @return TiRegion of current data loaded to cache
    * @throws GrpcException if scan still fails after backoff
+   *
+   * TODO : Add test to check it correctness
    */
   abstract TiRegion loadCurrentRegionToCache() throws GrpcException;
 
