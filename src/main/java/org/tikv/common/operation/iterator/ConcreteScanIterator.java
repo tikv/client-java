@@ -77,6 +77,10 @@ public class ConcreteScanIterator extends ScanIterator {
       client.setTimeout(conf.getScanTimeout());
       BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
       currentCache = client.scan(backOffer, startKey, version);
+      // If we get region before scan, we will use region from cache which
+      // may have wrong end key. This may miss some regions that split from old region.
+      // Client will get the newest region during scan. So we need to
+      // update region after scan.
       region = client.getRegion();
       return region;
     }
