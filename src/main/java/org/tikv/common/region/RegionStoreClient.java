@@ -339,9 +339,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       BackOffer backOffer, ByteString startKey, long version, boolean keyOnly) {
     boolean forWrite = false;
     while (true) {
-      // we should refresh region
-      region = regionManager.getRegionByKey(startKey, backOffer);
-
       Supplier<ScanRequest> request =
           () ->
               ScanRequest.newBuilder()
@@ -365,6 +362,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               version,
               forWrite);
       ScanResponse resp = callWithRetry(backOffer, TikvGrpc.getKvScanMethod(), request, handler);
+      // retry may refresh region info
+      // we need to update region after retry
+      region = regionManager.getRegionByKey(startKey, backOffer);
+
       if (isScanSuccess(backOffer, resp)) {
         return doScan(resp);
       }
@@ -1253,6 +1254,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               regionManager, this, resp -> resp.hasRegionError() ? resp.getRegionError() : null);
       RawScanResponse resp =
           callWithRetry(backOffer, TikvGrpc.getRawScanMethod(), factory, handler);
+      // RegionErrorHandler may refresh region cache due to outdated region info,
+      // This region need to get newest info from cache.
+      region = regionManager.getRegionByKey(key, backOffer);
       return rawScanHelper(resp);
     } finally {
       requestTimer.observeDuration();
