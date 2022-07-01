@@ -57,6 +57,9 @@ public class RawScanIterator extends ScanIterator {
         } else {
           try {
             currentCache = client.rawScan(backOffer, startKey, limit, keyOnly);
+            // Client will get the newest region during scan. So we need to
+            // update region after scan.
+            region = client.getRegion();
           } catch (final TiKVException e) {
             backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoRegionMiss, e);
             continue;
