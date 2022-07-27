@@ -198,8 +198,7 @@ public abstract class AbstractGRPCClient<
     }
   }
 
-  protected boolean checkHealth(String addressStr, HostMapping hostMapping) {
-    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff((int) (timeout * 2));
+  protected boolean checkHealth(BackOffer backOffer, String addressStr, HostMapping hostMapping) {
     try {
       return doCheckHealth(backOffer, addressStr, hostMapping);
     } catch (Exception e) {
