@@ -26,20 +26,21 @@ import org.tikv.raw.RawKVClient;
 public class TimeoutTest extends MockThreeStoresTest {
   @Before
   public void init() throws Exception {
-    updateConf(conf -> {
-      conf.setEnableAtomicForCAS(true);
-      conf.setTimeout(150);
-      conf.setForwardTimeout(200);
-      conf.setRawKVReadTimeoutInMS(400);
-      conf.setRawKVWriteTimeoutInMS(400);
-      conf.setRawKVBatchReadTimeoutInMS(400);
-      conf.setRawKVBatchWriteTimeoutInMS(400);
-      conf.setRawKVWriteSlowLogInMS(50);
-      conf.setRawKVReadSlowLogInMS(50);
-      conf.setRawKVBatchReadSlowLogInMS(50);
-      conf.setRawKVBatchWriteSlowLogInMS(50);
-      return conf;
-    });
+    updateConf(
+        conf -> {
+          conf.setEnableAtomicForCAS(true);
+          conf.setTimeout(150);
+          conf.setForwardTimeout(200);
+          conf.setRawKVReadTimeoutInMS(400);
+          conf.setRawKVWriteTimeoutInMS(400);
+          conf.setRawKVBatchReadTimeoutInMS(400);
+          conf.setRawKVBatchWriteTimeoutInMS(400);
+          conf.setRawKVWriteSlowLogInMS(50);
+          conf.setRawKVReadSlowLogInMS(50);
+          conf.setRawKVBatchReadSlowLogInMS(50);
+          conf.setRawKVBatchWriteSlowLogInMS(50);
+          return conf;
+        });
   }
 
   private RawKVClient createClient() {

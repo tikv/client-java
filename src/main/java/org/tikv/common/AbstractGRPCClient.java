@@ -40,7 +40,6 @@ import org.tikv.common.streaming.StreamingResponse;
 import org.tikv.common.util.BackOffFunction.BackOffFuncType;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
-import org.tikv.common.util.ConcreteBackOffer;
 
 public abstract class AbstractGRPCClient<
         BlockingStubT extends AbstractStub<BlockingStubT>,
