@@ -54,7 +54,7 @@ public class TimeoutTest extends MockThreeStoresTest {
       long start = System.currentTimeMillis();
       client.get(ByteString.copyFromUtf8("key"));
       long end = System.currentTimeMillis();
-      Assert.assertTrue(end - start < 500);
+      Assert.assertTrue(end - start < session.getConf().getRawKVReadTimeoutInMS() * 2L);
     }
   }
 }
