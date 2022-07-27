@@ -1084,4 +1084,20 @@ public class RawKVClientTest extends BaseRawKVTest {
       return FastByteComparisons.compareTo(startKey.toByteArray(), endKey.toByteArray());
     }
   }
+
+  @Test
+  public void testBatchPut() throws Exception {
+    TiConfiguration conf = session.getConf();
+    conf.setRawKVBatchWriteTimeoutInMS(100000);
+    conf.setTimeout(100000);
+    try(TiSession newSession = TiSession.create(conf)){
+      try(RawKVClient client=newSession.createRawClient()) {
+        HashMap<ByteString, ByteString> kvs = new HashMap<>();
+        for (int i = 0; i < 2048; i++) {
+          kvs.put(ByteString.copyFromUtf8("key@" + i), rawValue("value@" + i));
+        }
+        client.batchPut(kvs);
+      }
+    };
+  }
 }
