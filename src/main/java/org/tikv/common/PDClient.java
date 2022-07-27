@@ -581,8 +581,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   public void tryUpdateLeader() {
     for (URI url : this.pdAddrs) {
+      BackOffer backOffer = defaultBackOffer();
       // since resp is null, we need update leader's address by walking through all pd server.
-      GetMembersResponse resp = getMembers(defaultBackOffer(), url);
+      GetMembersResponse resp = getMembers(backOffer, url);
       if (resp == null) {
         continue;
       }
@@ -595,8 +596,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
 
       // If leader is not change but becomes available, we can cancel follower forward.
-      if (checkHealth(defaultBackOffer(), leaderUrlStr, hostMapping)
-          && trySwitchLeader(leaderUrlStr)) {
+      if (checkHealth(backOffer, leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
         if (!urls.equals(this.pdAddrs)) {
           tryUpdateMembers(urls);
         }
