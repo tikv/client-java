@@ -20,6 +20,7 @@ package org.tikv.common;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import org.junit.After;
 import org.junit.Before;
 import org.tikv.common.TiConfiguration.ApiVersion;
@@ -49,6 +50,16 @@ public abstract class PDMockServerTest {
     session.close();
 
     session = TiSession.create(conf);
+  }
+
+  void updateConf(Function<TiConfiguration, TiConfiguration> update) throws Exception {
+    if (session == null) {
+      throw new IllegalStateException("Cluster is not initialized");
+    }
+
+    session.close();
+
+    session = TiSession.create(update.apply(session.getConf()));
   }
 
   void setup(String addr) throws IOException {

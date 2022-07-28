@@ -40,7 +40,6 @@ import org.tikv.common.streaming.StreamingResponse;
 import org.tikv.common.util.BackOffFunction.BackOffFuncType;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
-import org.tikv.common.util.ConcreteBackOffer;
 
 public abstract class AbstractGRPCClient<
         BlockingStubT extends AbstractStub<BlockingStubT>,
@@ -198,8 +197,7 @@ public abstract class AbstractGRPCClient<
     }
   }
 
-  protected boolean checkHealth(String addressStr, HostMapping hostMapping) {
-    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff((int) (timeout * 2));
+  protected boolean checkHealth(BackOffer backOffer, String addressStr, HostMapping hostMapping) {
     try {
       return doCheckHealth(backOffer, addressStr, hostMapping);
     } catch (Exception e) {

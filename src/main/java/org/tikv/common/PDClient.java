@@ -440,6 +440,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   private GetMembersResponse doGetMembers(BackOffer backOffer, URI uri) {
     while (true) {
+      backOffer.checkTimeout();
+
       try {
         ManagedChannel probChan = channelFactory.getChannel(uriToAddr(uri), hostMapping);
         PDGrpc.PDBlockingStub stub =
@@ -459,8 +461,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     }
   }
 
-  private GetMembersResponse getMembers(URI uri) {
-    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
+  private GetMembersResponse getMembers(BackOffer backOffer, URI uri) {
     try {
       return doGetMembers(backOffer, uri);
     } catch (Exception e) {
@@ -497,11 +498,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return true;
   }
 
-  synchronized boolean createFollowerClientWrapper(String followerUrlStr, String leaderUrls) {
+  synchronized boolean createFollowerClientWrapper(
+      BackOffer backOffer, String followerUrlStr, String leaderUrls) {
     // TODO: Why not strip protocol info on server side since grpc does not need it
 
     try {
-      if (!checkHealth(followerUrlStr, hostMapping)) {
+      if (!checkHealth(backOffer, followerUrlStr, hostMapping)) {
         return false;
       }
 
@@ -516,13 +518,13 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return true;
   }
 
-  public synchronized void updateLeaderOrForwardFollower() {
+  public synchronized void updateLeaderOrForwardFollower(BackOffer backOffer) {
     if (System.currentTimeMillis() - lastUpdateLeaderTime < MIN_TRY_UPDATE_DURATION) {
       return;
     }
     for (URI url : this.pdAddrs) {
       // since resp is null, we need update leader's address by walking through all pd server.
-      GetMembersResponse resp = getMembers(url);
+      GetMembersResponse resp = getMembers(backOffer, url);
       if (resp == null) {
         continue;
       }
@@ -534,7 +536,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
 
       // if leader is switched, just return.
-      if (checkHealth(leaderUrlStr, hostMapping) && createLeaderClientWrapper(leaderUrlStr)) {
+      if (checkHealth(backOffer, leaderUrlStr, hostMapping)
+          && createLeaderClientWrapper(leaderUrlStr)) {
         lastUpdateLeaderTime = System.currentTimeMillis();
         return;
       }
@@ -561,7 +564,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
           hasReachNextMember = true;
           continue;
         }
-        if (hasReachNextMember && createFollowerClientWrapper(followerUrlStr, leaderUrlStr)) {
+        if (hasReachNextMember
+            && createFollowerClientWrapper(backOffer, followerUrlStr, leaderUrlStr)) {
           logger.warn(
               String.format("forward request to pd [%s] by pd [%s]", leaderUrlStr, followerUrlStr));
           return;
@@ -577,8 +581,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   public void tryUpdateLeader() {
     for (URI url : this.pdAddrs) {
+      BackOffer backOffer = defaultBackOffer();
       // since resp is null, we need update leader's address by walking through all pd server.
-      GetMembersResponse resp = getMembers(url);
+      GetMembersResponse resp = getMembers(backOffer, url);
       if (resp == null) {
         continue;
       }
@@ -591,7 +596,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
 
       // If leader is not change but becomes available, we can cancel follower forward.
-      if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
+      if (checkHealth(backOffer, leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
         if (!urls.equals(this.pdAddrs)) {
           tryUpdateMembers(urls);
         }
@@ -705,7 +710,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     this.timeout = conf.getPdFirstGetMemberTimeout();
     for (URI u : pdAddrs) {
       logger.info("get members with pd " + u + ": start");
-      resp = getMembers(u);
+      resp = getMembers(defaultBackOffer(), u);
       logger.info("get members with pd " + u + ": end");
       if (resp != null) {
         break;
@@ -824,5 +829,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   public RequestKeyCodec getCodec() {
     return codec;
+  }
+
+  private static BackOffer defaultBackOffer() {
+    return ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
   }
 }
