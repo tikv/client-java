@@ -20,6 +20,7 @@ package org.tikv.raw;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.tikv.raw.RawKVClientBase.MAX_RAW_BATCH_LIMIT;
 
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
@@ -1086,18 +1087,13 @@ public class RawKVClientTest extends BaseRawKVTest {
   }
 
   @Test
-  public void testBatchPut() throws Exception {
-    TiConfiguration conf = session.getConf();
-    conf.setRawKVBatchWriteTimeoutInMS(100000);
-    conf.setTimeout(100000);
-    try(TiSession newSession = TiSession.create(conf)){
-      try(RawKVClient client=newSession.createRawClient()) {
-        HashMap<ByteString, ByteString> kvs = new HashMap<>();
-        for (int i = 0; i < 2048; i++) {
-          kvs.put(ByteString.copyFromUtf8("key@" + i), rawValue("value@" + i));
-        }
-        client.batchPut(kvs);
-      }
-    };
+  public void testBatchPutForIssue634() {
+    ByteString prefix = ByteString.copyFromUtf8("testBatchPutForIssue634");
+    client.deletePrefix(prefix);
+    HashMap<ByteString, ByteString> kvs = new HashMap<>();
+    for (int i = 0; i < MAX_RAW_BATCH_LIMIT * 4; i++) {
+      kvs.put(prefix.concat(ByteString.copyFromUtf8("key@" + i)), rawValue("value@" + i));
+    }
+    client.batchPut(kvs);
   }
 }
