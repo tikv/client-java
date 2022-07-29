@@ -62,7 +62,7 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
               BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
           SlowLogSpan tryUpdateLeaderSpan = backOffer.getSlowLog().start("try_update_leader");
           try {
-            client.tryUpdateLeaderOrForwardFollower(backOffer);
+            client.tryUpdateLeaderOrForwardFollower();
           } finally {
             tryUpdateLeaderSpan.end();
           }
@@ -86,9 +86,9 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
       return false;
     }
     backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoPDRPC, e);
-    SlowLogSpan updateLeaderSpan = backOffer.getSlowLog().start("update_leader");
+    SlowLogSpan updateLeaderSpan = backOffer.getSlowLog().start("try_update_leader");
     try {
-      client.tryUpdateLeaderOrForwardFollower(backOffer);
+      client.tryUpdateLeaderOrForwardFollower();
     } finally {
       updateLeaderSpan.end();
     }

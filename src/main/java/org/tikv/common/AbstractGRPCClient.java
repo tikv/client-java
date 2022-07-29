@@ -33,7 +33,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.operation.ErrorHandler;
 import org.tikv.common.policy.RetryMaxMs.Builder;
 import org.tikv.common.policy.RetryPolicy;
@@ -201,13 +200,6 @@ public abstract class AbstractGRPCClient<
   }
 
   protected boolean checkHealth(BackOffer backOffer, String addressStr, HostMapping hostMapping) {
-    SlowLogSpan checkHealthSpan = backOffer.getSlowLog().start("check_health");
-    try {
-      return doCheckHealth(backOffer, addressStr, hostMapping);
-    } catch (Exception e) {
-      return false;
-    } finally {
-      checkHealthSpan.end();
-    }
+    return doCheckHealth(backOffer, addressStr, hostMapping);
   }
 }

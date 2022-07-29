@@ -50,10 +50,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -67,7 +68,6 @@ import org.tikv.common.apiversion.RequestKeyCodec;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
-import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.NoopHandler;
 import org.tikv.common.operation.PDErrorHandler;
@@ -124,8 +124,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
   private HostMapping hostMapping;
   private long lastUpdateLeaderTime;
-
-  private final ReentrantLock leaderLock = new ReentrantLock();
+  private final ExecutorService updateLeaderService = Executors.newSingleThreadExecutor();
+  private final AtomicBoolean updateLeaderNotify = new AtomicBoolean();
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
       HistogramUtils.buildDuration()
@@ -430,6 +430,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     if (channelFactory != null) {
       channelFactory.close();
     }
+
+    updateLeaderService.shutdownNow();
   }
 
   @VisibleForTesting
@@ -466,14 +468,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   private GetMembersResponse getMembers(BackOffer backOffer, URI uri) {
-    SlowLogSpan getMembersSpan = backOffer.getSlowLog().start("get_members");
-    try {
-      return doGetMembers(backOffer, uri);
-    } catch (Exception e) {
-      return null;
-    } finally {
-      getMembersSpan.end();
-    }
+    return doGetMembers(backOffer, uri);
   }
 
   // return whether the leader has changed to target address `leaderUrlStr`.
@@ -525,15 +520,20 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return true;
   }
 
-  public void tryUpdateLeaderOrForwardFollower(BackOffer backOffer) {
-    if (leaderLock.tryLock()) {
-      SlowLogSpan updateLeaderSpan = backOffer.getSlowLog().start("try_update_leader");
-      try {
-        updateLeaderOrForwardFollower(backOffer);
-      } finally {
-        leaderLock.unlock();
-        updateLeaderSpan.end();
-      }
+  public void tryUpdateLeaderOrForwardFollower() {
+    logger.error("here!!!!!");
+    if (updateLeaderNotify.compareAndSet(false, true)) {
+      logger.error("there!!!");
+      BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
+      updateLeaderService.submit(
+          () -> {
+            logger.error("try_update!!!");
+            try {
+              updateLeaderOrForwardFollower(backOffer);
+            } finally {
+              updateLeaderNotify.set(false);
+            }
+          });
     }
   }
 
@@ -687,7 +687,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   @Override
-  protected PDBlockingStub getBlockingStub() {
+  protected synchronized PDBlockingStub getBlockingStub() {
     if (pdClientWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
