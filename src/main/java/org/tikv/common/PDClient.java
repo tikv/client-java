@@ -53,6 +53,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -66,6 +67,7 @@ import org.tikv.common.apiversion.RequestKeyCodec;
 import org.tikv.common.codec.KeyUtils;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.operation.NoopHandler;
 import org.tikv.common.operation.PDErrorHandler;
@@ -122,6 +124,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
   private HostMapping hostMapping;
   private long lastUpdateLeaderTime;
+
+  private final ReentrantLock leaderLock = new ReentrantLock();
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
       HistogramUtils.buildDuration()
@@ -462,10 +466,13 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   private GetMembersResponse getMembers(BackOffer backOffer, URI uri) {
+    SlowLogSpan getMembersSpan = backOffer.getSlowLog().start("get_members");
     try {
       return doGetMembers(backOffer, uri);
     } catch (Exception e) {
       return null;
+    } finally {
+      getMembersSpan.end();
     }
   }
 
@@ -498,11 +505,12 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return true;
   }
 
-  synchronized boolean createFollowerClientWrapper(String followerUrlStr, String leaderUrls) {
+  synchronized boolean createFollowerClientWrapper(
+      BackOffer backOffer, String followerUrlStr, String leaderUrls) {
     // TODO: Why not strip protocol info on server side since grpc does not need it
 
     try {
-      if (!checkHealth(followerUrlStr, hostMapping)) {
+      if (!checkHealth(backOffer, followerUrlStr, hostMapping)) {
         return false;
       }
 
@@ -517,7 +525,19 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return true;
   }
 
-  public synchronized void updateLeaderOrForwardFollower(BackOffer backOffer) {
+  public void tryUpdateLeaderOrForwardFollower(BackOffer backOffer) {
+    if (leaderLock.tryLock()) {
+      SlowLogSpan updateLeaderSpan = backOffer.getSlowLog().start("try_update_leader");
+      try {
+        updateLeaderOrForwardFollower(backOffer);
+      } finally {
+        leaderLock.unlock();
+        updateLeaderSpan.end();
+      }
+    }
+  }
+
+  private synchronized void updateLeaderOrForwardFollower(BackOffer backOffer) {
     if (System.currentTimeMillis() - lastUpdateLeaderTime < MIN_TRY_UPDATE_DURATION) {
       return;
     }
@@ -535,7 +555,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
 
       // if leader is switched, just return.
-      if (checkHealth(leaderUrlStr, hostMapping) && createLeaderClientWrapper(leaderUrlStr)) {
+      if (checkHealth(backOffer, leaderUrlStr, hostMapping)
+          && createLeaderClientWrapper(leaderUrlStr)) {
         lastUpdateLeaderTime = System.currentTimeMillis();
         return;
       }
@@ -562,7 +583,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
           hasReachNextMember = true;
           continue;
         }
-        if (hasReachNextMember && createFollowerClientWrapper(followerUrlStr, leaderUrlStr)) {
+        if (hasReachNextMember
+            && createFollowerClientWrapper(backOffer, followerUrlStr, leaderUrlStr)) {
           logger.warn(
               String.format("forward request to pd [%s] by pd [%s]", leaderUrlStr, followerUrlStr));
           return;
@@ -578,8 +600,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   public void tryUpdateLeader() {
     for (URI url : this.pdAddrs) {
+      BackOffer backOffer = defaultBackOffer();
       // since resp is null, we need update leader's address by walking through all pd server.
-      GetMembersResponse resp = getMembers(defaultBackOffer(), url);
+      GetMembersResponse resp = getMembers(backOffer, url);
       if (resp == null) {
         continue;
       }
@@ -592,7 +615,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
       leaderUrlStr = uriToAddr(addrToUri(leaderUrlStr));
 
       // If leader is not change but becomes available, we can cancel follower forward.
-      if (checkHealth(leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
+      if (checkHealth(backOffer, leaderUrlStr, hostMapping) && trySwitchLeader(leaderUrlStr)) {
         if (!urls.equals(this.pdAddrs)) {
           tryUpdateMembers(urls);
         }

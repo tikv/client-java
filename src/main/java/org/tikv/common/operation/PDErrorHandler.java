@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.PDClient;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.pd.PDError;
 import org.tikv.common.util.BackOffFunction;
 import org.tikv.common.util.BackOffer;
@@ -59,7 +60,12 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
         case PD_ERROR:
           backOffer.doBackOff(
               BackOffFunction.BackOffFuncType.BoPDRPC, new GrpcException(error.toString()));
-          client.updateLeaderOrForwardFollower(backOffer);
+          SlowLogSpan tryUpdateLeaderSpan = backOffer.getSlowLog().start("try_update_leader");
+          try {
+            client.tryUpdateLeaderOrForwardFollower(backOffer);
+          } finally {
+            tryUpdateLeaderSpan.end();
+          }
           return true;
         case REGION_PEER_NOT_ELECTED:
           logger.debug(error.getMessage());
@@ -80,7 +86,12 @@ public class PDErrorHandler<RespT> implements ErrorHandler<RespT> {
       return false;
     }
     backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoPDRPC, e);
-    client.updateLeaderOrForwardFollower(backOffer);
+    SlowLogSpan updateLeaderSpan = backOffer.getSlowLog().start("update_leader");
+    try {
+      client.tryUpdateLeaderOrForwardFollower(backOffer);
+    } finally {
+      updateLeaderSpan.end();
+    }
     return true;
   }
 }

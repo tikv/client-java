@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.log.SlowLogSpan;
 import org.tikv.common.operation.ErrorHandler;
 import org.tikv.common.policy.RetryMaxMs.Builder;
 import org.tikv.common.policy.RetryPolicy;
@@ -40,7 +41,6 @@ import org.tikv.common.streaming.StreamingResponse;
 import org.tikv.common.util.BackOffFunction.BackOffFuncType;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ChannelFactory;
-import org.tikv.common.util.ConcreteBackOffer;
 
 public abstract class AbstractGRPCClient<
         BlockingStubT extends AbstractStub<BlockingStubT>,
@@ -183,6 +183,8 @@ public abstract class AbstractGRPCClient<
 
   private boolean doCheckHealth(BackOffer backOffer, String addressStr, HostMapping hostMapping) {
     while (true) {
+      backOffer.checkTimeout();
+
       try {
         ManagedChannel channel = channelFactory.getChannel(addressStr, hostMapping);
         HealthGrpc.HealthBlockingStub stub =
@@ -198,12 +200,14 @@ public abstract class AbstractGRPCClient<
     }
   }
 
-  protected boolean checkHealth(String addressStr, HostMapping hostMapping) {
-    BackOffer backOffer = ConcreteBackOffer.newCustomBackOff((int) (timeout * 2));
+  protected boolean checkHealth(BackOffer backOffer, String addressStr, HostMapping hostMapping) {
+    SlowLogSpan checkHealthSpan = backOffer.getSlowLog().start("check_health");
     try {
       return doCheckHealth(backOffer, addressStr, hostMapping);
     } catch (Exception e) {
       return false;
+    } finally {
+      checkHealthSpan.end();
     }
   }
 }
