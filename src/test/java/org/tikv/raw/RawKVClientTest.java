@@ -361,7 +361,7 @@ public class RawKVClientTest extends BaseRawKVTest {
     }
 
     int i = 0;
-    Iterator<KvPair> iter = client.scan0(prefix, ByteString.EMPTY, cnt);
+    Iterator<KvPair> iter = client.scanPrefix0(prefix, cnt, false);
     while (iter.hasNext()) {
       i++;
       KvPair pair = iter.next();
@@ -370,7 +370,7 @@ public class RawKVClientTest extends BaseRawKVTest {
     assertEquals(cnt, i);
 
     i = 0;
-    iter = client.scan0(prefix, ByteString.EMPTY, true);
+    iter = client.scanPrefix0(prefix, true);
     while (iter.hasNext()) {
       i++;
       KvPair pair = iter.next();
@@ -398,7 +398,7 @@ public class RawKVClientTest extends BaseRawKVTest {
         });
     client.ingest(kvs);
 
-    assertEquals(client.scan(prefix, ByteString.EMPTY).size(), cnt);
+    assertEquals(client.scanPrefix(prefix).size(), cnt);
   }
 
   @Test
