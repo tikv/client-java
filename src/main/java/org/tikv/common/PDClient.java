@@ -52,6 +52,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -521,19 +522,21 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   public void tryUpdateLeaderOrForwardFollower() {
-    logger.error("here!!!!!");
     if (updateLeaderNotify.compareAndSet(false, true)) {
-      logger.error("there!!!");
       BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
-      updateLeaderService.submit(
-          () -> {
-            logger.error("try_update!!!");
-            try {
-              updateLeaderOrForwardFollower(backOffer);
-            } finally {
-              updateLeaderNotify.set(false);
-            }
-          });
+      try {
+        updateLeaderService.submit(
+            () -> {
+              try {
+                updateLeaderOrForwardFollower(backOffer);
+              } finally {
+                updateLeaderNotify.set(false);
+              }
+            });
+      } catch (RejectedExecutionException e) {
+        logger.error("PDClient is shutdown", e);
+        updateLeaderNotify.set(false);
+      }
     }
   }
 
@@ -687,7 +690,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   @Override
-  protected synchronized PDBlockingStub getBlockingStub() {
+  protected PDBlockingStub getBlockingStub() {
     if (pdClientWrapper == null) {
       throw new GrpcException("PDClient may not be initialized");
     }
