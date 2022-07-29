@@ -749,17 +749,18 @@ public class RawKVClient implements RawKVClientBase {
     while (!taskQueue.isEmpty()) {
       List<Batch> task = taskQueue.poll();
       for (Batch batch : task) {
-        completionService.submit(
-            () -> doSendBatchPutInBatchesWithRetry(batch.getBackOffer(), batch, ttl));
+        futureList.add(
+            completionService.submit(
+                () -> doSendBatchPutInBatchesWithRetry(batch.getBackOffer(), batch, ttl)));
+      }
 
-        try {
-          getTasks(completionService, taskQueue, task, deadline - System.currentTimeMillis());
-        } catch (Exception e) {
-          for (Future<List<Batch>> future : futureList) {
-            future.cancel(true);
-          }
-          throw e;
+      try {
+        getTasks(completionService, taskQueue, task, deadline - System.currentTimeMillis());
+      } catch (Exception e) {
+        for (Future<List<Batch>> future : futureList) {
+          future.cancel(true);
         }
+        throw e;
       }
     }
   }
