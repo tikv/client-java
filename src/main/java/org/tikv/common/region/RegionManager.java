@@ -138,6 +138,8 @@ public class RegionManager {
         region =
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
       }
+    } catch (Exception e) {
+      return null;
     } finally {
       requestTimer.observeDuration();
       slowLogSpan.end();
@@ -180,7 +182,7 @@ public class RegionManager {
   public Pair<TiRegion, TiStore> getRegionStorePairByKey(
       ByteString key, TiStoreType storeType, BackOffer backOffer) {
     TiRegion region = getRegionByKey(key, backOffer);
-    if (!region.isValid()) {
+    if (region == null || !region.isValid()) {
       throw new TiClientInternalException("Region invalid: " + region);
     }
 
