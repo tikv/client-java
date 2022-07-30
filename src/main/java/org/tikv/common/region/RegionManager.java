@@ -138,8 +138,6 @@ public class RegionManager {
         region =
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
       }
-    } catch (Exception e) {
-      return null;
     } finally {
       requestTimer.observeDuration();
       slowLogSpan.end();
