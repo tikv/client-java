@@ -182,6 +182,8 @@ public abstract class AbstractGRPCClient<
 
   private boolean doCheckHealth(BackOffer backOffer, String addressStr, HostMapping hostMapping) {
     while (true) {
+      backOffer.checkTimeout();
+
       try {
         ManagedChannel channel = channelFactory.getChannel(addressStr, hostMapping);
         HealthGrpc.HealthBlockingStub stub =
@@ -198,10 +200,6 @@ public abstract class AbstractGRPCClient<
   }
 
   protected boolean checkHealth(BackOffer backOffer, String addressStr, HostMapping hostMapping) {
-    try {
-      return doCheckHealth(backOffer, addressStr, hostMapping);
-    } catch (Exception e) {
-      return false;
-    }
+    return doCheckHealth(backOffer, addressStr, hostMapping);
   }
 }
