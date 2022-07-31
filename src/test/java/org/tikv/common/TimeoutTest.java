@@ -52,9 +52,12 @@ public class TimeoutTest extends MockThreeStoresTest {
     try (RawKVClient client = createClient()) {
       pdServers.get(0).stop();
       long start = System.currentTimeMillis();
-      client.get(ByteString.copyFromUtf8("key"));
+      try {
+        client.get(ByteString.copyFromUtf8("key"));
+      } catch (Exception ignore) {
+      }
       long end = System.currentTimeMillis();
-      Assert.assertTrue(end - start < session.getConf().getRawKVReadTimeoutInMS() * 2L);
+      Assert.assertTrue(end - start < (session.getConf().getRawKVReadTimeoutInMS() * 1.5));
     }
   }
 }

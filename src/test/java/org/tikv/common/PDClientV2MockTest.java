@@ -88,18 +88,16 @@ public class PDClientV2MockTest extends PDMockServerTest {
     String start = "getRegionById";
     String end = "getRegionByIdEnd";
     leader.addGetRegionByIDListener(request -> makeGetRegionResponse(start, end));
-    try (PDClient client = createClient()) {
-      Metapb.Region r = client.getRegionByID(ConcreteBackOffer.newRawKVBackOff(), 1).first;
-      Assert.assertEquals(start, r.getStartKey().toStringUtf8());
-      Assert.assertEquals(end, r.getEndKey().toStringUtf8());
-    }
+    PDClient client = createClient();
+    Metapb.Region r = client.getRegionByID(ConcreteBackOffer.newRawKVBackOff(), 1).first;
+    Assert.assertEquals(start, r.getStartKey().toStringUtf8());
+    Assert.assertEquals(end, r.getEndKey().toStringUtf8());
 
     leader.addGetRegionByIDListener(request -> makeGetRegionResponse(start, ""));
-    try (PDClient client = createClient()) {
-      Metapb.Region r = client.getRegionByID(ConcreteBackOffer.newRawKVBackOff(), 1).first;
-      Assert.assertEquals(start, r.getStartKey().toStringUtf8());
-      Assert.assertEquals("", r.getEndKey().toStringUtf8());
-    }
+
+    r = client.getRegionByID(ConcreteBackOffer.newRawKVBackOff(), 1).first;
+    Assert.assertEquals(start, r.getStartKey().toStringUtf8());
+    Assert.assertEquals("", r.getEndKey().toStringUtf8());
   }
 
   @Test
@@ -113,15 +111,14 @@ public class PDClientV2MockTest extends PDMockServerTest {
                 .addRegions(Pdpb.Region.newBuilder().setRegion(makeRegion(start, end)).build())
                 .build());
 
-    try (PDClient client = createClient()) {
-      List<Region> regions =
-          client.scanRegions(
-              ConcreteBackOffer.newRawKVBackOff(), ByteString.EMPTY, ByteString.EMPTY, 1);
+    PDClient client = createClient();
+    List<Region> regions =
+        client.scanRegions(
+            ConcreteBackOffer.newRawKVBackOff(), ByteString.EMPTY, ByteString.EMPTY, 1);
 
-      for (Region r : regions) {
-        Assert.assertEquals(start, r.getRegion().getStartKey().toStringUtf8());
-        Assert.assertEquals(end, r.getRegion().getEndKey().toStringUtf8());
-      }
+    for (Region r : regions) {
+      Assert.assertEquals(start, r.getRegion().getStartKey().toStringUtf8());
+      Assert.assertEquals(end, r.getRegion().getEndKey().toStringUtf8());
     }
   }
 }
