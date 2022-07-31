@@ -50,9 +50,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -122,6 +125,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private ConcurrentMap<Long, Double> tiflashReplicaMap;
   private HostMapping hostMapping;
   private long lastUpdateLeaderTime;
+  private final ExecutorService updateLeaderService = Executors.newSingleThreadExecutor();
+  private final AtomicBoolean updateLeaderNotify = new AtomicBoolean();
 
   public static final Histogram PD_GET_REGION_BY_KEY_REQUEST_LATENCY =
       HistogramUtils.buildDuration()
@@ -426,6 +431,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     if (channelFactory != null) {
       channelFactory.close();
     }
+
+    updateLeaderService.shutdownNow();
   }
 
   @VisibleForTesting
@@ -462,11 +469,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   private GetMembersResponse getMembers(BackOffer backOffer, URI uri) {
-    try {
-      return doGetMembers(backOffer, uri);
-    } catch (Exception e) {
-      return null;
-    }
+    return doGetMembers(backOffer, uri);
   }
 
   // return whether the leader has changed to target address `leaderUrlStr`.
@@ -518,7 +521,26 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return true;
   }
 
-  public synchronized void updateLeaderOrForwardFollower(BackOffer backOffer) {
+  public void tryUpdateLeaderOrForwardFollower() {
+    if (updateLeaderNotify.compareAndSet(false, true)) {
+      try {
+        BackOffer backOffer = defaultBackOffer();
+        updateLeaderService.submit(
+            () -> {
+              try {
+                updateLeaderOrForwardFollower(backOffer);
+              } finally {
+                updateLeaderNotify.set(false);
+              }
+            });
+      } catch (RejectedExecutionException e) {
+        logger.error("PDClient is shutdown", e);
+        updateLeaderNotify.set(false);
+      }
+    }
+  }
+
+  private synchronized void updateLeaderOrForwardFollower(BackOffer backOffer) {
     if (System.currentTimeMillis() - lastUpdateLeaderTime < MIN_TRY_UPDATE_DURATION) {
       return;
     }

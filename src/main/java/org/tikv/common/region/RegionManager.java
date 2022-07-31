@@ -182,7 +182,7 @@ public class RegionManager {
   public Pair<TiRegion, TiStore> getRegionStorePairByKey(
       ByteString key, TiStoreType storeType, BackOffer backOffer) {
     TiRegion region = getRegionByKey(key, backOffer);
-    if (!region.isValid()) {
+    if (region == null || !region.isValid()) {
       throw new TiClientInternalException("Region invalid: " + region);
     }
 
