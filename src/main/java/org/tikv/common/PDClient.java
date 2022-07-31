@@ -523,8 +523,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   public void tryUpdateLeaderOrForwardFollower() {
     if (updateLeaderNotify.compareAndSet(false, true)) {
-      BackOffer backOffer = ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
       try {
+        BackOffer backOffer = defaultBackOffer();
         updateLeaderService.submit(
             () -> {
               try {
