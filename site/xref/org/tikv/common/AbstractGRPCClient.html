@@ -190,29 +190,27 @@
 <a class="jxr_linenumber" name="L182" href="#L182">182</a> 
 <a class="jxr_linenumber" name="L183" href="#L183">183</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">boolean</strong> doCheckHealth(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, String addressStr, <a name="HostMapping" href="../../../org/tikv/common/HostMapping.html#HostMapping">HostMapping</a> hostMapping) {
 <a class="jxr_linenumber" name="L184" href="#L184">184</a>     <strong class="jxr_keyword">while</strong> (<strong class="jxr_keyword">true</strong>) {
-<a class="jxr_linenumber" name="L185" href="#L185">185</a>       <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L186" href="#L186">186</a>         ManagedChannel channel = channelFactory.getChannel(addressStr, hostMapping);
-<a class="jxr_linenumber" name="L187" href="#L187">187</a>         HealthGrpc.HealthBlockingStub stub =
-<a class="jxr_linenumber" name="L188" href="#L188">188</a>             HealthGrpc.newBlockingStub(channel)
-<a class="jxr_linenumber" name="L189" href="#L189">189</a>                 .withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
-<a class="jxr_linenumber" name="L190" href="#L190">190</a>         HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
-<a class="jxr_linenumber" name="L191" href="#L191">191</a>         HealthCheckResponse resp = stub.check(req);
-<a class="jxr_linenumber" name="L192" href="#L192">192</a>         <strong class="jxr_keyword">return</strong> resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING;
-<a class="jxr_linenumber" name="L193" href="#L193">193</a>       } <strong class="jxr_keyword">catch</strong> (Exception e) {
-<a class="jxr_linenumber" name="L194" href="#L194">194</a>         logger.warn(<span class="jxr_string">"check health failed."</span>, e);
-<a class="jxr_linenumber" name="L195" href="#L195">195</a>         backOffer.doBackOff(BackOffFuncType.BoCheckHealth, e);
-<a class="jxr_linenumber" name="L196" href="#L196">196</a>       }
-<a class="jxr_linenumber" name="L197" href="#L197">197</a>     }
-<a class="jxr_linenumber" name="L198" href="#L198">198</a>   }
-<a class="jxr_linenumber" name="L199" href="#L199">199</a> 
-<a class="jxr_linenumber" name="L200" href="#L200">200</a>   <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> checkHealth(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, String addressStr, <a name="HostMapping" href="../../../org/tikv/common/HostMapping.html#HostMapping">HostMapping</a> hostMapping) {
-<a class="jxr_linenumber" name="L201" href="#L201">201</a>     <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L202" href="#L202">202</a>       <strong class="jxr_keyword">return</strong> doCheckHealth(backOffer, addressStr, hostMapping);
-<a class="jxr_linenumber" name="L203" href="#L203">203</a>     } <strong class="jxr_keyword">catch</strong> (Exception e) {
-<a class="jxr_linenumber" name="L204" href="#L204">204</a>       <strong class="jxr_keyword">return</strong> false;
-<a class="jxr_linenumber" name="L205" href="#L205">205</a>     }
-<a class="jxr_linenumber" name="L206" href="#L206">206</a>   }
-<a class="jxr_linenumber" name="L207" href="#L207">207</a> }
+<a class="jxr_linenumber" name="L185" href="#L185">185</a>       backOffer.checkTimeout();
+<a class="jxr_linenumber" name="L186" href="#L186">186</a> 
+<a class="jxr_linenumber" name="L187" href="#L187">187</a>       <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L188" href="#L188">188</a>         ManagedChannel channel = channelFactory.getChannel(addressStr, hostMapping);
+<a class="jxr_linenumber" name="L189" href="#L189">189</a>         HealthGrpc.HealthBlockingStub stub =
+<a class="jxr_linenumber" name="L190" href="#L190">190</a>             HealthGrpc.newBlockingStub(channel)
+<a class="jxr_linenumber" name="L191" href="#L191">191</a>                 .withDeadlineAfter(getTimeout(), TimeUnit.MILLISECONDS);
+<a class="jxr_linenumber" name="L192" href="#L192">192</a>         HealthCheckRequest req = HealthCheckRequest.newBuilder().build();
+<a class="jxr_linenumber" name="L193" href="#L193">193</a>         HealthCheckResponse resp = stub.check(req);
+<a class="jxr_linenumber" name="L194" href="#L194">194</a>         <strong class="jxr_keyword">return</strong> resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING;
+<a class="jxr_linenumber" name="L195" href="#L195">195</a>       } <strong class="jxr_keyword">catch</strong> (Exception e) {
+<a class="jxr_linenumber" name="L196" href="#L196">196</a>         logger.warn(<span class="jxr_string">"check health failed."</span>, e);
+<a class="jxr_linenumber" name="L197" href="#L197">197</a>         backOffer.doBackOff(BackOffFuncType.BoCheckHealth, e);
+<a class="jxr_linenumber" name="L198" href="#L198">198</a>       }
+<a class="jxr_linenumber" name="L199" href="#L199">199</a>     }
+<a class="jxr_linenumber" name="L200" href="#L200">200</a>   }
+<a class="jxr_linenumber" name="L201" href="#L201">201</a> 
+<a class="jxr_linenumber" name="L202" href="#L202">202</a>   <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> checkHealth(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, String addressStr, <a name="HostMapping" href="../../../org/tikv/common/HostMapping.html#HostMapping">HostMapping</a> hostMapping) {
+<a class="jxr_linenumber" name="L203" href="#L203">203</a>     <strong class="jxr_keyword">return</strong> doCheckHealth(backOffer, addressStr, hostMapping);
+<a class="jxr_linenumber" name="L204" href="#L204">204</a>   }
+<a class="jxr_linenumber" name="L205" href="#L205">205</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>

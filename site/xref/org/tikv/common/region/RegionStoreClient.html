@@ -1416,54 +1416,50 @@
 <a class="jxr_linenumber" name="L1408" href="#L1408">1408</a>           <strong class="jxr_keyword">this</strong>);
 <a class="jxr_linenumber" name="L1409" href="#L1409">1409</a>     }
 <a class="jxr_linenumber" name="L1410" href="#L1410">1410</a> 
-<a class="jxr_linenumber" name="L1411" href="#L1411">1411</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">synchronized</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(<a name="TiRegion" href="../../../../org/tikv/common/region/TiRegion.html#TiRegion">TiRegion</a> region, <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> store)
-<a class="jxr_linenumber" name="L1412" href="#L1412">1412</a>         <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
-<a class="jxr_linenumber" name="L1413" href="#L1413">1413</a>       <strong class="jxr_keyword">return</strong> build(region, store, TiStoreType.TiKV);
-<a class="jxr_linenumber" name="L1414" href="#L1414">1414</a>     }
-<a class="jxr_linenumber" name="L1415" href="#L1415">1415</a> 
-<a class="jxr_linenumber" name="L1416" href="#L1416">1416</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">synchronized</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(ByteString key) <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
-<a class="jxr_linenumber" name="L1417" href="#L1417">1417</a>       <strong class="jxr_keyword">return</strong> build(key, TiStoreType.TiKV);
-<a class="jxr_linenumber" name="L1418" href="#L1418">1418</a>     }
-<a class="jxr_linenumber" name="L1419" href="#L1419">1419</a> 
-<a class="jxr_linenumber" name="L1420" href="#L1420">1420</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">synchronized</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(ByteString key, <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer)
-<a class="jxr_linenumber" name="L1421" href="#L1421">1421</a>         <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
-<a class="jxr_linenumber" name="L1422" href="#L1422">1422</a>       <strong class="jxr_keyword">return</strong> build(key, TiStoreType.TiKV, backOffer);
-<a class="jxr_linenumber" name="L1423" href="#L1423">1423</a>     }
-<a class="jxr_linenumber" name="L1424" href="#L1424">1424</a> 
-<a class="jxr_linenumber" name="L1425" href="#L1425">1425</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">synchronized</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(ByteString key, <a name="TiStoreType" href="../../../../org/tikv/common/region/TiStoreType.html#TiStoreType">TiStoreType</a> storeType)
-<a class="jxr_linenumber" name="L1426" href="#L1426">1426</a>         <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
-<a class="jxr_linenumber" name="L1427" href="#L1427">1427</a>       <strong class="jxr_keyword">return</strong> build(key, storeType, defaultBackOff());
-<a class="jxr_linenumber" name="L1428" href="#L1428">1428</a>     }
-<a class="jxr_linenumber" name="L1429" href="#L1429">1429</a> 
-<a class="jxr_linenumber" name="L1430" href="#L1430">1430</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">synchronized</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(
-<a class="jxr_linenumber" name="L1431" href="#L1431">1431</a>         ByteString key, <a name="TiStoreType" href="../../../../org/tikv/common/region/TiStoreType.html#TiStoreType">TiStoreType</a> storeType, <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
-<a class="jxr_linenumber" name="L1432" href="#L1432">1432</a>       Pair&lt;TiRegion, TiStore&gt; pair =
-<a class="jxr_linenumber" name="L1433" href="#L1433">1433</a>           regionManager.getRegionStorePairByKey(key, storeType, backOffer);
-<a class="jxr_linenumber" name="L1434" href="#L1434">1434</a>       <strong class="jxr_keyword">return</strong> build(pair.first, pair.second, storeType);
-<a class="jxr_linenumber" name="L1435" href="#L1435">1435</a>     }
-<a class="jxr_linenumber" name="L1436" href="#L1436">1436</a> 
-<a class="jxr_linenumber" name="L1437" href="#L1437">1437</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">synchronized</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(<a name="TiRegion" href="../../../../org/tikv/common/region/TiRegion.html#TiRegion">TiRegion</a> region) <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
-<a class="jxr_linenumber" name="L1438" href="#L1438">1438</a>       <strong class="jxr_keyword">return</strong> build(region, defaultBackOff());
-<a class="jxr_linenumber" name="L1439" href="#L1439">1439</a>     }
-<a class="jxr_linenumber" name="L1440" href="#L1440">1440</a> 
-<a class="jxr_linenumber" name="L1441" href="#L1441">1441</a>     <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">synchronized</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(<a name="TiRegion" href="../../../../org/tikv/common/region/TiRegion.html#TiRegion">TiRegion</a> region, <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer)
-<a class="jxr_linenumber" name="L1442" href="#L1442">1442</a>         <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
-<a class="jxr_linenumber" name="L1443" href="#L1443">1443</a>       <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> store = regionManager.getStoreById(region.getLeader().getStoreId(), backOffer);
-<a class="jxr_linenumber" name="L1444" href="#L1444">1444</a>       <strong class="jxr_keyword">return</strong> build(region, store, TiStoreType.TiKV);
+<a class="jxr_linenumber" name="L1411" href="#L1411">1411</a>     <strong class="jxr_keyword">public</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(<a name="TiRegion" href="../../../../org/tikv/common/region/TiRegion.html#TiRegion">TiRegion</a> region, <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> store) <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
+<a class="jxr_linenumber" name="L1412" href="#L1412">1412</a>       <strong class="jxr_keyword">return</strong> build(region, store, TiStoreType.TiKV);
+<a class="jxr_linenumber" name="L1413" href="#L1413">1413</a>     }
+<a class="jxr_linenumber" name="L1414" href="#L1414">1414</a> 
+<a class="jxr_linenumber" name="L1415" href="#L1415">1415</a>     <strong class="jxr_keyword">public</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(ByteString key) <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
+<a class="jxr_linenumber" name="L1416" href="#L1416">1416</a>       <strong class="jxr_keyword">return</strong> build(key, TiStoreType.TiKV);
+<a class="jxr_linenumber" name="L1417" href="#L1417">1417</a>     }
+<a class="jxr_linenumber" name="L1418" href="#L1418">1418</a> 
+<a class="jxr_linenumber" name="L1419" href="#L1419">1419</a>     <strong class="jxr_keyword">public</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(ByteString key, <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
+<a class="jxr_linenumber" name="L1420" href="#L1420">1420</a>       <strong class="jxr_keyword">return</strong> build(key, TiStoreType.TiKV, backOffer);
+<a class="jxr_linenumber" name="L1421" href="#L1421">1421</a>     }
+<a class="jxr_linenumber" name="L1422" href="#L1422">1422</a> 
+<a class="jxr_linenumber" name="L1423" href="#L1423">1423</a>     <strong class="jxr_keyword">public</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(ByteString key, <a name="TiStoreType" href="../../../../org/tikv/common/region/TiStoreType.html#TiStoreType">TiStoreType</a> storeType) <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
+<a class="jxr_linenumber" name="L1424" href="#L1424">1424</a>       <strong class="jxr_keyword">return</strong> build(key, storeType, defaultBackOff());
+<a class="jxr_linenumber" name="L1425" href="#L1425">1425</a>     }
+<a class="jxr_linenumber" name="L1426" href="#L1426">1426</a> 
+<a class="jxr_linenumber" name="L1427" href="#L1427">1427</a>     <strong class="jxr_keyword">public</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(ByteString key, <a name="TiStoreType" href="../../../../org/tikv/common/region/TiStoreType.html#TiStoreType">TiStoreType</a> storeType, <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer)
+<a class="jxr_linenumber" name="L1428" href="#L1428">1428</a>         <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
+<a class="jxr_linenumber" name="L1429" href="#L1429">1429</a>       Pair&lt;TiRegion, TiStore&gt; pair =
+<a class="jxr_linenumber" name="L1430" href="#L1430">1430</a>           regionManager.getRegionStorePairByKey(key, storeType, backOffer);
+<a class="jxr_linenumber" name="L1431" href="#L1431">1431</a>       <strong class="jxr_keyword">return</strong> build(pair.first, pair.second, storeType);
+<a class="jxr_linenumber" name="L1432" href="#L1432">1432</a>     }
+<a class="jxr_linenumber" name="L1433" href="#L1433">1433</a> 
+<a class="jxr_linenumber" name="L1434" href="#L1434">1434</a>     <strong class="jxr_keyword">public</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(<a name="TiRegion" href="../../../../org/tikv/common/region/TiRegion.html#TiRegion">TiRegion</a> region) <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
+<a class="jxr_linenumber" name="L1435" href="#L1435">1435</a>       <strong class="jxr_keyword">return</strong> build(region, defaultBackOff());
+<a class="jxr_linenumber" name="L1436" href="#L1436">1436</a>     }
+<a class="jxr_linenumber" name="L1437" href="#L1437">1437</a> 
+<a class="jxr_linenumber" name="L1438" href="#L1438">1438</a>     <strong class="jxr_keyword">public</strong> <a name="RegionStoreClient" href="../../../../org/tikv/common/region/RegionStoreClient.html#RegionStoreClient">RegionStoreClient</a> build(<a name="TiRegion" href="../../../../org/tikv/common/region/TiRegion.html#TiRegion">TiRegion</a> region, <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) <strong class="jxr_keyword">throws</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a> {
+<a class="jxr_linenumber" name="L1439" href="#L1439">1439</a>       <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> store = regionManager.getStoreById(region.getLeader().getStoreId(), backOffer);
+<a class="jxr_linenumber" name="L1440" href="#L1440">1440</a>       <strong class="jxr_keyword">return</strong> build(region, store, TiStoreType.TiKV);
+<a class="jxr_linenumber" name="L1441" href="#L1441">1441</a>     }
+<a class="jxr_linenumber" name="L1442" href="#L1442">1442</a> 
+<a class="jxr_linenumber" name="L1443" href="#L1443">1443</a>     <strong class="jxr_keyword">public</strong> <a name="RegionManager" href="../../../../org/tikv/common/region/RegionManager.html#RegionManager">RegionManager</a> getRegionManager() {
+<a class="jxr_linenumber" name="L1444" href="#L1444">1444</a>       <strong class="jxr_keyword">return</strong> regionManager;
 <a class="jxr_linenumber" name="L1445" href="#L1445">1445</a>     }
 <a class="jxr_linenumber" name="L1446" href="#L1446">1446</a> 
-<a class="jxr_linenumber" name="L1447" href="#L1447">1447</a>     <strong class="jxr_keyword">public</strong> <a name="RegionManager" href="../../../../org/tikv/common/region/RegionManager.html#RegionManager">RegionManager</a> getRegionManager() {
-<a class="jxr_linenumber" name="L1448" href="#L1448">1448</a>       <strong class="jxr_keyword">return</strong> regionManager;
-<a class="jxr_linenumber" name="L1449" href="#L1449">1449</a>     }
-<a class="jxr_linenumber" name="L1450" href="#L1450">1450</a> 
-<a class="jxr_linenumber" name="L1451" href="#L1451">1451</a>     <strong class="jxr_keyword">private</strong> <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> defaultBackOff() {
-<a class="jxr_linenumber" name="L1452" href="#L1452">1452</a>       <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backoffer =
-<a class="jxr_linenumber" name="L1453" href="#L1453">1453</a>           ConcreteBackOffer.newCustomBackOff(
-<a class="jxr_linenumber" name="L1454" href="#L1454">1454</a>               conf.getRawKVDefaultBackoffInMS(), pdClient.getClusterId());
-<a class="jxr_linenumber" name="L1455" href="#L1455">1455</a>       <strong class="jxr_keyword">return</strong> backoffer;
-<a class="jxr_linenumber" name="L1456" href="#L1456">1456</a>     }
-<a class="jxr_linenumber" name="L1457" href="#L1457">1457</a>   }
-<a class="jxr_linenumber" name="L1458" href="#L1458">1458</a> }
+<a class="jxr_linenumber" name="L1447" href="#L1447">1447</a>     <strong class="jxr_keyword">private</strong> <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> defaultBackOff() {
+<a class="jxr_linenumber" name="L1448" href="#L1448">1448</a>       <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backoffer =
+<a class="jxr_linenumber" name="L1449" href="#L1449">1449</a>           ConcreteBackOffer.newCustomBackOff(
+<a class="jxr_linenumber" name="L1450" href="#L1450">1450</a>               conf.getRawKVDefaultBackoffInMS(), pdClient.getClusterId());
+<a class="jxr_linenumber" name="L1451" href="#L1451">1451</a>       <strong class="jxr_keyword">return</strong> backoffer;
+<a class="jxr_linenumber" name="L1452" href="#L1452">1452</a>     }
+<a class="jxr_linenumber" name="L1453" href="#L1453">1453</a>   }
+<a class="jxr_linenumber" name="L1454" href="#L1454">1454</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>

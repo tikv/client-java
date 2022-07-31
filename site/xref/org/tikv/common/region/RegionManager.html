@@ -190,7 +190,7 @@
 <a class="jxr_linenumber" name="L182" href="#L182">182</a>   <strong class="jxr_keyword">public</strong> Pair&lt;TiRegion, TiStore&gt; getRegionStorePairByKey(
 <a class="jxr_linenumber" name="L183" href="#L183">183</a>       ByteString key, <a name="TiStoreType" href="../../../../org/tikv/common/region/TiStoreType.html#TiStoreType">TiStoreType</a> storeType, <a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
 <a class="jxr_linenumber" name="L184" href="#L184">184</a>     <a name="TiRegion" href="../../../../org/tikv/common/region/TiRegion.html#TiRegion">TiRegion</a> region = getRegionByKey(key, backOffer);
-<a class="jxr_linenumber" name="L185" href="#L185">185</a>     <strong class="jxr_keyword">if</strong> (!region.isValid()) {
+<a class="jxr_linenumber" name="L185" href="#L185">185</a>     <strong class="jxr_keyword">if</strong> (region == <strong class="jxr_keyword">null</strong> || !region.isValid()) {
 <a class="jxr_linenumber" name="L186" href="#L186">186</a>       <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="TiClientInternalException" href="../../../../org/tikv/common/exception/TiClientInternalException.html#TiClientInternalException">TiClientInternalException</a>(<span class="jxr_string">"Region invalid: "</span> + region);
 <a class="jxr_linenumber" name="L187" href="#L187">187</a>     }
 <a class="jxr_linenumber" name="L188" href="#L188">188</a> 
