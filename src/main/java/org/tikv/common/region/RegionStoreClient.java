@@ -298,20 +298,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             forWrite);
     BatchGetResponse resp =
         callWithRetry(backOffer, TikvGrpc.getKvBatchGetMethod(), request, handler);
-    try {
-      return handleBatchGetResponse(backOffer, resp, version);
-    } catch (TiKVException e) {
-      if ("locks not resolved, retry".equals(e.getMessage())) {
-        backOffer.doBackOff(BackOffFunction.BackOffFuncType.BoTxnLock, e);
-        return batchGet(backOffer, keys, version);
-      } else {
-        throw e;
-      }
-    }
+    return handleBatchGetResponse(backOffer, resp, version, keys);
   }
 
   private List<KvPair> handleBatchGetResponse(
-      BackOffer backOffer, BatchGetResponse resp, long version) {
+      BackOffer backOffer, BatchGetResponse resp, long version, List<ByteString> keys) {
     boolean forWrite = false;
     if (resp == null) {
       this.regionManager.onRequestFail(region);
@@ -338,7 +329,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           lockResolverClient.resolveLocks(backOffer, version, locks, forWrite);
       addResolvedLocks(version, resolveLockResult.getResolvedLocks());
       // resolveLocks already retried, just throw error to upper logic.
-      throw new TiKVException("locks not resolved, retry");
+      backOffer.doBackOff(
+          BackOffFunction.BackOffFuncType.BoTxnLock,
+          new TiKVException("locks not resolved, retry"));
+      return batchGet(backOffer, keys, version);
     }
 
     return codec.decodeKvPairs(resp.getPairsList());
