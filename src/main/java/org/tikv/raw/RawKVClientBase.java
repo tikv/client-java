@@ -21,12 +21,14 @@ import com.google.protobuf.ByteString;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import org.tikv.common.TiSession;
 import org.tikv.common.util.Pair;
 import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
 public interface RawKVClientBase extends AutoCloseable {
+
   // https://www.github.com/pingcap/tidb/blob/master/store/tikv/rawkv.go
   int MAX_RAW_SCAN_LIMIT = 10240;
   int MAX_RAW_BATCH_LIMIT = 1024;
@@ -50,6 +52,20 @@ public interface RawKVClientBase extends AutoCloseable {
    * @param ttl the ttl of the key (in seconds), 0 means the key will never be outdated
    */
   void put(ByteString key, ByteString value, long ttl);
+
+  /**
+   * Put a raw key-value pair to TiKV
+   *
+   * @see #put(ByteString, ByteString, long)
+   * @param key raw key
+   * @param value raw value
+   * @param duration the duration of the key, 0 means the key will never be outdated
+   * @param timeUnit the time unit of duration
+   */
+  default void put(ByteString key, ByteString value, long duration, TimeUnit timeUnit) {
+    Long seconds = timeUnit.toSeconds(duration);
+    put(key, value, seconds);
+  }
 
   /**
    * Put a key-value pair if it does not exist. This API is atomic.
@@ -77,6 +93,25 @@ public interface RawKVClientBase extends AutoCloseable {
   Optional<ByteString> putIfAbsent(ByteString key, ByteString value, long ttl);
 
   /**
+   * Put a key-value pair with TTL if it does not exist. This API is atomic.
+   *
+   * <p>To use this API, please enable `tikv.enable_atomic_for_cas`.
+   *
+   * @see #putIfAbsent(ByteString, ByteString, long)
+   * @param key key
+   * @param value value
+   * @param duration duration of key, 0 means the key will never be outdated.
+   * @param timeUnit the time unit of duration
+   * @return a ByteString. returns Optional.EMPTY if the value is written successfully. returns the
+   *     previous key if the value already exists, and does not write to TiKV.
+   */
+  default Optional<ByteString> putIfAbsent(
+      ByteString key, ByteString value, long duration, TimeUnit timeUnit) {
+    Long seconds = timeUnit.toSeconds(duration);
+    return putIfAbsent(key, value, seconds);
+  }
+
+  /**
    * Put a key-value pair if the prevValue matched the value in TiKV. This API is atomic.
    *
    * <p>To use this API, please enable `tikv.enable_atomic_for_cas`.
@@ -98,6 +133,27 @@ public interface RawKVClientBase extends AutoCloseable {
   void compareAndSet(ByteString key, Optional<ByteString> prevValue, ByteString value, long ttl);
 
   /**
+   * pair if the prevValue matched the value in TiKV. This API is atomic.
+   *
+   * <p>To use this API, please enable `tikv.enable_atomic_for_cas`.
+   *
+   * @see #compareAndSet(ByteString, Optional, ByteString, long)
+   * @param key key
+   * @param value value
+   * @param duration duration of key , 0 means the key will never be outdated.
+   * @param timeUnit time unit of duration
+   */
+  default void compareAndSet(
+      ByteString key,
+      Optional<ByteString> prevValue,
+      ByteString value,
+      long duration,
+      TimeUnit timeUnit) {
+    long seconds = timeUnit.toSeconds(duration);
+    compareAndSet(key, prevValue, value, seconds);
+  }
+
+  /**
    * Put a set of raw key-value pair to TiKV.
    *
    * @param kvPairs kvPairs
@@ -111,6 +167,19 @@ public interface RawKVClientBase extends AutoCloseable {
    * @param ttl the TTL of keys to be put (in seconds), 0 means the keys will never be outdated
    */
   void batchPut(Map<ByteString, ByteString> kvPairs, long ttl);
+
+  /**
+   * Put a set of raw key-value pair to TiKV.
+   *
+   * @see #batchPut(Map, long)
+   * @param kvPairs kvPairs
+   * @param duration the duration of keys to be put, 0 means the keys will never be outdated
+   * @param timeUnit time unit of duration
+   */
+  default void batchPut(Map<ByteString, ByteString> kvPairs, long duration, TimeUnit timeUnit) {
+    long seconds = timeUnit.toSeconds(duration);
+    batchPut(kvPairs, seconds);
+  }
 
   /**
    * Get a raw key-value pair from TiKV if key exists
