@@ -29,7 +29,7 @@ public class BaseRawKVTest {
     TiConfiguration conf = createTiConfiguration();
     TiSession session = TiSession.create(conf);
     PDClient pdClient = session.getPDClient();
-    return StoreVersion.minTiKVVersion(expectedVersion, pdClient);
+    return StoreVersion.isTiKVVersionGreatEqualThanVersion(pdClient, expectedVersion);
   }
 
   protected TiConfiguration createTiConfiguration() {

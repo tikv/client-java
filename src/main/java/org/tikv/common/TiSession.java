@@ -175,7 +175,8 @@ public class TiSession implements AutoCloseable {
     }
 
     this.client = PDClient.createRaw(conf, keyCodec, channelFactory);
-    if (conf.getApiVersion().isV2() && !StoreVersion.minTiKVVersion(Version.API_V2, client)) {
+    if (conf.getApiVersion().isV2()
+        && !StoreVersion.isTiKVVersionGreatEqualThanVersion(client, Version.API_V2)) {
       throw new IllegalStateException(
           "With API v2, store versions should not older than " + Version.API_V2);
     }
