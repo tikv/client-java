@@ -24,6 +24,7 @@ import static io.grpc.Contexts.statusFromCancelled;
 import static io.grpc.Status.DEADLINE_EXCEEDED;
 import static io.grpc.internal.GrpcUtil.CONTENT_ACCEPT_ENCODING_KEY;
 import static io.grpc.internal.GrpcUtil.CONTENT_ENCODING_KEY;
+import static io.grpc.internal.GrpcUtil.CONTENT_LENGTH_KEY;
 import static io.grpc.internal.GrpcUtil.MESSAGE_ACCEPT_ENCODING_KEY;
 import static io.grpc.internal.GrpcUtil.MESSAGE_ENCODING_KEY;
 import static java.lang.Math.max;
@@ -33,6 +34,7 @@ import com.google.common.base.MoreObjects;
 import io.grpc.Attributes;
 import io.grpc.CallOptions;
 import io.grpc.ClientCall;
+import io.grpc.ClientStreamTracer;
 import io.grpc.Codec;
 import io.grpc.Compressor;
 import io.grpc.CompressorRegistry;
@@ -166,6 +168,7 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
       DecompressorRegistry decompressorRegistry,
       Compressor compressor,
       boolean fullStreamDecompression) {
+    headers.discardAll(CONTENT_LENGTH_KEY);
     headers.discardAll(MESSAGE_ENCODING_KEY);
     if (compressor != Codec.Identity.NONE) {
       headers.put(MESSAGE_ENCODING_KEY, compressor.getMessageEncoding());
@@ -260,10 +263,13 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
           effectiveDeadline, context.getDeadline(), callOptions.getDeadline());
       stream = clientStreamProvider.newStream(method, callOptions, headers, context);
     } else {
+      ClientStreamTracer[] tracers =
+          GrpcUtil.getClientStreamTracers(callOptions, headers, 0, false);
       stream =
           new FailingClientStream(
               DEADLINE_EXCEEDED.withDescription(
-                  "ClientCall started after deadline exceeded: " + effectiveDeadline));
+                  "ClientCall started after deadline exceeded: " + effectiveDeadline),
+              tracers);
     }
 
     if (callExecutorIsDirect) {
@@ -363,12 +369,14 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
     StringBuilder builder =
         new StringBuilder(
             String.format(
-                "Call timeout set to '%d' ns, due to context deadline.", effectiveTimeout));
+                Locale.US,
+                "Call timeout set to '%d' ns, due to context deadline.",
+                effectiveTimeout));
     if (callDeadline == null) {
       builder.append(" Explicit call timeout was not set.");
     } else {
       long callTimeout = callDeadline.timeRemaining(TimeUnit.NANOSECONDS);
-      builder.append(String.format(" Explicit call timeout was '%d' ns.", callTimeout));
+      builder.append(String.format(Locale.US, " Explicit call timeout was '%d' ns.", callTimeout));
     }
 
     log.fine(builder.toString());
@@ -562,6 +570,9 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
 
   @Override
   public boolean isReady() {
+    if (halfCloseCalled) {
+      return false;
+    }
     return stream.isReady();
   }
 
@@ -709,11 +720,6 @@ final class ClientCallImpl<ReqT, RespT> extends ClientCall<ReqT, RespT> {
         PerfMark.stopTask("ClientStreamListener.messagesAvailable", tag);
         messagesAvailable.observeDuration();
       }
-    }
-
-    @Override
-    public void closed(Status status, Metadata trailers) {
-      closed(status, RpcProgress.PROCESSED, trailers);
     }
 
     @Override
