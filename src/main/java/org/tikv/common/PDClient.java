@@ -462,14 +462,19 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
         }
         return resp;
       } catch (Exception e) {
-        logger.warn("failed to get member from pd server.", e);
+        logger.warn(
+            "failed to get member from pd server from {}, caused by: {}", uri, e.getMessage());
         backOffer.doBackOff(BackOffFuncType.BoPDRPC, e);
       }
     }
   }
 
   private GetMembersResponse getMembers(BackOffer backOffer, URI uri) {
-    return doGetMembers(backOffer, uri);
+    try {
+      return doGetMembers(backOffer, uri);
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   // return whether the leader has changed to target address `leaderUrlStr`.
@@ -524,13 +529,16 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   public void tryUpdateLeaderOrForwardFollower() {
     if (updateLeaderNotify.compareAndSet(false, true)) {
       try {
-        BackOffer backOffer = defaultBackOffer();
         updateLeaderService.submit(
             () -> {
               try {
-                updateLeaderOrForwardFollower(backOffer);
+                updateLeaderOrForwardFollower();
+              } catch (Exception e) {
+                logger.info("update leader or forward follower failed", e);
+                throw e;
               } finally {
                 updateLeaderNotify.set(false);
+                logger.info("updating leader finish");
               }
             });
       } catch (RejectedExecutionException e) {
@@ -540,11 +548,13 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     }
   }
 
-  private synchronized void updateLeaderOrForwardFollower(BackOffer backOffer) {
+  private synchronized void updateLeaderOrForwardFollower() {
+    logger.warn("updating leader or forward follower");
     if (System.currentTimeMillis() - lastUpdateLeaderTime < MIN_TRY_UPDATE_DURATION) {
       return;
     }
     for (URI url : this.pdAddrs) {
+      BackOffer backOffer = this.probeBackOffer();
       // since resp is null, we need update leader's address by walking through all pd server.
       GetMembersResponse resp = getMembers(backOffer, url);
       if (resp == null) {
@@ -602,8 +612,9 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   public void tryUpdateLeader() {
+    logger.info("try update leader");
     for (URI url : this.pdAddrs) {
-      BackOffer backOffer = defaultBackOffer();
+      BackOffer backOffer = this.probeBackOffer();
       // since resp is null, we need update leader's address by walking through all pd server.
       GetMembersResponse resp = getMembers(backOffer, url);
       if (resp == null) {
@@ -855,5 +866,10 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
 
   private static BackOffer defaultBackOffer() {
     return ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
+  }
+
+  private BackOffer probeBackOffer() {
+    int maxSleep = (int) getTimeout() * 2;
+    return ConcreteBackOffer.newCustomBackOff(maxSleep);
   }
 }
