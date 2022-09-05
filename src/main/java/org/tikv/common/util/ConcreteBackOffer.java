@@ -174,6 +174,13 @@ public class ConcreteBackOffer implements BackOffer {
       case BoCheckHealth:
         backOffFunction = BackOffFunction.create(100, 600, BackOffStrategy.EqualJitter);
         break;
+      case BoTsoBatchUsedUp:
+        backOffFunction =
+            BackOffFunction.create(
+                TiConfiguration.getInt(TIKV_BO_REGION_MISS_BASE_IN_MS),
+                500,
+                BackOffStrategy.NoJitter);
+        break;
     }
     return backOffFunction;
   }
