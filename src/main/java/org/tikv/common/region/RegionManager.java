@@ -26,10 +26,12 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.InvalidStoreException;
 import org.tikv.common.exception.TiClientInternalException;
@@ -68,6 +70,7 @@ public class RegionManager {
   private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
   private final StoreHealthyChecker storeChecker;
+  private Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
 
   public RegionManager(
       TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
@@ -81,6 +84,25 @@ public class RegionManager {
     this.storeChecker = storeChecker;
     this.executor = Executors.newScheduledThreadPool(1);
     this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
+    this.cacheInvalidateCallback = null;
+  }
+
+  public RegionManager(
+      TiConfiguration conf,
+      ReadOnlyPDClient pdClient,
+      ChannelFactory channelFactory,
+      Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack) {
+    this.cache = new RegionCache();
+    this.pdClient = pdClient;
+    this.conf = conf;
+    long period = conf.getHealthCheckPeriodDuration();
+    StoreHealthyChecker storeChecker =
+        new StoreHealthyChecker(
+            channelFactory, pdClient, this.cache, conf.getGrpcHealthCheckTimeout());
+    this.storeChecker = storeChecker;
+    this.executor = Executors.newScheduledThreadPool(1);
+    this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
+    this.cacheInvalidateCallback = cacheInvalidateCallBack;
   }
 
   public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
@@ -89,6 +111,19 @@ public class RegionManager {
     this.conf = conf;
     this.storeChecker = null;
     this.executor = null;
+    this.cacheInvalidateCallback = null;
+  }
+
+  public RegionManager(
+      TiConfiguration conf,
+      ReadOnlyPDClient pdClient,
+      Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
+    this.cache = new RegionCache();
+    this.pdClient = pdClient;
+    this.conf = conf;
+    this.storeChecker = null;
+    this.executor = null;
+    this.cacheInvalidateCallback = cacheInvalidateCallback;
   }
 
   public synchronized void close() {
@@ -99,6 +134,15 @@ public class RegionManager {
 
   public ReadOnlyPDClient getPDClient() {
     return this.pdClient;
+  }
+
+  public synchronized Function<CacheInvalidateEvent, Void> getCacheInvalidateCallback() {
+    return cacheInvalidateCallback;
+  }
+
+  public synchronized void setCacheInvalidateCallback(
+      Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
+    this.cacheInvalidateCallback = cacheInvalidateCallback;
   }
 
   public void invalidateAll() {
