@@ -52,11 +52,13 @@ public class CacheInvalidCallBackTest extends MockServerTest {
             .build();
     TiStore store = new TiStore(meta);
 
+    RegionManager manager = new RegionManager(session.getConf(), session.getPDClient());
+    manager.addCacheInvalidateCallback(cacheInvalidateCallBack);
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(
             session.getConf(),
             session.getChannelFactory(),
-            new RegionManager(session.getConf(), session.getPDClient(), cacheInvalidateCallBack),
+            manager,
             session.getPDClient());
 
     return builder.build(region, store);

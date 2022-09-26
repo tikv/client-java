@@ -44,7 +44,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private final Function<RespT, Errorpb.Error> getRegionError;
   private final RegionManager regionManager;
   private final RegionErrorReceiver recv;
-  private final Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack;
+  private final List<Function<CacheInvalidateEvent, Void>> cacheInvalidateCallBackList;
 
   public RegionErrorHandler(
       RegionManager regionManager,
@@ -53,7 +53,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     this.recv = recv;
     this.regionManager = regionManager;
     this.getRegionError = getRegionError;
-    cacheInvalidateCallBack = regionManager.getCacheInvalidateCallback();
+    this.cacheInvalidateCallBackList = regionManager.getCacheInvalidateCallbackList();
   }
 
   @Override
@@ -278,14 +278,24 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
 
   private void notifyRegionStoreCacheInvalidate(
       long regionId, long storeId, CacheInvalidateEvent.CacheType type) {
-    if (cacheInvalidateCallBack != null) {
-      cacheInvalidateCallBack.apply(new CacheInvalidateEvent(regionId, storeId, true, true, type));
+    if (cacheInvalidateCallBackList != null) {
+      for (Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack : cacheInvalidateCallBackList) {
+        cacheInvalidateCallBack.apply(
+            new CacheInvalidateEvent(regionId, storeId, true, true, type));
+      }
     }
   }
 
   private void notifyRegionCacheInvalidate(long regionId, CacheInvalidateEvent.CacheType type) {
-    if (cacheInvalidateCallBack != null) {
-      cacheInvalidateCallBack.apply(new CacheInvalidateEvent(regionId, 0, true, false, type));
+    if (cacheInvalidateCallBackList != null) {
+      for (Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack : cacheInvalidateCallBackList) {
+        try {
+          cacheInvalidateCallBack.apply(
+              new CacheInvalidateEvent(regionId, 0, true, true, type));
+        } catch (Exception e) {
+          logger.warn(String.format("CacheInvalidCallBack failed %s", e));
+        }
+      }
     }
   }
 }

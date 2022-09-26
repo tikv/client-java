@@ -70,7 +70,7 @@ public class RegionManager {
   private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
   private final StoreHealthyChecker storeChecker;
-  private Function<CacheInvalidateEvent, Void> cacheInvalidateCallback;
+  private final List<Function<CacheInvalidateEvent, Void>> cacheInvalidateCallbackList;
 
   public RegionManager(
       TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
@@ -84,25 +84,7 @@ public class RegionManager {
     this.storeChecker = storeChecker;
     this.executor = Executors.newScheduledThreadPool(1);
     this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
-    this.cacheInvalidateCallback = null;
-  }
-
-  public RegionManager(
-      TiConfiguration conf,
-      ReadOnlyPDClient pdClient,
-      ChannelFactory channelFactory,
-      Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack) {
-    this.cache = new RegionCache();
-    this.pdClient = pdClient;
-    this.conf = conf;
-    long period = conf.getHealthCheckPeriodDuration();
-    StoreHealthyChecker storeChecker =
-        new StoreHealthyChecker(
-            channelFactory, pdClient, this.cache, conf.getGrpcHealthCheckTimeout());
-    this.storeChecker = storeChecker;
-    this.executor = Executors.newScheduledThreadPool(1);
-    this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
-    this.cacheInvalidateCallback = cacheInvalidateCallBack;
+    this.cacheInvalidateCallbackList = new ArrayList<>();
   }
 
   public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
@@ -111,19 +93,7 @@ public class RegionManager {
     this.conf = conf;
     this.storeChecker = null;
     this.executor = null;
-    this.cacheInvalidateCallback = null;
-  }
-
-  public RegionManager(
-      TiConfiguration conf,
-      ReadOnlyPDClient pdClient,
-      Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
-    this.cache = new RegionCache();
-    this.pdClient = pdClient;
-    this.conf = conf;
-    this.storeChecker = null;
-    this.executor = null;
-    this.cacheInvalidateCallback = cacheInvalidateCallback;
+    this.cacheInvalidateCallbackList= new ArrayList<>();
   }
 
   public synchronized void close() {
@@ -136,13 +106,13 @@ public class RegionManager {
     return this.pdClient;
   }
 
-  public synchronized Function<CacheInvalidateEvent, Void> getCacheInvalidateCallback() {
-    return cacheInvalidateCallback;
+  public synchronized List<Function<CacheInvalidateEvent, Void>> getCacheInvalidateCallbackList() {
+    return cacheInvalidateCallbackList;
   }
 
-  public synchronized void setCacheInvalidateCallback(
+  public synchronized void addCacheInvalidateCallback(
       Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
-    this.cacheInvalidateCallback = cacheInvalidateCallback;
+    this.cacheInvalidateCallbackList.add(cacheInvalidateCallback);
   }
 
   public void invalidateAll() {
