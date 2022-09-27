@@ -23,6 +23,7 @@ import com.google.protobuf.ByteString;
 import io.prometheus.client.Histogram;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -93,7 +94,7 @@ public class RegionManager {
     this.conf = conf;
     this.storeChecker = null;
     this.executor = null;
-    this.cacheInvalidateCallbackList = new ArrayList<>();
+    this.cacheInvalidateCallbackList = new CopyOnWriteArrayList<>();
   }
 
   public synchronized void close() {
@@ -106,11 +107,11 @@ public class RegionManager {
     return this.pdClient;
   }
 
-  public synchronized List<Function<CacheInvalidateEvent, Void>> getCacheInvalidateCallbackList() {
+  public List<Function<CacheInvalidateEvent, Void>> getCacheInvalidateCallbackList() {
     return cacheInvalidateCallbackList;
   }
 
-  public synchronized void addCacheInvalidateCallback(
+  public void addCacheInvalidateCallback(
       Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
     this.cacheInvalidateCallbackList.add(cacheInvalidateCallback);
   }
