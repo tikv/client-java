@@ -279,7 +279,8 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private void notifyRegionStoreCacheInvalidate(
       long regionId, long storeId, CacheInvalidateEvent.CacheType type) {
     if (cacheInvalidateCallBackList != null) {
-      for (Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack : cacheInvalidateCallBackList) {
+      for (Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack :
+          cacheInvalidateCallBackList) {
         cacheInvalidateCallBack.apply(
             new CacheInvalidateEvent(regionId, storeId, true, true, type));
       }
@@ -288,10 +289,10 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
 
   private void notifyRegionCacheInvalidate(long regionId, CacheInvalidateEvent.CacheType type) {
     if (cacheInvalidateCallBackList != null) {
-      for (Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack : cacheInvalidateCallBackList) {
+      for (Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack :
+          cacheInvalidateCallBackList) {
         try {
-          cacheInvalidateCallBack.apply(
-              new CacheInvalidateEvent(regionId, 0, true, true, type));
+          cacheInvalidateCallBack.apply(new CacheInvalidateEvent(regionId, 0, true, true, type));
         } catch (Exception e) {
           logger.warn(String.format("CacheInvalidCallBack failed %s", e));
         }

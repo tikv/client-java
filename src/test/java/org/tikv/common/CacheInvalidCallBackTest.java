@@ -56,10 +56,7 @@ public class CacheInvalidCallBackTest extends MockServerTest {
     manager.addCacheInvalidateCallback(cacheInvalidateCallBack);
     RegionStoreClientBuilder builder =
         new RegionStoreClientBuilder(
-            session.getConf(),
-            session.getChannelFactory(),
-            manager,
-            session.getPDClient());
+            session.getConf(), session.getChannelFactory(), manager, session.getPDClient());
 
     return builder.build(region, store);
   }

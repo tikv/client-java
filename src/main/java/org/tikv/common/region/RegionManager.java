@@ -93,7 +93,7 @@ public class RegionManager {
     this.conf = conf;
     this.storeChecker = null;
     this.executor = null;
-    this.cacheInvalidateCallbackList= new ArrayList<>();
+    this.cacheInvalidateCallbackList = new ArrayList<>();
   }
 
   public synchronized void close() {
