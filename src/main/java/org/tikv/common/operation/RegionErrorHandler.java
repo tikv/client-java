@@ -275,6 +275,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private void notifyRegionRequestError(
       TiRegion ctxRegion, long storeId, CacheInvalidateEvent.CacheType type) {
     CacheInvalidateEvent event;
+    // When store(region) id is 0, it implies that the error was not caused by store(region).
     switch (type) {
       case REGION:
       case LEADER:
