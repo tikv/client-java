@@ -48,6 +48,8 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private final List<Function<CacheInvalidateEvent, Void>> cacheInvalidateCallBackList;
 
   private final ExecutorService callBackThreadPool;
+  private final int INVALID_STORE_ID = 0;
+  private final int INVALID_REGION_ID = 0;
 
   public RegionErrorHandler(
       RegionManager regionManager,
@@ -279,13 +281,13 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     switch (type) {
       case REGION:
       case LEADER:
-        event = new CacheInvalidateEvent(ctxRegion.getId(), 0, true, false, type);
+        event = new CacheInvalidateEvent(ctxRegion.getId(), INVALID_STORE_ID, true, false, type);
         break;
       case REGION_STORE:
         event = new CacheInvalidateEvent(ctxRegion.getId(), storeId, true, true, type);
         break;
       case REQ_FAILED:
-        event = new CacheInvalidateEvent(0, 0, false, false, type);
+        event = new CacheInvalidateEvent(INVALID_REGION_ID, INVALID_STORE_ID, false, false, type);
         break;
       default:
         throw new IllegalArgumentException("Unexpect invalid cache invalid type " + type);
@@ -299,6 +301,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
                 cacheInvalidateCallBack.apply(event);
               } catch (Exception e) {
                 logger.warn(String.format("CacheInvalidCallBack failed %s", e));
+                throw e;
               }
             });
       }
