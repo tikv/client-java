@@ -71,7 +71,7 @@ public class RegionManager {
   private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
   private final StoreHealthyChecker storeChecker;
-  private final List<Function<CacheInvalidateEvent, Void>> cacheInvalidateCallbackList;
+  private final CopyOnWriteArrayList<Function<CacheInvalidateEvent, Void>> cacheInvalidateCallbackList;
 
   public RegionManager(
       TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
@@ -85,7 +85,7 @@ public class RegionManager {
     this.storeChecker = storeChecker;
     this.executor = Executors.newScheduledThreadPool(1);
     this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
-    this.cacheInvalidateCallbackList = new ArrayList<>();
+    this.cacheInvalidateCallbackList = new CopyOnWriteArrayList<>();
   }
 
   public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
