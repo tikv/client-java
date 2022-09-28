@@ -24,6 +24,7 @@ import io.prometheus.client.Histogram;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -73,8 +74,31 @@ public class RegionManager {
   private final StoreHealthyChecker storeChecker;
   private final CopyOnWriteArrayList<Function<CacheInvalidateEvent, Void>> cacheInvalidateCallbackList;
 
+  private final ExecutorService callBackThreadPool;
+
   public RegionManager(
       TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
+    this(conf, pdClient, channelFactory, 1);
+  }
+
+  public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
+    this(conf, pdClient, 1);
+  }
+
+  public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient,
+      int callBackExecutorThreadNum) {
+    this.cache = new RegionCache();
+    this.pdClient = pdClient;
+    this.conf = conf;
+    this.storeChecker = null;
+    this.executor = null;
+    this.cacheInvalidateCallbackList = new CopyOnWriteArrayList<>();
+    this.callBackThreadPool = Executors.newFixedThreadPool(callBackExecutorThreadNum);
+  }
+
+  public RegionManager(
+      TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory,
+      int callBackExecutorThreadNum) {
     this.cache = new RegionCache();
     this.pdClient = pdClient;
     this.conf = conf;
@@ -86,25 +110,22 @@ public class RegionManager {
     this.executor = Executors.newScheduledThreadPool(1);
     this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
     this.cacheInvalidateCallbackList = new CopyOnWriteArrayList<>();
-  }
-
-  public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
-    this.cache = new RegionCache();
-    this.pdClient = pdClient;
-    this.conf = conf;
-    this.storeChecker = null;
-    this.executor = null;
-    this.cacheInvalidateCallbackList = new CopyOnWriteArrayList<>();
+    this.callBackThreadPool = Executors.newFixedThreadPool(callBackExecutorThreadNum);
   }
 
   public synchronized void close() {
     if (this.executor != null) {
       this.executor.shutdownNow();
     }
+    this.callBackThreadPool.shutdownNow();
   }
 
   public ReadOnlyPDClient getPDClient() {
     return this.pdClient;
+  }
+
+  public ExecutorService getCallBackThreadPool() {
+    return callBackThreadPool;
   }
 
   public List<Function<CacheInvalidateEvent, Void>> getCacheInvalidateCallbackList() {

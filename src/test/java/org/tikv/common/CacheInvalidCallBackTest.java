@@ -81,7 +81,6 @@ public class CacheInvalidCallBackTest extends MockServerTest {
     } catch (Exception e) {
       assertEquals(1, cacheInvalidateCallBack.cacheInvalidateEvents.size());
     }
-
     server.putError(
         "failure",
         () -> Errorpb.Error.newBuilder().setEpochNotMatch(EpochNotMatch.getDefaultInstance()));
@@ -89,6 +88,7 @@ public class CacheInvalidCallBackTest extends MockServerTest {
       client.rawGet(defaultBackOff(), ByteString.copyFromUtf8("failure"));
       fail();
     } catch (Exception e) {
+      sleep(1000);
       assertEquals(2, cacheInvalidateCallBack.cacheInvalidateEvents.size());
     }
     server.putError(
@@ -98,10 +98,19 @@ public class CacheInvalidCallBackTest extends MockServerTest {
       client.rawGet(defaultBackOff(), ByteString.copyFromUtf8("failure"));
       fail();
     } catch (Exception e) {
+      sleep(1000);
       assertEquals(3, cacheInvalidateCallBack.cacheInvalidateEvents.size());
     }
     server.clearAllMap();
     client.close();
+  }
+
+  private void sleep(int time) {
+    try {
+      Thread.sleep(time);
+    } catch (InterruptedException e) {
+      fail();
+    }
   }
 
   private BackOffer defaultBackOff() {

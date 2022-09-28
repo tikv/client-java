@@ -21,6 +21,7 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private final RegionErrorReceiver recv;
   private final List<Function<CacheInvalidateEvent, Void>> cacheInvalidateCallBackList;
 
+  private final ExecutorService callBackThreadPool;
   public RegionErrorHandler(
       RegionManager regionManager,
       RegionErrorReceiver recv,
@@ -54,6 +56,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     this.regionManager = regionManager;
     this.getRegionError = getRegionError;
     this.cacheInvalidateCallBackList = regionManager.getCacheInvalidateCallbackList();
+    this.callBackThreadPool = regionManager.getCallBackThreadPool();
   }
 
   @Override
@@ -286,16 +289,17 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
         throw new IllegalArgumentException("Unexpect invalid cache invalid type " + type);
     }
     if (cacheInvalidateCallBackList != null) {
-      new Thread(() -> {
-        for (Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack :
-            cacheInvalidateCallBackList) {
+      for (Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack :
+          cacheInvalidateCallBackList) {
+        callBackThreadPool.submit(() -> {
           try {
             cacheInvalidateCallBack.apply(event);
           } catch (Exception e) {
             logger.warn(String.format("CacheInvalidCallBack failed %s", e));
           }
-        }
-      }).start();
+        });
+
+      }
     }
   }
 
