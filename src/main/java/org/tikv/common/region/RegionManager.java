@@ -72,7 +72,8 @@ public class RegionManager {
   private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
   private final StoreHealthyChecker storeChecker;
-  private final CopyOnWriteArrayList<Function<CacheInvalidateEvent, Void>> cacheInvalidateCallbackList;
+  private final CopyOnWriteArrayList<Function<CacheInvalidateEvent, Void>>
+      cacheInvalidateCallbackList;
 
   private final ExecutorService callBackThreadPool;
 
@@ -85,8 +86,8 @@ public class RegionManager {
     this(conf, pdClient, 1);
   }
 
-  public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient,
-      int callBackExecutorThreadNum) {
+  public RegionManager(
+      TiConfiguration conf, ReadOnlyPDClient pdClient, int callBackExecutorThreadNum) {
     this.cache = new RegionCache();
     this.pdClient = pdClient;
     this.conf = conf;
@@ -97,7 +98,9 @@ public class RegionManager {
   }
 
   public RegionManager(
-      TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory,
+      TiConfiguration conf,
+      ReadOnlyPDClient pdClient,
+      ChannelFactory channelFactory,
       int callBackExecutorThreadNum) {
     this.cache = new RegionCache();
     this.pdClient = pdClient;

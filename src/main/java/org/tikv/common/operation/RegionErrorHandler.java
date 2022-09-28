@@ -48,6 +48,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private final List<Function<CacheInvalidateEvent, Void>> cacheInvalidateCallBackList;
 
   private final ExecutorService callBackThreadPool;
+
   public RegionErrorHandler(
       RegionManager regionManager,
       RegionErrorReceiver recv,
@@ -291,14 +292,14 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     if (cacheInvalidateCallBackList != null) {
       for (Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack :
           cacheInvalidateCallBackList) {
-        callBackThreadPool.submit(() -> {
-          try {
-            cacheInvalidateCallBack.apply(event);
-          } catch (Exception e) {
-            logger.warn(String.format("CacheInvalidCallBack failed %s", e));
-          }
-        });
-
+        callBackThreadPool.submit(
+            () -> {
+              try {
+                cacheInvalidateCallBack.apply(event);
+              } catch (Exception e) {
+                logger.warn(String.format("CacheInvalidCallBack failed %s", e));
+              }
+            });
       }
     }
   }
