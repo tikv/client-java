@@ -301,8 +301,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
               try {
                 cacheInvalidateCallBack.apply(event);
               } catch (Exception e) {
-                logger.warn(String.format("CacheInvalidCallBack failed %s", e));
-                throw e;
+                logger.error(String.format("CacheInvalidCallBack failed %s", e));
               }
             });
       }
