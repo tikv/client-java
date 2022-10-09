@@ -10,7 +10,7 @@ At the same time, RawKV has been used in the production environment of some comm
 ## TxnKV
 All TxnKV APIs are covered by [CI](https://github.com/tikv/client-java/actions/workflows/ci.yml).
 
-In the meantime, TxnKV has been used in the [TiBigData](https://github.com/tidb-incubator/TiBigData) project to integrate data from TiDB to ODS for building data warehouses. And TiBigData was used in the production system of a couple of internet companies.
+In the meantime, TxnKV has been used in the [TiSpark](https://docs.pingcap.com/tidb/stable/tispark-overview) and [TiBigData](https://github.com/tidb-incubator/TiBigData) project to integrate data from TiDB to Big Data ecosystem. TiSpark or TiBigData were used in the production system of couple of commercial customers and some internet companies.
 
 Similar to RawKV, only part of APIs are used in this scenario (mainly including `prewrite/commit` and `coprocessor`). And this use case doesn't care about latency but throughput and reliability.
 
