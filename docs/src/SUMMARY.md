@@ -4,6 +4,8 @@
 
 - [Introduction](./introduction/introduction.md)
 
+- [Production Readiness](./production-readiness.md)
+
 - [Start With Examples](./examples/introduction.md)
     - [Quick Start](./examples/quick-start.md)
     - [Interact with TiKV RawKV API](./examples/rawkv.md)
