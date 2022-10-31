@@ -23,6 +23,7 @@ import com.google.protobuf.ByteString;
 import io.prometheus.client.Histogram;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +42,7 @@ import org.tikv.common.util.HistogramUtils;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Metapb.Peer;
+import org.tikv.kvproto.Metapb.Store;
 import org.tikv.kvproto.Metapb.StoreState;
 import org.tikv.kvproto.Pdpb;
 
@@ -191,17 +193,21 @@ public class RegionManager {
       Peer peer = region.getCurrentReplica();
       store = getStoreById(peer.getStoreId(), backOffer);
     } else {
-      outerLoop:
+      List<TiStore> tiflashStores = new ArrayList<>();
       for (Peer peer : region.getLearnerList()) {
         TiStore s = getStoreById(peer.getStoreId(), backOffer);
         for (Metapb.StoreLabel label : s.getStore().getLabelsList()) {
           if (label.getKey().equals(storeType.getLabelKey())
               && label.getValue().equals(storeType.getLabelValue())) {
-            store = s;
-            break outerLoop;
+            tiflashStores.add(s);
           }
         }
       }
+      // select a tiflash randomly
+      Random random = new Random();
+      int randomIndex = random.nextInt(tiflashStores.size());
+      store = tiflashStores.get(randomIndex);
+
       if (store == null) {
         // clear the region cache, so we may get the learner peer next time
         cache.invalidateRegion(region);
