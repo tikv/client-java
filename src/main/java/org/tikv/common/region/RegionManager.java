@@ -23,7 +23,6 @@ import com.google.protobuf.ByteString;
 import io.prometheus.client.Histogram;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +68,7 @@ public class RegionManager {
   private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
   private final StoreHealthyChecker storeChecker;
+  private int TiFlashStoreIndex = 0;
 
   public RegionManager(
       TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
@@ -202,9 +202,11 @@ public class RegionManager {
           }
         }
       }
-      // select a tiflash randomly
-      if(tiflashStores.size() > 0) {
-        store = tiflashStores.get(new Random().nextInt(tiflashStores.size()));
+      // select a tiflash with RR strategy
+      if (tiflashStores.size() > 0) {
+        store =
+            tiflashStores.get(TiFlashStoreIndex > tiflashStores.size() - 1 ? 0 : TiFlashStoreIndex);
+        TiFlashStoreIndex++;
       }
 
       if (store == null) {

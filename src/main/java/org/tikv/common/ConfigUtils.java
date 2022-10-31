@@ -121,6 +121,7 @@ public class ConfigUtils {
 
   public static final String TIFLASH_ENABLE = "tiflash.enable";
   public static final String TIKV_WARM_UP_ENABLE = "tikv.warm_up.enable";
+  public static final String TIFLASH_BALANCE_STRATEGY = "tiflash.balance_strategy";
 
   public static final String TIKV_API_VERSION = "tikv.api_version";
 
