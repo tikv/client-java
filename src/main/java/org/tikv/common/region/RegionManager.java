@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
@@ -68,7 +69,7 @@ public class RegionManager {
   private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
   private final StoreHealthyChecker storeChecker;
-  private int TiFlashStoreIndex = 0;
+  private AtomicInteger tiflashStoreIndex = new AtomicInteger(0);
 
   public RegionManager(
       TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
@@ -204,9 +205,7 @@ public class RegionManager {
       }
       // select a tiflash with RR strategy
       if (tiflashStores.size() > 0) {
-        store =
-            tiflashStores.get(TiFlashStoreIndex > tiflashStores.size() - 1 ? 0 : TiFlashStoreIndex);
-        TiFlashStoreIndex++;
+        store = tiflashStores.get(tiflashStoreIndex.getAndIncrement() % tiflashStores.size());
       }
 
       if (store == null) {
