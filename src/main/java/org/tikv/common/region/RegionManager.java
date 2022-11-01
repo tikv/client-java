@@ -205,7 +205,7 @@ public class RegionManager {
       }
       // select a tiflash with RR strategy
       if (tiflashStores.size() > 0) {
-        store = tiflashStores.get(tiflashStoreIndex.getAndIncrement() % tiflashStores.size());
+        store = tiflashStores.get(Math.abs(tiflashStoreIndex.getAndIncrement() % tiflashStores.size()));
       }
 
       if (store == null) {
