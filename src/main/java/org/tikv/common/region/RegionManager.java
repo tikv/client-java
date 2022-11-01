@@ -203,7 +203,7 @@ public class RegionManager {
           }
         }
       }
-      // select a tiflash with RR strategy
+      // select a tiflash with Round-Robin strategy
       if (tiflashStores.size() > 0) {
         store =
             tiflashStores.get(
