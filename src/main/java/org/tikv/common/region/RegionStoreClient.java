@@ -357,7 +357,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               this,
               lockResolverClient,
               resp -> resp.hasRegionError() ? resp.getRegionError() : null,
-              resp -> null,
+              resp -> resp.hasError() ? resp.getError() : null,
               resolveLockResult -> addResolvedLocks(version, resolveLockResult.getResolvedLocks()),
               version,
               forWrite);
@@ -366,9 +366,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       // we need to update region after retry
       region = regionManager.getRegionByKey(startKey, backOffer);
 
-      // logger.info("scan.resp: {}", resp.toString());
       if (handleScanResponse(backOffer, resp, version, forWrite)) {
-        return doScan(resp);
+        return resp.getPairsList();
       }
     }
   }
@@ -379,27 +378,21 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("ScanResponse failed without a cause");
     }
-    logger.info("handleScanResponse, resp: {}", resp.toString());
     if (resp.hasRegionError()) {
       backOffer.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
       return false;
     }
 
     // resolve locks
+    // To be backward-compatible with TiKV < v5.0.0, which does not have `error` in `ScanResponse`
+    // See https://github.com/pingcap/kvproto/pull/697
     List<Lock> locks = new ArrayList<>();
-
-    for (KvPair pair : resp.getPairsList()) {
-      if (pair.hasError()) {
-        if (pair.getError().hasLocked()) {
-          Lock lock = new Lock(pair.getError().getLocked());
-          locks.add(lock);
-        } else {
-          throw new KeyException(pair.getError());
-        }
+    for (KvPair kvPair : resp.getPairsList()) {
+      if (kvPair.hasError()) {
+        Lock lock = AbstractLockResolverClient.extractLockFromKeyErr(kvPair.getError());
+        locks.add(lock);
       }
     }
-    logger.info("handleScanResponse, locks count: {}, locks: {}", locks.size(), locks.toString());
-
     if (!locks.isEmpty()) {
       ResolveLockResult resolveLockResult =
           lockResolverClient.resolveLocks(backOffer, version, locks, forWrite);
@@ -410,6 +403,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return true;
   }
 
+<<<<<<< HEAD
   // TODO: resolve locks after scan
   private List<KvPair> doScan(ScanResponse resp) {
     // Check if kvPair contains error, it should be a Lock if hasError is true.
@@ -431,6 +425,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return Collections.unmodifiableList(newKvPairs);
   }
 
+=======
+>>>>>>> acd069e084 (add resolve locks to scan)
   public List<KvPair> scan(BackOffer backOffer, ByteString startKey, long version) {
     return scan(backOffer, startKey, version, false);
   }
