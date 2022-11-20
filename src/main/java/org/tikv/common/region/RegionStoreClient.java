@@ -366,21 +366,47 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       // we need to update region after retry
       region = regionManager.getRegionByKey(startKey, backOffer);
 
-      if (isScanSuccess(backOffer, resp)) {
+      // logger.info("scan.resp: {}", resp.toString());
+      if (handleScanResponse(backOffer, resp, version, forWrite)) {
         return doScan(resp);
       }
     }
   }
 
-  private boolean isScanSuccess(BackOffer backOffer, ScanResponse resp) {
+  private boolean handleScanResponse(
+      BackOffer backOffer, ScanResponse resp, long version, boolean forWrite) {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("ScanResponse failed without a cause");
     }
+    logger.info("handleScanResponse, resp: {}", resp.toString());
     if (resp.hasRegionError()) {
       backOffer.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
       return false;
     }
+
+    // resolve locks
+    List<Lock> locks = new ArrayList<>();
+
+    for (KvPair pair : resp.getPairsList()) {
+      if (pair.hasError()) {
+        if (pair.getError().hasLocked()) {
+          Lock lock = new Lock(pair.getError().getLocked());
+          locks.add(lock);
+        } else {
+          throw new KeyException(pair.getError());
+        }
+      }
+    }
+    logger.info("handleScanResponse, locks count: {}, locks: {}", locks.size(), locks.toString());
+
+    if (!locks.isEmpty()) {
+      ResolveLockResult resolveLockResult =
+          lockResolverClient.resolveLocks(backOffer, version, locks, forWrite);
+      addResolvedLocks(version, resolveLockResult.getResolvedLocks());
+      return false;
+    }
+
     return true;
   }
 
