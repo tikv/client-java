@@ -383,13 +383,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       return false;
     }
 
-    // resolve locks
+    // Resolve locks
     // To be backward-compatible with TiKV < v5.0.0, which does not have `error` in `ScanResponse`
     // See https://github.com/pingcap/kvproto/pull/697
     List<Lock> locks = new ArrayList<>();
     for (KvPair kvPair : resp.getPairsList()) {
       if (kvPair.hasError()) {
-        Lock lock = AbstractLockResolverClient.extractLockFromKeyErr(kvPair.getError());
+        Lock lock = AbstractLockResolverClient.extractLockFromKeyErr(kvPair.getError(), codec);
         locks.add(lock);
       }
     }
@@ -403,30 +403,6 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     return true;
   }
 
-<<<<<<< HEAD
-  // TODO: resolve locks after scan
-  private List<KvPair> doScan(ScanResponse resp) {
-    // Check if kvPair contains error, it should be a Lock if hasError is true.
-    List<KvPair> kvPairs = resp.getPairsList();
-    List<KvPair> newKvPairs = new ArrayList<>();
-    for (KvPair kvPair : kvPairs) {
-      if (kvPair.hasError()) {
-        Lock lock = AbstractLockResolverClient.extractLockFromKeyErr(kvPair.getError(), codec);
-        newKvPairs.add(
-            KvPair.newBuilder()
-                .setError(kvPair.getError())
-                .setValue(kvPair.getValue())
-                .setKey(lock.getKey())
-                .build());
-      } else {
-        newKvPairs.add(codec.decodeKvPair(kvPair));
-      }
-    }
-    return Collections.unmodifiableList(newKvPairs);
-  }
-
-=======
->>>>>>> acd069e084 (add resolve locks to scan)
   public List<KvPair> scan(BackOffer backOffer, ByteString startKey, long version) {
     return scan(backOffer, startKey, version, false);
   }
