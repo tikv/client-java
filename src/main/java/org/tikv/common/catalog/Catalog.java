@@ -88,6 +88,7 @@ public class Catalog implements AutoCloseable {
   public TiTableInfo getTable(String dbName, String tableName) {
     TiDBInfo database = getDatabase(dbName);
     if (database == null) {
+      logger.info("database {} not found", dbName);
       return null;
     }
     return getTable(database, tableName);
@@ -122,6 +123,7 @@ public class Catalog implements AutoCloseable {
   }
 
   private static class CatalogCache {
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private final Map<String, TiDBInfo> dbCache;
     private final ConcurrentHashMap<TiDBInfo, Map<String, TiTableInfo>> tableCache;
@@ -193,6 +195,7 @@ public class Catalog implements AutoCloseable {
       HashMap<String, TiDBInfo> newDBCache = new HashMap<>();
 
       List<TiDBInfo> databases = transaction.getDatabases();
+      logger.info("loadDatabases, count:{}", databases.size());
       databases.forEach(
           db -> {
             TiDBInfo newDBInfo = db.rename(dbPrefix + db.getName());
@@ -200,6 +203,7 @@ public class Catalog implements AutoCloseable {
             if (loadTables) {
               loadTables(newDBInfo);
             }
+            logger.info("loadDatabases, db:{}", newDBInfo.getName().toLowerCase());
           });
       return newDBCache;
     }
