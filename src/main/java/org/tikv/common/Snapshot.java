@@ -27,8 +27,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.tikv.common.columnar.TiChunk;
 import org.tikv.common.key.Key;
 import org.tikv.common.meta.TiDAGRequest;
@@ -42,7 +40,6 @@ import org.tikv.common.util.RangeSplitter.RegionTask;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class Snapshot {
-  private final Logger logger = LoggerFactory.getLogger(this.getClass());
   private final TiTimestamp timestamp;
   private final TiSession session;
 
@@ -169,7 +166,6 @@ public class Snapshot {
    */
   public Iterator<KvPair> scanPrefix(ByteString prefix) {
     ByteString nextPrefix = Key.toRawKey(prefix).nextPrefix().toByteString();
-    logger.info("Snapshot.scanPrefix, start:{}, end:{}", prefix, nextPrefix);
     return new ConcreteScanIterator(
         session.getConf(),
         session.getRegionStoreClientBuilder(),

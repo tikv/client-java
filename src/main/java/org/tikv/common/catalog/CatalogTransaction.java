@@ -73,10 +73,6 @@ public class CatalogTransaction {
   public List<TiDBInfo> getDatabases() {
     List<Pair<ByteString, ByteString>> fields =
         MetaCodec.hashGetFields(MetaCodec.KEY_DBs, this.snapshot);
-    logger.info(
-        "CatalogTransaction.getDatabases, count:{}, version:{}",
-        fields.size(),
-        this.snapshot.getVersion());
     ImmutableList.Builder<TiDBInfo> builder = ImmutableList.builder();
     for (Pair<ByteString, ByteString> pair : fields) {
       builder.add(parseFromJson(pair.second, TiDBInfo.class));
@@ -109,9 +105,6 @@ public class CatalogTransaction {
         }
       }
     }
-    List<TiTableInfo> lst = builder.build();
-    logger.info(
-        "CatalogTransaction.getTables-0, count:{}, table[1]:{}", lst.size(), lst.get(1).getName());
-    return lst;
+    return builder.build();
   }
 }
