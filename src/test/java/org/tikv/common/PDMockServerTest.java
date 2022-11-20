@@ -18,40 +18,61 @@
 package org.tikv.common;
 
 import java.io.IOException;
+import java.net.ServerSocket;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.After;
 import org.junit.Before;
 
 public abstract class PDMockServerTest {
   protected static final String LOCAL_ADDR = "127.0.0.1";
   static final long CLUSTER_ID = 1024;
-  protected static TiSession session;
-  protected PDMockServer pdServer;
+  protected TiSession session;
+  protected PDMockServer leader;
+  protected List<PDMockServer> pdServers = new ArrayList<>();
 
   @Before
-  public void setUp() throws IOException {
-    setUp(LOCAL_ADDR);
+  public void setup() throws IOException {
+    setup(LOCAL_ADDR);
   }
 
-  void setUp(String addr) throws IOException {
-    pdServer = new PDMockServer();
-    pdServer.start(CLUSTER_ID);
-    pdServer.addGetMemberResp(
-        GrpcUtils.makeGetMembersResponse(
-            pdServer.getClusterId(),
-            GrpcUtils.makeMember(1, "http://" + addr + ":" + pdServer.port),
-            GrpcUtils.makeMember(2, "http://" + addr + ":" + (pdServer.port + 1)),
-            GrpcUtils.makeMember(3, "http://" + addr + ":" + (pdServer.port + 2))));
-    TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + pdServer.port);
-    conf.setEnableGrpcForward(false);
+  void setup(String addr) throws IOException {
+    int[] ports = new int[3];
+    for (int i = 0; i < ports.length; i++) {
+      try (ServerSocket s = new ServerSocket(0)) {
+        ports[i] = s.getLocalPort();
+      }
+    }
+
+    for (int i = 0; i < ports.length; i++) {
+      PDMockServer server = new PDMockServer();
+      server.start(CLUSTER_ID, ports[i]);
+      server.addGetMembersListener(
+          (request) ->
+              GrpcUtils.makeGetMembersResponse(
+                  server.getClusterId(),
+                  GrpcUtils.makeMember(1, "http://" + addr + ":" + ports[0]),
+                  GrpcUtils.makeMember(2, "http://" + addr + ":" + ports[1]),
+                  GrpcUtils.makeMember(3, "http://" + addr + ":" + ports[2])));
+      pdServers.add(server);
+      if (i == 0) {
+        leader = server;
+      }
+    }
+
+    TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + ports[0]);
     conf.setKvMode("RAW");
-    conf.setTest(true);
+    conf.setWarmUpEnable(false);
     conf.setTimeout(2000);
+    conf.setEnableGrpcForward(true);
     session = TiSession.create(conf);
   }
 
   @After
   public void tearDown() throws Exception {
     session.close();
-    pdServer.stop();
+    for (PDMockServer server : pdServers) {
+      server.stop();
+    }
   }
 }

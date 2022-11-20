@@ -17,14 +17,32 @@
 
 package org.tikv.raw;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.TreeMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -45,6 +63,7 @@ import org.tikv.common.util.ScanOption;
 import org.tikv.kvproto.Kvrpcpb;
 
 public class RawKVClientTest extends BaseRawKVTest {
+
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -180,7 +199,8 @@ public class RawKVClientTest extends BaseRawKVTest {
   public void testDeadlineBackOff() {
     int timeout = 2000;
     int sleep = 150;
-    BackOffer backOffer = ConcreteBackOffer.newDeadlineBackOff(timeout, SlowLogEmptyImpl.INSTANCE);
+    BackOffer backOffer =
+        ConcreteBackOffer.newDeadlineBackOff(timeout, SlowLogEmptyImpl.INSTANCE, 0);
     long s = System.currentTimeMillis();
     try {
       while (true) {
@@ -361,6 +381,34 @@ public class RawKVClientTest extends BaseRawKVTest {
   }
 
   @Test
+  public void scanTestForIssue540() {
+    ByteString splitKeyA = ByteString.copyFromUtf8("splitKeyA");
+    ByteString splitKeyB = ByteString.copyFromUtf8("splitKeyB");
+    session.splitRegionAndScatter(
+        ImmutableList.of(splitKeyA.toByteArray(), splitKeyB.toByteArray()));
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+
+    client.put(ByteString.EMPTY, ByteString.EMPTY);
+    client.put(splitKeyA, ByteString.EMPTY);
+    Assert.assertEquals(0, client.scan(ByteString.EMPTY, 0).size());
+    Assert.assertEquals(1, client.scan(ByteString.EMPTY, 1).size());
+    Assert.assertEquals(2, client.scan(ByteString.EMPTY, 2).size());
+    Assert.assertEquals(2, client.scan(ByteString.EMPTY, 3).size());
+
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+
+    client.put(ByteString.EMPTY, ByteString.EMPTY);
+    client.put(splitKeyA, ByteString.EMPTY);
+    client.put(splitKeyA.concat(ByteString.copyFromUtf8("1")), ByteString.EMPTY);
+    client.put(splitKeyA.concat(ByteString.copyFromUtf8("2")), ByteString.EMPTY);
+    client.put(splitKeyA.concat(ByteString.copyFromUtf8("3")), ByteString.EMPTY);
+    client.put(splitKeyB.concat(ByteString.copyFromUtf8("1")), ByteString.EMPTY);
+    Assert.assertEquals(6, client.scan(ByteString.EMPTY, 7).size());
+    Assert.assertEquals(0, client.scan(ByteString.EMPTY, -1).size());
+    client.deleteRange(ByteString.EMPTY, ByteString.EMPTY);
+  }
+
+  @Test
   public void validate() {
     baseTest(100, 100, 100, 100, false, false, false, false, false);
     baseTest(100, 100, 100, 100, false, true, true, true, true);
@@ -449,7 +497,9 @@ public class RawKVClientTest extends BaseRawKVTest {
       int i = cnt;
       completionService.submit(
           () -> {
-            for (int j = 0; j < base; j++) checkDelete(remainingKeys.get(i * base + j).getKey());
+            for (int j = 0; j < base; j++) {
+              checkDelete(remainingKeys.get(i * base + j).getKey());
+            }
             return null;
           });
     }
@@ -955,6 +1005,7 @@ public class RawKVClientTest extends BaseRawKVTest {
   }
 
   private static class ByteStringComparator implements Comparator<ByteString> {
+
     @Override
     public int compare(ByteString startKey, ByteString endKey) {
       return FastByteComparisons.compareTo(startKey.toByteArray(), endKey.toByteArray());

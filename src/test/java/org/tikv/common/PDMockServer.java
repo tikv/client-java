@@ -23,29 +23,37 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.util.Deque;
 import java.util.Optional;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.function.Function;
 import org.tikv.kvproto.PDGrpc;
-import org.tikv.kvproto.Pdpb.*;
+import org.tikv.kvproto.Pdpb.GetMembersRequest;
+import org.tikv.kvproto.Pdpb.GetMembersResponse;
+import org.tikv.kvproto.Pdpb.GetRegionByIDRequest;
+import org.tikv.kvproto.Pdpb.GetRegionRequest;
+import org.tikv.kvproto.Pdpb.GetRegionResponse;
+import org.tikv.kvproto.Pdpb.GetStoreRequest;
+import org.tikv.kvproto.Pdpb.GetStoreResponse;
+import org.tikv.kvproto.Pdpb.TsoRequest;
+import org.tikv.kvproto.Pdpb.TsoResponse;
 
 public class PDMockServer extends PDGrpc.PDImplBase {
-  public int port;
+  private int port;
   private long clusterId;
-
   private Server server;
 
-  public void addGetMemberResp(GetMembersResponse r) {
-    getMembersResp.addLast(Optional.ofNullable(r));
-  }
+  private Function<GetMembersRequest, GetMembersResponse> getMembersListener;
+  private Function<GetStoreRequest, GetStoreResponse> getStoreListener;
+  private Function<GetRegionRequest, GetRegionResponse> getRegionListener;
+  private Function<GetRegionByIDRequest, GetRegionResponse> getRegionByIDListener;
 
-  private final Deque<java.util.Optional<GetMembersResponse>> getMembersResp =
-      new LinkedBlockingDeque<java.util.Optional<GetMembersResponse>>();
+  public void addGetMembersListener(Function<GetMembersRequest, GetMembersResponse> func) {
+    getMembersListener = func;
+  }
 
   @Override
   public void getMembers(GetMembersRequest request, StreamObserver<GetMembersResponse> resp) {
     try {
-      resp.onNext(getMembersResp.getFirst().get());
+      resp.onNext(Optional.ofNullable(getMembersListener.apply(request)).get());
       resp.onCompleted();
     } catch (Exception e) {
       resp.onError(Status.INTERNAL.asRuntimeException());
@@ -72,47 +80,42 @@ public class PDMockServer extends PDGrpc.PDImplBase {
     };
   }
 
-  public void addGetRegionResp(GetRegionResponse r) {
-    getRegionResp.addLast(r);
+  public void addGetRegionListener(Function<GetRegionRequest, GetRegionResponse> func) {
+    getRegionListener = func;
   }
-
-  private final Deque<GetRegionResponse> getRegionResp = new LinkedBlockingDeque<>();
 
   @Override
   public void getRegion(GetRegionRequest request, StreamObserver<GetRegionResponse> resp) {
     try {
-      resp.onNext(getRegionResp.removeFirst());
+      resp.onNext(getRegionListener.apply(request));
       resp.onCompleted();
     } catch (Exception e) {
       resp.onError(Status.INTERNAL.asRuntimeException());
     }
   }
 
-  public void addGetRegionByIDResp(GetRegionResponse r) {
-    getRegionByIDResp.addLast(r);
+  public void addGetRegionByIDListener(Function<GetRegionByIDRequest, GetRegionResponse> func) {
+    getRegionByIDListener = func;
   }
-
-  private final Deque<GetRegionResponse> getRegionByIDResp = new LinkedBlockingDeque<>();
 
   @Override
   public void getRegionByID(GetRegionByIDRequest request, StreamObserver<GetRegionResponse> resp) {
     try {
-      resp.onNext(getRegionByIDResp.removeFirst());
+      resp.onNext(getRegionByIDListener.apply(request));
       resp.onCompleted();
     } catch (Exception e) {
       resp.onError(Status.INTERNAL.asRuntimeException());
     }
   }
 
-  public void addGetStoreResp(GetStoreResponse r) {
-    getStoreResp.addLast(Optional.ofNullable(r));
+  public void addGetStoreListener(Function<GetStoreRequest, GetStoreResponse> func) {
+    getStoreListener = func;
   }
 
-  private final Deque<Optional<GetStoreResponse>> getStoreResp = new LinkedBlockingDeque<>();
-
+  @Override
   public void getStore(GetStoreRequest request, StreamObserver<GetStoreResponse> resp) {
     try {
-      resp.onNext(getStoreResp.removeFirst().get());
+      resp.onNext(Optional.ofNullable(getStoreListener.apply(request)).get());
       resp.onCompleted();
     } catch (Exception e) {
       resp.onError(Status.INTERNAL.asRuntimeException());
@@ -120,10 +123,16 @@ public class PDMockServer extends PDGrpc.PDImplBase {
   }
 
   public void start(long clusterId) throws IOException {
+    int port;
     try (ServerSocket s = new ServerSocket(0)) {
       port = s.getLocalPort();
     }
+    start(clusterId, port);
+  }
+
+  public void start(long clusterId, int port) throws IOException {
     this.clusterId = clusterId;
+    this.port = port;
     server = ServerBuilder.forPort(port).addService(this).build().start();
 
     Runtime.getRuntime().addShutdownHook(new Thread(PDMockServer.this::stop));
@@ -137,5 +146,9 @@ public class PDMockServer extends PDGrpc.PDImplBase {
 
   public long getClusterId() {
     return clusterId;
+  }
+
+  public long getPort() {
+    return port;
   }
 }

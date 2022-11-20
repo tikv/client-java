@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  format:
+    name: Check Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 8
+        uses: actions/setup-java@v2
+        with:
+          java-version: '8.0'
+          distribution: 'adopt'
+      - run: |
+          ./dev/javafmt
+          if [[ $(git diff) != "" ]]
+          then
+              echo "code format error, please run the following commands:"
+              echo "   ./dev/javafmt"
+              exit 1
+          fi
+
+  integration-test:
+    name: Integration Test - ${{ matrix.tikv_version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tikv_version: [nightly, v5.0.4, v5.3.0, v5.4.0]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 8
+        uses: actions/setup-java@v2
+        with:
+          java-version: '8.0'
+          distribution: 'adopt'
+      - name: Install TiUP
+        run: curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
+      - name: Start TiUP Playground
+        run: |
+          # Start TiKV in APIV1TTL
+          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> raw.out 2>&1 &
+
+          # The first run of `tiup` has to download all components so it'll take longer.
+          sleep 1m 30s
+
+          # Start TiKV in APIV1
+          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> txn.out 2>&1 &
+
+          sleep 30s
+
+          # Parse PD address from `tiup` output
+          echo "RAWKV_PD_ADDRESSES=$(cat raw.out | grep -oP '(?<=PD client endpoints: \[)[0-9\.:]+(?=\])')" >> $GITHUB_ENV
+          echo "TXNKV_PD_ADDRESSES=$(cat txn.out | grep -oP '(?<=PD client endpoints: \[)[0-9\.:]+(?=\])')" >> $GITHUB_ENV
+
+          # Log the output
+          echo "$(cat raw.out)" >&2
+          echo "$(cat txn.out)" >&2
+      - name: Run Integration Test
+        run: mvn clean test
+      - name: Upload coverage
+        uses: codecov/codecov-action@v2
+        with:
+          files: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
+          fail_ci_if_error: true
+          verbose: true
