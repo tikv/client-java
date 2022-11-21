@@ -384,8 +384,10 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
 
     // Resolve locks
-    // To be backward-compatible with TiKV < v5.0.0, which does not have `error` in `ScanResponse`
-    // See https://github.com/pingcap/kvproto/pull/697
+    // Note:
+    //   Memory lock conflict is returned by both `ScanResponse.error` & `ScanResponse.pairs[0].error`,
+    //   while other key errors are returned by `ScanResponse.pairs.error`
+    //   See https://github.com/pingcap/kvproto/pull/697
     List<Lock> locks = new ArrayList<>();
     for (KvPair kvPair : resp.getPairsList()) {
       if (kvPair.hasError()) {
