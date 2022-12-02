@@ -210,7 +210,7 @@ cd java-client-example
 <pre><code class="language-xml">&lt;dependency&gt;
   &lt;groupId&gt;org.tikv&lt;/groupId&gt;
   &lt;artifactId&gt;tikv-client-java&lt;/artifactId&gt;
-  &lt;version&gt;3.1.0&lt;/version&gt;
+  &lt;version&gt;3.3.0&lt;/version&gt;
 &lt;/dependency&gt;
 &lt;dependency&gt;
   &lt;groupId&gt;org.slf4j&lt;/groupId&gt;
@@ -293,7 +293,7 @@ import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
 public class Main {
-  public static void main() {
+  public static void main(String[] args) throws Exception {
     // You MUST create a raw configuration if you are using RawKVClient.
     TiConfiguration conf = TiConfiguration.createRawDefault(&quot;127.0.0.1:2379&quot;);
     TiSession session = TiSession.create(conf);
@@ -334,7 +334,7 @@ public class Main {
 import org.tikv.common.TiConfiguration.ApiVersion;
 
 public class Main {
-  public static void main() {
+  public static void main(String[] args) throws Exception {
     TiConfiguration conf = TiConfiguration.createRawDefault(&quot;127.0.0.1:2379&quot;);
     conf.setApiVersion(ApiVersion.V2);
     try(TiSession session = TiSession.create(conf)) {
@@ -383,7 +383,7 @@ import org.tikv.txn.TwoPhaseCommitter;
 
 public class App {
     public static void main(String[] args) throws Exception {
-        TiConfiguration conf = TiConfiguration.createDefault(&quot;127.0.0.1:2389&quot;);
+        TiConfiguration conf = TiConfiguration.createDefault(&quot;127.0.0.1:2379&quot;);
         try (TiSession session = TiSession.create(conf)) {
             // two-phrase write
             long startTS = session.getTimestamp().getVersion();
