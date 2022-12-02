@@ -4,18 +4,17 @@
 
 ## TiKV JAVA Client
 
-A Java client for [TiDB](https://github.com/pingcap/tidb)/[TiKV](https://github.com/tikv/tikv).
+A Java client for [TiKV](https://github.com/tikv/tikv).
 It is supposed to:
 + Communicate via [gRPC](http://www.grpc.io/)
 + Talk to Placement Driver searching for a region
-+ Talk to TiKV for reading/writing data and the resulted data is encoded/decoded just like what we do in TiDB.
-+ Talk to Coprocessor for calculation pushdown
++ Talk to TiKV for reading/writing data
 
 ## Quick Start
 
-> TiKV Java Client is designed to communicate with [pd](https://github.com/tikv/pd) and [tikv](https://github.com/tikv/tikv), please run TiKV and PD in advance.
+> TiKV Java Client is designed to communicate with [PD](https://github.com/tikv/pd) and [TiKV](https://github.com/tikv/tikv), please run PD and TiKV in advance.
 
-Build java client from source file:
+Build Java client from source file:
 
 ```sh
 mvn clean install -Dmaven.test.skip=true
@@ -27,11 +26,27 @@ Add maven dependency to `pom.xml`:
 <dependency>
 	<groupId>org.tikv</groupId>
 	<artifactId>tikv-client-java</artifactId>
-	<version>3.1.0</version>
+	<version>3.3.0</version>
 </dependency>
 ```
 
-Create a RawKVClient and communicates with TiKV:
+Create a transactional `KVClient` and communicates with TiKV:
+
+```java
+import org.tikv.common.TiConfiguration;
+import org.tikv.common.TiSession;
+import org.tikv.txn.KVClient;
+
+public class Main {
+	public static void main(String[] args) throws Exception {
+		TiConfiguration conf = TiConfiguration.createDefault(YOUR_PD_ADDRESSES);
+		TiSession session = TiSession.create(conf);
+		KVClient client = session.createKVClient();
+	}
+}
+```
+
+Or create a `RawKVClient` if you don't need the transaction semantic:
 
 ```java
 import org.tikv.common.TiConfiguration;
@@ -39,8 +54,7 @@ import org.tikv.common.TiSession;
 import org.tikv.raw.RawKVClient;
 
 public class Main {
-	public static void main() {
-		// You MUST create a raw configuration if you are using RawKVClient.
+	public static void main(String[] args) throws Exception {
 		TiConfiguration conf = TiConfiguration.createRawDefault(YOUR_PD_ADDRESSES);
 		TiSession session = TiSession.create(conf);
 		RawKVClient client = session.createRawClient();
@@ -48,7 +62,7 @@ public class Main {
 }
 ```
 
-Find more demo in [KVRawClientTest](https://github.com/birdstorm/KVRawClientTest/)
+Find more demo in [TiKV Java Client User Documents](https://tikv.github.io/client-java/examples/introduction.html)
 
 ## Documentation
 

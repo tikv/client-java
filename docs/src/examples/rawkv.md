@@ -15,7 +15,7 @@ import org.tikv.raw.RawKVClient;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
 public class Main {
-  public static void main() {
+  public static void main(String[] args) throws Exception {
     // You MUST create a raw configuration if you are using RawKVClient.
     TiConfiguration conf = TiConfiguration.createRawDefault("127.0.0.1:2379");
     TiSession session = TiSession.create(conf);
@@ -61,7 +61,7 @@ To enable the API V2 mode, users need to specify the API version of the client.
 import org.tikv.common.TiConfiguration.ApiVersion;
 
 public class Main {
-  public static void main() {
+  public static void main(String[] args) throws Exception {
     TiConfiguration conf = TiConfiguration.createRawDefault("127.0.0.1:2379");
     conf.setApiVersion(ApiVersion.V2);
     try(TiSession session = TiSession.create(conf)) {
