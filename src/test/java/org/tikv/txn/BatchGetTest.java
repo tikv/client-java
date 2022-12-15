@@ -36,7 +36,6 @@ public class BatchGetTest extends TXNTest {
   @Test
   public void BatchGetResolveLockTest() throws Exception {
     long lockTTL = 20000L;
-    long startTS = session.getTimestamp().getVersion();
     String key1 = "batchGetResolveLockTestKey1";
     String key2 = "batchGetResolveLockTestKey2";
     String val1 = "val1";
@@ -51,6 +50,7 @@ public class BatchGetTest extends TXNTest {
     // run 2PC background
     new Thread(
             () -> {
+              long startTS = session.getTimestamp().getVersion();
               try (TwoPhaseCommitter twoPhaseCommitter =
                   new TwoPhaseCommitter(session, startTS, lockTTL)) {
                 byte[] primaryKey = key1.getBytes("UTF-8");
@@ -95,6 +95,7 @@ public class BatchGetTest extends TXNTest {
       // Timestamp
       assertEquals(ByteString.copyFromUtf8(val1), kvPairs.get(0).getValue());
       assertEquals(ByteString.copyFromUtf8(val2), kvPairs.get(1).getValue());
+      System.out.println(kvPairs);
       // wait 2PC finish
       Thread.sleep(10000);
     }
