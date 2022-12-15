@@ -50,6 +50,7 @@ public class KVClient implements AutoCloseable {
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
   private final ExecutorService executorService;
+  private Set<Long> resolvedLocks = new HashSet<>();
 
   public KVClient(TiConfiguration conf, RegionStoreClientBuilder clientBuilder, TiSession session) {
     Objects.requireNonNull(conf, "conf is null");
@@ -223,6 +224,10 @@ public class KVClient implements AutoCloseable {
 
     if (oldRegion.equals(currentRegion)) {
       RegionStoreClient client = clientBuilder.build(batch.getRegion());
+      // set resolvedLocks for the new client
+      if (!resolvedLocks.isEmpty()) {
+        client.addResolvedLocks(version, resolvedLocks);
+      }
       try {
         return client.batchGet(backOffer, batch.getKeys(), version);
       } catch (final TiKVException e) {
@@ -230,7 +235,8 @@ public class KVClient implements AutoCloseable {
         clientBuilder.getRegionManager().invalidateRegion(batch.getRegion());
         logger.warn("ReSplitting ranges for BatchGetRequest", e);
 
-        // retry
+        // get resolved locks and retry
+        resolvedLocks = client.getResolvedLocks(version);
         return doSendBatchGetWithRefetchRegion(backOffer, batch, version);
       }
     } else {
