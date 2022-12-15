@@ -1,7 +1,23 @@
+/*
+ * Copyright 2022 TiKV Project Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package org.tikv.txn;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
 
 import com.google.protobuf.ByteString;
 import java.util.Arrays;
@@ -9,7 +25,6 @@ import java.util.List;
 import org.junit.Test;
 import org.tikv.common.BytePairWrapper;
 import org.tikv.common.ByteWrapper;
-import org.tikv.common.exception.KeyException;
 import org.tikv.common.util.BackOffer;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
@@ -48,9 +63,7 @@ public class BatchGetTest extends TXNTest {
                 // commit secondary key
                 List<ByteWrapper> keys = Arrays.asList(new ByteWrapper(secondary));
                 twoPhaseCommitter.commitSecondaryKeys(keys.iterator(), commitTS, 5000);
-              } catch (Exception e) {
-                KeyException keyException = (KeyException) e.getCause().getCause();
-                assertNotSame("", keyException.getKeyErr().getCommitTsExpired().toString());
+              } catch (Exception ignore) {
               }
             })
         .start();
@@ -69,8 +82,5 @@ public class BatchGetTest extends TXNTest {
       assertEquals(ByteString.copyFromUtf8(val1), kvPairs.get(0).getValue());
       assertEquals(ByteString.copyFromUtf8(val2), kvPairs.get(1).getValue());
     }
-
-    // wait 2PC commit finish
-    Thread.sleep(10000);
   }
 }
