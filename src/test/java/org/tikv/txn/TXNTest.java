@@ -41,7 +41,7 @@ import org.tikv.kvproto.Kvrpcpb;
 
 public class TXNTest extends BaseTxnKVTest {
   static final int DEFAULT_TTL = 10;
-  private TiSession session;
+  public TiSession session;
   RegionStoreClient.RegionStoreClientBuilder builder;
 
   @Before
