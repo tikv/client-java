@@ -50,7 +50,7 @@ public class KVClient implements AutoCloseable {
   private final RegionStoreClientBuilder clientBuilder;
   private final TiConfiguration conf;
   private final ExecutorService executorService;
-  private Set<Long> resolvedLocks = new HashSet<>();
+  private Set<Long> resolvedLocks = Collections.emptySet();
 
   public KVClient(TiConfiguration conf, RegionStoreClientBuilder clientBuilder, TiSession session) {
     Objects.requireNonNull(conf, "conf is null");
