@@ -49,6 +49,10 @@ public class RegionStoreClientTest extends MockServerTest {
     return createClient("3.0.12");
   }
 
+  private RegionStoreClient createClientV4() {
+    return createClient("6.1.0");
+  }
+
   private RegionStoreClient createClient(String version) {
     Metapb.Store meta =
         Metapb.Store.newBuilder()
@@ -185,6 +189,27 @@ public class RegionStoreClientTest extends MockServerTest {
     } catch (Exception e) {
       assertTrue(true);
     }
+    server.clearAllMap();
+    client.close();
+  }
+
+  @Test
+  public void resolveLocksTest() {
+    doResolveLocksTest(createClientV4());
+  }
+
+  public void doResolveLocksTest(RegionStoreClient client) {
+    server.put("key0", "value0");
+
+    ByteString key1 = ByteString.copyFromUtf8("key1");
+    ByteString value1 = ByteString.copyFromUtf8("value1");
+    // server.put(key1, value1);
+    server.putWithLock(key1, value1, ByteString.copyFromUtf8("key0"), 100L, 1L);
+    server.putTxnStatus(100L, 200L);
+
+    ByteString value = client.get(defaultBackOff(), key1, 300);
+    assertEquals(value1, value);
+
     server.clearAllMap();
     client.close();
   }

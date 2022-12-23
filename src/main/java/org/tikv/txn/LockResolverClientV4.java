@@ -300,6 +300,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
 
     while (true) {
       TiRegion primaryKeyRegion = regionManager.getRegionByKey(primary);
+      logger.info("before getTxnStatus, primary: " + primary + ", region: " + primaryKeyRegion);
       // new RegionStoreClient for PrimaryKey
       RegionStoreClient primaryKeyRegionStoreClient = clientBuilder.build(primary);
       KVErrorHandler<Kvrpcpb.CheckTxnStatusResponse> handler =
