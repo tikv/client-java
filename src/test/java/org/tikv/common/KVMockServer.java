@@ -135,6 +135,10 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     lockMap.put(toRawKey(key), () -> lock);
   }
 
+  public void removeLock(ByteString key) {
+    lockMap.remove(toRawKey(key));
+  }
+
   // use to save transaction status
   // commitTs: 0: rollbacked, > 0: committed
   // not support "locked" yet
@@ -449,7 +453,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         lockMap.entrySet().removeIf(entry -> entry.getValue().get().getLockVersion() == startTs);
       } else {
         for (int i = 0; i < request.getKeysCount(); i++) {
-          lockMap.remove(request.getKeys(i));
+          removeLock(request.getKeys(i));
         }
       }
 

@@ -199,16 +199,26 @@ public class RegionStoreClientTest extends MockServerTest {
   }
 
   public void doResolveLocksTest(RegionStoreClient client) {
-    server.put("key0", "value0");
+    ByteString primaryKey = ByteString.copyFromUtf8("primary");
+    server.put(primaryKey, ByteString.copyFromUtf8("value0"));
 
+    // get with committed lock.
     ByteString key1 = ByteString.copyFromUtf8("key1");
     ByteString value1 = ByteString.copyFromUtf8("value1");
-    // server.put(key1, value1);
-    server.putWithLock(key1, value1, ByteString.copyFromUtf8("key0"), 100L, 1L);
-    server.putTxnStatus(100L, 200L);
+    server.putWithLock(key1, value1, primaryKey, 100L, 1L);
+    server.putTxnStatus(100L, 110L);
 
-    ByteString value = client.get(defaultBackOff(), key1, 300);
-    assertEquals(value1, value);
+    ByteString expected = client.get(defaultBackOff(), key1, 200);
+    assertEquals(value1, expected);
+
+    // get with not expired lock.
+//    ByteString key2 = ByteString.copyFromUtf8("key2");
+//    ByteString value2 = ByteString.copyFromUtf8("value2");
+//    server.putWithLock(key2, value2, key2, 200L, 3000L);
+//    server.putTxnStatus(200L, 0L);
+//
+//    expected = client.get(defaultBackOff(), key2, 300);
+//    assertEquals(value2, expected);
 
     server.clearAllMap();
     client.close();
