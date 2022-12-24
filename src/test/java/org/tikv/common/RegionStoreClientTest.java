@@ -17,15 +17,18 @@
 
 package org.tikv.common;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import java.util.List;
 import java.util.Optional;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.tikv.common.exception.GrpcException;
+import org.tikv.common.exception.KeyException;
+import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
@@ -40,6 +43,7 @@ import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Metapb;
 
 public class RegionStoreClientTest extends MockServerTest {
+  private static final Logger logger = LoggerFactory.getLogger(MockServerTest.class);
 
   private RegionStoreClient createClientV2() {
     return createClient("2.1.19");
@@ -165,30 +169,48 @@ public class RegionStoreClientTest extends MockServerTest {
 
   @Test
   public void scanTest() {
-    doScanTest(createClientV3());
+    doScanTest(createClientV4());
   }
 
   public void doScanTest(RegionStoreClient client) {
+    TiTimestamp startTs = session.getTimestamp();
+
     server.put("key1", "value1");
     server.put("key2", "value2");
     server.put("key4", "value4");
     server.put("key5", "value5");
-    List<Kvrpcpb.KvPair> kvs = client.scan(defaultBackOff(), ByteString.copyFromUtf8("key2"), 1);
+    List<Kvrpcpb.KvPair> kvs = client.scan(defaultBackOff(), ByteString.copyFromUtf8("key2"), startTs.getVersion());
     assertEquals(3, kvs.size());
     kvs.forEach(
         kv ->
             assertEquals(
                 kv.getKey().toStringUtf8().replace("key", "value"), kv.getValue().toStringUtf8()));
 
+    // put region error
     server.putError(
         "error1",
         () -> Errorpb.Error.newBuilder().setServerIsBusy(ServerIsBusy.getDefaultInstance()));
     try {
-      client.scan(defaultBackOff(), ByteString.copyFromUtf8("error1"), 1);
+      client.scan(defaultBackOff(), ByteString.copyFromUtf8("error1"), startTs.getVersion());
       fail();
     } catch (Exception e) {
       assertTrue(true);
     }
+    server.removeError("error1");
+
+    // put key error
+    server.putWithLock("key6", "value6", "key6", startTs.getVersion(), 3000L);
+    server.putTxnStatus(startTs.getVersion(), 0L, ByteString.copyFromUtf8("key6"));
+    assertTrue(server.hasLock(ByteString.copyFromUtf8("key6")));
+    try {
+      client.scan(defaultBackOff(), ByteString.copyFromUtf8("key2"), startTs.getVersion());
+      fail();
+    } catch (Exception e) {
+      KeyException keyException = (KeyException) e.getCause();
+      assertTrue(keyException.getMessage().contains("org.tikv.txn.Lock"));
+    }
+    assertTrue(server.hasLock(ByteString.copyFromUtf8("key6")));
+
     server.clearAllMap();
     client.close();
   }
@@ -202,23 +224,59 @@ public class RegionStoreClientTest extends MockServerTest {
     ByteString primaryKey = ByteString.copyFromUtf8("primary");
     server.put(primaryKey, ByteString.copyFromUtf8("value0"));
 
-    // get with committed lock.
-    ByteString key1 = ByteString.copyFromUtf8("key1");
-    ByteString value1 = ByteString.copyFromUtf8("value1");
-    server.putWithLock(key1, value1, primaryKey, 100L, 1L);
-    server.putTxnStatus(100L, 110L);
+    // get with committed lock
+    {
+      TiTimestamp startTs = session.getTimestamp();
+      TiTimestamp commitTs = session.getTimestamp();
+      logger.info("startTs: " + startTs);
 
-    ByteString expected = client.get(defaultBackOff(), key1, 200);
-    assertEquals(value1, expected);
+      ByteString key1 = ByteString.copyFromUtf8("key1");
+      ByteString value1 = ByteString.copyFromUtf8("value1");
+      server.putWithLock(key1, value1, primaryKey, startTs.getVersion(), 1L);
+      server.putTxnStatus(startTs.getVersion(), commitTs.getVersion());
+      assertTrue(server.hasLock(key1));
+
+      ByteString expected1 = client.get(defaultBackOff(), key1, 200);
+      assertEquals(value1, expected1);
+      assertFalse(server.hasLock(key1));
+    }
 
     // get with not expired lock.
-//    ByteString key2 = ByteString.copyFromUtf8("key2");
-//    ByteString value2 = ByteString.copyFromUtf8("value2");
-//    server.putWithLock(key2, value2, key2, 200L, 3000L);
-//    server.putTxnStatus(200L, 0L);
-//
-//    expected = client.get(defaultBackOff(), key2, 300);
-//    assertEquals(value2, expected);
+    {
+      TiTimestamp startTs = session.getTimestamp();
+      logger.info("startTs: " + startTs);
+
+      ByteString key2 = ByteString.copyFromUtf8("key2");
+      ByteString value2 = ByteString.copyFromUtf8("value2");
+      server.putWithLock(key2, value2, key2, startTs.getVersion(), 3000L);
+      server.putTxnStatus(startTs.getVersion(), 0L, key2);
+      assertTrue(server.hasLock(key2));
+
+      try {
+        client.get(defaultBackOff(), key2, session.getTimestamp().getVersion());
+        fail();
+      } catch (Exception e) {
+        KeyException keyException = (KeyException) e.getCause();
+        assertTrue(keyException.getMessage().contains("org.tikv.txn.Lock"));
+      }
+      assertTrue(server.hasLock(key2));
+    }
+
+    // get with expired lock.
+    {
+      TiTimestamp startTs = session.getTimestamp();
+      logger.info("startTs: " + startTs);
+
+      ByteString key3 = ByteString.copyFromUtf8("key3");
+      ByteString value3 = ByteString.copyFromUtf8("value3");
+      server.putWithLock(key3, value3, key3, startTs.getVersion(), 100L);
+      server.putTxnStatus(startTs.getVersion(), 0L, key3);
+      assertTrue(server.hasLock(key3));
+
+      ByteString expected3 = client.get(defaultBackOff(), key3, session.getTimestamp().getVersion());
+      assertEquals(expected3, value3);
+      assertFalse(server.hasLock(key3));
+    }
 
     server.clearAllMap();
     client.close();

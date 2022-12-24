@@ -399,6 +399,14 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       ResolveLockResult resolveLockResult =
           lockResolverClient.resolveLocks(backOffer, version, locks, forWrite);
       addResolvedLocks(version, resolveLockResult.getResolvedLocks());
+
+      long msBeforeExpired = resolveLockResult.getMsBeforeTxnExpired();
+      if (msBeforeExpired > 0) {
+        // if not resolve all locks, we wait and retry
+        backOffer.doBackOffWithMaxSleep(
+                BoTxnLockFast, msBeforeExpired, new KeyException(locks.toString()));
+      }
+
       return false;
     }
 
