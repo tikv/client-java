@@ -115,7 +115,6 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
 
     for (Lock l : locks) {
       TxnStatus status = getTxnStatusFromLock(bo, l, callerStartTS);
-      logger.info("getTxnStatusFromLock: commitTs:" + status.getCommitTS() + ", ttl:" + status.getTtl() + ", action:" + status.getAction());
 
       if (status.getTtl() == 0) {
         Set<RegionVerID> cleanRegion =
@@ -301,7 +300,6 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
 
     while (true) {
       TiRegion primaryKeyRegion = regionManager.getRegionByKey(primary);
-      logger.info("before getTxnStatus, primary: " + primary + ", region: " + primaryKeyRegion);
       // new RegionStoreClient for PrimaryKey
       RegionStoreClient primaryKeyRegionStoreClient = clientBuilder.build(primary);
       KVErrorHandler<Kvrpcpb.CheckTxnStatusResponse> handler =

@@ -80,8 +80,8 @@ public class PDMockServer extends PDGrpc.PDImplBase {
 
       private void updateTso() {
         logical++;
-        if (logical >= (1<<18)) {
-          logical = 2;
+        if (logical >= (1 << 18)) {
+          logical = 0;
           physical++;
         }
         physical = Math.max(physical, System.currentTimeMillis());

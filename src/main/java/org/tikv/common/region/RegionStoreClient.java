@@ -404,7 +404,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       if (msBeforeExpired > 0) {
         // if not resolve all locks, we wait and retry
         backOffer.doBackOffWithMaxSleep(
-                BoTxnLockFast, msBeforeExpired, new KeyException(locks.toString()));
+            BoTxnLockFast, msBeforeExpired, new KeyException(locks.toString()));
       }
 
       return false;

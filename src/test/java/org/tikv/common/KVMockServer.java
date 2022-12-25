@@ -126,7 +126,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     regionErrMap.remove(toRawKey(key.getBytes(StandardCharsets.UTF_8)));
   }
 
-  // use to "prewrite" key-value without "commit"
+  // putWithLock is used to "prewrite" key-value without "commit"
   public void putWithLock(
       ByteString key, ByteString value, ByteString primaryKey, Long startTs, Long ttl) {
     put(key, value);
@@ -140,12 +140,6 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     lockMap.put(toRawKey(key), () -> lock);
   }
 
-  public void putWithLock(
-          String key, String value, String primaryKey, Long startTs, Long ttl) {
-    putWithLock(ByteString.copyFromUtf8(key), ByteString.copyFromUtf8(value),
-            ByteString.copyFromUtf8(primaryKey), startTs, ttl);
-  }
-
   public void removeLock(ByteString key) {
     lockMap.remove(toRawKey(key));
   }
@@ -154,30 +148,33 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     return lockMap.containsKey(toRawKey(key));
   }
 
-  // use to save transaction status
+  // putTxnStatus is used to save transaction status
   // commitTs > 0: committed
   // commitTs == 0 && key is empty: rollback
   // commitTs == 0 && key not empty: locked by key
   public void putTxnStatus(Long startTs, Long commitTs, ByteString key) {
     if (commitTs > 0 || (commitTs == 0 && key.isEmpty())) { // committed || rollback
       Kvrpcpb.CheckTxnStatusResponse.Builder txnStatus =
-              Kvrpcpb.CheckTxnStatusResponse.newBuilder()
-                      .setCommitVersion(commitTs)
-                      .setLockTtl(0)
-                      .setAction(Kvrpcpb.Action.NoAction);
+          Kvrpcpb.CheckTxnStatusResponse.newBuilder()
+              .setCommitVersion(commitTs)
+              .setLockTtl(0)
+              .setAction(Kvrpcpb.Action.NoAction);
       txnStatusMap.put(startTs, () -> txnStatus);
-    } else { // locking
+    } else { // locked
       Kvrpcpb.LockInfo.Builder lock = lockMap.get(toRawKey(key)).get();
       Kvrpcpb.CheckTxnStatusResponse.Builder txnStatus =
-              Kvrpcpb.CheckTxnStatusResponse.newBuilder()
-                      .setCommitVersion(commitTs)
-                      .setLockTtl(lock.getLockTtl())
-                      .setAction(Kvrpcpb.Action.NoAction)
-                      .setLockInfo(lock);
+          Kvrpcpb.CheckTxnStatusResponse.newBuilder()
+              .setCommitVersion(commitTs)
+              .setLockTtl(lock.getLockTtl())
+              .setAction(Kvrpcpb.Action.NoAction)
+              .setLockInfo(lock);
       txnStatusMap.put(startTs, () -> txnStatus);
     }
   }
 
+  // putTxnStatus is used to save transaction status
+  // commitTs > 0: committed
+  // commitTs == 0: rollback
   public void putTxnStatus(Long startTs, Long commitTs) {
     putTxnStatus(startTs, commitTs, ByteString.EMPTY);
   }
@@ -368,16 +365,18 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         builder.addAllPairs(
             kvs.entrySet()
                 .stream()
-                .map(kv -> {
-                  Kvrpcpb.KvPair.Builder kvBuilder = Kvrpcpb.KvPair.newBuilder()
+                .map(
+                    kv -> {
+                      Kvrpcpb.KvPair.Builder kvBuilder =
+                          Kvrpcpb.KvPair.newBuilder()
                               .setKey(kv.getKey().toByteString())
                               .setValue(kv.getValue());
-                  Supplier<Kvrpcpb.LockInfo.Builder> lock = lockMap.get(kv.getKey());
-                  if (lock != null) {
-                    kvBuilder.setError(Kvrpcpb.KeyError.newBuilder().setLocked(lock.get()));
-                  }
-                  return kvBuilder.build();
-                })
+                      Supplier<Kvrpcpb.LockInfo.Builder> lock = lockMap.get(kv.getKey());
+                      if (lock != null) {
+                        kvBuilder.setError(Kvrpcpb.KeyError.newBuilder().setLocked(lock.get()));
+                      }
+                      return kvBuilder.build();
+                    })
                 .collect(Collectors.toList()));
       }
       responseObserver.onNext(builder.build());
@@ -436,7 +435,6 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     logger.info("KVMockServer.kvCheckTxnStatus");
     try {
       Long startTs = request.getLockTs();
-      Long callerStartTs = request.getCallerStartTs();
       Long currentTs = request.getCurrentTs();
       logger.info("kvCheckTxnStatus for txn: " + startTs);
       Kvrpcpb.CheckTxnStatusResponse.Builder builder = Kvrpcpb.CheckTxnStatusResponse.newBuilder();
@@ -451,10 +449,15 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       Supplier<Kvrpcpb.CheckTxnStatusResponse.Builder> txnStatus = txnStatusMap.get(startTs);
       if (txnStatus != null) {
         Kvrpcpb.CheckTxnStatusResponse resp = txnStatus.get().build();
-        if (resp.getCommitVersion() == 0 && resp.getLockTtl() > 0
-                && TiTimestamp.extractPhysical(startTs) + resp.getLockInfo().getLockTtl() < TiTimestamp.extractPhysical(currentTs)) {
+        if (resp.getCommitVersion() == 0
+            && resp.getLockTtl() > 0
+            && TiTimestamp.extractPhysical(startTs) + resp.getLockInfo().getLockTtl()
+                < TiTimestamp.extractPhysical(currentTs)) {
           ByteString key = resp.getLockInfo().getKey();
-          logger.info("kvCheckTxnStatus rollback expired txn: " + startTs + ", remove lock: " + key);
+          logger.info(
+              String.format(
+                  "kvCheckTxnStatus rollback expired txn: %d, remove lock: %s",
+                  startTs, key.toStringUtf8()));
           removeLock(key);
           putTxnStatus(startTs, 0L, ByteString.EMPTY);
           resp = txnStatusMap.get(startTs).get().build();
@@ -486,7 +489,10 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     try {
       Long startTs = request.getStartVersion();
       Long commitTs = request.getCommitVersion();
-      logger.info("kvResolveLock for txn: " + startTs + ", commitTs: " + commitTs + ", keys: " + request.getKeysCount());
+      logger.info(
+          String.format(
+              "kvResolveLock for txn: %d, commitTs: %d, keys: %d",
+              startTs, commitTs, request.getKeysCount()));
       Kvrpcpb.ResolveLockResponse.Builder builder = Kvrpcpb.ResolveLockResponse.newBuilder();
 
       Error e = verifyContext(request.getContext());
