@@ -29,6 +29,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.meta.TiTimestamp;
@@ -71,7 +72,7 @@ public class PDClientMockTest extends PDMockServerTest {
     }
   }
 
-  @Test
+  @Ignore
   public void testTso() throws Exception {
     try (PDClient client = session.getPDClient()) {
       TiTimestamp ts = client.getTimestamp(defaultBackOff());
