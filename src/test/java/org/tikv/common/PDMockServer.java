@@ -75,8 +75,17 @@ public class PDMockServer extends PDGrpc.PDImplBase {
   @Override
   public StreamObserver<TsoRequest> tso(StreamObserver<TsoResponse> resp) {
     return new StreamObserver<TsoRequest>() {
-      private int physical = 1;
-      private int logical = 0;
+      private long physical = System.currentTimeMillis();
+      private long logical = 0;
+
+      private void updateTso() {
+        logical++;
+        if (logical >= (1 << 18)) {
+          logical = 0;
+          physical++;
+        }
+        physical = Math.max(physical, System.currentTimeMillis());
+      }
 
       @Override
       public void onNext(TsoRequest value) {}
@@ -86,7 +95,8 @@ public class PDMockServer extends PDGrpc.PDImplBase {
 
       @Override
       public void onCompleted() {
-        resp.onNext(GrpcUtils.makeTsoResponse(clusterId, physical++, logical++));
+        updateTso();
+        resp.onNext(GrpcUtils.makeTsoResponse(clusterId, physical, logical));
         resp.onCompleted();
       }
     };
