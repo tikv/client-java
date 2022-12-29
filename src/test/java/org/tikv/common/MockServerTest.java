@@ -39,6 +39,8 @@ public class MockServerTest extends PDMockServerTest {
   public void setup() throws IOException {
     super.setup();
 
+    port = GrpcUtils.getFreePort();
+
     Metapb.Region r =
         Metapb.Region.newBuilder()
             .setRegionEpoch(Metapb.RegionEpoch.newBuilder().setConfVer(1).setVersion(2))
@@ -51,7 +53,7 @@ public class MockServerTest extends PDMockServerTest {
     List<Metapb.Store> s =
         ImmutableList.of(
             Metapb.Store.newBuilder()
-                .setAddress("localhost:1234")
+                .setAddress(LOCAL_ADDR + ":" + port)
                 .setVersion("5.0.0")
                 .setId(13)
                 .build());
@@ -70,6 +72,6 @@ public class MockServerTest extends PDMockServerTest {
           (request) -> Pdpb.GetStoreResponse.newBuilder().setStore(store).build());
     }
     server = new KVMockServer();
-    port = server.start(region);
+    server.start(region, port);
   }
 }
