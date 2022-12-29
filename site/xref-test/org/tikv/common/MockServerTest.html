@@ -47,40 +47,42 @@
 <a class="jxr_linenumber" name="L39" href="#L39">39</a>    <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">void</strong> setup() <strong class="jxr_keyword">throws</strong> IOException {
 <a class="jxr_linenumber" name="L40" href="#L40">40</a>      <strong class="jxr_keyword">super</strong>.setup();
 <a class="jxr_linenumber" name="L41" href="#L41">41</a>  
-<a class="jxr_linenumber" name="L42" href="#L42">42</a>      Metapb.Region r =
-<a class="jxr_linenumber" name="L43" href="#L43">43</a>          Metapb.Region.newBuilder()
-<a class="jxr_linenumber" name="L44" href="#L44">44</a>              .setRegionEpoch(Metapb.RegionEpoch.newBuilder().setConfVer(1).setVersion(2))
-<a class="jxr_linenumber" name="L45" href="#L45">45</a>              .setId(233)
-<a class="jxr_linenumber" name="L46" href="#L46">46</a>              .setStartKey(ByteString.EMPTY)
-<a class="jxr_linenumber" name="L47" href="#L47">47</a>              .setEndKey(ByteString.EMPTY)
-<a class="jxr_linenumber" name="L48" href="#L48">48</a>              .addPeers(Metapb.Peer.newBuilder().setId(11).setStoreId(13))
-<a class="jxr_linenumber" name="L49" href="#L49">49</a>              .build();
-<a class="jxr_linenumber" name="L50" href="#L50">50</a>  
-<a class="jxr_linenumber" name="L51" href="#L51">51</a>      List&lt;Metapb.Store&gt; s =
-<a class="jxr_linenumber" name="L52" href="#L52">52</a>          ImmutableList.of(
-<a class="jxr_linenumber" name="L53" href="#L53">53</a>              Metapb.Store.newBuilder()
-<a class="jxr_linenumber" name="L54" href="#L54">54</a>                  .setAddress(<span class="jxr_string">"localhost:1234"</span>)
-<a class="jxr_linenumber" name="L55" href="#L55">55</a>                  .setVersion(<span class="jxr_string">"5.0.0"</span>)
-<a class="jxr_linenumber" name="L56" href="#L56">56</a>                  .setId(13)
-<a class="jxr_linenumber" name="L57" href="#L57">57</a>                  .build());
-<a class="jxr_linenumber" name="L58" href="#L58">58</a>  
-<a class="jxr_linenumber" name="L59" href="#L59">59</a>      region =
-<a class="jxr_linenumber" name="L60" href="#L60">60</a>          <strong class="jxr_keyword">new</strong> TiRegion(
-<a class="jxr_linenumber" name="L61" href="#L61">61</a>              session.getConf(),
-<a class="jxr_linenumber" name="L62" href="#L62">62</a>              r,
-<a class="jxr_linenumber" name="L63" href="#L63">63</a>              r.getPeers(0),
-<a class="jxr_linenumber" name="L64" href="#L64">64</a>              r.getPeersList(),
-<a class="jxr_linenumber" name="L65" href="#L65">65</a>              s.stream().map(TiStore::<strong class="jxr_keyword">new</strong>).collect(Collectors.toList()));
-<a class="jxr_linenumber" name="L66" href="#L66">66</a>      leader.addGetRegionListener(
-<a class="jxr_linenumber" name="L67" href="#L67">67</a>          request -&gt; Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
-<a class="jxr_linenumber" name="L68" href="#L68">68</a>      <strong class="jxr_keyword">for</strong> (Metapb.Store store : s) {
-<a class="jxr_linenumber" name="L69" href="#L69">69</a>        leader.addGetStoreListener(
-<a class="jxr_linenumber" name="L70" href="#L70">70</a>            (request) -&gt; Pdpb.GetStoreResponse.newBuilder().setStore(store).build());
-<a class="jxr_linenumber" name="L71" href="#L71">71</a>      }
-<a class="jxr_linenumber" name="L72" href="#L72">72</a>      server = <strong class="jxr_keyword">new</strong> <a name="KVMockServer" href="../../../org/tikv/common/KVMockServer.html#KVMockServer">KVMockServer</a>();
-<a class="jxr_linenumber" name="L73" href="#L73">73</a>      port = server.start(region);
-<a class="jxr_linenumber" name="L74" href="#L74">74</a>    }
-<a class="jxr_linenumber" name="L75" href="#L75">75</a>  }
+<a class="jxr_linenumber" name="L42" href="#L42">42</a>      port = GrpcUtils.getFreePort();
+<a class="jxr_linenumber" name="L43" href="#L43">43</a>  
+<a class="jxr_linenumber" name="L44" href="#L44">44</a>      Metapb.Region r =
+<a class="jxr_linenumber" name="L45" href="#L45">45</a>          Metapb.Region.newBuilder()
+<a class="jxr_linenumber" name="L46" href="#L46">46</a>              .setRegionEpoch(Metapb.RegionEpoch.newBuilder().setConfVer(1).setVersion(2))
+<a class="jxr_linenumber" name="L47" href="#L47">47</a>              .setId(233)
+<a class="jxr_linenumber" name="L48" href="#L48">48</a>              .setStartKey(ByteString.EMPTY)
+<a class="jxr_linenumber" name="L49" href="#L49">49</a>              .setEndKey(ByteString.EMPTY)
+<a class="jxr_linenumber" name="L50" href="#L50">50</a>              .addPeers(Metapb.Peer.newBuilder().setId(11).setStoreId(13))
+<a class="jxr_linenumber" name="L51" href="#L51">51</a>              .build();
+<a class="jxr_linenumber" name="L52" href="#L52">52</a>  
+<a class="jxr_linenumber" name="L53" href="#L53">53</a>      List&lt;Metapb.Store&gt; s =
+<a class="jxr_linenumber" name="L54" href="#L54">54</a>          ImmutableList.of(
+<a class="jxr_linenumber" name="L55" href="#L55">55</a>              Metapb.Store.newBuilder()
+<a class="jxr_linenumber" name="L56" href="#L56">56</a>                  .setAddress(LOCAL_ADDR + <span class="jxr_string">":"</span> + port)
+<a class="jxr_linenumber" name="L57" href="#L57">57</a>                  .setVersion(<span class="jxr_string">"5.0.0"</span>)
+<a class="jxr_linenumber" name="L58" href="#L58">58</a>                  .setId(13)
+<a class="jxr_linenumber" name="L59" href="#L59">59</a>                  .build());
+<a class="jxr_linenumber" name="L60" href="#L60">60</a>  
+<a class="jxr_linenumber" name="L61" href="#L61">61</a>      region =
+<a class="jxr_linenumber" name="L62" href="#L62">62</a>          <strong class="jxr_keyword">new</strong> TiRegion(
+<a class="jxr_linenumber" name="L63" href="#L63">63</a>              session.getConf(),
+<a class="jxr_linenumber" name="L64" href="#L64">64</a>              r,
+<a class="jxr_linenumber" name="L65" href="#L65">65</a>              r.getPeers(0),
+<a class="jxr_linenumber" name="L66" href="#L66">66</a>              r.getPeersList(),
+<a class="jxr_linenumber" name="L67" href="#L67">67</a>              s.stream().map(TiStore::<strong class="jxr_keyword">new</strong>).collect(Collectors.toList()));
+<a class="jxr_linenumber" name="L68" href="#L68">68</a>      leader.addGetRegionListener(
+<a class="jxr_linenumber" name="L69" href="#L69">69</a>          request -&gt; Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
+<a class="jxr_linenumber" name="L70" href="#L70">70</a>      <strong class="jxr_keyword">for</strong> (Metapb.Store store : s) {
+<a class="jxr_linenumber" name="L71" href="#L71">71</a>        leader.addGetStoreListener(
+<a class="jxr_linenumber" name="L72" href="#L72">72</a>            (request) -&gt; Pdpb.GetStoreResponse.newBuilder().setStore(store).build());
+<a class="jxr_linenumber" name="L73" href="#L73">73</a>      }
+<a class="jxr_linenumber" name="L74" href="#L74">74</a>      server = <strong class="jxr_keyword">new</strong> <a name="KVMockServer" href="../../../org/tikv/common/KVMockServer.html#KVMockServer">KVMockServer</a>();
+<a class="jxr_linenumber" name="L75" href="#L75">75</a>      server.start(region, port);
+<a class="jxr_linenumber" name="L76" href="#L76">76</a>    }
+<a class="jxr_linenumber" name="L77" href="#L77">77</a>  }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>
