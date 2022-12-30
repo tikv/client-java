@@ -81,6 +81,7 @@ public class BackOffFunction {
     BoServerBusy,
     BoTxnNotFound,
     BoCheckTimeout,
-    BoCheckHealth
+    BoCheckHealth,
+    BoTsoBatchUsedUp
   }
 }
