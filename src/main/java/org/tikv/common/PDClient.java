@@ -867,7 +867,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private static BackOffer defaultBackOffer() {
     return ConcreteBackOffer.newCustomBackOff(BackOffer.PD_INFO_BACKOFF);
   }
-
   private BackOffer probeBackOffer() {
     int maxSleep = (int) getTimeout() * 2;
     return ConcreteBackOffer.newCustomBackOff(maxSleep);
