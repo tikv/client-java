@@ -201,16 +201,20 @@
 <a class="jxr_linenumber" name="L193" href="#L193">193</a>         HealthCheckResponse resp = stub.check(req);
 <a class="jxr_linenumber" name="L194" href="#L194">194</a>         <strong class="jxr_keyword">return</strong> resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING;
 <a class="jxr_linenumber" name="L195" href="#L195">195</a>       } <strong class="jxr_keyword">catch</strong> (Exception e) {
-<a class="jxr_linenumber" name="L196" href="#L196">196</a>         logger.warn(<span class="jxr_string">"check health failed."</span>, e);
+<a class="jxr_linenumber" name="L196" href="#L196">196</a>         logger.warn(<span class="jxr_string">"check health failed, addr: {}, caused by: {}"</span>, addressStr, e.getMessage());
 <a class="jxr_linenumber" name="L197" href="#L197">197</a>         backOffer.doBackOff(BackOffFuncType.BoCheckHealth, e);
 <a class="jxr_linenumber" name="L198" href="#L198">198</a>       }
 <a class="jxr_linenumber" name="L199" href="#L199">199</a>     }
 <a class="jxr_linenumber" name="L200" href="#L200">200</a>   }
 <a class="jxr_linenumber" name="L201" href="#L201">201</a> 
 <a class="jxr_linenumber" name="L202" href="#L202">202</a>   <strong class="jxr_keyword">protected</strong> <strong class="jxr_keyword">boolean</strong> checkHealth(<a name="BackOffer" href="../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer, String addressStr, <a name="HostMapping" href="../../../org/tikv/common/HostMapping.html#HostMapping">HostMapping</a> hostMapping) {
-<a class="jxr_linenumber" name="L203" href="#L203">203</a>     <strong class="jxr_keyword">return</strong> doCheckHealth(backOffer, addressStr, hostMapping);
-<a class="jxr_linenumber" name="L204" href="#L204">204</a>   }
-<a class="jxr_linenumber" name="L205" href="#L205">205</a> }
+<a class="jxr_linenumber" name="L203" href="#L203">203</a>     <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L204" href="#L204">204</a>       <strong class="jxr_keyword">return</strong> doCheckHealth(backOffer, addressStr, hostMapping);
+<a class="jxr_linenumber" name="L205" href="#L205">205</a>     } <strong class="jxr_keyword">catch</strong> (Exception e) {
+<a class="jxr_linenumber" name="L206" href="#L206">206</a>       <strong class="jxr_keyword">return</strong> false;
+<a class="jxr_linenumber" name="L207" href="#L207">207</a>     }
+<a class="jxr_linenumber" name="L208" href="#L208">208</a>   }
+<a class="jxr_linenumber" name="L209" href="#L209">209</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2022 PingCAP. All rights reserved.</div>
