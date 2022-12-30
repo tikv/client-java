@@ -31,6 +31,7 @@ import org.tikv.common.key.Key;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.region.TiStore;
+import org.tikv.common.region.TiStoreType;
 import org.tikv.common.util.KeyRangeUtils;
 import org.tikv.common.util.Pair;
 import org.tikv.kvproto.Metapb;
@@ -135,7 +136,7 @@ public class RegionManagerTest extends PDMockServerTest {
 
     Pair<TiRegion, TiStore> pair = mgr.getRegionStorePairByKey(searchKey);
     assertEquals(pair.first.getId(), regionId);
-    assertEquals(pair.first.getId(), storeId);
+    assertEquals(pair.second.getId(), 10);
   }
 
   @Test
@@ -178,5 +179,53 @@ public class RegionManagerTest extends PDMockServerTest {
       fail();
     } catch (Exception ignored) {
     }
+  }
+
+  @Test
+  public void getRegionStorePairByKeyWithTiFlash() {
+
+    ByteString startKey = ByteString.copyFrom(new byte[] {1});
+    ByteString endKey = ByteString.copyFrom(new byte[] {10});
+    ByteString searchKey = ByteString.copyFrom(new byte[] {5});
+    String testAddress = "testAddress";
+    long firstStoreId = 233;
+    long secondStoreId = 234;
+    int confVer = 1026;
+    int ver = 1027;
+    long regionId = 233;
+    leader.addGetRegionListener(
+        request ->
+            GrpcUtils.makeGetRegionResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeRegion(
+                    regionId,
+                    GrpcUtils.encodeKey(startKey.toByteArray()),
+                    GrpcUtils.encodeKey(endKey.toByteArray()),
+                    GrpcUtils.makeRegionEpoch(confVer, ver),
+                    GrpcUtils.makeLearnerPeer(1, firstStoreId),
+                    GrpcUtils.makeLearnerPeer(2, secondStoreId))));
+
+    AtomicInteger i = new AtomicInteger(0);
+    long[] ids = new long[] {firstStoreId, secondStoreId};
+    leader.addGetStoreListener(
+        (request ->
+            GrpcUtils.makeGetStoreResponse(
+                leader.getClusterId(),
+                GrpcUtils.makeStore(
+                    ids[i.getAndIncrement()],
+                    testAddress,
+                    StoreState.Up,
+                    GrpcUtils.makeStoreLabel("engine", "tiflash"),
+                    GrpcUtils.makeStoreLabel("k1", "v1"),
+                    GrpcUtils.makeStoreLabel("k2", "v2")))));
+
+    Pair<TiRegion, TiStore> pair = mgr.getRegionStorePairByKey(searchKey, TiStoreType.TiFlash);
+    assertEquals(pair.first.getId(), regionId);
+    assertEquals(pair.second.getId(), firstStoreId);
+
+    Pair<TiRegion, TiStore> secondPair =
+        mgr.getRegionStorePairByKey(searchKey, TiStoreType.TiFlash);
+    assertEquals(secondPair.first.getId(), regionId);
+    assertEquals(secondPair.second.getId(), secondStoreId);
   }
 }
