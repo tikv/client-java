@@ -357,7 +357,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
               this,
               lockResolverClient,
               resp -> resp.hasRegionError() ? resp.getRegionError() : null,
-              resp -> resp.hasError() ? resp.getError() : null,
+              resp -> null,
               resolveLockResult -> addResolvedLocks(version, resolveLockResult.getResolvedLocks()),
               version,
               forWrite);
@@ -366,14 +366,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       // we need to update region after retry
       region = regionManager.getRegionByKey(startKey, backOffer);
 
-      if (handleScanResponse(backOffer, resp, version, forWrite)) {
-        return resp.getPairsList();
+      if (isScanSuccess(backOffer, resp)) {
+        return doScan(resp);
       }
     }
   }
 
-  private boolean handleScanResponse(
-      BackOffer backOffer, ScanResponse resp, long version, boolean forWrite) {
+  private boolean isScanSuccess(BackOffer backOffer, ScanResponse resp) {
     if (resp == null) {
       this.regionManager.onRequestFail(region);
       throw new TiClientInternalException("ScanResponse failed without a cause");
@@ -382,35 +381,28 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       backOffer.doBackOff(BoRegionMiss, new RegionException(resp.getRegionError()));
       return false;
     }
+    return true;
+  }
 
-    // Resolve locks
-    // Note: Memory lock conflict is returned by both `ScanResponse.error` &
-    // `ScanResponse.pairs[0].error`, while other key errors are returned by
-    // `ScanResponse.pairs.error`
-    // See https://github.com/pingcap/kvproto/pull/697
-    List<Lock> locks = new ArrayList<>();
-    for (KvPair kvPair : resp.getPairsList()) {
+  // TODO: resolve locks after scan
+  private List<KvPair> doScan(ScanResponse resp) {
+    // Check if kvPair contains error, it should be a Lock if hasError is true.
+    List<KvPair> kvPairs = resp.getPairsList();
+    List<KvPair> newKvPairs = new ArrayList<>();
+    for (KvPair kvPair : kvPairs) {
       if (kvPair.hasError()) {
         Lock lock = AbstractLockResolverClient.extractLockFromKeyErr(kvPair.getError(), codec);
-        locks.add(lock);
+        newKvPairs.add(
+            KvPair.newBuilder()
+                .setError(kvPair.getError())
+                .setValue(kvPair.getValue())
+                .setKey(lock.getKey())
+                .build());
+      } else {
+        newKvPairs.add(codec.decodeKvPair(kvPair));
       }
     }
-    if (!locks.isEmpty()) {
-      ResolveLockResult resolveLockResult =
-          lockResolverClient.resolveLocks(backOffer, version, locks, forWrite);
-      addResolvedLocks(version, resolveLockResult.getResolvedLocks());
-
-      long msBeforeExpired = resolveLockResult.getMsBeforeTxnExpired();
-      if (msBeforeExpired > 0) {
-        // if not resolve all locks, we wait and retry
-        backOffer.doBackOffWithMaxSleep(
-            BoTxnLockFast, msBeforeExpired, new KeyException(locks.toString()));
-      }
-
-      return false;
-    }
-
-    return true;
+    return Collections.unmodifiableList(newKvPairs);
   }
 
   public List<KvPair> scan(BackOffer backOffer, ByteString startKey, long version) {
