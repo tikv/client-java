@@ -1011,7 +1011,7 @@ public class RawKVClient implements RawKVClientBase {
     if (limit > MAX_RAW_SCAN_LIMIT) {
       throw ERR_MAX_SCAN_LIMIT_EXCEEDED;
     }
-    return new RawScanIterator(conf, builder, startKey, endKey, limit, keyOnly, backOffer);
+    return new RawScanIterator(conf, builder, startKey, endKey, limit, keyOnly, false, backOffer);
   }
 
   /**
