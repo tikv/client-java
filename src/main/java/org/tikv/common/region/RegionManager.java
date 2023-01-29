@@ -29,6 +29,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
@@ -74,8 +75,8 @@ public class RegionManager {
   private final StoreHealthyChecker storeChecker;
   private final CopyOnWriteArrayList<Function<CacheInvalidateEvent, Void>>
       cacheInvalidateCallbackList;
-
   private final ExecutorService callBackThreadPool;
+  private AtomicInteger tiflashStoreIndex = new AtomicInteger(0);
 
   public RegionManager(
       TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
@@ -230,17 +231,23 @@ public class RegionManager {
       Peer peer = region.getCurrentReplica();
       store = getStoreById(peer.getStoreId(), backOffer);
     } else {
-      outerLoop:
+      List<TiStore> tiflashStores = new ArrayList<>();
       for (Peer peer : region.getLearnerList()) {
         TiStore s = getStoreById(peer.getStoreId(), backOffer);
         for (Metapb.StoreLabel label : s.getStore().getLabelsList()) {
           if (label.getKey().equals(storeType.getLabelKey())
               && label.getValue().equals(storeType.getLabelValue())) {
-            store = s;
-            break outerLoop;
+            tiflashStores.add(s);
           }
         }
       }
+      // select a tiflash with Round-Robin strategy
+      if (tiflashStores.size() > 0) {
+        store =
+            tiflashStores.get(
+                Math.floorMod(tiflashStoreIndex.getAndIncrement(), tiflashStores.size()));
+      }
+
       if (store == null) {
         // clear the region cache, so we may get the learner peer next time
         cache.invalidateRegion(region);

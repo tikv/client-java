@@ -34,6 +34,7 @@ import org.tikv.common.region.RegionErrorReceiver;
 import org.tikv.common.region.RegionManager;
 import org.tikv.common.region.TiRegion;
 import org.tikv.common.util.BackOffFunction;
+import org.tikv.common.util.BackOffFunction.BackOffFuncType;
 import org.tikv.common.util.BackOffer;
 import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.Metapb;
@@ -175,6 +176,12 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
               recv.getRegion(), KeyUtils.formatBytesUTF8(invalidKey)));
       regionManager.clearRegionCache();
       throw new StatusRuntimeException(Status.UNKNOWN.withDescription(error.toString()));
+    }
+    // The tso cache is used up in TiKV servers, we should backoff and wait its cache is renewed.
+    else if (error.getMessage().contains("TsoBatchUsedUp")) {
+      logger.warn(String.format("tso batch used up for region [%s]", recv.getRegion()));
+      backOffer.doBackOff(BackOffFuncType.BoTsoBatchUsedUp, new GrpcException(error.getMessage()));
+      return true;
     }
 
     logger.warn(String.format("Unknown error %s for region [%s]", error, recv.getRegion()));
