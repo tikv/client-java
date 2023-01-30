@@ -97,6 +97,8 @@ public class CacheInvalidateEvent implements Serializable {
 
   public enum CacheType implements Serializable {
     REGION_STORE,
+    STORE,
+    REGION,
     REQ_FAILED,
     LEADER
   }
