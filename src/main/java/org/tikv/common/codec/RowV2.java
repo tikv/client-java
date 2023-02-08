@@ -147,7 +147,7 @@ public class RowV2 {
       if (this.large) {
         v = this.colIDs32[h];
       } else {
-        v = this.colIDs[h];
+        v = this.colIDs[h] & 0xFF;
       }
       if (v < colID) {
         i = h + 1;
