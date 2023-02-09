@@ -21,10 +21,13 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.codec.KeyUtils;
+import org.tikv.common.event.CacheInvalidateEvent;
+import org.tikv.common.event.CacheInvalidateEvent.CacheType;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.region.RegionErrorReceiver;
@@ -43,6 +46,11 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private final Function<RespT, Errorpb.Error> getRegionError;
   private final RegionManager regionManager;
   private final RegionErrorReceiver recv;
+  private final List<Function<CacheInvalidateEvent, Void>> cacheInvalidateCallBackList;
+
+  private final ExecutorService callBackThreadPool;
+  private final int INVALID_STORE_ID = 0;
+  private final int INVALID_REGION_ID = 0;
 
   public RegionErrorHandler(
       RegionManager regionManager,
@@ -51,6 +59,8 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     this.recv = recv;
     this.regionManager = regionManager;
     this.getRegionError = getRegionError;
+    this.cacheInvalidateCallBackList = regionManager.getCacheInvalidateCallbackList();
+    this.callBackThreadPool = regionManager.getCallBackThreadPool();
   }
 
   @Override
@@ -107,6 +117,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
 
       if (!retry) {
         this.regionManager.invalidateRegion(recv.getRegion());
+        notifyRegionLeaderError(recv.getRegion());
       }
 
       backOffer.doBackOff(backOffFuncType, new GrpcException(error.toString()));
@@ -116,15 +127,14 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
       // this error is reported from raftstore:
       // store_id requested at the moment is inconsistent with that expected
       // Solution：re-fetch from PD
-      long storeId = recv.getRegion().getLeader().getStoreId();
+      long storeId = error.getStoreNotMatch().getRequestStoreId();
       long actualStoreId = error.getStoreNotMatch().getActualStoreId();
       logger.warn(
           String.format(
               "Store Not Match happened with region id %d, store id %d, actual store id %d",
               recv.getRegion().getId(), storeId, actualStoreId));
-
-      this.regionManager.invalidateRegion(recv.getRegion());
-      this.regionManager.invalidateStore(storeId);
+      // may request store which is not leader.
+      invalidateRegionStoreCache(recv.getRegion(), storeId);
       // assume this is a low probability error, do not retry, just re-split the request by
       // throwing it out.
       return false;
@@ -143,8 +153,6 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
           BackOffFunction.BackOffFuncType.BoServerBusy,
           new StatusRuntimeException(
               Status.fromCode(Status.Code.UNAVAILABLE).withDescription(error.toString())));
-      backOffer.doBackOff(
-          BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException(error.getMessage()));
       return true;
     } else if (error.hasStaleCommand()) {
       // this error is reported from raftstore:
@@ -179,7 +187,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     logger.warn(String.format("Unknown error %s for region [%s]", error, recv.getRegion()));
     // For other errors, we only drop cache here.
     // Upper level may split this task.
-    invalidateRegionStoreCache(recv.getRegion());
+    invalidateRegionStoreCache(recv.getRegion(), recv.getRegion().getLeader().getStoreId());
     // retry if raft proposal is dropped, it indicates the store is in the middle of transition
     if (error.getMessage().contains("Raft ProposalDropped")) {
       backOffer.doBackOff(
@@ -196,6 +204,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
   private boolean onRegionEpochNotMatch(BackOffer backOffer, List<Metapb.Region> currentRegions) {
     if (currentRegions.size() == 0) {
       this.regionManager.onRegionStale(recv.getRegion());
+      notifyRegionCacheInvalidate(recv.getRegion());
       return false;
     }
 
@@ -229,6 +238,7 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     }
 
     if (needInvalidateOld) {
+      notifyRegionCacheInvalidate(recv.getRegion());
       this.regionManager.onRegionStale(recv.getRegion());
     }
 
@@ -271,8 +281,51 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     return recv.getRegion();
   }
 
-  private void invalidateRegionStoreCache(TiRegion ctxRegion) {
+  private void notifyRegionRequestError(
+      TiRegion ctxRegion, long storeId, CacheInvalidateEvent.CacheType type) {
+    CacheInvalidateEvent event;
+    // When store(region) id is invalid,
+    // it implies that the error was not caused by store(region) error.
+    switch (type) {
+      case REGION:
+      case LEADER:
+        event = new CacheInvalidateEvent(ctxRegion.getId(), INVALID_STORE_ID, true, false, type);
+        break;
+      case REGION_STORE:
+        event = new CacheInvalidateEvent(ctxRegion.getId(), storeId, true, true, type);
+        break;
+      case REQ_FAILED:
+        event = new CacheInvalidateEvent(INVALID_REGION_ID, INVALID_STORE_ID, false, false, type);
+        break;
+      default:
+        throw new IllegalArgumentException("Unexpect invalid cache invalid type " + type);
+    }
+    if (cacheInvalidateCallBackList != null) {
+      for (Function<CacheInvalidateEvent, Void> cacheInvalidateCallBack :
+          cacheInvalidateCallBackList) {
+        callBackThreadPool.submit(
+            () -> {
+              try {
+                cacheInvalidateCallBack.apply(event);
+              } catch (Exception e) {
+                logger.error(String.format("CacheInvalidCallBack failed %s", e));
+              }
+            });
+      }
+    }
+  }
+
+  private void invalidateRegionStoreCache(TiRegion ctxRegion, long storeId) {
     regionManager.invalidateRegion(ctxRegion);
-    regionManager.invalidateStore(ctxRegion.getLeader().getStoreId());
+    regionManager.invalidateStore(storeId);
+    notifyRegionRequestError(ctxRegion, storeId, CacheType.REGION_STORE);
+  }
+
+  private void notifyRegionCacheInvalidate(TiRegion ctxRegion) {
+    notifyRegionRequestError(ctxRegion, 0, CacheType.REGION);
+  }
+
+  private void notifyRegionLeaderError(TiRegion ctxRegion) {
+    notifyRegionRequestError(ctxRegion, 0, CacheType.LEADER);
   }
 }
