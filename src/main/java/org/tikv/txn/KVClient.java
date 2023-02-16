@@ -39,6 +39,8 @@ import org.tikv.common.operation.iterator.ConcreteScanIterator;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
+import org.tikv.common.region.TiStore;
+import org.tikv.common.region.TiStoreType;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Kvrpcpb;
 
@@ -288,5 +290,10 @@ public class KVClient implements AutoCloseable {
     Key maxKey = Key.toRawKey(sortedList.get(sortedList.size() - 1).first);
     ImporterClient importerClient = new ImporterClient(tiSession, uuid, minKey, maxKey, region, 0L);
     importerClient.write(sortedList.iterator());
+  }
+
+  public Boolean isMppAlive(TiRegion tiRegion, TiStore store) {
+    RegionStoreClient client = clientBuilder.build(tiRegion, store, TiStoreType.TiFlash);
+    return client.isAlive();
   }
 }

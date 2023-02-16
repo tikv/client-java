@@ -62,7 +62,6 @@ import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.exception.TiKVException;
 import org.tikv.common.log.SlowLogEmptyImpl;
 import org.tikv.common.operation.KVErrorHandler;
-import org.tikv.common.operation.NoopHandler;
 import org.tikv.common.operation.RegionErrorHandler;
 import org.tikv.common.streaming.StreamingResponse;
 import org.tikv.common.util.BackOffFunction;
@@ -114,7 +113,6 @@ import org.tikv.kvproto.Kvrpcpb.TxnHeartBeatRequest;
 import org.tikv.kvproto.Kvrpcpb.TxnHeartBeatResponse;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Mpp;
-import org.tikv.kvproto.PDGrpc;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvFutureStub;
@@ -1342,18 +1340,18 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public Boolean isAlive() {
     // no need to backoff because isAlive is designed to detect the true status.
-    TikvBlockingStub stub = getBlockingStub().withDeadlineAfter(500,TimeUnit.MILLISECONDS);
+    TikvBlockingStub stub = getBlockingStub().withDeadlineAfter(500, TimeUnit.MILLISECONDS);
     Supplier<Mpp.IsAliveRequest> factory = () -> Mpp.IsAliveRequest.newBuilder().build();
     try {
-      Mpp.IsAliveResponse resp = ClientCalls.blockingUnaryCall(
-        stub.getChannel(), TikvGrpc.getIsAliveMethod(), stub.getCallOptions(), factory.get());
+      Mpp.IsAliveResponse resp =
+          ClientCalls.blockingUnaryCall(
+              stub.getChannel(), TikvGrpc.getIsAliveMethod(), stub.getCallOptions(), factory.get());
       return resp != null && resp.getAvailable();
     } catch (GrpcException e) {
       logger.warn("Call mpp isAlive fail with GrpcException", e);
       return false;
     }
   }
-
 
   public enum RequestTypes {
     REQ_TYPE_SELECT(101),
