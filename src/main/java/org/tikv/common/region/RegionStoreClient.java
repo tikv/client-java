@@ -1347,8 +1347,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
           ClientCalls.blockingUnaryCall(
               stub.getChannel(), TikvGrpc.getIsAliveMethod(), stub.getCallOptions(), factory.get());
       return resp != null && resp.getAvailable();
-    } catch (GrpcException e) {
-      logger.warn("Call mpp isAlive fail with GrpcException", e);
+    } catch (Exception e) {
+      logger.warn("Call mpp isAlive fail with Exception", e);
       return false;
     }
   }
