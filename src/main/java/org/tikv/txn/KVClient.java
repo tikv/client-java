@@ -291,9 +291,4 @@ public class KVClient implements AutoCloseable {
     ImporterClient importerClient = new ImporterClient(tiSession, uuid, minKey, maxKey, region, 0L);
     importerClient.write(sortedList.iterator());
   }
-
-  public Boolean isMppAlive(TiRegion tiRegion, TiStore store) {
-    RegionStoreClient client = clientBuilder.build(tiRegion, store, TiStoreType.TiFlash);
-    return client.isAlive();
-  }
 }
