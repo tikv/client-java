@@ -39,8 +39,6 @@ import org.tikv.common.operation.iterator.ConcreteScanIterator;
 import org.tikv.common.region.RegionStoreClient;
 import org.tikv.common.region.RegionStoreClient.RegionStoreClientBuilder;
 import org.tikv.common.region.TiRegion;
-import org.tikv.common.region.TiStore;
-import org.tikv.common.region.TiStoreType;
 import org.tikv.common.util.*;
 import org.tikv.kvproto.Kvrpcpb;
 
