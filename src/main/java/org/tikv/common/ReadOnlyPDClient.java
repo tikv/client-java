@@ -72,4 +72,6 @@ public interface ReadOnlyPDClient {
   Long getClusterId();
 
   RequestKeyCodec getCodec();
+
+  Long UpdateServiceGCSafePoint(String serverId, long ttl, long savePoint, BackOffer backOffer);
 }
