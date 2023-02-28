@@ -73,5 +73,5 @@ public interface ReadOnlyPDClient {
 
   RequestKeyCodec getCodec();
 
-  Long UpdateServiceGCSafePoint(String serverId, long ttl, long savePoint, BackOffer backOffer);
+  Long UpdateServiceGCSafePoint(String serviceId, long ttl, long safePoint, BackOffer backOffer);
 }
