@@ -22,6 +22,7 @@ import static org.tikv.common.ConfigUtils.DEF_BATCH_GET_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.DEF_BATCH_PUT_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.DEF_BATCH_SCAN_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.DEF_CHECK_HEALTH_TIMEOUT;
+import static org.tikv.common.ConfigUtils.DEF_COP_TIMEOUT;
 import static org.tikv.common.ConfigUtils.DEF_DB_PREFIX;
 import static org.tikv.common.ConfigUtils.DEF_DELETE_RANGE_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.DEF_FORWARD_TIMEOUT;
@@ -94,6 +95,7 @@ import static org.tikv.common.ConfigUtils.TIKV_DB_PREFIX;
 import static org.tikv.common.ConfigUtils.TIKV_DELETE_RANGE_CONCURRENCY;
 import static org.tikv.common.ConfigUtils.TIKV_ENABLE_ATOMIC_FOR_CAS;
 import static org.tikv.common.ConfigUtils.TIKV_ENABLE_GRPC_FORWARD;
+import static org.tikv.common.ConfigUtils.TIKV_GRPC_COP_TIMEOUT;
 import static org.tikv.common.ConfigUtils.TIKV_GRPC_FORWARD_TIMEOUT;
 import static org.tikv.common.ConfigUtils.TIKV_GRPC_HEALTH_CHECK_TIMEOUT;
 import static org.tikv.common.ConfigUtils.TIKV_GRPC_IDLE_TIMEOUT;
@@ -238,6 +240,7 @@ public class TiConfiguration implements Serializable {
     setIfMissing(TIKV_GRPC_FORWARD_TIMEOUT, DEF_FORWARD_TIMEOUT);
     setIfMissing(TIKV_GRPC_WARM_UP_TIMEOUT, DEF_TIKV_GRPC_WARM_UP_TIMEOUT);
     setIfMissing(TIKV_PD_FIRST_GET_MEMBER_TIMEOUT, DEF_TIKV_PD_FIRST_GET_MEMBER_TIMEOUT);
+    setIfMissing(TIKV_GRPC_COP_TIMEOUT, DEF_COP_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_TIMEOUT, DEF_SCAN_TIMEOUT);
     setIfMissing(TIKV_GRPC_SCAN_BATCH_SIZE, DEF_SCAN_BATCH_SIZE);
     setIfMissing(TIKV_GRPC_MAX_FRAME_SIZE, DEF_MAX_FRAME_SIZE);
@@ -468,6 +471,7 @@ public class TiConfiguration implements Serializable {
   private long forwardTimeout = getTimeAsMs(TIKV_GRPC_FORWARD_TIMEOUT);
   private long warmUpTimeout = getTimeAsMs(TIKV_GRPC_WARM_UP_TIMEOUT);
   private long pdFirstGetMemberTimeout = getTimeAsMs(TIKV_PD_FIRST_GET_MEMBER_TIMEOUT);
+  private long copTimeout = getTimeAsMs(TIKV_GRPC_COP_TIMEOUT);
   private long scanTimeout = getTimeAsMs(TIKV_GRPC_SCAN_TIMEOUT);
   private int maxFrameSize = getInt(TIKV_GRPC_MAX_FRAME_SIZE);
   private long connRecycleTime = getTimeAsSeconds(TIKV_CONN_RECYCLE_TIME);
@@ -671,6 +675,15 @@ public class TiConfiguration implements Serializable {
 
   public TiConfiguration setScanTimeout(long scanTimeout) {
     this.scanTimeout = scanTimeout;
+    return this;
+  }
+
+  public long getCopTimeout() {
+    return copTimeout;
+  }
+
+  public TiConfiguration setCopTimeout(long copTimeout) {
+    this.scanTimeout = copTimeout;
     return this;
   }
 

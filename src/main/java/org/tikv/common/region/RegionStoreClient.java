@@ -658,6 +658,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       List<Coprocessor.KeyRange> ranges,
       Queue<SelectResponse> responseQueue,
       long startTs) {
+    setTimeout(getConf().getCopTimeout());
     boolean forWrite = false;
     if (req == null || ranges == null || req.getExecutorsCount() < 1) {
       throw new IllegalArgumentException("Invalid coprocessor argument!");
