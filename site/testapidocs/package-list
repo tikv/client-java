@@ -6,6 +6,7 @@ org.tikv.common.columnar
 org.tikv.common.importer
 org.tikv.common.key
 org.tikv.common.log
+org.tikv.common.util
 org.tikv.raw
 org.tikv.service.failsafe
 org.tikv.txn
