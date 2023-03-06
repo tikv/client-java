@@ -66,7 +66,7 @@ public abstract class AbstractRegionStoreClient
           .labelNames("cluster")
           .register();
 
-  public final RegionManager regionManager;
+  protected final RegionManager regionManager;
   protected final RequestKeyCodec codec;
   protected TiRegion region;
   protected TiStore store;
