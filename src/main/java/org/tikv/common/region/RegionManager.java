@@ -23,14 +23,18 @@ import com.google.protobuf.ByteString;
 import io.prometheus.client.Histogram;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.InvalidStoreException;
 import org.tikv.common.exception.TiClientInternalException;
@@ -69,10 +73,36 @@ public class RegionManager {
   private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
   private final StoreHealthyChecker storeChecker;
+  private final CopyOnWriteArrayList<Function<CacheInvalidateEvent, Void>>
+      cacheInvalidateCallbackList;
+  private final ExecutorService callBackThreadPool;
   private AtomicInteger tiflashStoreIndex = new AtomicInteger(0);
 
   public RegionManager(
       TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
+    this(conf, pdClient, channelFactory, 1);
+  }
+
+  public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
+    this(conf, pdClient, 1);
+  }
+
+  public RegionManager(
+      TiConfiguration conf, ReadOnlyPDClient pdClient, int callBackExecutorThreadNum) {
+    this.cache = new RegionCache();
+    this.pdClient = pdClient;
+    this.conf = conf;
+    this.storeChecker = null;
+    this.executor = null;
+    this.cacheInvalidateCallbackList = new CopyOnWriteArrayList<>();
+    this.callBackThreadPool = Executors.newFixedThreadPool(callBackExecutorThreadNum);
+  }
+
+  public RegionManager(
+      TiConfiguration conf,
+      ReadOnlyPDClient pdClient,
+      ChannelFactory channelFactory,
+      int callBackExecutorThreadNum) {
     this.cache = new RegionCache();
     this.pdClient = pdClient;
     this.conf = conf;
@@ -83,24 +113,32 @@ public class RegionManager {
     this.storeChecker = storeChecker;
     this.executor = Executors.newScheduledThreadPool(1);
     this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
-  }
-
-  public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
-    this.cache = new RegionCache();
-    this.pdClient = pdClient;
-    this.conf = conf;
-    this.storeChecker = null;
-    this.executor = null;
+    this.cacheInvalidateCallbackList = new CopyOnWriteArrayList<>();
+    this.callBackThreadPool = Executors.newFixedThreadPool(callBackExecutorThreadNum);
   }
 
   public synchronized void close() {
     if (this.executor != null) {
       this.executor.shutdownNow();
     }
+    this.callBackThreadPool.shutdownNow();
   }
 
   public ReadOnlyPDClient getPDClient() {
     return this.pdClient;
+  }
+
+  public ExecutorService getCallBackThreadPool() {
+    return callBackThreadPool;
+  }
+
+  public List<Function<CacheInvalidateEvent, Void>> getCacheInvalidateCallbackList() {
+    return cacheInvalidateCallbackList;
+  }
+
+  public void addCacheInvalidateCallback(
+      Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
+    this.cacheInvalidateCallbackList.add(cacheInvalidateCallback);
   }
 
   public void invalidateAll() {
