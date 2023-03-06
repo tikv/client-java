@@ -79,9 +79,9 @@ public interface ReadOnlyPDClient {
    * @param serviceId ServiceId
    * @param ttl TTL in seconds
    * @param safePoint The TiTimestamp you want to set. Set to start_ts.getPrevious() is a good
-   *     practise
+   *     practice
    * @return the MinSafePoint of all services. If this value is greater than safePoint, it means
-   *     update failedmvn
+   *     update failed
    */
   Long updateServiceGCSafePoint(String serviceId, long ttl, long safePoint, BackOffer backOffer);
 }
