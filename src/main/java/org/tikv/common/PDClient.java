@@ -437,7 +437,8 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     return callWithRetry(
             backOffer,
             PDGrpc.getUpdateServiceGCSafePointMethod(),
-            buildUpdateServiceGCSafePointRequest(ByteString.copyFromUtf8(serviceId), ttl, safePoint),
+            buildUpdateServiceGCSafePointRequest(
+                ByteString.copyFromUtf8(serviceId), ttl, safePoint),
             new PDErrorHandler<>(
                 r -> r.getHeader().hasError() ? buildFromPdpbError(r.getHeader().getError()) : null,
                 this))
