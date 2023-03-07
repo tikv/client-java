@@ -131,7 +131,7 @@ public class ConfigUtils {
   public static final String DEF_FORWARD_TIMEOUT = "300ms";
   public static final String DEF_TIKV_GRPC_WARM_UP_TIMEOUT = "5000ms";
   public static final String DEF_TIKV_PD_FIRST_GET_MEMBER_TIMEOUT = "10000ms";
-  public static final String DEF_COP_TIMEOUT = "180s";
+  public static final String DEF_COP_TIMEOUT = "60s";
   public static final String DEF_SCAN_TIMEOUT = "20s";
   public static final int DEF_CHECK_HEALTH_TIMEOUT = 100;
   public static final int DEF_HEALTH_CHECK_PERIOD_DURATION = 300;
