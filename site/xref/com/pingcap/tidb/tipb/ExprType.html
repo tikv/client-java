@@ -373,101 +373,107 @@
 <a class="jxr_linenumber" name="L365" href="#L365">365</a>   }
 <a class="jxr_linenumber" name="L366" href="#L366">366</a> 
 <a class="jxr_linenumber" name="L367" href="#L367">367</a>   <em class="jxr_javadoccomment">/**</em>
-<a class="jxr_linenumber" name="L368" href="#L368">368</a> <em class="jxr_javadoccomment">   * @deprecated Use {@link #forNumber(int)} instead.</em>
-<a class="jxr_linenumber" name="L369" href="#L369">369</a> <em class="jxr_javadoccomment">   */</em>
-<a class="jxr_linenumber" name="L370" href="#L370">370</a>   @java.lang.Deprecated
-<a class="jxr_linenumber" name="L371" href="#L371">371</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a> valueOf(<strong class="jxr_keyword">int</strong> value) {
-<a class="jxr_linenumber" name="L372" href="#L372">372</a>     <strong class="jxr_keyword">return</strong> forNumber(value);
-<a class="jxr_linenumber" name="L373" href="#L373">373</a>   }
-<a class="jxr_linenumber" name="L374" href="#L374">374</a> 
-<a class="jxr_linenumber" name="L375" href="#L375">375</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a> forNumber(<strong class="jxr_keyword">int</strong> value) {
-<a class="jxr_linenumber" name="L376" href="#L376">376</a>     <strong class="jxr_keyword">switch</strong> (value) {
-<a class="jxr_linenumber" name="L377" href="#L377">377</a>       <strong class="jxr_keyword">case</strong> 0: <strong class="jxr_keyword">return</strong> Null;
-<a class="jxr_linenumber" name="L378" href="#L378">378</a>       <strong class="jxr_keyword">case</strong> 1: <strong class="jxr_keyword">return</strong> Int64;
-<a class="jxr_linenumber" name="L379" href="#L379">379</a>       <strong class="jxr_keyword">case</strong> 2: <strong class="jxr_keyword">return</strong> Uint64;
-<a class="jxr_linenumber" name="L380" href="#L380">380</a>       <strong class="jxr_keyword">case</strong> 3: <strong class="jxr_keyword">return</strong> Float32;
-<a class="jxr_linenumber" name="L381" href="#L381">381</a>       <strong class="jxr_keyword">case</strong> 4: <strong class="jxr_keyword">return</strong> Float64;
-<a class="jxr_linenumber" name="L382" href="#L382">382</a>       <strong class="jxr_keyword">case</strong> 5: <strong class="jxr_keyword">return</strong> String;
-<a class="jxr_linenumber" name="L383" href="#L383">383</a>       <strong class="jxr_keyword">case</strong> 6: <strong class="jxr_keyword">return</strong> Bytes;
-<a class="jxr_linenumber" name="L384" href="#L384">384</a>       <strong class="jxr_keyword">case</strong> 101: <strong class="jxr_keyword">return</strong> MysqlBit;
-<a class="jxr_linenumber" name="L385" href="#L385">385</a>       <strong class="jxr_keyword">case</strong> 102: <strong class="jxr_keyword">return</strong> MysqlDecimal;
-<a class="jxr_linenumber" name="L386" href="#L386">386</a>       <strong class="jxr_keyword">case</strong> 103: <strong class="jxr_keyword">return</strong> MysqlDuration;
-<a class="jxr_linenumber" name="L387" href="#L387">387</a>       <strong class="jxr_keyword">case</strong> 104: <strong class="jxr_keyword">return</strong> MysqlEnum;
-<a class="jxr_linenumber" name="L388" href="#L388">388</a>       <strong class="jxr_keyword">case</strong> 105: <strong class="jxr_keyword">return</strong> MysqlHex;
-<a class="jxr_linenumber" name="L389" href="#L389">389</a>       <strong class="jxr_keyword">case</strong> 106: <strong class="jxr_keyword">return</strong> MysqlSet;
-<a class="jxr_linenumber" name="L390" href="#L390">390</a>       <strong class="jxr_keyword">case</strong> 107: <strong class="jxr_keyword">return</strong> MysqlTime;
-<a class="jxr_linenumber" name="L391" href="#L391">391</a>       <strong class="jxr_keyword">case</strong> 108: <strong class="jxr_keyword">return</strong> MysqlJson;
-<a class="jxr_linenumber" name="L392" href="#L392">392</a>       <strong class="jxr_keyword">case</strong> 151: <strong class="jxr_keyword">return</strong> ValueList;
-<a class="jxr_linenumber" name="L393" href="#L393">393</a>       <strong class="jxr_keyword">case</strong> 201: <strong class="jxr_keyword">return</strong> ColumnRef;
-<a class="jxr_linenumber" name="L394" href="#L394">394</a>       <strong class="jxr_keyword">case</strong> 3001: <strong class="jxr_keyword">return</strong> Count;
-<a class="jxr_linenumber" name="L395" href="#L395">395</a>       <strong class="jxr_keyword">case</strong> 3002: <strong class="jxr_keyword">return</strong> Sum;
-<a class="jxr_linenumber" name="L396" href="#L396">396</a>       <strong class="jxr_keyword">case</strong> 3003: <strong class="jxr_keyword">return</strong> Avg;
-<a class="jxr_linenumber" name="L397" href="#L397">397</a>       <strong class="jxr_keyword">case</strong> 3004: <strong class="jxr_keyword">return</strong> Min;
-<a class="jxr_linenumber" name="L398" href="#L398">398</a>       <strong class="jxr_keyword">case</strong> 3005: <strong class="jxr_keyword">return</strong> Max;
-<a class="jxr_linenumber" name="L399" href="#L399">399</a>       <strong class="jxr_keyword">case</strong> 3006: <strong class="jxr_keyword">return</strong> First;
-<a class="jxr_linenumber" name="L400" href="#L400">400</a>       <strong class="jxr_keyword">case</strong> 3007: <strong class="jxr_keyword">return</strong> GroupConcat;
-<a class="jxr_linenumber" name="L401" href="#L401">401</a>       <strong class="jxr_keyword">case</strong> 3008: <strong class="jxr_keyword">return</strong> Agg_BitAnd;
-<a class="jxr_linenumber" name="L402" href="#L402">402</a>       <strong class="jxr_keyword">case</strong> 3009: <strong class="jxr_keyword">return</strong> Agg_BitOr;
-<a class="jxr_linenumber" name="L403" href="#L403">403</a>       <strong class="jxr_keyword">case</strong> 3010: <strong class="jxr_keyword">return</strong> Agg_BitXor;
-<a class="jxr_linenumber" name="L404" href="#L404">404</a>       <strong class="jxr_keyword">case</strong> 3011: <strong class="jxr_keyword">return</strong> Std;
-<a class="jxr_linenumber" name="L405" href="#L405">405</a>       <strong class="jxr_keyword">case</strong> 3012: <strong class="jxr_keyword">return</strong> Stddev;
-<a class="jxr_linenumber" name="L406" href="#L406">406</a>       <strong class="jxr_keyword">case</strong> 3013: <strong class="jxr_keyword">return</strong> StddevPop;
-<a class="jxr_linenumber" name="L407" href="#L407">407</a>       <strong class="jxr_keyword">case</strong> 3014: <strong class="jxr_keyword">return</strong> StddevSamp;
-<a class="jxr_linenumber" name="L408" href="#L408">408</a>       <strong class="jxr_keyword">case</strong> 3015: <strong class="jxr_keyword">return</strong> VarPop;
-<a class="jxr_linenumber" name="L409" href="#L409">409</a>       <strong class="jxr_keyword">case</strong> 3016: <strong class="jxr_keyword">return</strong> VarSamp;
-<a class="jxr_linenumber" name="L410" href="#L410">410</a>       <strong class="jxr_keyword">case</strong> 3017: <strong class="jxr_keyword">return</strong> Variance;
-<a class="jxr_linenumber" name="L411" href="#L411">411</a>       <strong class="jxr_keyword">case</strong> 3018: <strong class="jxr_keyword">return</strong> JsonArrayAgg;
-<a class="jxr_linenumber" name="L412" href="#L412">412</a>       <strong class="jxr_keyword">case</strong> 3019: <strong class="jxr_keyword">return</strong> JsonObjectAgg;
-<a class="jxr_linenumber" name="L413" href="#L413">413</a>       <strong class="jxr_keyword">case</strong> 10000: <strong class="jxr_keyword">return</strong> ScalarFunc;
-<a class="jxr_linenumber" name="L414" href="#L414">414</a>       <strong class="jxr_keyword">default</strong>: <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L415" href="#L415">415</a>     }
-<a class="jxr_linenumber" name="L416" href="#L416">416</a>   }
-<a class="jxr_linenumber" name="L417" href="#L417">417</a> 
-<a class="jxr_linenumber" name="L418" href="#L418">418</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> com.google.protobuf.Internal.EnumLiteMap&lt;ExprType&gt;
-<a class="jxr_linenumber" name="L419" href="#L419">419</a>       internalGetValueMap() {
-<a class="jxr_linenumber" name="L420" href="#L420">420</a>     <strong class="jxr_keyword">return</strong> internalValueMap;
-<a class="jxr_linenumber" name="L421" href="#L421">421</a>   }
-<a class="jxr_linenumber" name="L422" href="#L422">422</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> com.google.protobuf.Internal.EnumLiteMap&lt;
-<a class="jxr_linenumber" name="L423" href="#L423">423</a>       ExprType&gt; internalValueMap =
-<a class="jxr_linenumber" name="L424" href="#L424">424</a>         <strong class="jxr_keyword">new</strong> com.google.protobuf.Internal.EnumLiteMap&lt;ExprType&gt;() {
-<a class="jxr_linenumber" name="L425" href="#L425">425</a>           <strong class="jxr_keyword">public</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a> findValueByNumber(<strong class="jxr_keyword">int</strong> number) {
-<a class="jxr_linenumber" name="L426" href="#L426">426</a>             <strong class="jxr_keyword">return</strong> ExprType.forNumber(number);
-<a class="jxr_linenumber" name="L427" href="#L427">427</a>           }
-<a class="jxr_linenumber" name="L428" href="#L428">428</a>         };
-<a class="jxr_linenumber" name="L429" href="#L429">429</a> 
-<a class="jxr_linenumber" name="L430" href="#L430">430</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> com.google.protobuf.Descriptors.EnumValueDescriptor
-<a class="jxr_linenumber" name="L431" href="#L431">431</a>       getValueDescriptor() {
-<a class="jxr_linenumber" name="L432" href="#L432">432</a>     <strong class="jxr_keyword">return</strong> getDescriptor().getValues().get(ordinal());
-<a class="jxr_linenumber" name="L433" href="#L433">433</a>   }
-<a class="jxr_linenumber" name="L434" href="#L434">434</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> com.google.protobuf.Descriptors.EnumDescriptor
-<a class="jxr_linenumber" name="L435" href="#L435">435</a>       getDescriptorForType() {
-<a class="jxr_linenumber" name="L436" href="#L436">436</a>     <strong class="jxr_keyword">return</strong> getDescriptor();
-<a class="jxr_linenumber" name="L437" href="#L437">437</a>   }
-<a class="jxr_linenumber" name="L438" href="#L438">438</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> com.google.protobuf.Descriptors.EnumDescriptor
-<a class="jxr_linenumber" name="L439" href="#L439">439</a>       getDescriptor() {
-<a class="jxr_linenumber" name="L440" href="#L440">440</a>     <strong class="jxr_keyword">return</strong> com.pingcap.tidb.tipb.Expression.getDescriptor().getEnumTypes().get(0);
-<a class="jxr_linenumber" name="L441" href="#L441">441</a>   }
-<a class="jxr_linenumber" name="L442" href="#L442">442</a> 
-<a class="jxr_linenumber" name="L443" href="#L443">443</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a>[] VALUES = values();
-<a class="jxr_linenumber" name="L444" href="#L444">444</a> 
-<a class="jxr_linenumber" name="L445" href="#L445">445</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a> valueOf(
-<a class="jxr_linenumber" name="L446" href="#L446">446</a>       com.google.protobuf.Descriptors.EnumValueDescriptor desc) {
-<a class="jxr_linenumber" name="L447" href="#L447">447</a>     <strong class="jxr_keyword">if</strong> (desc.getType() != getDescriptor()) {
-<a class="jxr_linenumber" name="L448" href="#L448">448</a>       <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> java.lang.IllegalArgumentException(
-<a class="jxr_linenumber" name="L449" href="#L449">449</a>         <span class="jxr_string">"EnumValueDescriptor is not for this type."</span>);
-<a class="jxr_linenumber" name="L450" href="#L450">450</a>     }
-<a class="jxr_linenumber" name="L451" href="#L451">451</a>     <strong class="jxr_keyword">return</strong> VALUES[desc.getIndex()];
-<a class="jxr_linenumber" name="L452" href="#L452">452</a>   }
-<a class="jxr_linenumber" name="L453" href="#L453">453</a> 
-<a class="jxr_linenumber" name="L454" href="#L454">454</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">int</strong> value;
-<a class="jxr_linenumber" name="L455" href="#L455">455</a> 
-<a class="jxr_linenumber" name="L456" href="#L456">456</a>   <strong class="jxr_keyword">private</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a>(<strong class="jxr_keyword">int</strong> value) {
-<a class="jxr_linenumber" name="L457" href="#L457">457</a>     <strong class="jxr_keyword">this</strong>.value = value;
+<a class="jxr_linenumber" name="L368" href="#L368">368</a> <em class="jxr_javadoccomment">   * @param value The numeric wire value of the corresponding enum entry.</em>
+<a class="jxr_linenumber" name="L369" href="#L369">369</a> <em class="jxr_javadoccomment">   * @return The enum associated with the given numeric wire value.</em>
+<a class="jxr_linenumber" name="L370" href="#L370">370</a> <em class="jxr_javadoccomment">   * @deprecated Use {@link #forNumber(int)} instead.</em>
+<a class="jxr_linenumber" name="L371" href="#L371">371</a> <em class="jxr_javadoccomment">   */</em>
+<a class="jxr_linenumber" name="L372" href="#L372">372</a>   @java.lang.Deprecated
+<a class="jxr_linenumber" name="L373" href="#L373">373</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a> valueOf(<strong class="jxr_keyword">int</strong> value) {
+<a class="jxr_linenumber" name="L374" href="#L374">374</a>     <strong class="jxr_keyword">return</strong> forNumber(value);
+<a class="jxr_linenumber" name="L375" href="#L375">375</a>   }
+<a class="jxr_linenumber" name="L376" href="#L376">376</a> 
+<a class="jxr_linenumber" name="L377" href="#L377">377</a>   <em class="jxr_javadoccomment">/**</em>
+<a class="jxr_linenumber" name="L378" href="#L378">378</a> <em class="jxr_javadoccomment">   * @param value The numeric wire value of the corresponding enum entry.</em>
+<a class="jxr_linenumber" name="L379" href="#L379">379</a> <em class="jxr_javadoccomment">   * @return The enum associated with the given numeric wire value.</em>
+<a class="jxr_linenumber" name="L380" href="#L380">380</a> <em class="jxr_javadoccomment">   */</em>
+<a class="jxr_linenumber" name="L381" href="#L381">381</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a> forNumber(<strong class="jxr_keyword">int</strong> value) {
+<a class="jxr_linenumber" name="L382" href="#L382">382</a>     <strong class="jxr_keyword">switch</strong> (value) {
+<a class="jxr_linenumber" name="L383" href="#L383">383</a>       <strong class="jxr_keyword">case</strong> 0: <strong class="jxr_keyword">return</strong> Null;
+<a class="jxr_linenumber" name="L384" href="#L384">384</a>       <strong class="jxr_keyword">case</strong> 1: <strong class="jxr_keyword">return</strong> Int64;
+<a class="jxr_linenumber" name="L385" href="#L385">385</a>       <strong class="jxr_keyword">case</strong> 2: <strong class="jxr_keyword">return</strong> Uint64;
+<a class="jxr_linenumber" name="L386" href="#L386">386</a>       <strong class="jxr_keyword">case</strong> 3: <strong class="jxr_keyword">return</strong> Float32;
+<a class="jxr_linenumber" name="L387" href="#L387">387</a>       <strong class="jxr_keyword">case</strong> 4: <strong class="jxr_keyword">return</strong> Float64;
+<a class="jxr_linenumber" name="L388" href="#L388">388</a>       <strong class="jxr_keyword">case</strong> 5: <strong class="jxr_keyword">return</strong> String;
+<a class="jxr_linenumber" name="L389" href="#L389">389</a>       <strong class="jxr_keyword">case</strong> 6: <strong class="jxr_keyword">return</strong> Bytes;
+<a class="jxr_linenumber" name="L390" href="#L390">390</a>       <strong class="jxr_keyword">case</strong> 101: <strong class="jxr_keyword">return</strong> MysqlBit;
+<a class="jxr_linenumber" name="L391" href="#L391">391</a>       <strong class="jxr_keyword">case</strong> 102: <strong class="jxr_keyword">return</strong> MysqlDecimal;
+<a class="jxr_linenumber" name="L392" href="#L392">392</a>       <strong class="jxr_keyword">case</strong> 103: <strong class="jxr_keyword">return</strong> MysqlDuration;
+<a class="jxr_linenumber" name="L393" href="#L393">393</a>       <strong class="jxr_keyword">case</strong> 104: <strong class="jxr_keyword">return</strong> MysqlEnum;
+<a class="jxr_linenumber" name="L394" href="#L394">394</a>       <strong class="jxr_keyword">case</strong> 105: <strong class="jxr_keyword">return</strong> MysqlHex;
+<a class="jxr_linenumber" name="L395" href="#L395">395</a>       <strong class="jxr_keyword">case</strong> 106: <strong class="jxr_keyword">return</strong> MysqlSet;
+<a class="jxr_linenumber" name="L396" href="#L396">396</a>       <strong class="jxr_keyword">case</strong> 107: <strong class="jxr_keyword">return</strong> MysqlTime;
+<a class="jxr_linenumber" name="L397" href="#L397">397</a>       <strong class="jxr_keyword">case</strong> 108: <strong class="jxr_keyword">return</strong> MysqlJson;
+<a class="jxr_linenumber" name="L398" href="#L398">398</a>       <strong class="jxr_keyword">case</strong> 151: <strong class="jxr_keyword">return</strong> ValueList;
+<a class="jxr_linenumber" name="L399" href="#L399">399</a>       <strong class="jxr_keyword">case</strong> 201: <strong class="jxr_keyword">return</strong> ColumnRef;
+<a class="jxr_linenumber" name="L400" href="#L400">400</a>       <strong class="jxr_keyword">case</strong> 3001: <strong class="jxr_keyword">return</strong> Count;
+<a class="jxr_linenumber" name="L401" href="#L401">401</a>       <strong class="jxr_keyword">case</strong> 3002: <strong class="jxr_keyword">return</strong> Sum;
+<a class="jxr_linenumber" name="L402" href="#L402">402</a>       <strong class="jxr_keyword">case</strong> 3003: <strong class="jxr_keyword">return</strong> Avg;
+<a class="jxr_linenumber" name="L403" href="#L403">403</a>       <strong class="jxr_keyword">case</strong> 3004: <strong class="jxr_keyword">return</strong> Min;
+<a class="jxr_linenumber" name="L404" href="#L404">404</a>       <strong class="jxr_keyword">case</strong> 3005: <strong class="jxr_keyword">return</strong> Max;
+<a class="jxr_linenumber" name="L405" href="#L405">405</a>       <strong class="jxr_keyword">case</strong> 3006: <strong class="jxr_keyword">return</strong> First;
+<a class="jxr_linenumber" name="L406" href="#L406">406</a>       <strong class="jxr_keyword">case</strong> 3007: <strong class="jxr_keyword">return</strong> GroupConcat;
+<a class="jxr_linenumber" name="L407" href="#L407">407</a>       <strong class="jxr_keyword">case</strong> 3008: <strong class="jxr_keyword">return</strong> Agg_BitAnd;
+<a class="jxr_linenumber" name="L408" href="#L408">408</a>       <strong class="jxr_keyword">case</strong> 3009: <strong class="jxr_keyword">return</strong> Agg_BitOr;
+<a class="jxr_linenumber" name="L409" href="#L409">409</a>       <strong class="jxr_keyword">case</strong> 3010: <strong class="jxr_keyword">return</strong> Agg_BitXor;
+<a class="jxr_linenumber" name="L410" href="#L410">410</a>       <strong class="jxr_keyword">case</strong> 3011: <strong class="jxr_keyword">return</strong> Std;
+<a class="jxr_linenumber" name="L411" href="#L411">411</a>       <strong class="jxr_keyword">case</strong> 3012: <strong class="jxr_keyword">return</strong> Stddev;
+<a class="jxr_linenumber" name="L412" href="#L412">412</a>       <strong class="jxr_keyword">case</strong> 3013: <strong class="jxr_keyword">return</strong> StddevPop;
+<a class="jxr_linenumber" name="L413" href="#L413">413</a>       <strong class="jxr_keyword">case</strong> 3014: <strong class="jxr_keyword">return</strong> StddevSamp;
+<a class="jxr_linenumber" name="L414" href="#L414">414</a>       <strong class="jxr_keyword">case</strong> 3015: <strong class="jxr_keyword">return</strong> VarPop;
+<a class="jxr_linenumber" name="L415" href="#L415">415</a>       <strong class="jxr_keyword">case</strong> 3016: <strong class="jxr_keyword">return</strong> VarSamp;
+<a class="jxr_linenumber" name="L416" href="#L416">416</a>       <strong class="jxr_keyword">case</strong> 3017: <strong class="jxr_keyword">return</strong> Variance;
+<a class="jxr_linenumber" name="L417" href="#L417">417</a>       <strong class="jxr_keyword">case</strong> 3018: <strong class="jxr_keyword">return</strong> JsonArrayAgg;
+<a class="jxr_linenumber" name="L418" href="#L418">418</a>       <strong class="jxr_keyword">case</strong> 3019: <strong class="jxr_keyword">return</strong> JsonObjectAgg;
+<a class="jxr_linenumber" name="L419" href="#L419">419</a>       <strong class="jxr_keyword">case</strong> 10000: <strong class="jxr_keyword">return</strong> ScalarFunc;
+<a class="jxr_linenumber" name="L420" href="#L420">420</a>       <strong class="jxr_keyword">default</strong>: <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L421" href="#L421">421</a>     }
+<a class="jxr_linenumber" name="L422" href="#L422">422</a>   }
+<a class="jxr_linenumber" name="L423" href="#L423">423</a> 
+<a class="jxr_linenumber" name="L424" href="#L424">424</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> com.google.protobuf.Internal.EnumLiteMap&lt;ExprType&gt;
+<a class="jxr_linenumber" name="L425" href="#L425">425</a>       internalGetValueMap() {
+<a class="jxr_linenumber" name="L426" href="#L426">426</a>     <strong class="jxr_keyword">return</strong> internalValueMap;
+<a class="jxr_linenumber" name="L427" href="#L427">427</a>   }
+<a class="jxr_linenumber" name="L428" href="#L428">428</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> com.google.protobuf.Internal.EnumLiteMap&lt;
+<a class="jxr_linenumber" name="L429" href="#L429">429</a>       ExprType&gt; internalValueMap =
+<a class="jxr_linenumber" name="L430" href="#L430">430</a>         <strong class="jxr_keyword">new</strong> com.google.protobuf.Internal.EnumLiteMap&lt;ExprType&gt;() {
+<a class="jxr_linenumber" name="L431" href="#L431">431</a>           <strong class="jxr_keyword">public</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a> findValueByNumber(<strong class="jxr_keyword">int</strong> number) {
+<a class="jxr_linenumber" name="L432" href="#L432">432</a>             <strong class="jxr_keyword">return</strong> ExprType.forNumber(number);
+<a class="jxr_linenumber" name="L433" href="#L433">433</a>           }
+<a class="jxr_linenumber" name="L434" href="#L434">434</a>         };
+<a class="jxr_linenumber" name="L435" href="#L435">435</a> 
+<a class="jxr_linenumber" name="L436" href="#L436">436</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> com.google.protobuf.Descriptors.EnumValueDescriptor
+<a class="jxr_linenumber" name="L437" href="#L437">437</a>       getValueDescriptor() {
+<a class="jxr_linenumber" name="L438" href="#L438">438</a>     <strong class="jxr_keyword">return</strong> getDescriptor().getValues().get(ordinal());
+<a class="jxr_linenumber" name="L439" href="#L439">439</a>   }
+<a class="jxr_linenumber" name="L440" href="#L440">440</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">final</strong> com.google.protobuf.Descriptors.EnumDescriptor
+<a class="jxr_linenumber" name="L441" href="#L441">441</a>       getDescriptorForType() {
+<a class="jxr_linenumber" name="L442" href="#L442">442</a>     <strong class="jxr_keyword">return</strong> getDescriptor();
+<a class="jxr_linenumber" name="L443" href="#L443">443</a>   }
+<a class="jxr_linenumber" name="L444" href="#L444">444</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> com.google.protobuf.Descriptors.EnumDescriptor
+<a class="jxr_linenumber" name="L445" href="#L445">445</a>       getDescriptor() {
+<a class="jxr_linenumber" name="L446" href="#L446">446</a>     <strong class="jxr_keyword">return</strong> com.pingcap.tidb.tipb.Expression.getDescriptor().getEnumTypes().get(0);
+<a class="jxr_linenumber" name="L447" href="#L447">447</a>   }
+<a class="jxr_linenumber" name="L448" href="#L448">448</a> 
+<a class="jxr_linenumber" name="L449" href="#L449">449</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">final</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a>[] VALUES = values();
+<a class="jxr_linenumber" name="L450" href="#L450">450</a> 
+<a class="jxr_linenumber" name="L451" href="#L451">451</a>   <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a> valueOf(
+<a class="jxr_linenumber" name="L452" href="#L452">452</a>       com.google.protobuf.Descriptors.EnumValueDescriptor desc) {
+<a class="jxr_linenumber" name="L453" href="#L453">453</a>     <strong class="jxr_keyword">if</strong> (desc.getType() != getDescriptor()) {
+<a class="jxr_linenumber" name="L454" href="#L454">454</a>       <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> java.lang.IllegalArgumentException(
+<a class="jxr_linenumber" name="L455" href="#L455">455</a>         <span class="jxr_string">"EnumValueDescriptor is not for this type."</span>);
+<a class="jxr_linenumber" name="L456" href="#L456">456</a>     }
+<a class="jxr_linenumber" name="L457" href="#L457">457</a>     <strong class="jxr_keyword">return</strong> VALUES[desc.getIndex()];
 <a class="jxr_linenumber" name="L458" href="#L458">458</a>   }
 <a class="jxr_linenumber" name="L459" href="#L459">459</a> 
-<a class="jxr_linenumber" name="L460" href="#L460">460</a>   <em class="jxr_comment">// @@protoc_insertion_point(enum_scope:tipb.ExprType)</em>
-<a class="jxr_linenumber" name="L461" href="#L461">461</a> }
-<a class="jxr_linenumber" name="L462" href="#L462">462</a> 
+<a class="jxr_linenumber" name="L460" href="#L460">460</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> <strong class="jxr_keyword">int</strong> value;
+<a class="jxr_linenumber" name="L461" href="#L461">461</a> 
+<a class="jxr_linenumber" name="L462" href="#L462">462</a>   <strong class="jxr_keyword">private</strong> <a name="ExprType" href="../../../../com/pingcap/tidb/tipb/ExprType.html#ExprType">ExprType</a>(<strong class="jxr_keyword">int</strong> value) {
+<a class="jxr_linenumber" name="L463" href="#L463">463</a>     <strong class="jxr_keyword">this</strong>.value = value;
+<a class="jxr_linenumber" name="L464" href="#L464">464</a>   }
+<a class="jxr_linenumber" name="L465" href="#L465">465</a> 
+<a class="jxr_linenumber" name="L466" href="#L466">466</a>   <em class="jxr_comment">// @@protoc_insertion_point(enum_scope:tipb.ExprType)</em>
+<a class="jxr_linenumber" name="L467" href="#L467">467</a> }
+<a class="jxr_linenumber" name="L468" href="#L468">468</a> 
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2023 PingCAP. All rights reserved.</div>

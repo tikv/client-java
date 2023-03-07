@@ -116,89 +116,81 @@
 <a class="jxr_linenumber" name="L108" href="#L108">108</a>       <span class="jxr_string">"an\022\020\n\014LittleEndian\020\000\022\r\n\tBigEndian\020\001B%\n\025c"</span> +
 <a class="jxr_linenumber" name="L109" href="#L109">109</a>       <span class="jxr_string">"om.pingcap.tidb.tipbP\001\310\342\036\001\340\342\036\001\320\342\036\001"</span>
 <a class="jxr_linenumber" name="L110" href="#L110">110</a>     };
-<a class="jxr_linenumber" name="L111" href="#L111">111</a>     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
-<a class="jxr_linenumber" name="L112" href="#L112">112</a>         <strong class="jxr_keyword">new</strong> com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
-<a class="jxr_linenumber" name="L113" href="#L113">113</a>           <strong class="jxr_keyword">public</strong> com.google.protobuf.ExtensionRegistry assignDescriptors(
-<a class="jxr_linenumber" name="L114" href="#L114">114</a>               com.google.protobuf.Descriptors.FileDescriptor root) {
-<a class="jxr_linenumber" name="L115" href="#L115">115</a>             descriptor = root;
-<a class="jxr_linenumber" name="L116" href="#L116">116</a>             <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L117" href="#L117">117</a>           }
-<a class="jxr_linenumber" name="L118" href="#L118">118</a>         };
-<a class="jxr_linenumber" name="L119" href="#L119">119</a>     com.google.protobuf.Descriptors.FileDescriptor
-<a class="jxr_linenumber" name="L120" href="#L120">120</a>       .internalBuildGeneratedFileFrom(descriptorData,
-<a class="jxr_linenumber" name="L121" href="#L121">121</a>         <strong class="jxr_keyword">new</strong> com.google.protobuf.Descriptors.FileDescriptor[] {
-<a class="jxr_linenumber" name="L122" href="#L122">122</a>           com.pingcap.tidb.tipb.ExecutorOuterClass.getDescriptor(),
-<a class="jxr_linenumber" name="L123" href="#L123">123</a>           com.google.protobuf.GoGoProtos.getDescriptor(),
-<a class="jxr_linenumber" name="L124" href="#L124">124</a>         }, assigner);
-<a class="jxr_linenumber" name="L125" href="#L125">125</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Row_descriptor =
-<a class="jxr_linenumber" name="L126" href="#L126">126</a>       getDescriptor().getMessageTypes().get(0);
-<a class="jxr_linenumber" name="L127" href="#L127">127</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Row_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L128" href="#L128">128</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L129" href="#L129">129</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_Row_descriptor,
-<a class="jxr_linenumber" name="L130" href="#L130">130</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Handle"</span>, <span class="jxr_string">"Data"</span>, });
-<a class="jxr_linenumber" name="L131" href="#L131">131</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Error_descriptor =
-<a class="jxr_linenumber" name="L132" href="#L132">132</a>       getDescriptor().getMessageTypes().get(1);
-<a class="jxr_linenumber" name="L133" href="#L133">133</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Error_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L134" href="#L134">134</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L135" href="#L135">135</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_Error_descriptor,
-<a class="jxr_linenumber" name="L136" href="#L136">136</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Code"</span>, <span class="jxr_string">"Msg"</span>, });
-<a class="jxr_linenumber" name="L137" href="#L137">137</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_SelectResponse_descriptor =
-<a class="jxr_linenumber" name="L138" href="#L138">138</a>       getDescriptor().getMessageTypes().get(2);
-<a class="jxr_linenumber" name="L139" href="#L139">139</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_SelectResponse_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L140" href="#L140">140</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L141" href="#L141">141</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_SelectResponse_descriptor,
-<a class="jxr_linenumber" name="L142" href="#L142">142</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Error"</span>, <span class="jxr_string">"Rows"</span>, <span class="jxr_string">"Chunks"</span>, <span class="jxr_string">"Warnings"</span>, <span class="jxr_string">"OutputCounts"</span>, <span class="jxr_string">"WarningCount"</span>, <span class="jxr_string">"ExecutionSummaries"</span>, <span class="jxr_string">"EncodeType"</span>, });
-<a class="jxr_linenumber" name="L143" href="#L143">143</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Chunk_descriptor =
-<a class="jxr_linenumber" name="L144" href="#L144">144</a>       getDescriptor().getMessageTypes().get(3);
-<a class="jxr_linenumber" name="L145" href="#L145">145</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Chunk_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L146" href="#L146">146</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L147" href="#L147">147</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_Chunk_descriptor,
-<a class="jxr_linenumber" name="L148" href="#L148">148</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"RowsData"</span>, <span class="jxr_string">"RowsMeta"</span>, });
-<a class="jxr_linenumber" name="L149" href="#L149">149</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_RowMeta_descriptor =
-<a class="jxr_linenumber" name="L150" href="#L150">150</a>       getDescriptor().getMessageTypes().get(4);
-<a class="jxr_linenumber" name="L151" href="#L151">151</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_RowMeta_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L152" href="#L152">152</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L153" href="#L153">153</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_RowMeta_descriptor,
-<a class="jxr_linenumber" name="L154" href="#L154">154</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Handle"</span>, <span class="jxr_string">"Length"</span>, });
-<a class="jxr_linenumber" name="L155" href="#L155">155</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_DAGRequest_descriptor =
-<a class="jxr_linenumber" name="L156" href="#L156">156</a>       getDescriptor().getMessageTypes().get(5);
-<a class="jxr_linenumber" name="L157" href="#L157">157</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_DAGRequest_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L158" href="#L158">158</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L159" href="#L159">159</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_DAGRequest_descriptor,
-<a class="jxr_linenumber" name="L160" href="#L160">160</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"StartTsFallback"</span>, <span class="jxr_string">"Executors"</span>, <span class="jxr_string">"TimeZoneOffset"</span>, <span class="jxr_string">"Flags"</span>, <span class="jxr_string">"OutputOffsets"</span>, <span class="jxr_string">"CollectRangeCounts"</span>, <span class="jxr_string">"MaxWarningCount"</span>, <span class="jxr_string">"EncodeType"</span>, <span class="jxr_string">"SqlMode"</span>, <span class="jxr_string">"TimeZoneName"</span>, <span class="jxr_string">"CollectExecutionSummaries"</span>, <span class="jxr_string">"MaxAllowedPacket"</span>, <span class="jxr_string">"ChunkMemoryLayout"</span>, <span class="jxr_string">"IsRpnExpr"</span>, <span class="jxr_string">"User"</span>, });
-<a class="jxr_linenumber" name="L161" href="#L161">161</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_ChunkMemoryLayout_descriptor =
-<a class="jxr_linenumber" name="L162" href="#L162">162</a>       getDescriptor().getMessageTypes().get(6);
-<a class="jxr_linenumber" name="L163" href="#L163">163</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_ChunkMemoryLayout_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L164" href="#L164">164</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L165" href="#L165">165</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_ChunkMemoryLayout_descriptor,
-<a class="jxr_linenumber" name="L166" href="#L166">166</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Endian"</span>, });
-<a class="jxr_linenumber" name="L167" href="#L167">167</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_UserIdentity_descriptor =
-<a class="jxr_linenumber" name="L168" href="#L168">168</a>       getDescriptor().getMessageTypes().get(7);
-<a class="jxr_linenumber" name="L169" href="#L169">169</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_UserIdentity_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L170" href="#L170">170</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L171" href="#L171">171</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_UserIdentity_descriptor,
-<a class="jxr_linenumber" name="L172" href="#L172">172</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"UserName"</span>, <span class="jxr_string">"UserHost"</span>, });
-<a class="jxr_linenumber" name="L173" href="#L173">173</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_StreamResponse_descriptor =
-<a class="jxr_linenumber" name="L174" href="#L174">174</a>       getDescriptor().getMessageTypes().get(8);
-<a class="jxr_linenumber" name="L175" href="#L175">175</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_StreamResponse_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L176" href="#L176">176</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L177" href="#L177">177</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_StreamResponse_descriptor,
-<a class="jxr_linenumber" name="L178" href="#L178">178</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Error"</span>, <span class="jxr_string">"Data"</span>, <span class="jxr_string">"Warnings"</span>, <span class="jxr_string">"OutputCounts"</span>, <span class="jxr_string">"WarningCount"</span>, });
-<a class="jxr_linenumber" name="L179" href="#L179">179</a>     com.google.protobuf.ExtensionRegistry registry =
-<a class="jxr_linenumber" name="L180" href="#L180">180</a>         com.google.protobuf.ExtensionRegistry.newInstance();
-<a class="jxr_linenumber" name="L181" href="#L181">181</a>     registry.add(com.google.protobuf.GoGoProtos.customtype);
-<a class="jxr_linenumber" name="L182" href="#L182">182</a>     registry.add(com.google.protobuf.GoGoProtos.marshalerAll);
-<a class="jxr_linenumber" name="L183" href="#L183">183</a>     registry.add(com.google.protobuf.GoGoProtos.nullable);
-<a class="jxr_linenumber" name="L184" href="#L184">184</a>     registry.add(com.google.protobuf.GoGoProtos.sizerAll);
-<a class="jxr_linenumber" name="L185" href="#L185">185</a>     registry.add(com.google.protobuf.GoGoProtos.unmarshalerAll);
-<a class="jxr_linenumber" name="L186" href="#L186">186</a>     com.google.protobuf.Descriptors.FileDescriptor
-<a class="jxr_linenumber" name="L187" href="#L187">187</a>         .internalUpdateFileDescriptor(descriptor, registry);
-<a class="jxr_linenumber" name="L188" href="#L188">188</a>     com.pingcap.tidb.tipb.ExecutorOuterClass.getDescriptor();
-<a class="jxr_linenumber" name="L189" href="#L189">189</a>     com.google.protobuf.GoGoProtos.getDescriptor();
-<a class="jxr_linenumber" name="L190" href="#L190">190</a>   }
-<a class="jxr_linenumber" name="L191" href="#L191">191</a> 
-<a class="jxr_linenumber" name="L192" href="#L192">192</a>   <em class="jxr_comment">// @@protoc_insertion_point(outer_class_scope)</em>
-<a class="jxr_linenumber" name="L193" href="#L193">193</a> }
+<a class="jxr_linenumber" name="L111" href="#L111">111</a>     descriptor = com.google.protobuf.Descriptors.FileDescriptor
+<a class="jxr_linenumber" name="L112" href="#L112">112</a>       .internalBuildGeneratedFileFrom(descriptorData,
+<a class="jxr_linenumber" name="L113" href="#L113">113</a>         <strong class="jxr_keyword">new</strong> com.google.protobuf.Descriptors.FileDescriptor[] {
+<a class="jxr_linenumber" name="L114" href="#L114">114</a>           com.pingcap.tidb.tipb.ExecutorOuterClass.getDescriptor(),
+<a class="jxr_linenumber" name="L115" href="#L115">115</a>           com.google.protobuf.GoGoProtos.getDescriptor(),
+<a class="jxr_linenumber" name="L116" href="#L116">116</a>         });
+<a class="jxr_linenumber" name="L117" href="#L117">117</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Row_descriptor =
+<a class="jxr_linenumber" name="L118" href="#L118">118</a>       getDescriptor().getMessageTypes().get(0);
+<a class="jxr_linenumber" name="L119" href="#L119">119</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Row_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L120" href="#L120">120</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L121" href="#L121">121</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_Row_descriptor,
+<a class="jxr_linenumber" name="L122" href="#L122">122</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Handle"</span>, <span class="jxr_string">"Data"</span>, });
+<a class="jxr_linenumber" name="L123" href="#L123">123</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Error_descriptor =
+<a class="jxr_linenumber" name="L124" href="#L124">124</a>       getDescriptor().getMessageTypes().get(1);
+<a class="jxr_linenumber" name="L125" href="#L125">125</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Error_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L126" href="#L126">126</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L127" href="#L127">127</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_Error_descriptor,
+<a class="jxr_linenumber" name="L128" href="#L128">128</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Code"</span>, <span class="jxr_string">"Msg"</span>, });
+<a class="jxr_linenumber" name="L129" href="#L129">129</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_SelectResponse_descriptor =
+<a class="jxr_linenumber" name="L130" href="#L130">130</a>       getDescriptor().getMessageTypes().get(2);
+<a class="jxr_linenumber" name="L131" href="#L131">131</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_SelectResponse_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L132" href="#L132">132</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L133" href="#L133">133</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_SelectResponse_descriptor,
+<a class="jxr_linenumber" name="L134" href="#L134">134</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Error"</span>, <span class="jxr_string">"Rows"</span>, <span class="jxr_string">"Chunks"</span>, <span class="jxr_string">"Warnings"</span>, <span class="jxr_string">"OutputCounts"</span>, <span class="jxr_string">"WarningCount"</span>, <span class="jxr_string">"ExecutionSummaries"</span>, <span class="jxr_string">"EncodeType"</span>, });
+<a class="jxr_linenumber" name="L135" href="#L135">135</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Chunk_descriptor =
+<a class="jxr_linenumber" name="L136" href="#L136">136</a>       getDescriptor().getMessageTypes().get(3);
+<a class="jxr_linenumber" name="L137" href="#L137">137</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_Chunk_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L138" href="#L138">138</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L139" href="#L139">139</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_Chunk_descriptor,
+<a class="jxr_linenumber" name="L140" href="#L140">140</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"RowsData"</span>, <span class="jxr_string">"RowsMeta"</span>, });
+<a class="jxr_linenumber" name="L141" href="#L141">141</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_RowMeta_descriptor =
+<a class="jxr_linenumber" name="L142" href="#L142">142</a>       getDescriptor().getMessageTypes().get(4);
+<a class="jxr_linenumber" name="L143" href="#L143">143</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_RowMeta_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L144" href="#L144">144</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L145" href="#L145">145</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_RowMeta_descriptor,
+<a class="jxr_linenumber" name="L146" href="#L146">146</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Handle"</span>, <span class="jxr_string">"Length"</span>, });
+<a class="jxr_linenumber" name="L147" href="#L147">147</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_DAGRequest_descriptor =
+<a class="jxr_linenumber" name="L148" href="#L148">148</a>       getDescriptor().getMessageTypes().get(5);
+<a class="jxr_linenumber" name="L149" href="#L149">149</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_DAGRequest_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L150" href="#L150">150</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L151" href="#L151">151</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_DAGRequest_descriptor,
+<a class="jxr_linenumber" name="L152" href="#L152">152</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"StartTsFallback"</span>, <span class="jxr_string">"Executors"</span>, <span class="jxr_string">"TimeZoneOffset"</span>, <span class="jxr_string">"Flags"</span>, <span class="jxr_string">"OutputOffsets"</span>, <span class="jxr_string">"CollectRangeCounts"</span>, <span class="jxr_string">"MaxWarningCount"</span>, <span class="jxr_string">"EncodeType"</span>, <span class="jxr_string">"SqlMode"</span>, <span class="jxr_string">"TimeZoneName"</span>, <span class="jxr_string">"CollectExecutionSummaries"</span>, <span class="jxr_string">"MaxAllowedPacket"</span>, <span class="jxr_string">"ChunkMemoryLayout"</span>, <span class="jxr_string">"IsRpnExpr"</span>, <span class="jxr_string">"User"</span>, });
+<a class="jxr_linenumber" name="L153" href="#L153">153</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_ChunkMemoryLayout_descriptor =
+<a class="jxr_linenumber" name="L154" href="#L154">154</a>       getDescriptor().getMessageTypes().get(6);
+<a class="jxr_linenumber" name="L155" href="#L155">155</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_ChunkMemoryLayout_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L156" href="#L156">156</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L157" href="#L157">157</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_ChunkMemoryLayout_descriptor,
+<a class="jxr_linenumber" name="L158" href="#L158">158</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Endian"</span>, });
+<a class="jxr_linenumber" name="L159" href="#L159">159</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_UserIdentity_descriptor =
+<a class="jxr_linenumber" name="L160" href="#L160">160</a>       getDescriptor().getMessageTypes().get(7);
+<a class="jxr_linenumber" name="L161" href="#L161">161</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_UserIdentity_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L162" href="#L162">162</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L163" href="#L163">163</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_UserIdentity_descriptor,
+<a class="jxr_linenumber" name="L164" href="#L164">164</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"UserName"</span>, <span class="jxr_string">"UserHost"</span>, });
+<a class="jxr_linenumber" name="L165" href="#L165">165</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_StreamResponse_descriptor =
+<a class="jxr_linenumber" name="L166" href="#L166">166</a>       getDescriptor().getMessageTypes().get(8);
+<a class="jxr_linenumber" name="L167" href="#L167">167</a>     internal_<strong class="jxr_keyword">static</strong>_tipb_StreamResponse_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L168" href="#L168">168</a>       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L169" href="#L169">169</a>         internal_<strong class="jxr_keyword">static</strong>_tipb_StreamResponse_descriptor,
+<a class="jxr_linenumber" name="L170" href="#L170">170</a>         <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Error"</span>, <span class="jxr_string">"Data"</span>, <span class="jxr_string">"Warnings"</span>, <span class="jxr_string">"OutputCounts"</span>, <span class="jxr_string">"WarningCount"</span>, });
+<a class="jxr_linenumber" name="L171" href="#L171">171</a>     com.google.protobuf.ExtensionRegistry registry =
+<a class="jxr_linenumber" name="L172" href="#L172">172</a>         com.google.protobuf.ExtensionRegistry.newInstance();
+<a class="jxr_linenumber" name="L173" href="#L173">173</a>     registry.add(com.google.protobuf.GoGoProtos.customtype);
+<a class="jxr_linenumber" name="L174" href="#L174">174</a>     registry.add(com.google.protobuf.GoGoProtos.marshalerAll);
+<a class="jxr_linenumber" name="L175" href="#L175">175</a>     registry.add(com.google.protobuf.GoGoProtos.nullable);
+<a class="jxr_linenumber" name="L176" href="#L176">176</a>     registry.add(com.google.protobuf.GoGoProtos.sizerAll);
+<a class="jxr_linenumber" name="L177" href="#L177">177</a>     registry.add(com.google.protobuf.GoGoProtos.unmarshalerAll);
+<a class="jxr_linenumber" name="L178" href="#L178">178</a>     com.google.protobuf.Descriptors.FileDescriptor
+<a class="jxr_linenumber" name="L179" href="#L179">179</a>         .internalUpdateFileDescriptor(descriptor, registry);
+<a class="jxr_linenumber" name="L180" href="#L180">180</a>     com.pingcap.tidb.tipb.ExecutorOuterClass.getDescriptor();
+<a class="jxr_linenumber" name="L181" href="#L181">181</a>     com.google.protobuf.GoGoProtos.getDescriptor();
+<a class="jxr_linenumber" name="L182" href="#L182">182</a>   }
+<a class="jxr_linenumber" name="L183" href="#L183">183</a> 
+<a class="jxr_linenumber" name="L184" href="#L184">184</a>   <em class="jxr_comment">// @@protoc_insertion_point(outer_class_scope)</em>
+<a class="jxr_linenumber" name="L185" href="#L185">185</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2023 PingCAP. All rights reserved.</div>

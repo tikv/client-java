@@ -66,56 +66,48 @@
 <a class="jxr_linenumber" name="L58" href="#L58">58</a>        <span class="jxr_string">"\001(\014B%\n\025com.pingcap.tidb.tipbP\001\310\342\036\001\340\342\036\001\320\342"</span> +
 <a class="jxr_linenumber" name="L59" href="#L59">59</a>        <span class="jxr_string">"\036\001"</span>
 <a class="jxr_linenumber" name="L60" href="#L60">60</a>      };
-<a class="jxr_linenumber" name="L61" href="#L61">61</a>      com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
-<a class="jxr_linenumber" name="L62" href="#L62">62</a>          <strong class="jxr_keyword">new</strong> com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
-<a class="jxr_linenumber" name="L63" href="#L63">63</a>            <strong class="jxr_keyword">public</strong> com.google.protobuf.ExtensionRegistry assignDescriptors(
-<a class="jxr_linenumber" name="L64" href="#L64">64</a>                com.google.protobuf.Descriptors.FileDescriptor root) {
-<a class="jxr_linenumber" name="L65" href="#L65">65</a>              descriptor = root;
-<a class="jxr_linenumber" name="L66" href="#L66">66</a>              <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L67" href="#L67">67</a>            }
-<a class="jxr_linenumber" name="L68" href="#L68">68</a>          };
-<a class="jxr_linenumber" name="L69" href="#L69">69</a>      com.google.protobuf.Descriptors.FileDescriptor
-<a class="jxr_linenumber" name="L70" href="#L70">70</a>        .internalBuildGeneratedFileFrom(descriptorData,
-<a class="jxr_linenumber" name="L71" href="#L71">71</a>          <strong class="jxr_keyword">new</strong> com.google.protobuf.Descriptors.FileDescriptor[] {
-<a class="jxr_linenumber" name="L72" href="#L72">72</a>            com.google.protobuf.GoGoProtos.getDescriptor(),
-<a class="jxr_linenumber" name="L73" href="#L73">73</a>          }, assigner);
-<a class="jxr_linenumber" name="L74" href="#L74">74</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_TableInfo_descriptor =
-<a class="jxr_linenumber" name="L75" href="#L75">75</a>        getDescriptor().getMessageTypes().get(0);
-<a class="jxr_linenumber" name="L76" href="#L76">76</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_TableInfo_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L77" href="#L77">77</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L78" href="#L78">78</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_TableInfo_descriptor,
-<a class="jxr_linenumber" name="L79" href="#L79">79</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"TableId"</span>, <span class="jxr_string">"Columns"</span>, });
-<a class="jxr_linenumber" name="L80" href="#L80">80</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_ColumnInfo_descriptor =
-<a class="jxr_linenumber" name="L81" href="#L81">81</a>        getDescriptor().getMessageTypes().get(1);
-<a class="jxr_linenumber" name="L82" href="#L82">82</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_ColumnInfo_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L83" href="#L83">83</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L84" href="#L84">84</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_ColumnInfo_descriptor,
-<a class="jxr_linenumber" name="L85" href="#L85">85</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"ColumnId"</span>, <span class="jxr_string">"Tp"</span>, <span class="jxr_string">"Collation"</span>, <span class="jxr_string">"ColumnLen"</span>, <span class="jxr_string">"Decimal"</span>, <span class="jxr_string">"Flag"</span>, <span class="jxr_string">"Elems"</span>, <span class="jxr_string">"DefaultVal"</span>, <span class="jxr_string">"PkHandle"</span>, });
-<a class="jxr_linenumber" name="L86" href="#L86">86</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_IndexInfo_descriptor =
-<a class="jxr_linenumber" name="L87" href="#L87">87</a>        getDescriptor().getMessageTypes().get(2);
-<a class="jxr_linenumber" name="L88" href="#L88">88</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_IndexInfo_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L89" href="#L89">89</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L90" href="#L90">90</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_IndexInfo_descriptor,
-<a class="jxr_linenumber" name="L91" href="#L91">91</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"TableId"</span>, <span class="jxr_string">"IndexId"</span>, <span class="jxr_string">"Columns"</span>, <span class="jxr_string">"Unique"</span>, });
-<a class="jxr_linenumber" name="L92" href="#L92">92</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_KeyRange_descriptor =
-<a class="jxr_linenumber" name="L93" href="#L93">93</a>        getDescriptor().getMessageTypes().get(3);
-<a class="jxr_linenumber" name="L94" href="#L94">94</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_KeyRange_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L95" href="#L95">95</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L96" href="#L96">96</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_KeyRange_descriptor,
-<a class="jxr_linenumber" name="L97" href="#L97">97</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Low"</span>, <span class="jxr_string">"High"</span>, });
-<a class="jxr_linenumber" name="L98" href="#L98">98</a>      com.google.protobuf.ExtensionRegistry registry =
-<a class="jxr_linenumber" name="L99" href="#L99">99</a>          com.google.protobuf.ExtensionRegistry.newInstance();
-<a class="jxr_linenumber" name="L100" href="#L100">100</a>     registry.add(com.google.protobuf.GoGoProtos.marshalerAll);
-<a class="jxr_linenumber" name="L101" href="#L101">101</a>     registry.add(com.google.protobuf.GoGoProtos.nullable);
-<a class="jxr_linenumber" name="L102" href="#L102">102</a>     registry.add(com.google.protobuf.GoGoProtos.sizerAll);
-<a class="jxr_linenumber" name="L103" href="#L103">103</a>     registry.add(com.google.protobuf.GoGoProtos.unmarshalerAll);
-<a class="jxr_linenumber" name="L104" href="#L104">104</a>     com.google.protobuf.Descriptors.FileDescriptor
-<a class="jxr_linenumber" name="L105" href="#L105">105</a>         .internalUpdateFileDescriptor(descriptor, registry);
-<a class="jxr_linenumber" name="L106" href="#L106">106</a>     com.google.protobuf.GoGoProtos.getDescriptor();
-<a class="jxr_linenumber" name="L107" href="#L107">107</a>   }
-<a class="jxr_linenumber" name="L108" href="#L108">108</a> 
-<a class="jxr_linenumber" name="L109" href="#L109">109</a>   <em class="jxr_comment">// @@protoc_insertion_point(outer_class_scope)</em>
-<a class="jxr_linenumber" name="L110" href="#L110">110</a> }
+<a class="jxr_linenumber" name="L61" href="#L61">61</a>      descriptor = com.google.protobuf.Descriptors.FileDescriptor
+<a class="jxr_linenumber" name="L62" href="#L62">62</a>        .internalBuildGeneratedFileFrom(descriptorData,
+<a class="jxr_linenumber" name="L63" href="#L63">63</a>          <strong class="jxr_keyword">new</strong> com.google.protobuf.Descriptors.FileDescriptor[] {
+<a class="jxr_linenumber" name="L64" href="#L64">64</a>            com.google.protobuf.GoGoProtos.getDescriptor(),
+<a class="jxr_linenumber" name="L65" href="#L65">65</a>          });
+<a class="jxr_linenumber" name="L66" href="#L66">66</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_TableInfo_descriptor =
+<a class="jxr_linenumber" name="L67" href="#L67">67</a>        getDescriptor().getMessageTypes().get(0);
+<a class="jxr_linenumber" name="L68" href="#L68">68</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_TableInfo_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L69" href="#L69">69</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L70" href="#L70">70</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_TableInfo_descriptor,
+<a class="jxr_linenumber" name="L71" href="#L71">71</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"TableId"</span>, <span class="jxr_string">"Columns"</span>, });
+<a class="jxr_linenumber" name="L72" href="#L72">72</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_ColumnInfo_descriptor =
+<a class="jxr_linenumber" name="L73" href="#L73">73</a>        getDescriptor().getMessageTypes().get(1);
+<a class="jxr_linenumber" name="L74" href="#L74">74</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_ColumnInfo_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L75" href="#L75">75</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L76" href="#L76">76</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_ColumnInfo_descriptor,
+<a class="jxr_linenumber" name="L77" href="#L77">77</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"ColumnId"</span>, <span class="jxr_string">"Tp"</span>, <span class="jxr_string">"Collation"</span>, <span class="jxr_string">"ColumnLen"</span>, <span class="jxr_string">"Decimal"</span>, <span class="jxr_string">"Flag"</span>, <span class="jxr_string">"Elems"</span>, <span class="jxr_string">"DefaultVal"</span>, <span class="jxr_string">"PkHandle"</span>, });
+<a class="jxr_linenumber" name="L78" href="#L78">78</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_IndexInfo_descriptor =
+<a class="jxr_linenumber" name="L79" href="#L79">79</a>        getDescriptor().getMessageTypes().get(2);
+<a class="jxr_linenumber" name="L80" href="#L80">80</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_IndexInfo_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L81" href="#L81">81</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L82" href="#L82">82</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_IndexInfo_descriptor,
+<a class="jxr_linenumber" name="L83" href="#L83">83</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"TableId"</span>, <span class="jxr_string">"IndexId"</span>, <span class="jxr_string">"Columns"</span>, <span class="jxr_string">"Unique"</span>, });
+<a class="jxr_linenumber" name="L84" href="#L84">84</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_KeyRange_descriptor =
+<a class="jxr_linenumber" name="L85" href="#L85">85</a>        getDescriptor().getMessageTypes().get(3);
+<a class="jxr_linenumber" name="L86" href="#L86">86</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_KeyRange_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L87" href="#L87">87</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L88" href="#L88">88</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_KeyRange_descriptor,
+<a class="jxr_linenumber" name="L89" href="#L89">89</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"Low"</span>, <span class="jxr_string">"High"</span>, });
+<a class="jxr_linenumber" name="L90" href="#L90">90</a>      com.google.protobuf.ExtensionRegistry registry =
+<a class="jxr_linenumber" name="L91" href="#L91">91</a>          com.google.protobuf.ExtensionRegistry.newInstance();
+<a class="jxr_linenumber" name="L92" href="#L92">92</a>      registry.add(com.google.protobuf.GoGoProtos.marshalerAll);
+<a class="jxr_linenumber" name="L93" href="#L93">93</a>      registry.add(com.google.protobuf.GoGoProtos.nullable);
+<a class="jxr_linenumber" name="L94" href="#L94">94</a>      registry.add(com.google.protobuf.GoGoProtos.sizerAll);
+<a class="jxr_linenumber" name="L95" href="#L95">95</a>      registry.add(com.google.protobuf.GoGoProtos.unmarshalerAll);
+<a class="jxr_linenumber" name="L96" href="#L96">96</a>      com.google.protobuf.Descriptors.FileDescriptor
+<a class="jxr_linenumber" name="L97" href="#L97">97</a>          .internalUpdateFileDescriptor(descriptor, registry);
+<a class="jxr_linenumber" name="L98" href="#L98">98</a>      com.google.protobuf.GoGoProtos.getDescriptor();
+<a class="jxr_linenumber" name="L99" href="#L99">99</a>    }
+<a class="jxr_linenumber" name="L100" href="#L100">100</a> 
+<a class="jxr_linenumber" name="L101" href="#L101">101</a>   <em class="jxr_comment">// @@protoc_insertion_point(outer_class_scope)</em>
+<a class="jxr_linenumber" name="L102" href="#L102">102</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2023 PingCAP. All rights reserved.</div>

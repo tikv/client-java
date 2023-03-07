@@ -47,44 +47,36 @@
 <a class="jxr_linenumber" name="L39" href="#L39">39</a>        <span class="jxr_string">"\030\001 \002(\010B\004\310\336\037\000\022\016\n\006consts\030\002 \001(\014B%\n\025com.ping"</span> +
 <a class="jxr_linenumber" name="L40" href="#L40">40</a>        <span class="jxr_string">"cap.tidb.tipbP\001\310\342\036\001\340\342\036\001\320\342\036\001"</span>
 <a class="jxr_linenumber" name="L41" href="#L41">41</a>      };
-<a class="jxr_linenumber" name="L42" href="#L42">42</a>      com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
-<a class="jxr_linenumber" name="L43" href="#L43">43</a>          <strong class="jxr_keyword">new</strong> com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
-<a class="jxr_linenumber" name="L44" href="#L44">44</a>            <strong class="jxr_keyword">public</strong> com.google.protobuf.ExtensionRegistry assignDescriptors(
-<a class="jxr_linenumber" name="L45" href="#L45">45</a>                com.google.protobuf.Descriptors.FileDescriptor root) {
-<a class="jxr_linenumber" name="L46" href="#L46">46</a>              descriptor = root;
-<a class="jxr_linenumber" name="L47" href="#L47">47</a>              <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L48" href="#L48">48</a>            }
-<a class="jxr_linenumber" name="L49" href="#L49">49</a>          };
-<a class="jxr_linenumber" name="L50" href="#L50">50</a>      com.google.protobuf.Descriptors.FileDescriptor
-<a class="jxr_linenumber" name="L51" href="#L51">51</a>        .internalBuildGeneratedFileFrom(descriptorData,
-<a class="jxr_linenumber" name="L52" href="#L52">52</a>          <strong class="jxr_keyword">new</strong> com.google.protobuf.Descriptors.FileDescriptor[] {
-<a class="jxr_linenumber" name="L53" href="#L53">53</a>            com.google.protobuf.GoGoProtos.getDescriptor(),
-<a class="jxr_linenumber" name="L54" href="#L54">54</a>          }, assigner);
-<a class="jxr_linenumber" name="L55" href="#L55">55</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_InUnionMetadata_descriptor =
-<a class="jxr_linenumber" name="L56" href="#L56">56</a>        getDescriptor().getMessageTypes().get(0);
-<a class="jxr_linenumber" name="L57" href="#L57">57</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_InUnionMetadata_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L58" href="#L58">58</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L59" href="#L59">59</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_InUnionMetadata_descriptor,
-<a class="jxr_linenumber" name="L60" href="#L60">60</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"InUnion"</span>, });
-<a class="jxr_linenumber" name="L61" href="#L61">61</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_CompareInMetadata_descriptor =
-<a class="jxr_linenumber" name="L62" href="#L62">62</a>        getDescriptor().getMessageTypes().get(1);
-<a class="jxr_linenumber" name="L63" href="#L63">63</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_CompareInMetadata_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
-<a class="jxr_linenumber" name="L64" href="#L64">64</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-<a class="jxr_linenumber" name="L65" href="#L65">65</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_CompareInMetadata_descriptor,
-<a class="jxr_linenumber" name="L66" href="#L66">66</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"HasNull"</span>, <span class="jxr_string">"Consts"</span>, });
-<a class="jxr_linenumber" name="L67" href="#L67">67</a>      com.google.protobuf.ExtensionRegistry registry =
-<a class="jxr_linenumber" name="L68" href="#L68">68</a>          com.google.protobuf.ExtensionRegistry.newInstance();
-<a class="jxr_linenumber" name="L69" href="#L69">69</a>      registry.add(com.google.protobuf.GoGoProtos.marshalerAll);
-<a class="jxr_linenumber" name="L70" href="#L70">70</a>      registry.add(com.google.protobuf.GoGoProtos.nullable);
-<a class="jxr_linenumber" name="L71" href="#L71">71</a>      registry.add(com.google.protobuf.GoGoProtos.sizerAll);
-<a class="jxr_linenumber" name="L72" href="#L72">72</a>      registry.add(com.google.protobuf.GoGoProtos.unmarshalerAll);
-<a class="jxr_linenumber" name="L73" href="#L73">73</a>      com.google.protobuf.Descriptors.FileDescriptor
-<a class="jxr_linenumber" name="L74" href="#L74">74</a>          .internalUpdateFileDescriptor(descriptor, registry);
-<a class="jxr_linenumber" name="L75" href="#L75">75</a>      com.google.protobuf.GoGoProtos.getDescriptor();
-<a class="jxr_linenumber" name="L76" href="#L76">76</a>    }
-<a class="jxr_linenumber" name="L77" href="#L77">77</a>  
-<a class="jxr_linenumber" name="L78" href="#L78">78</a>    <em class="jxr_comment">// @@protoc_insertion_point(outer_class_scope)</em>
-<a class="jxr_linenumber" name="L79" href="#L79">79</a>  }
+<a class="jxr_linenumber" name="L42" href="#L42">42</a>      descriptor = com.google.protobuf.Descriptors.FileDescriptor
+<a class="jxr_linenumber" name="L43" href="#L43">43</a>        .internalBuildGeneratedFileFrom(descriptorData,
+<a class="jxr_linenumber" name="L44" href="#L44">44</a>          <strong class="jxr_keyword">new</strong> com.google.protobuf.Descriptors.FileDescriptor[] {
+<a class="jxr_linenumber" name="L45" href="#L45">45</a>            com.google.protobuf.GoGoProtos.getDescriptor(),
+<a class="jxr_linenumber" name="L46" href="#L46">46</a>          });
+<a class="jxr_linenumber" name="L47" href="#L47">47</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_InUnionMetadata_descriptor =
+<a class="jxr_linenumber" name="L48" href="#L48">48</a>        getDescriptor().getMessageTypes().get(0);
+<a class="jxr_linenumber" name="L49" href="#L49">49</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_InUnionMetadata_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L50" href="#L50">50</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L51" href="#L51">51</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_InUnionMetadata_descriptor,
+<a class="jxr_linenumber" name="L52" href="#L52">52</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"InUnion"</span>, });
+<a class="jxr_linenumber" name="L53" href="#L53">53</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_CompareInMetadata_descriptor =
+<a class="jxr_linenumber" name="L54" href="#L54">54</a>        getDescriptor().getMessageTypes().get(1);
+<a class="jxr_linenumber" name="L55" href="#L55">55</a>      internal_<strong class="jxr_keyword">static</strong>_tipb_CompareInMetadata_fieldAccessorTable = <strong class="jxr_keyword">new</strong>
+<a class="jxr_linenumber" name="L56" href="#L56">56</a>        com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+<a class="jxr_linenumber" name="L57" href="#L57">57</a>          internal_<strong class="jxr_keyword">static</strong>_tipb_CompareInMetadata_descriptor,
+<a class="jxr_linenumber" name="L58" href="#L58">58</a>          <strong class="jxr_keyword">new</strong> java.lang.String[] { <span class="jxr_string">"HasNull"</span>, <span class="jxr_string">"Consts"</span>, });
+<a class="jxr_linenumber" name="L59" href="#L59">59</a>      com.google.protobuf.ExtensionRegistry registry =
+<a class="jxr_linenumber" name="L60" href="#L60">60</a>          com.google.protobuf.ExtensionRegistry.newInstance();
+<a class="jxr_linenumber" name="L61" href="#L61">61</a>      registry.add(com.google.protobuf.GoGoProtos.marshalerAll);
+<a class="jxr_linenumber" name="L62" href="#L62">62</a>      registry.add(com.google.protobuf.GoGoProtos.nullable);
+<a class="jxr_linenumber" name="L63" href="#L63">63</a>      registry.add(com.google.protobuf.GoGoProtos.sizerAll);
+<a class="jxr_linenumber" name="L64" href="#L64">64</a>      registry.add(com.google.protobuf.GoGoProtos.unmarshalerAll);
+<a class="jxr_linenumber" name="L65" href="#L65">65</a>      com.google.protobuf.Descriptors.FileDescriptor
+<a class="jxr_linenumber" name="L66" href="#L66">66</a>          .internalUpdateFileDescriptor(descriptor, registry);
+<a class="jxr_linenumber" name="L67" href="#L67">67</a>      com.google.protobuf.GoGoProtos.getDescriptor();
+<a class="jxr_linenumber" name="L68" href="#L68">68</a>    }
+<a class="jxr_linenumber" name="L69" href="#L69">69</a>  
+<a class="jxr_linenumber" name="L70" href="#L70">70</a>    <em class="jxr_comment">// @@protoc_insertion_point(outer_class_scope)</em>
+<a class="jxr_linenumber" name="L71" href="#L71">71</a>  }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2023 PingCAP. All rights reserved.</div>
