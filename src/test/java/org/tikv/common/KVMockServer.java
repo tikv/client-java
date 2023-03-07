@@ -46,6 +46,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.key.Key;
+import org.tikv.common.meta.TiTimestamp;
 import org.tikv.common.region.TiRegion;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Errorpb;
@@ -66,6 +67,10 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   private final Map<Key, Supplier<Errorpb.Error.Builder>> regionErrMap = new HashMap<>();
 
   private final Map<Key, Supplier<Kvrpcpb.KeyError.Builder>> keyErrMap = new HashMap<>();
+
+  private final Map<Key, Supplier<Kvrpcpb.LockInfo.Builder>> lockMap = new HashMap<>();
+  private final Map<Long, Supplier<Kvrpcpb.CheckTxnStatusResponse.Builder>> txnStatusMap =
+      new HashMap<>();
 
   // for KV error
   public static final int ABORT = 1;
@@ -117,9 +122,68 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     regionErrMap.put(toRawKey(key.getBytes(StandardCharsets.UTF_8)), builder);
   }
 
+  public void removeError(String key) {
+    regionErrMap.remove(toRawKey(key.getBytes(StandardCharsets.UTF_8)));
+  }
+
+  // putWithLock is used to "prewrite" key-value without "commit"
+  public void putWithLock(
+      ByteString key, ByteString value, ByteString primaryKey, Long startTs, Long ttl) {
+    put(key, value);
+
+    Kvrpcpb.LockInfo.Builder lock =
+        Kvrpcpb.LockInfo.newBuilder()
+            .setPrimaryLock(primaryKey)
+            .setLockVersion(startTs)
+            .setKey(key)
+            .setLockTtl(ttl);
+    lockMap.put(toRawKey(key), () -> lock);
+  }
+
+  public void removeLock(ByteString key) {
+    lockMap.remove(toRawKey(key));
+  }
+
+  public boolean hasLock(ByteString key) {
+    return lockMap.containsKey(toRawKey(key));
+  }
+
+  // putTxnStatus is used to save transaction status
+  // commitTs > 0: committed
+  // commitTs == 0 && key is empty: rollback
+  // commitTs == 0 && key not empty: locked by key
+  public void putTxnStatus(Long startTs, Long commitTs, ByteString key) {
+    if (commitTs > 0 || (commitTs == 0 && key.isEmpty())) { // committed || rollback
+      Kvrpcpb.CheckTxnStatusResponse.Builder txnStatus =
+          Kvrpcpb.CheckTxnStatusResponse.newBuilder()
+              .setCommitVersion(commitTs)
+              .setLockTtl(0)
+              .setAction(Kvrpcpb.Action.NoAction);
+      txnStatusMap.put(startTs, () -> txnStatus);
+    } else { // locked
+      Kvrpcpb.LockInfo.Builder lock = lockMap.get(toRawKey(key)).get();
+      Kvrpcpb.CheckTxnStatusResponse.Builder txnStatus =
+          Kvrpcpb.CheckTxnStatusResponse.newBuilder()
+              .setCommitVersion(commitTs)
+              .setLockTtl(lock.getLockTtl())
+              .setAction(Kvrpcpb.Action.NoAction)
+              .setLockInfo(lock);
+      txnStatusMap.put(startTs, () -> txnStatus);
+    }
+  }
+
+  // putTxnStatus is used to save transaction status
+  // commitTs > 0: committed
+  // commitTs == 0: rollback
+  public void putTxnStatus(Long startTs, Long commitTs) {
+    putTxnStatus(startTs, commitTs, ByteString.EMPTY);
+  }
+
   public void clearAllMap() {
     dataMap.clear();
     regionErrMap.clear();
+    lockMap.clear();
+    txnStatusMap.clear();
   }
 
   private Errorpb.Error verifyContext(Context context) throws Exception {
@@ -255,9 +319,12 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         return;
       }
 
+      Supplier<Kvrpcpb.LockInfo.Builder> lock = lockMap.get(key);
       Supplier<Kvrpcpb.KeyError.Builder> errProvider = keyErrMap.remove(key);
       if (errProvider != null) {
         builder.setError(errProvider.get().build());
+      } else if (lock != null) {
+        builder.setError(Kvrpcpb.KeyError.newBuilder().setLocked(lock.get()));
       } else {
         ByteString value = dataMap.get(key);
         builder.setValue(value);
@@ -299,11 +366,17 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
             kvs.entrySet()
                 .stream()
                 .map(
-                    kv ->
-                        Kvrpcpb.KvPair.newBuilder()
-                            .setKey(kv.getKey().toByteString())
-                            .setValue(kv.getValue())
-                            .build())
+                    kv -> {
+                      Kvrpcpb.KvPair.Builder kvBuilder =
+                          Kvrpcpb.KvPair.newBuilder()
+                              .setKey(kv.getKey().toByteString())
+                              .setValue(kv.getValue());
+                      Supplier<Kvrpcpb.LockInfo.Builder> lock = lockMap.get(kv.getKey());
+                      if (lock != null) {
+                        kvBuilder.setError(Kvrpcpb.KeyError.newBuilder().setLocked(lock.get()));
+                      }
+                      return kvBuilder.build();
+                    })
                 .collect(Collectors.toList()));
       }
       responseObserver.onNext(builder.build());
@@ -347,6 +420,96 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         resultList.add(Kvrpcpb.KvPair.newBuilder().setKey(key).setValue(value).build());
       }
       builder.addAllPairs(resultList.build());
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      responseObserver.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  @Override
+  public void kvCheckTxnStatus(
+      org.tikv.kvproto.Kvrpcpb.CheckTxnStatusRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.CheckTxnStatusResponse>
+          responseObserver) {
+    logger.info("KVMockServer.kvCheckTxnStatus");
+    try {
+      Long startTs = request.getLockTs();
+      Long currentTs = request.getCurrentTs();
+      logger.info("kvCheckTxnStatus for txn: " + startTs);
+      Kvrpcpb.CheckTxnStatusResponse.Builder builder = Kvrpcpb.CheckTxnStatusResponse.newBuilder();
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      Supplier<Kvrpcpb.CheckTxnStatusResponse.Builder> txnStatus = txnStatusMap.get(startTs);
+      if (txnStatus != null) {
+        Kvrpcpb.CheckTxnStatusResponse resp = txnStatus.get().build();
+        if (resp.getCommitVersion() == 0
+            && resp.getLockTtl() > 0
+            && TiTimestamp.extractPhysical(startTs) + resp.getLockInfo().getLockTtl()
+                < TiTimestamp.extractPhysical(currentTs)) {
+          ByteString key = resp.getLockInfo().getKey();
+          logger.info(
+              String.format(
+                  "kvCheckTxnStatus rollback expired txn: %d, remove lock: %s",
+                  startTs, key.toStringUtf8()));
+          removeLock(key);
+          putTxnStatus(startTs, 0L, ByteString.EMPTY);
+          resp = txnStatusMap.get(startTs).get().build();
+        }
+        logger.info("kvCheckTxnStatus resp: " + resp);
+        responseObserver.onNext(resp);
+      } else {
+        builder.setError(
+            Kvrpcpb.KeyError.newBuilder()
+                .setTxnNotFound(
+                    Kvrpcpb.TxnNotFound.newBuilder()
+                        .setPrimaryKey(request.getPrimaryKey())
+                        .setStartTs(startTs)));
+        logger.info("kvCheckTxnStatus, TxnNotFound");
+        responseObserver.onNext(builder.build());
+      }
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.error("kvCheckTxnStatus error: " + e);
+      responseObserver.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  @Override
+  public void kvResolveLock(
+      org.tikv.kvproto.Kvrpcpb.ResolveLockRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.ResolveLockResponse> responseObserver) {
+    logger.info("KVMockServer.kvResolveLock");
+    try {
+      Long startTs = request.getStartVersion();
+      Long commitTs = request.getCommitVersion();
+      logger.info(
+          String.format(
+              "kvResolveLock for txn: %d, commitTs: %d, keys: %d",
+              startTs, commitTs, request.getKeysCount()));
+      Kvrpcpb.ResolveLockResponse.Builder builder = Kvrpcpb.ResolveLockResponse.newBuilder();
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      if (request.getKeysCount() == 0) {
+        lockMap.entrySet().removeIf(entry -> entry.getValue().get().getLockVersion() == startTs);
+      } else {
+        for (int i = 0; i < request.getKeysCount(); i++) {
+          removeLock(request.getKeys(i));
+        }
+      }
+
       responseObserver.onNext(builder.build());
       responseObserver.onCompleted();
     } catch (Exception e) {
