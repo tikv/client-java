@@ -74,9 +74,12 @@ public class PDClientMockTest extends PDMockServerTest {
   @Test
   public void testTso() throws Exception {
     try (PDClient client = session.getPDClient()) {
+      Long current = System.currentTimeMillis();
       TiTimestamp ts = client.getTimestamp(defaultBackOff());
-      // Test pdServer is set to generate physical == logical + 1
-      assertEquals(ts.getPhysical(), ts.getLogical() + 1);
+      // Test pdServer is set to generate physical to current, logical to 1
+      assertTrue(ts.getPhysical() >= current);
+      assertTrue(ts.getPhysical() < current + 100);
+      assertEquals(ts.getLogical(), 1);
     }
   }
 
