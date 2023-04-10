@@ -228,12 +228,20 @@ public class RegionManager {
 
     TiStore store = null;
     if (storeType == TiStoreType.TiKV) {
+      region.SetReplicaIdx(0);
       Peer peer = region.getCurrentReplica();
       store = getStoreById(peer.getStoreId(), backOffer);
+      while (!store.isReachable()){
+        peer = region.getNextReplica();
+        store = getStoreById(peer.getStoreId(), backOffer);
+      }
     } else {
       List<TiStore> tiflashStores = new ArrayList<>();
       for (Peer peer : region.getLearnerList()) {
         TiStore s = getStoreById(peer.getStoreId(), backOffer);
+        if (!s.isReachable()) {
+          continue;
+        }
         for (Metapb.StoreLabel label : s.getStore().getLabelsList()) {
           if (label.getKey().equals(storeType.getLabelKey())
               && label.getValue().equals(storeType.getLabelValue())) {
