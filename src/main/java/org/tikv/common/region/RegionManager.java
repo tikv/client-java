@@ -231,7 +231,7 @@ public class RegionManager {
       region.SetReplicaIdx(0);
       Peer peer = region.getCurrentReplica();
       store = getStoreById(peer.getStoreId(), backOffer);
-      while (!store.isReachable()){
+      while (!store.isReachable()) {
         peer = region.getNextReplica();
         store = getStoreById(peer.getStoreId(), backOffer);
       }
