@@ -232,6 +232,7 @@ public class RegionManager {
       Peer peer = region.getCurrentReplica();
       store = getStoreById(peer.getStoreId(), backOffer);
       while (!store.isReachable()) {
+        logger.info("Store is unreachable, try to get the next replica");
         peer = region.getNextReplica();
         store = getStoreById(peer.getStoreId(), backOffer);
       }
