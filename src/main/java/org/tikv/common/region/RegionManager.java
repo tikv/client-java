@@ -229,15 +229,16 @@ public class RegionManager {
     TiStore store = null;
     if (storeType == TiStoreType.TiKV) {
       // check from the first replica in case it recovers
-      for (int i = 0; i < region.getReplicaList().size(); i++) {
-        Peer peer = region.getReplicaList().get(i);
+      List<Peer> replicaList = region.getReplicaList();
+      for (int i = 0; i < replicaList.size(); i++) {
+        Peer peer = replicaList.get(i);
         store = getStoreById(peer.getStoreId(), backOffer);
         if (store.isReachable()) {
           // update replica index
           region.setReplicaIdx(i);
           break;
         }
-        logger.info("Store is unreachable, try to get the replica,index: " + i);
+        logger.info("Store {} is unreachable, try to get the next replica", peer.getStoreId());
       }
     } else {
       List<TiStore> tiflashStores = new ArrayList<>();
