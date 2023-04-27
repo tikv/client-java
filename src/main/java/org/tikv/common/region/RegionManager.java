@@ -234,7 +234,7 @@ public class RegionManager {
         Peer peer = replicaList.get(i);
         store = getStoreById(peer.getStoreId(), backOffer);
         if (store.isReachable()) {
-          // update replica index
+          // update replica's index
           region.setReplicaIdx(i);
           break;
         }
