@@ -50,7 +50,7 @@ jobs:
           sleep 1m 30s
 
           # Start TiKV in APIV1
-          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2382 2>&1 &
+          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2381 2>&1 &
 
           sleep 30s
 
