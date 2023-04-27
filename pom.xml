@@ -3,7 +3,11 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.tikv</groupId>
     <artifactId>tikv-client-java</artifactId>
+<<<<<<< HEAD
     <version>3.3.2</version>
+=======
+    <version>3.3.4-SNAPSHOT</version>
+>>>>>>> e8feb23344 ([close #736] Select reachable store (#737))
     <packaging>jar</packaging>
     <name>TiKV Java Client</name>
     <description>A Java Client for TiKV</description>
