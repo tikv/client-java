@@ -44,13 +44,13 @@ jobs:
       - name: Start TiUP Playground
         run: |
           # Start TiKV in APIV1TTL
-          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> raw.out 2>&1 &
+          /home/runner/.tiup/bin/tiup playground:v1.12.0 ${{ matrix.tikv_version }} --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> raw.out 2>&1 &
 
           # The first run of `tiup` has to download all components so it'll take longer.
           sleep 1m 30s
 
           # Start TiKV in APIV1
-          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> txn.out 2>&1 &
+          /home/runner/.tiup/bin/tiup playground:v1.12.0 ${{ matrix.tikv_version }} --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml &> txn.out 2>&1 &
 
           sleep 30s
 
