@@ -20,17 +20,22 @@ import io.grpc.ManagedChannel;
 import io.grpc.health.v1.HealthCheckRequest;
 import io.grpc.health.v1.HealthCheckResponse;
 import io.grpc.health.v1.HealthGrpc;
+import io.grpc.stub.ClientCalls;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.util.ChannelFactory;
 import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.kvproto.Metapb;
+import org.tikv.kvproto.Mpp;
+import org.tikv.kvproto.Mpp.IsAliveRequest;
+import org.tikv.kvproto.TikvGrpc;
 
 public class StoreHealthyChecker implements Runnable {
   private static final Logger logger = LoggerFactory.getLogger(StoreHealthyChecker.class);
@@ -75,6 +80,32 @@ public class StoreHealthyChecker implements Runnable {
 
   private boolean checkStoreHealth(TiStore store) {
     String addressStr = store.getStore().getAddress();
+    for (Metapb.StoreLabel label : store.getStore().getLabelsList()) {
+      if (label.getKey().equals(TiStoreType.TiFlash.getLabelKey())
+          && label.getValue().equals(TiStoreType.TiFlash.getLabelValue())) {
+        return checkTiFlashHealth(addressStr);
+      }
+    }
+    return checkTiKVHealth(addressStr);
+  }
+
+  private boolean checkTiFlashHealth(String addressStr) {
+    try {
+      ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
+      TikvGrpc.TikvBlockingStub stub =
+          TikvGrpc.newBlockingStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+      Supplier<IsAliveRequest> factory = () -> Mpp.IsAliveRequest.newBuilder().build();
+      Mpp.IsAliveResponse resp =
+          ClientCalls.blockingUnaryCall(
+              stub.getChannel(), TikvGrpc.getIsAliveMethod(), stub.getCallOptions(), factory.get());
+      return resp != null && resp.getAvailable();
+    } catch (Exception e) {
+      logger.warn("fail to check TiFlash health, regrade as unhealthy", e);
+      return false;
+    }
+  }
+
+  private boolean checkTiKVHealth(String addressStr) {
     try {
       ManagedChannel channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
       HealthGrpc.HealthBlockingStub stub =
@@ -83,6 +114,7 @@ public class StoreHealthyChecker implements Runnable {
       HealthCheckResponse resp = stub.check(req);
       return resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING;
     } catch (Exception e) {
+      logger.warn("fail to check TiKV health, regrade as unhealthy", e);
       return false;
     }
   }
