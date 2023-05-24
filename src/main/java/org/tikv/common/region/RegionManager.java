@@ -177,6 +177,10 @@ public class RegionManager {
         Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
         region =
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
+        logger.info(
+            String.format(
+                "get region id: %d with leader: %d",
+                region.getId(), region.getLeader().getStoreId()));
       }
     } catch (Exception e) {
       return null;
@@ -235,6 +239,7 @@ public class RegionManager {
         store = getStoreById(peer.getStoreId(), backOffer);
         if (store.isReachable()) {
           // update replica's index
+          logger.info("Store {} is reachable, use it as TiStore", peer.getStoreId());
           region.setReplicaIdx(i);
           break;
         }
@@ -260,11 +265,13 @@ public class RegionManager {
             tiflashStores.get(
                 Math.floorMod(tiflashStoreIndex.getAndIncrement(), tiflashStores.size()));
       }
-
-      if (store == null) {
-        // clear the region cache, so we may get the learner peer next time
-        cache.invalidateRegion(region);
-      }
+    }
+    if (store == null || !store.isReachable()) {
+      // For TiFlash: clear the region cache, so we may get the learner peer next time
+      // For TiKV: clear the region cache and set store to null
+      logger.info("store is null or unreachable, clear region cache");
+      store = null;
+      cache.invalidateRegion(region);
     }
     return Pair.create(region, store);
   }
