@@ -235,10 +235,12 @@ public class RegionManager {
         store = getStoreById(peer.getStoreId(), backOffer);
         if (store.isReachable()) {
           // update replica's index
+          logger.info("Store {} is reachable, use it as store", peer.getStoreId());
           region.setReplicaIdx(i);
           break;
         }
         logger.info("Store {} is unreachable, try to get the next replica", peer.getStoreId());
+        store = null;
       }
     } else {
       List<TiStore> tiflashStores = new ArrayList<>();
