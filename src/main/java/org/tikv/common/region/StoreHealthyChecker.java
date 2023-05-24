@@ -100,7 +100,8 @@ public class StoreHealthyChecker implements Runnable {
               stub.getChannel(), TikvGrpc.getIsAliveMethod(), stub.getCallOptions(), factory.get());
       return resp != null && resp.getAvailable();
     } catch (Exception e) {
-      logger.warn("fail to check TiFlash health, regrade as unhealthy. TiFlash address: " + addressStr, e);
+      logger.warn(
+          "fail to check TiFlash health, regrade as unhealthy. TiFlash address: " + addressStr, e);
       return false;
     }
   }
@@ -114,7 +115,8 @@ public class StoreHealthyChecker implements Runnable {
       HealthCheckResponse resp = stub.check(req);
       return resp.getStatus() == HealthCheckResponse.ServingStatus.SERVING;
     } catch (Exception e) {
-      logger.warn("fail to check TiKV health, regrade as unhealthy. TiKV address: " + addressStr, e);
+      logger.warn(
+          "fail to check TiKV health, regrade as unhealthy. TiKV address: " + addressStr, e);
       return false;
     }
   }
