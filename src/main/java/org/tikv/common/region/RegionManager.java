@@ -245,6 +245,10 @@ public class RegionManager {
         }
         logger.info("Store {} is unreachable, try to get the next replica", peer.getStoreId());
       }
+      // Does not set unreachable store to null in case it is incompatible with GrpcForward
+      if (store == null || !store.isReachable()) {
+        logger.warn("No TiKV store available for region: " + region);
+      }
     } else {
       List<TiStore> tiflashStores = new ArrayList<>();
       for (Peer peer : region.getLearnerList()) {
@@ -265,13 +269,11 @@ public class RegionManager {
             tiflashStores.get(
                 Math.floorMod(tiflashStoreIndex.getAndIncrement(), tiflashStores.size()));
       }
-    }
-    if (store == null || !store.isReachable()) {
-      // For TiFlash: clear the region cache, so we may get the learner peer next time
-      // For TiKV: clear the region cache and set store to null
-      logger.info("store is null or unreachable, clear region cache");
-      store = null;
-      cache.invalidateRegion(region);
+
+      if (store == null) {
+        // clear the region cache, so we may get the learner peer next time
+        cache.invalidateRegion(region);
+      }
     }
     return Pair.create(region, store);
   }
