@@ -239,7 +239,6 @@ public class RegionManager {
         store = getStoreById(peer.getStoreId(), backOffer);
         if (store.isReachable()) {
           // update replica's index
-          logger.info("Store {} is reachable, select it", peer.getStoreId());
           region.setReplicaIdx(i);
           break;
         }
