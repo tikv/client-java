@@ -105,4 +105,14 @@ public class TiStore implements Serializable {
   public long getId() {
     return this.store.getId();
   }
+
+  public boolean isTiFlash() {
+    for (Metapb.StoreLabel label : store.getLabelsList()) {
+      if (label.getKey().equals(TiStoreType.TiFlash.getLabelKey())
+          && label.getValue().equals(TiStoreType.TiFlash.getLabelValue())) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
