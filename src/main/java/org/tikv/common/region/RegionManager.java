@@ -247,11 +247,8 @@ public class RegionManager {
         if (!s.isReachable()) {
           continue;
         }
-        for (Metapb.StoreLabel label : s.getStore().getLabelsList()) {
-          if (label.getKey().equals(storeType.getLabelKey())
-              && label.getValue().equals(storeType.getLabelValue())) {
-            tiflashStores.add(s);
-          }
+        if (s.isTiFlash()) {
+          tiflashStores.add(s);
         }
       }
       // select a tiflash with Round-Robin strategy
