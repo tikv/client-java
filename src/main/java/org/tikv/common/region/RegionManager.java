@@ -235,12 +235,10 @@ public class RegionManager {
         store = getStoreById(peer.getStoreId(), backOffer);
         if (store.isReachable()) {
           // update replica's index
-          logger.info("Store {} is reachable, use it as store", peer.getStoreId());
           region.setReplicaIdx(i);
           break;
         }
         logger.info("Store {} is unreachable, try to get the next replica", peer.getStoreId());
-        store = null;
       }
     } else {
       List<TiStore> tiflashStores = new ArrayList<>();
@@ -249,11 +247,8 @@ public class RegionManager {
         if (!s.isReachable()) {
           continue;
         }
-        for (Metapb.StoreLabel label : s.getStore().getLabelsList()) {
-          if (label.getKey().equals(storeType.getLabelKey())
-              && label.getValue().equals(storeType.getLabelValue())) {
-            tiflashStores.add(s);
-          }
+        if (s.isTiFlash()) {
+          tiflashStores.add(s);
         }
       }
       // select a tiflash with Round-Robin strategy
