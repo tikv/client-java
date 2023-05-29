@@ -183,6 +183,7 @@ public class RegionManager {
                 region.getId(), region.getLeader().getStoreId()));
       }
     } catch (Exception e) {
+      logger.warn("Get region failed: ", e);
       return null;
     } finally {
       requestTimer.observeDuration();
