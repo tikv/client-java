@@ -177,8 +177,13 @@ public class RegionManager {
         Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
         region =
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
+        logger.debug(
+            String.format(
+                "get region id: %d with leader: %d",
+                region.getId(), region.getLeader().getStoreId()));
       }
     } catch (Exception e) {
+      logger.warn("Get region failed: ", e);
       return null;
     } finally {
       requestTimer.observeDuration();
@@ -240,6 +245,10 @@ public class RegionManager {
         }
         logger.info("Store {} is unreachable, try to get the next replica", peer.getStoreId());
       }
+      // Does not set unreachable store to null in case it is incompatible with GrpcForward
+      if (store == null || !store.isReachable()) {
+        logger.warn("No TiKV store available for region: " + region);
+      }
     } else {
       List<TiStore> tiflashStores = new ArrayList<>();
       for (Peer peer : region.getLearnerList()) {
@@ -247,11 +256,8 @@ public class RegionManager {
         if (!s.isReachable()) {
           continue;
         }
-        for (Metapb.StoreLabel label : s.getStore().getLabelsList()) {
-          if (label.getKey().equals(storeType.getLabelKey())
-              && label.getValue().equals(storeType.getLabelValue())) {
-            tiflashStores.add(s);
-          }
+        if (s.isTiFlash()) {
+          tiflashStores.add(s);
         }
       }
       // select a tiflash with Round-Robin strategy
