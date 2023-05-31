@@ -177,7 +177,7 @@ public class RegionManager {
         Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
         region =
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
-        logger.info(
+        logger.debug(
             String.format(
                 "get region id: %d with leader: %d",
                 region.getId(), region.getLeader().getStoreId()));
