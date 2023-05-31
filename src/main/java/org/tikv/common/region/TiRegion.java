@@ -126,6 +126,14 @@ public class TiRegion implements Serializable {
     return getCurrentReplica();
   }
 
+  public void setReplicaIdx(int idx) {
+    replicaIdx = idx;
+  }
+
+  public List<Peer> getReplicaList() {
+    return replicaList;
+  }
+
   private boolean isLeader(Peer peer) {
     return getLeader().equals(peer);
   }

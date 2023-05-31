@@ -177,8 +177,13 @@ public class RegionManager {
         Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
         region =
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
+        logger.debug(
+            String.format(
+                "get region id: %d with leader: %d",
+                region.getId(), region.getLeader().getStoreId()));
       }
     } catch (Exception e) {
+      logger.warn("Get region failed: ", e);
       return null;
     } finally {
       requestTimer.observeDuration();
@@ -228,17 +233,31 @@ public class RegionManager {
 
     TiStore store = null;
     if (storeType == TiStoreType.TiKV) {
-      Peer peer = region.getCurrentReplica();
-      store = getStoreById(peer.getStoreId(), backOffer);
+      // check from the first replica in case it recovers
+      List<Peer> replicaList = region.getReplicaList();
+      for (int i = 0; i < replicaList.size(); i++) {
+        Peer peer = replicaList.get(i);
+        store = getStoreById(peer.getStoreId(), backOffer);
+        if (store.isReachable()) {
+          // update replica's index
+          region.setReplicaIdx(i);
+          break;
+        }
+        logger.info("Store {} is unreachable, try to get the next replica", peer.getStoreId());
+      }
+      // Does not set unreachable store to null in case it is incompatible with GrpcForward
+      if (store == null || !store.isReachable()) {
+        logger.warn("No TiKV store available for region: " + region);
+      }
     } else {
       List<TiStore> tiflashStores = new ArrayList<>();
       for (Peer peer : region.getLearnerList()) {
         TiStore s = getStoreById(peer.getStoreId(), backOffer);
-        for (Metapb.StoreLabel label : s.getStore().getLabelsList()) {
-          if (label.getKey().equals(storeType.getLabelKey())
-              && label.getValue().equals(storeType.getLabelValue())) {
-            tiflashStores.add(s);
-          }
+        if (!s.isReachable()) {
+          continue;
+        }
+        if (s.isTiFlash()) {
+          tiflashStores.add(s);
         }
       }
       // select a tiflash with Round-Robin strategy
