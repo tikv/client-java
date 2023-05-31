@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.tikv</groupId>
     <artifactId>tikv-client-java</artifactId>
-    <version>3.3.4</version>
+    <version>3.3.5</version>
     <packaging>jar</packaging>
     <name>TiKV Java Client</name>
     <description>A Java Client for TiKV</description>
