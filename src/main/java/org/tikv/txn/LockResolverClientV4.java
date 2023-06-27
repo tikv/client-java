@@ -321,6 +321,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
               .setCallerStartTs(callerStartTS)
               .setCurrentTs(currentTS)
               .setRollbackIfNotExist(rollbackIfNotExist)
+              .setVerifyIsPrimary(true)
               .build();
         };
 
