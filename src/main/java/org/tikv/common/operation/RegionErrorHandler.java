@@ -220,7 +220,16 @@ public class RegionErrorHandler<RespT> implements ErrorHandler<RespT> {
     // If the region epoch is not ahead of TiKV's, replace region meta in region cache.
     for (Metapb.Region meta : currentRegions) {
       // The region needs to be decoded to plain format.
-      meta = regionManager.getPDClient().getCodec().decodeRegion(meta);
+      try {
+        meta = regionManager.getPDClient().getCodec().decodeRegion(meta);
+      } catch (Exception e) {
+        logger.warn("ignore invalid region: " + meta.toString());
+        // if the region is invalid, ignore it since the following situation might appear.
+        // Assuming a region with range [r000, z), then it splits into:
+        // [r000, x) [x, z), the right region is invalid for keyspace `r000`.
+        // We should only care about the valid region.
+        continue;
+      }
       TiRegion region = regionManager.createRegion(meta, backOffer);
       newRegions.add(region);
       if (recv.getRegion().getVerID() == region.getVerID()) {
