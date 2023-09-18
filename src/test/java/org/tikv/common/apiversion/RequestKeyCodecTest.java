@@ -186,7 +186,7 @@ public class RequestKeyCodecTest {
 
     try {
       decoded = v2.decodeRegion(region);
-      assertTrue(false);
+      fail();
     } catch (Exception ignored) {
     }
 
@@ -197,11 +197,11 @@ public class RequestKeyCodecTest {
             .build();
     try {
       decoded = v2.decodeRegion(region);
-      assertTrue(false);
+      fail();
     } catch (Exception ignored) {
     }
 
-    // test region is INTERSECT with keyspace
+    // case: regionStartKey == "" < keyPrefix < regionEndKey < infiniteEndKey
     region =
         Region.newBuilder()
             .setStartKey(ByteString.EMPTY)
@@ -211,6 +211,37 @@ public class RequestKeyCodecTest {
     assertTrue(decoded.getStartKey().isEmpty());
     assertEquals(ByteString.copyFromUtf8("0"), decoded.getEndKey());
 
+    // case: "" < regionStartKey < keyPrefix < regionEndKey < infiniteEndKey < ""
+    region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(ByteString.copyFromUtf8("m_123")))
+            .setEndKey(CodecUtils.encode(v2.keyPrefix.concat(ByteString.copyFromUtf8("0"))))
+            .build();
+    decoded = v2.decodeRegion(region);
+    assertEquals(ByteString.EMPTY, decoded.getStartKey());
+    assertEquals(ByteString.copyFromUtf8("0"), decoded.getEndKey());
+
+    // case: "" < regionStartKey < keyPrefix < infiniteEndKey < regionEndKey < ""
+    region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(ByteString.copyFromUtf8("m_123")))
+            .setEndKey(CodecUtils.encode(v2.infiniteEndKey.concat(ByteString.copyFromUtf8("0"))))
+            .build();
+    decoded = v2.decodeRegion(region);
+    assertEquals(ByteString.EMPTY, decoded.getStartKey());
+    assertEquals(ByteString.EMPTY, decoded.getEndKey());
+
+    // case: keyPrefix < regionStartKey <  infiniteEndKey < regionEndKey < ""
+    region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(v2.keyPrefix.concat(ByteString.copyFromUtf8("0"))))
+            .setEndKey(CodecUtils.encode(v2.infiniteEndKey.concat(ByteString.copyFromUtf8("0"))))
+            .build();
+    decoded = v2.decodeRegion(region);
+    assertEquals(ByteString.copyFromUtf8("0"), decoded.getStartKey());
+    assertTrue(decoded.getEndKey().isEmpty());
+
+    // case: keyPrefix < regionStartKey <  infiniteEndKey < regionEndKey == ""
     region =
         Region.newBuilder()
             .setStartKey(CodecUtils.encode(v2.keyPrefix.concat(ByteString.copyFromUtf8("0"))))
