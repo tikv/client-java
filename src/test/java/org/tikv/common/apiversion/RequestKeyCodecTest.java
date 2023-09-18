@@ -17,8 +17,7 @@
 
 package org.tikv.common.apiversion;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
@@ -177,5 +176,48 @@ public class RequestKeyCodecTest {
     decoded = v2.decodeRegion(region);
     assertEquals(start, decoded.getStartKey());
     assertEquals(ByteString.EMPTY, decoded.getEndKey());
+
+    // test region out of keyspace
+    region =
+        Region.newBuilder()
+            .setStartKey(ByteString.EMPTY)
+            .setEndKey(CodecUtils.encode(v2.keyPrefix))
+            .build();
+
+    try {
+      decoded = v2.decodeRegion(region);
+      assertTrue(false);
+    } catch (Exception ignored) {
+    }
+
+    region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(v2.infiniteEndKey))
+            .setEndKey(ByteString.EMPTY)
+            .build();
+    try {
+      decoded = v2.decodeRegion(region);
+      assertTrue(false);
+    } catch (Exception ignored) {
+    }
+
+    // test region is INTERSECT with keyspace
+    region =
+        Region.newBuilder()
+            .setStartKey(ByteString.EMPTY)
+            .setEndKey(CodecUtils.encode(v2.keyPrefix.concat(ByteString.copyFromUtf8("0"))))
+            .build();
+    decoded = v2.decodeRegion(region);
+    assertTrue(decoded.getStartKey().isEmpty());
+    assertEquals(ByteString.copyFromUtf8("0"), decoded.getEndKey());
+
+    region =
+        Region.newBuilder()
+            .setStartKey(CodecUtils.encode(v2.keyPrefix.concat(ByteString.copyFromUtf8("0"))))
+            .setEndKey(ByteString.EMPTY)
+            .build();
+    decoded = v2.decodeRegion(region);
+    assertEquals(ByteString.copyFromUtf8("0"), decoded.getStartKey());
+    assertTrue(decoded.getEndKey().isEmpty());
   }
 }
