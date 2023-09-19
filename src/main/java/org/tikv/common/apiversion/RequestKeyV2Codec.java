@@ -81,21 +81,20 @@ public class RequestKeyV2Codec implements RequestKeyCodec {
 
     if (!start.isEmpty()) {
       start = CodecUtils.decode(start);
-      if (ByteString.unsignedLexicographicalComparator().compare(start, keyPrefix) < 0) {
-        start = ByteString.EMPTY;
-      } else {
-        start = decodeKey(start);
-      }
     }
 
     if (!end.isEmpty()) {
       end = CodecUtils.decode(end);
-      if (ByteString.unsignedLexicographicalComparator().compare(end, infiniteEndKey) >= 0) {
-        end = ByteString.EMPTY;
-      } else {
-        end = decodeKey(end);
-      }
     }
+
+    if (ByteString.unsignedLexicographicalComparator().compare(start, infiniteEndKey) >= 0
+        || (!end.isEmpty()
+            && ByteString.unsignedLexicographicalComparator().compare(end, keyPrefix) <= 0)) {
+      throw new IllegalArgumentException("region out of keyspace" + region.toString());
+    }
+
+    start = start.startsWith(keyPrefix) ? start.substring(keyPrefix.size()) : ByteString.EMPTY;
+    end = end.startsWith(keyPrefix) ? end.substring(keyPrefix.size()) : ByteString.EMPTY;
 
     return builder.setStartKey(start).setEndKey(end).build();
   }
