@@ -178,27 +178,36 @@ public class RequestKeyCodecTest {
     assertEquals(ByteString.EMPTY, decoded.getEndKey());
 
     // test region out of keyspace
-    region =
-        Region.newBuilder()
-            .setStartKey(ByteString.EMPTY)
-            .setEndKey(CodecUtils.encode(v2.keyPrefix))
-            .build();
+    {
+      ByteString m_123 = CodecUtils.encode(ByteString.copyFromUtf8("m_123"));
+      ByteString m_124 = CodecUtils.encode(ByteString.copyFromUtf8("m_124"));
+      ByteString infiniteEndKey_0 = CodecUtils.encode(v2.infiniteEndKey.concat(ByteString.copyFrom(new byte[] {0})));
+      ByteString t_123 = CodecUtils.encode(ByteString.copyFromUtf8("t_123"));
+      ByteString y_123 = CodecUtils.encode(ByteString.copyFromUtf8("y_123"));
 
-    try {
-      decoded = v2.decodeRegion(region);
-      fail();
-    } catch (Exception ignored) {
-    }
-
-    region =
-        Region.newBuilder()
-            .setStartKey(CodecUtils.encode(v2.infiniteEndKey))
-            .setEndKey(ByteString.EMPTY)
-            .build();
-    try {
-      decoded = v2.decodeRegion(region);
-      fail();
-    } catch (Exception ignored) {
+      ByteString[][] outOfKeyspaceCases = {
+          {ByteString.EMPTY, CodecUtils.encode(v2.keyPrefix)},    // ["", "r000"/"x000")
+          {ByteString.EMPTY, m_123},
+          {m_123, m_124},
+          {m_124, CodecUtils.encode(v2.keyPrefix)},
+          {CodecUtils.encode(v2.infiniteEndKey), ByteString.EMPTY}, // ["r001"/"x001", "")
+          {CodecUtils.encode(v2.infiniteEndKey), infiniteEndKey_0},
+          {infiniteEndKey_0, t_123},
+          {y_123, ByteString.EMPTY}, // "y_123" is bigger than "infiniteEndKey" for both raw & txn.
+      };
+      
+      for (ByteString[] testCase : outOfKeyspaceCases) {
+        region =
+            Region.newBuilder()
+                .setStartKey(testCase[0])
+                .setEndKey(testCase[1])
+                .build();
+        try {
+          decoded = v2.decodeRegion(region);
+          fail(String.format("[%s,%s): %s", testCase[0], testCase[1], decoded.toString()));
+        } catch (Exception ignored) {
+        }
+      }
     }
 
     // case: regionStartKey == "" < keyPrefix < regionEndKey < infiniteEndKey
