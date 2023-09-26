@@ -87,7 +87,8 @@ public abstract class PDMockServerTest {
     TiConfiguration conf = TiConfiguration.createDefault(addr + ":" + ports[0]);
     conf.setKvMode("RAW");
     conf.setWarmUpEnable(false);
-    conf.setTimeout(2000);
+    conf.setTimeout(20000);
+    conf.setRawKVReadTimeoutInMS(2000);
     conf.setEnableGrpcForward(true);
 
     session = TiSession.create(conf);

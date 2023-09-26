@@ -35,6 +35,7 @@ import org.tikv.kvproto.Pdpb.GetAllStoresResponse;
 public class MockThreeStoresTest extends PDMockServerTest {
 
   protected TiRegion region;
+  protected TiRegion firstRegion;
   protected List<KVMockServer> servers = new ArrayList<>();
   protected List<Metapb.Store> stores;
 
@@ -102,6 +103,13 @@ public class MockThreeStoresTest extends PDMockServerTest {
     }
 
     this.region =
+        new TiRegion(
+            session.getConf(),
+            region,
+            region.getPeers(0),
+            region.getPeersList(),
+            stores.stream().map(TiStore::new).collect(Collectors.toList()));
+    this.firstRegion =
         new TiRegion(
             session.getConf(),
             region,

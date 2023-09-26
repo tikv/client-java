@@ -65,9 +65,12 @@ public class MockServerTest extends PDMockServerTest {
             s.stream().map(TiStore::new).collect(Collectors.toList()));
     leader.addGetRegionListener(
         request -> Pdpb.GetRegionResponse.newBuilder().setRegion(r).build());
-    for (Metapb.Store store : s) {
-      leader.addGetStoreListener(
-          (request) -> Pdpb.GetStoreResponse.newBuilder().setStore(store).build());
+    for (PDMockServer pd : pdServers) {
+      pd.addGetStoreListener(
+          request ->
+              Pdpb.GetStoreResponse.newBuilder()
+                  .setStore(s.get((int) (request.getStoreId() - 1)))
+                  .build());
     }
     server = new KVMockServer();
     port = server.start(region);
