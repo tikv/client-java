@@ -394,6 +394,14 @@ public class RegionErrorTest extends MockThreeStoresTest {
       } catch (Exception ignore) {
       }
 
+      // Forbid the client get region from PD leader.
+      leader.addGetRegionListener(request -> null);
+      try {
+        client.get(key);
+        fail();
+      } catch (Exception ignore) {
+      }
+
       leader.addGetRegionListener(
           request ->
               Pdpb.GetRegionResponse.newBuilder()
