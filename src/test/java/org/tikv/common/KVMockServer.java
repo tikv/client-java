@@ -47,13 +47,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.key.Key;
 import org.tikv.common.region.TiRegion;
-import org.tikv.kvproto.Coprocessor;
-import org.tikv.kvproto.Errorpb;
+import org.tikv.kvproto.*;
 import org.tikv.kvproto.Errorpb.EpochNotMatch;
 import org.tikv.kvproto.Errorpb.Error;
-import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.Context;
-import org.tikv.kvproto.TikvGrpc;
 
 public class KVMockServer extends TikvGrpc.TikvImplBase {
 
@@ -61,6 +58,11 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   private int port;
   private Server server;
   private TiRegion region;
+  private TiRegion firstRegion;
+  private Iterable<Metapb.Region> subregions;
+  private Metapb.Peer newLeader;
+  private Errorpb.StoreNotMatch storeNotMatch;
+  private boolean tempError = false;
   private State state = State.Normal;
   private final TreeMap<Key, ByteString> dataMap = new TreeMap<>();
   private final Map<Key, Supplier<Errorpb.Error.Builder>> regionErrMap = new HashMap<>();
@@ -97,6 +99,26 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     this.region = region;
   }
 
+  public void setNewLeader(Metapb.Peer leader) {
+    newLeader = leader;
+  }
+
+  public void setSubregions(Iterable<Metapb.Region> subregions) {
+    this.subregions = subregions;
+  }
+
+  public void setTempError(boolean tempError) {
+    this.tempError = tempError;
+  }
+
+  public void setStoreNotMatch(int request, int actual) {
+    this.storeNotMatch =
+        Errorpb.StoreNotMatch.newBuilder()
+            .setRequestStoreId(request)
+            .setActualStoreId(actual)
+            .build();
+  }
+
   public void put(ByteString key, ByteString value) {
     dataMap.put(toRawKey(key), value);
   }
@@ -117,23 +139,79 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
     regionErrMap.put(toRawKey(key.getBytes(StandardCharsets.UTF_8)), builder);
   }
 
+  private Supplier<Errorpb.Error.Builder> takeError(Key key, boolean tempError) {
+    if (tempError) {
+      return regionErrMap.remove(key);
+    } else {
+      return regionErrMap.get(key);
+    }
+  }
+
   public void clearAllMap() {
     dataMap.clear();
     regionErrMap.clear();
   }
 
+  public void reset() {
+    clearAllMap();
+    state = State.Normal;
+    storeNotMatch = null;
+    newLeader = null;
+    subregions = null;
+    region = firstRegion;
+    tempError = false;
+  }
+
+  private <T> boolean tryBuilderRegionError(Key key, T builder) throws Exception {
+    Supplier<Errorpb.Error.Builder> errProvider = takeError(key, tempError);
+    if (errProvider != null) {
+      Error.Builder eb = errProvider.get();
+      if (eb != null) {
+        builder
+            .getClass()
+            .getMethod("setRegionError", new Class<?>[]{Error.class})
+            .invoke(builder, eb.build());
+      }
+      return true;
+    }
+    return false;
+  }
+
   private Errorpb.Error verifyContext(Context context) throws Exception {
-    if (context.getRegionId() != region.getId() || !context.getPeer().equals(region.getLeader())) {
-      throw new Exception("context doesn't match");
+    if (context.getRegionId() != region.getId()) {
+      String errMsg =
+          String.format(
+              "client context mismatch: server: %s; client: %s",
+              region.toString(), context.toString());
+      throw new Exception(errMsg);
     }
 
+    logger.warn("local region: " + region.toString());
+    logger.warn("client context: " + context);
+
     Errorpb.Error.Builder errBuilder = Errorpb.Error.newBuilder();
+    if (storeNotMatch != null) {
+      return errBuilder.setStoreNotMatch(storeNotMatch).build();
+    }
+    if (!context.getPeer().equals(region.getLeader())) {
+      String warnMsg =
+          String.format("this store %d is not leader, new leader: %s", port, newLeader.toString());
+      logger.warn(warnMsg);
+      return errBuilder
+          .setNotLeader(
+              Errorpb.NotLeader.newBuilder()
+                  .setRegionId(context.getRegionId())
+                  .setLeader(newLeader)
+                  .build())
+          .build();
+    }
 
     if (!context.getRegionEpoch().equals(region.getRegionEpoch())) {
       return errBuilder
-          .setEpochNotMatch(EpochNotMatch.newBuilder().addCurrentRegions(region.getMeta()).build())
+          .setEpochNotMatch(EpochNotMatch.newBuilder().addAllCurrentRegions(subregions).build())
           .build();
     }
+
     return null;
   }
 
@@ -157,13 +235,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         return;
       }
 
-      Supplier<Errorpb.Error.Builder> errProvider = regionErrMap.get(key);
-      if (errProvider != null) {
-        Error.Builder eb = errProvider.get();
-        if (eb != null) {
-          builder.setRegionError(eb.build());
-        }
-      } else {
+      if (!tryBuilderRegionError(key, builder)) {
         ByteString value = dataMap.get(key);
         if (value == null) {
           value = ByteString.EMPTY;
@@ -413,6 +485,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   }
 
   private static class HealCheck extends HealthImplBase {
+
     @Override
     public void check(
         HealthCheckRequest request, StreamObserver<HealthCheckResponse> responseObserver) {
@@ -425,6 +498,7 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
   public void start(TiRegion region, int port) throws IOException {
     this.port = port;
     this.region = region;
+    this.firstRegion = region;
 
     logger.info("start mock server on port: " + port);
     server =
@@ -434,7 +508,12 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
   public void stop() {
     if (server != null) {
-      server.shutdown();
+      server.shutdownNow();
+      try {
+        server.awaitTermination();
+      } catch (Exception ignore) {
+
+      }
     }
   }
 }
