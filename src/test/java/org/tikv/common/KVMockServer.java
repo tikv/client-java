@@ -169,9 +169,8 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       if (eb != null) {
         builder
             .getClass()
-            .getMethod("setRegionError", new Class<?>[] {Error.class})
+            .getMethod("setRegionError", new Class<?>[]{Error.class})
             .invoke(builder, eb.build());
-        logger.warn("fuck!!!!!!!!!!!!!!!!!!!!!!!");
       }
       return true;
     }
@@ -509,7 +508,12 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
 
   public void stop() {
     if (server != null) {
-      server.shutdown();
+      server.shutdownNow();
+      try {
+        server.awaitTermination();
+      } catch (Exception ignore) {
+
+      }
     }
   }
 }

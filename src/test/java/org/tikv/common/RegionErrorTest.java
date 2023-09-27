@@ -54,6 +54,7 @@ public class RegionErrorTest extends MockThreeStoresTest {
 
   @Test
   public void testOnEpochNotMatch() {
+    initCluster();
     try (RawKVClient client = createClient()) {
       // Construct a key that is less than the prefix of RAW API v2;
       ByteString key = ByteString.copyFromUtf8("key-test-epoch-not-match");
@@ -94,6 +95,57 @@ public class RegionErrorTest extends MockThreeStoresTest {
       // The get should success since the region cache
       // will be updated the currentRegions of `EpochNotMatch` error.
       Assert.assertEquals(Optional.of(value), client.get(key));
+    }
+  }
+
+  @Test
+  public void testOlderEpochNotMatch() {
+    initCluster();
+    try (RawKVClient client = createClient()) {
+      // Construct a key that is less than the prefix of RAW API v2;
+      ByteString key = ByteString.copyFromUtf8("key-test-epoch-not-match");
+      ByteString value = ByteString.copyFromUtf8("value");
+
+      ByteString requestKey = client.getSession().getPDClient().getCodec().encodeKey(key);
+      put(requestKey, value);
+
+      Assert.assertEquals(Optional.of(value), client.get(key));
+
+      Metapb.Region newMeta =
+          Metapb.Region.newBuilder()
+              .mergeFrom(this.region.getMeta())
+              .setRegionEpoch(Metapb.RegionEpoch.newBuilder().setConfVer(1).setVersion(1))
+              .setStartKey(PDClientV2MockTest.encode(requestKey))
+              .setEndKey(PDClientV2MockTest.encode(requestKey.concat(ByteString.copyFromUtf8("0"))))
+              .build();
+
+      // Increase the region epoch for the cluster,
+      // this will cause the cluster return an EpochNotMatch region error.
+      TiRegion newRegion =
+          new TiRegion(
+              this.region.getConf(),
+              newMeta,
+              this.region.getLeader(),
+              this.region.getPeersList(),
+              stores.stream().map(TiStore::new).collect(Collectors.toList()));
+
+      // Update the region of each server
+      for (KVMockServer server : servers) {
+        server.setRegion(newRegion);
+        server.setSubregions(ImmutableList.of(newRegion.getMeta()));
+      }
+
+      // Forbid the client get region from PD leader.
+      leader.addGetRegionListener(request -> null);
+
+      // The get should success since the region cache
+      // will be updated the currentRegions of `EpochNotMatch` error.
+      try {
+        client.get(key);
+        fail(
+            "This request should fail since the local region epoch is newer than the remote region epoch.");
+      } catch (Exception ignored) {
+      }
     }
   }
 
