@@ -42,19 +42,19 @@ jobs:
       - name: Install TiUP
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
-          /home/runner/.tiup/bin/tiup install pd:${{ matrix.tikv_version }} tikv:${{ matrix.tikv_version }}
+          /home/runner/.tiup/bin/tiup install playground pd:${{ matrix.tikv_version }} tikv:${{ matrix.tikv_version }}
       - name: Start TiUP Playground
         run: |
           # Start TiKV in APIV1TTL
           touch tiup-v1ttl.log
           /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2379 2>&1 >> tiup-v1ttl.log &
-          grep -q "PD Endpoints:" <(tail -f tiup-v1ttl.log)
+          timeout 300 grep -q "PD Endpoints:" <(tail -f tiup-v1ttl.log)
           cat tiup-v1ttl.log
 
           # Start TiKV in APIV1
           touch tiup-v1.log
           /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2381 2>&1 >> tiup-v1.log &
-          grep -q "PD Endpoints:" <(tail -f tiup-v1.log)
+          timeout 300 grep -q "PD Endpoints:" <(tail -f tiup-v1.log)
           cat tiup-v1.log
 
           # Get PD address

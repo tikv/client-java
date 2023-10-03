@@ -12,3 +12,9 @@ max-open-files = 10000
 
 [raftdb]
 max-open-files = 10000
+
+[storage.block-cache]
+capacity = "128MB"
+
+[storage]
+reserve-space = "0MB"
