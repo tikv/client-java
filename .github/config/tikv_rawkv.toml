@@ -19,3 +19,7 @@ capacity = "128MB"
 [storage]
 reserve-space = "0MB"
 enable-ttl = true
+
+[server]
+addr = "127.0.0.1:20160"
+status-addr = "127.0.0.1:20180"
