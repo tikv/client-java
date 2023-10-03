@@ -48,7 +48,7 @@ jobs:
         run: |
           # Start TiKV in APIV1TTL
           touch tiup-v1ttl.log
-          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --tag rawkv --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2379 2>&1 >> tiup-v1ttl.log &
+          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --host 127.0.0.1 --tag rawkv --mode tikv-slim --kv 1 --without-monitor --kv.port 20160 --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2379 2>&1 >> tiup-v1ttl.log &
           timeout 300 grep -q "PD Endpoints:" <(tail -f tiup-v1ttl.log)
           cat tiup-v1ttl.log
           echo "Wait for bootstrap"
@@ -56,7 +56,7 @@ jobs:
 
           # Start TiKV in APIV1
           touch tiup-v1.log
-          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --tag txnkv --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2381 2>&1 >> tiup-v1.log &
+          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --host 127.0.0.1 --tag txnkv --mode tikv-slim --kv 1 --without-monitor --kv.port 30160 --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2381 2>&1 >> tiup-v1.log &
           timeout 300 grep -q "PD Endpoints:" <(tail -f tiup-v1.log)
           cat tiup-v1.log
           echo "Wait for bootstrap"
