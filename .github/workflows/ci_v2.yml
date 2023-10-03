@@ -1,0 +1,52 @@
+name: CI (APIv2)
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  integration-test:
+    name: Integration Test - ${{ matrix.tikv_version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tikv_version: [v6.5.3]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 8
+        uses: actions/setup-java@v2
+        with:
+          java-version: '8.0'
+          distribution: 'adopt'
+      - name: Install TiUP
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
+          /home/runner/.tiup/bin/tiup install playground pd:${{ matrix.tikv_version }} tikv:${{ matrix.tikv_version }}
+      - name: Start TiUP Playground
+        run: |
+          # Start TiKV in APIV2
+          touch tiup.log
+          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --tag kv --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_v2.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2379 2>&1 >> tiup.log &
+          timeout 300 grep -q "PD Endpoints:" <(tail -f tiup.log)
+          cat tiup.log
+
+          # Get PD address
+          echo "RAWKV_PD_ADDRESSES=127.0.0.1:2379" >> $GITHUB_ENV
+          echo "TXNKV_PD_ADDRESSES=127.0.0.1:2379" >> $GITHUB_ENV
+
+      - name: Run Integration Test
+        run: mvn clean test
+      - name: Print TiKV logs
+        if: failure()
+        run: |
+          echo "TiKV logs"
+          cat /home/runner/.tiup/data/kv/tikv-0/tikv.log
+      - name: Upload coverage
+        uses: codecov/codecov-action@v2
+        with:
+          files: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
+          fail_ci_if_error: true
+          verbose: true

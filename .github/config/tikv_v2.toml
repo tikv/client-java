@@ -1,0 +1,17 @@
+# TiKV Configuration.
+
+[raftstore]
+pd-heartbeat-tick-interval = "2s"
+pd-store-heartbeat-tick-interval = "5s"
+split-region-check-tick-interval = "1s"
+
+[rocksdb]
+max-open-files = 10000
+
+[raftdb]
+max-open-files = 10000
+
+[storage]
+reserve-space = "0MB"
+api-version = 2
+enable-ttl = true

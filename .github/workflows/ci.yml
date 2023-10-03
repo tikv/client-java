@@ -31,7 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        tikv_version: [v6.5.3]
+        tikv_version: [v5.0.4]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 8
