@@ -44,9 +44,10 @@ public class ConcreteScanIterator extends ScanIterator {
       RegionStoreClientBuilder builder,
       ByteString startKey,
       long version,
-      int limit) {
+      int limit,
+      boolean reverse) {
     // Passing endKey as ByteString.EMPTY means that endKey is +INF by default,
-    this(conf, builder, startKey, ByteString.EMPTY, version, limit);
+    this(conf, builder, startKey, ByteString.EMPTY, version, limit, reverse);
   }
 
   public ConcreteScanIterator(
@@ -54,9 +55,10 @@ public class ConcreteScanIterator extends ScanIterator {
       RegionStoreClientBuilder builder,
       ByteString startKey,
       ByteString endKey,
-      long version) {
+      long version,
+      boolean reverse) {
     // Passing endKey as ByteString.EMPTY means that endKey is +INF by default,
-    this(conf, builder, startKey, endKey, version, Integer.MAX_VALUE);
+    this(conf, builder, startKey, endKey, version, Integer.MAX_VALUE, reverse);
   }
 
   private ConcreteScanIterator(
@@ -65,8 +67,9 @@ public class ConcreteScanIterator extends ScanIterator {
       ByteString startKey,
       ByteString endKey,
       long version,
-      int limit) {
-    super(conf, builder, startKey, endKey, limit, false);
+      int limit,
+      boolean reverse) {
+    super(conf, builder, startKey, endKey, limit, false, reverse);
     this.version = version;
   }
 
@@ -76,7 +79,7 @@ public class ConcreteScanIterator extends ScanIterator {
     try (RegionStoreClient client = builder.build(startKey)) {
       client.setTimeout(conf.getScanTimeout());
       BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
-      currentCache = client.scan(backOffer, startKey, version);
+      currentCache = client.scan(backOffer, startKey, version, reverse);
       // If we get region before scan, we will use region from cache which
       // may have wrong end key. This may miss some regions that split from old region.
       // Client will get the newest region during scan. So we need to

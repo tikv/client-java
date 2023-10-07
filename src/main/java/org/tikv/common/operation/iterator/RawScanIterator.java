@@ -39,8 +39,9 @@ public class RawScanIterator extends ScanIterator {
       ByteString endKey,
       int limit,
       boolean keyOnly,
+      boolean reverse,
       BackOffer scanBackOffer) {
-    super(conf, builder, startKey, endKey, limit, keyOnly);
+    super(conf, builder, startKey, endKey, limit, keyOnly, reverse);
 
     this.scanBackOffer = scanBackOffer;
   }
@@ -56,7 +57,7 @@ public class RawScanIterator extends ScanIterator {
           currentCache = null;
         } else {
           try {
-            currentCache = client.rawScan(backOffer, startKey, limit, keyOnly);
+            currentCache = client.rawScan(backOffer, startKey, limit, keyOnly, reverse);
             // Client will get the newest region during scan. So we need to
             // update region after scan.
             region = client.getRegion();
