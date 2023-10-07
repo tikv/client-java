@@ -22,6 +22,7 @@ import static org.junit.Assert.assertFalse;
 
 import com.google.protobuf.ByteString;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -34,6 +35,7 @@ import org.tikv.common.TiSession;
 import org.tikv.common.exception.RawCASConflictException;
 
 public class CASTest extends BaseRawKVTest {
+
   private RawKVClient client;
   private boolean initialized;
   private static final Logger logger = LoggerFactory.getLogger(RawKVClientTest.class);
@@ -81,21 +83,22 @@ public class CASTest extends BaseRawKVTest {
 
   @Test
   public void rawPutIfAbsentTest() {
-    long ttl = 10;
+    long duration = 10;
+    TimeUnit timeUnit = TimeUnit.SECONDS;
     ByteString key = ByteString.copyFromUtf8("key_atomic");
     ByteString value = ByteString.copyFromUtf8("value");
     ByteString value2 = ByteString.copyFromUtf8("value2");
     client.delete(key);
-    Optional<ByteString> res1 = client.putIfAbsent(key, value, ttl);
+    Optional<ByteString> res1 = client.putIfAbsent(key, value, duration, timeUnit);
     assertFalse(res1.isPresent());
-    Optional<ByteString> res2 = client.putIfAbsent(key, value2, ttl);
+    Optional<ByteString> res2 = client.putIfAbsent(key, value2, duration, timeUnit);
     assertEquals(res2.get(), value);
     try {
-      Thread.sleep(ttl * 1000 + 100);
+      Thread.sleep(duration * 1000 + 100);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    Optional<ByteString> res3 = client.putIfAbsent(key, value, ttl);
+    Optional<ByteString> res3 = client.putIfAbsent(key, value, duration, timeUnit);
     assertFalse(res3.isPresent());
   }
 }
