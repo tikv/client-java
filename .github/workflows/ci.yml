@@ -31,7 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        tikv_version: [nightly, v5.0.4, v5.3.0, v5.4.0]
+        tikv_version: [v5.0.6, v5.3.4, v5.4.3]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 8
@@ -40,19 +41,26 @@ jobs:
           java-version: '8.0'
           distribution: 'adopt'
       - name: Install TiUP
-        run: curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://tiup-mirrors.pingcap.com/install.sh | sh
+          /home/runner/.tiup/bin/tiup install playground pd:${{ matrix.tikv_version }} tikv:${{ matrix.tikv_version }}
       - name: Start TiUP Playground
         run: |
           # Start TiKV in APIV1TTL
-          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2379 2>&1 &
-
-          # The first run of `tiup` has to download all components so it'll take longer.
-          sleep 1m 30s
+          touch tiup-v1ttl.log
+          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --host 127.0.0.1 --tag rawkv --mode tikv-slim --kv 1 --without-monitor --kv.port 20160 --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_rawkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2379 2>&1 >> tiup-v1ttl.log &
+          timeout 300 grep -q "PD Endpoints:" <(tail -f tiup-v1ttl.log)
+          cat tiup-v1ttl.log
+          echo "Wait for bootstrap"
+          sleep 10s
 
           # Start TiKV in APIV1
-          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --mode tikv-slim --kv 1 --without-monitor --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2381 2>&1 &
-
-          sleep 30s
+          touch tiup-v1.log
+          /home/runner/.tiup/bin/tiup playground ${{ matrix.tikv_version }} --host 127.0.0.1 --tag txnkv --mode tikv-slim --kv 1 --without-monitor --kv.port 30160 --kv.config /home/runner/work/client-java/client-java/.github/config/tikv_txnkv.toml --pd.config /home/runner/work/client-java/client-java/.github/config/pd.toml --pd.port 2381 2>&1 >> tiup-v1.log &
+          timeout 300 grep -q "PD Endpoints:" <(tail -f tiup-v1.log)
+          cat tiup-v1.log
+          echo "Wait for bootstrap"
+          sleep 10s
 
           # Get PD address
           echo "RAWKV_PD_ADDRESSES=127.0.0.1:2379" >> $GITHUB_ENV
@@ -60,6 +68,14 @@ jobs:
 
       - name: Run Integration Test
         run: mvn clean test
+      - name: Print TiKV logs
+        if: failure()
+        run: |
+          echo "RawKV TiKV logs"
+          cat /home/runner/.tiup/data/rawkv/tikv-0/tikv.log
+          
+          echo "TxnKV TiKV logs"
+          cat /home/runner/.tiup/data/txnkv/tikv-0/tikv.log
       - name: Upload coverage
         uses: codecov/codecov-action@v2
         with:
