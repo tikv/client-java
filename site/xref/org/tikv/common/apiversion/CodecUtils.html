@@ -31,7 +31,7 @@
 <a class="jxr_linenumber" name="L23" href="#L23">23</a>  <strong class="jxr_keyword">import</strong> org.tikv.common.codec.CodecDataOutput;
 <a class="jxr_linenumber" name="L24" href="#L24">24</a>  
 <a class="jxr_linenumber" name="L25" href="#L25">25</a>  <em class="jxr_comment">// TODO(iosmanthus): use ByteString.wrap to avoid once more copying.</em>
-<a class="jxr_linenumber" name="L26" href="#L26">26</a>  <strong class="jxr_keyword">class</strong> <a name="CodecUtils" href="../../../../org/tikv/common/apiversion/CodecUtils.html#CodecUtils">CodecUtils</a> {
+<a class="jxr_linenumber" name="L26" href="#L26">26</a>  <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">class</strong> <a name="CodecUtils" href="../../../../org/tikv/common/apiversion/CodecUtils.html#CodecUtils">CodecUtils</a> {
 <a class="jxr_linenumber" name="L27" href="#L27">27</a>    <strong class="jxr_keyword">public</strong> <strong class="jxr_keyword">static</strong> ByteString encode(ByteString key) {
 <a class="jxr_linenumber" name="L28" href="#L28">28</a>      <a name="CodecDataOutput" href="../../../../org/tikv/common/codec/CodecDataOutput.html#CodecDataOutput">CodecDataOutput</a> cdo = <strong class="jxr_keyword">new</strong> <a name="CodecDataOutput" href="../../../../org/tikv/common/codec/CodecDataOutput.html#CodecDataOutput">CodecDataOutput</a>();
 <a class="jxr_linenumber" name="L29" href="#L29">29</a>      BytesCodec.writeBytes(cdo, key.toByteArray());
