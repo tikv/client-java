@@ -55,8 +55,8 @@ public class ApiVersionTest {
   }
 
   private boolean minTiKVVersion(String version) {
-    return StoreVersion.minTiKVVersion(
-        version, TiSession.create(createConfiguration()).getPDClient());
+    return StoreVersion.isTiKVVersionGreatEqualThanVersion(
+        TiSession.create(createConfiguration()).getPDClient(), version);
   }
 
   @Test
