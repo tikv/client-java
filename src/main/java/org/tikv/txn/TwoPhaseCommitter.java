@@ -228,7 +228,9 @@ public class TwoPhaseCommitter implements AutoCloseable {
       }
     }
 
-    LOG.info("commit primary key {} successfully", KeyUtils.formatBytes(key));
+    if(LOG.isDebugEnabled()) {
+      LOG.debug("commit primary key {} successfully", KeyUtils.formatBytes(key));
+    }
   }
 
   /**
@@ -592,11 +594,13 @@ public class TwoPhaseCommitter implements AutoCloseable {
 
   private void doCommitSecondaryKeySingleBatchWithRetry(
       BackOffer backOffer, BatchKeys batchKeys, long commitTs) throws TiBatchWriteException {
-    LOG.info(
-        "start commit secondary key, row={}, size={}KB, regionId={}",
-        batchKeys.getKeys().size(),
-        batchKeys.getSizeInKB(),
-        batchKeys.getRegion().getId());
+    if(LOG.isDebugEnabled()) {
+      LOG.debug(
+              "start commit secondary key, row={}, size={}KB, regionId={}",
+              batchKeys.getKeys().size(),
+              batchKeys.getSizeInKB(),
+              batchKeys.getRegion().getId());
+    }
     List<ByteString> keysCommit = batchKeys.getKeys();
     ByteString[] keys = new ByteString[keysCommit.size()];
     keysCommit.toArray(keys);
@@ -612,11 +616,13 @@ public class TwoPhaseCommitter implements AutoCloseable {
       LOG.warn(error);
       throw new TiBatchWriteException("commit secondary key error", commitResult.getException());
     }
-    LOG.info(
-        "commit {} rows successfully, size={}KB, regionId={}",
-        batchKeys.getKeys().size(),
-        batchKeys.getSizeInKB(),
-        batchKeys.getRegion().getId());
+    if(LOG.isDebugEnabled()) {
+      LOG.info(
+              "commit {} rows successfully, size={}KB, regionId={}",
+              batchKeys.getKeys().size(),
+              batchKeys.getSizeInKB(),
+              batchKeys.getRegion().getId());
+    }
   }
 
   private GroupKeyResult groupKeysByRegion(ByteString[] keys, int size, BackOffer backOffer)
