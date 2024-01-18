@@ -101,6 +101,21 @@ public class TwoPhaseCommitter implements AutoCloseable {
         createExecutorService(WRITE_BUFFER_SIZE));
   }
 
+  public TwoPhaseCommitter(
+      TiSession session, long startTime, long lockTTL, ExecutorService executorService) {
+    this(
+        session,
+        startTime,
+        lockTTL,
+        TXN_COMMIT_BATCH_SIZE,
+        TXN_COMMIT_BATCH_SIZE,
+        WRITE_BUFFER_SIZE,
+        1,
+        true,
+        3,
+        executorService);
+  }
+
   TwoPhaseCommitter(
       TiSession session,
       long startTime,
