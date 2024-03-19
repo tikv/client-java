@@ -741,6 +741,8 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (!otherError.isEmpty()) {
       // Invalid cache and split ranges for range exceeds bound error
       if (otherError.contains("range exceeds bound")) {
+        backOffer.doBackOff(
+            BackOffFunction.BackOffFuncType.BoRegionMiss, new GrpcException("range exceeds bound"));
         this.regionManager.invalidateRegion(this.region);
         logger.warn(
             String.format("Invalid cache and re-splitting region task due to: %s.", otherError));
