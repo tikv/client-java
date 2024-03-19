@@ -739,6 +739,13 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
     String otherError = response.getOtherError();
     if (!otherError.isEmpty()) {
+      // Invalid cache and split ranges for range exceeds bound error
+      if (otherError.contains("range exceeds bound")) {
+        this.regionManager.invalidateRegion(this.region);
+        logger.warn(
+            String.format("Invalid cache and re-splitting region task due to: %s.", otherError));
+        return RangeSplitter.newSplitter(this.regionManager).splitRangeByRegion(ranges, storeType);
+      }
       logger.warn(String.format("Other error occurred, message: %s", otherError));
       throw new GrpcException(otherError);
     }
