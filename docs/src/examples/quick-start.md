@@ -24,7 +24,7 @@ Add maven dependency to `pom.xml`.
 <dependency>
   <groupId>org.tikv</groupId>
   <artifactId>tikv-client-java</artifactId>
-  <version>3.1.0</version>
+  <version>3.3.0</version>
 </dependency>
 <dependency>
   <groupId>org.slf4j</groupId>

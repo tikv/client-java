@@ -23,13 +23,18 @@ import com.google.protobuf.ByteString;
 import io.prometheus.client.Histogram;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.event.CacheInvalidateEvent;
 import org.tikv.common.exception.GrpcException;
 import org.tikv.common.exception.InvalidStoreException;
 import org.tikv.common.exception.TiClientInternalException;
@@ -68,9 +73,36 @@ public class RegionManager {
   private final TiConfiguration conf;
   private final ScheduledExecutorService executor;
   private final StoreHealthyChecker storeChecker;
+  private final CopyOnWriteArrayList<Function<CacheInvalidateEvent, Void>>
+      cacheInvalidateCallbackList;
+  private final ExecutorService callBackThreadPool;
+  private AtomicInteger tiflashStoreIndex = new AtomicInteger(0);
 
   public RegionManager(
       TiConfiguration conf, ReadOnlyPDClient pdClient, ChannelFactory channelFactory) {
+    this(conf, pdClient, channelFactory, 1);
+  }
+
+  public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
+    this(conf, pdClient, 1);
+  }
+
+  public RegionManager(
+      TiConfiguration conf, ReadOnlyPDClient pdClient, int callBackExecutorThreadNum) {
+    this.cache = new RegionCache();
+    this.pdClient = pdClient;
+    this.conf = conf;
+    this.storeChecker = null;
+    this.executor = null;
+    this.cacheInvalidateCallbackList = new CopyOnWriteArrayList<>();
+    this.callBackThreadPool = Executors.newFixedThreadPool(callBackExecutorThreadNum);
+  }
+
+  public RegionManager(
+      TiConfiguration conf,
+      ReadOnlyPDClient pdClient,
+      ChannelFactory channelFactory,
+      int callBackExecutorThreadNum) {
     this.cache = new RegionCache();
     this.pdClient = pdClient;
     this.conf = conf;
@@ -81,24 +113,32 @@ public class RegionManager {
     this.storeChecker = storeChecker;
     this.executor = Executors.newScheduledThreadPool(1);
     this.executor.scheduleAtFixedRate(storeChecker, period, period, TimeUnit.MILLISECONDS);
-  }
-
-  public RegionManager(TiConfiguration conf, ReadOnlyPDClient pdClient) {
-    this.cache = new RegionCache();
-    this.pdClient = pdClient;
-    this.conf = conf;
-    this.storeChecker = null;
-    this.executor = null;
+    this.cacheInvalidateCallbackList = new CopyOnWriteArrayList<>();
+    this.callBackThreadPool = Executors.newFixedThreadPool(callBackExecutorThreadNum);
   }
 
   public synchronized void close() {
     if (this.executor != null) {
       this.executor.shutdownNow();
     }
+    this.callBackThreadPool.shutdownNow();
   }
 
   public ReadOnlyPDClient getPDClient() {
     return this.pdClient;
+  }
+
+  public ExecutorService getCallBackThreadPool() {
+    return callBackThreadPool;
+  }
+
+  public List<Function<CacheInvalidateEvent, Void>> getCacheInvalidateCallbackList() {
+    return cacheInvalidateCallbackList;
+  }
+
+  public void addCacheInvalidateCallback(
+      Function<CacheInvalidateEvent, Void> cacheInvalidateCallback) {
+    this.cacheInvalidateCallbackList.add(cacheInvalidateCallback);
   }
 
   public void invalidateAll() {
@@ -137,8 +177,13 @@ public class RegionManager {
         Pair<Metapb.Region, Metapb.Peer> regionAndLeader = pdClient.getRegionByKey(backOffer, key);
         region =
             cache.putRegion(createRegion(regionAndLeader.first, regionAndLeader.second, backOffer));
+        logger.debug(
+            String.format(
+                "get region id: %d with leader: %d",
+                region.getId(), region.getLeader().getStoreId()));
       }
     } catch (Exception e) {
+      logger.warn("Get region failed: ", e);
       return null;
     } finally {
       requestTimer.observeDuration();
@@ -188,20 +233,40 @@ public class RegionManager {
 
     TiStore store = null;
     if (storeType == TiStoreType.TiKV) {
-      Peer peer = region.getCurrentReplica();
-      store = getStoreById(peer.getStoreId(), backOffer);
+      // check from the first replica in case it recovers
+      List<Peer> replicaList = region.getReplicaList();
+      for (int i = 0; i < replicaList.size(); i++) {
+        Peer peer = replicaList.get(i);
+        store = getStoreById(peer.getStoreId(), backOffer);
+        if (store.isReachable()) {
+          // update replica's index
+          region.setReplicaIdx(i);
+          break;
+        }
+        logger.info("Store {} is unreachable, try to get the next replica", peer.getStoreId());
+      }
+      // Does not set unreachable store to null in case it is incompatible with GrpcForward
+      if (store == null || !store.isReachable()) {
+        logger.warn("No TiKV store available for region: " + region);
+      }
     } else {
-      outerLoop:
+      List<TiStore> tiflashStores = new ArrayList<>();
       for (Peer peer : region.getLearnerList()) {
         TiStore s = getStoreById(peer.getStoreId(), backOffer);
-        for (Metapb.StoreLabel label : s.getStore().getLabelsList()) {
-          if (label.getKey().equals(storeType.getLabelKey())
-              && label.getValue().equals(storeType.getLabelValue())) {
-            store = s;
-            break outerLoop;
-          }
+        if (!s.isReachable()) {
+          continue;
+        }
+        if (s.isTiFlash()) {
+          tiflashStores.add(s);
         }
       }
+      // select a tiflash with Round-Robin strategy
+      if (tiflashStores.size() > 0) {
+        store =
+            tiflashStores.get(
+                Math.floorMod(tiflashStoreIndex.getAndIncrement(), tiflashStores.size()));
+      }
+
       if (store == null) {
         // clear the region cache, so we may get the learner peer next time
         cache.invalidateRegion(region);

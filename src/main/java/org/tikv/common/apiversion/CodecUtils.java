@@ -23,7 +23,7 @@ import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.CodecDataOutput;
 
 // TODO(iosmanthus): use ByteString.wrap to avoid once more copying.
-class CodecUtils {
+public class CodecUtils {
   public static ByteString encode(ByteString key) {
     CodecDataOutput cdo = new CodecDataOutput();
     BytesCodec.writeBytes(cdo, key.toByteArray());

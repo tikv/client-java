@@ -24,6 +24,7 @@ import java.util.Arrays;
 import org.tikv.common.codec.Codec.BytesCodec;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.kvproto.Metapb.Peer;
+import org.tikv.kvproto.Metapb.PeerRole;
 import org.tikv.kvproto.Metapb.Region;
 import org.tikv.kvproto.Metapb.RegionEpoch;
 import org.tikv.kvproto.Metapb.Store;
@@ -59,6 +60,10 @@ public class GrpcUtils {
 
   public static Peer makePeer(long id, long storeId) {
     return Peer.newBuilder().setStoreId(storeId).setId(id).build();
+  }
+
+  public static Peer makeLearnerPeer(long id, long storeId) {
+    return Peer.newBuilder().setRole(PeerRole.Learner).setStoreId(storeId).setId(id).build();
   }
 
   public static ByteString encodeKey(byte[] key) {

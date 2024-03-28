@@ -23,7 +23,7 @@ import org.tikv.txn.TwoPhaseCommitter;
 
 public class App {
     public static void main(String[] args) throws Exception {
-        TiConfiguration conf = TiConfiguration.createDefault("127.0.0.1:2389");
+        TiConfiguration conf = TiConfiguration.createDefault("127.0.0.1:2379");
         try (TiSession session = TiSession.create(conf)) {
             // two-phrase write
             long startTS = session.getTimestamp().getVersion();
