@@ -217,230 +217,232 @@
 <a class="jxr_linenumber" name="L209" href="#L209">209</a>     <strong class="jxr_keyword">if</strong> (store.getProxyStore() != <strong class="jxr_keyword">null</strong>) {
 <a class="jxr_linenumber" name="L210" href="#L210">210</a>       Metadata header = <strong class="jxr_keyword">new</strong> Metadata();
 <a class="jxr_linenumber" name="L211" href="#L211">211</a>       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
-<a class="jxr_linenumber" name="L212" href="#L212">212</a>       blockingStub = MetadataUtils.attachHeaders(blockingStub, header);
-<a class="jxr_linenumber" name="L213" href="#L213">213</a>       asyncStub = MetadataUtils.attachHeaders(asyncStub, header);
-<a class="jxr_linenumber" name="L214" href="#L214">214</a>     }
-<a class="jxr_linenumber" name="L215" href="#L215">215</a>   }
-<a class="jxr_linenumber" name="L216" href="#L216">216</a> 
-<a class="jxr_linenumber" name="L217" href="#L217">217</a>   <strong class="jxr_keyword">private</strong> Boolean seekLeaderStore(<a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
-<a class="jxr_linenumber" name="L218" href="#L218">218</a>     Histogram.Timer switchLeaderDurationTimer =
-<a class="jxr_linenumber" name="L219" href="#L219">219</a>         SEEK_LEADER_STORE_DURATION
-<a class="jxr_linenumber" name="L220" href="#L220">220</a>             .labels(regionManager.getPDClient().getClusterId().toString())
-<a class="jxr_linenumber" name="L221" href="#L221">221</a>             .startTimer();
-<a class="jxr_linenumber" name="L222" href="#L222">222</a>     <a name="SlowLogSpan" href="../../../../org/tikv/common/log/SlowLogSpan.html#SlowLogSpan">SlowLogSpan</a> slowLogSpan = backOffer.getSlowLog().start(<span class="jxr_string">"seekLeaderStore"</span>);
-<a class="jxr_linenumber" name="L223" href="#L223">223</a>     <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L224" href="#L224">224</a>       List&lt;Metapb.Peer&gt; peers = region.getFollowerList();
-<a class="jxr_linenumber" name="L225" href="#L225">225</a>       <strong class="jxr_keyword">if</strong> (peers.isEmpty()) {
-<a class="jxr_linenumber" name="L226" href="#L226">226</a>         <em class="jxr_comment">// no followers available, retry</em>
-<a class="jxr_linenumber" name="L227" href="#L227">227</a>         logger.warn(String.format(<span class="jxr_string">"no followers of region[%d] available, retry"</span>, region.getId()));
-<a class="jxr_linenumber" name="L228" href="#L228">228</a>         regionManager.onRequestFail(region);
-<a class="jxr_linenumber" name="L229" href="#L229">229</a>         <strong class="jxr_keyword">return</strong> false;
-<a class="jxr_linenumber" name="L230" href="#L230">230</a>       }
-<a class="jxr_linenumber" name="L231" href="#L231">231</a> 
-<a class="jxr_linenumber" name="L232" href="#L232">232</a>       logger.info(String.format(<span class="jxr_string">"try switch leader: region[%d]"</span>, region.getId()));
-<a class="jxr_linenumber" name="L233" href="#L233">233</a> 
-<a class="jxr_linenumber" name="L234" href="#L234">234</a>       Metapb.Peer peer = switchLeaderStore(backOffer);
-<a class="jxr_linenumber" name="L235" href="#L235">235</a>       <strong class="jxr_keyword">if</strong> (peer != <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L236" href="#L236">236</a>         <em class="jxr_comment">// we found a leader</em>
-<a class="jxr_linenumber" name="L237" href="#L237">237</a>         <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> currentLeaderStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
-<a class="jxr_linenumber" name="L238" href="#L238">238</a>         <strong class="jxr_keyword">if</strong> (currentLeaderStore.isReachable()) {
-<a class="jxr_linenumber" name="L239" href="#L239">239</a>           logger.info(
-<a class="jxr_linenumber" name="L240" href="#L240">240</a>               String.format(
-<a class="jxr_linenumber" name="L241" href="#L241">241</a>                   <span class="jxr_string">"update leader using switchLeader logic from store[%d] to store[%d]"</span>,
-<a class="jxr_linenumber" name="L242" href="#L242">242</a>                   region.getLeader().getStoreId(), peer.getStoreId()));
-<a class="jxr_linenumber" name="L243" href="#L243">243</a>           <em class="jxr_comment">// update region cache</em>
-<a class="jxr_linenumber" name="L244" href="#L244">244</a>           <a name="TiRegion" href="../../../../org/tikv/common/region/TiRegion.html#TiRegion">TiRegion</a> result = regionManager.updateLeader(region, peer.getStoreId());
-<a class="jxr_linenumber" name="L245" href="#L245">245</a>           <strong class="jxr_keyword">if</strong> (result != <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L246" href="#L246">246</a>             region = result;
-<a class="jxr_linenumber" name="L247" href="#L247">247</a>             <em class="jxr_comment">// switch to leader store</em>
-<a class="jxr_linenumber" name="L248" href="#L248">248</a>             store = currentLeaderStore;
-<a class="jxr_linenumber" name="L249" href="#L249">249</a>             updateClientStub();
-<a class="jxr_linenumber" name="L250" href="#L250">250</a>             <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L251" href="#L251">251</a>           }
-<a class="jxr_linenumber" name="L252" href="#L252">252</a>           <strong class="jxr_keyword">return</strong> false;
-<a class="jxr_linenumber" name="L253" href="#L253">253</a>         }
-<a class="jxr_linenumber" name="L254" href="#L254">254</a>       } <strong class="jxr_keyword">else</strong> {
-<a class="jxr_linenumber" name="L255" href="#L255">255</a>         <em class="jxr_comment">// no leader found, some response does not return normally, there may be network partition.</em>
-<a class="jxr_linenumber" name="L256" href="#L256">256</a>         logger.warn(
-<a class="jxr_linenumber" name="L257" href="#L257">257</a>             String.format(
-<a class="jxr_linenumber" name="L258" href="#L258">258</a>                 <span class="jxr_string">"leader for region[%d] is not found, it is possible that network partition occurred"</span>,
-<a class="jxr_linenumber" name="L259" href="#L259">259</a>                 region.getId()));
-<a class="jxr_linenumber" name="L260" href="#L260">260</a>       }
-<a class="jxr_linenumber" name="L261" href="#L261">261</a>     } <strong class="jxr_keyword">finally</strong> {
-<a class="jxr_linenumber" name="L262" href="#L262">262</a>       switchLeaderDurationTimer.observeDuration();
-<a class="jxr_linenumber" name="L263" href="#L263">263</a>       slowLogSpan.end();
-<a class="jxr_linenumber" name="L264" href="#L264">264</a>     }
-<a class="jxr_linenumber" name="L265" href="#L265">265</a>     <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L266" href="#L266">266</a>   }
-<a class="jxr_linenumber" name="L267" href="#L267">267</a> 
-<a class="jxr_linenumber" name="L268" href="#L268">268</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">boolean</strong> seekProxyStore(<a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
-<a class="jxr_linenumber" name="L269" href="#L269">269</a>     <a name="SlowLogSpan" href="../../../../org/tikv/common/log/SlowLogSpan.html#SlowLogSpan">SlowLogSpan</a> slowLogSpan = backOffer.getSlowLog().start(<span class="jxr_string">"seekProxyStore"</span>);
-<a class="jxr_linenumber" name="L270" href="#L270">270</a>     Histogram.Timer grpcForwardDurationTimer =
-<a class="jxr_linenumber" name="L271" href="#L271">271</a>         SEEK_PROXY_STORE_DURATION
-<a class="jxr_linenumber" name="L272" href="#L272">272</a>             .labels(regionManager.getPDClient().getClusterId().toString())
-<a class="jxr_linenumber" name="L273" href="#L273">273</a>             .startTimer();
-<a class="jxr_linenumber" name="L274" href="#L274">274</a>     <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L275" href="#L275">275</a>       logger.info(String.format(<span class="jxr_string">"try grpc forward: region[%d]"</span>, region.getId()));
-<a class="jxr_linenumber" name="L276" href="#L276">276</a>       <em class="jxr_comment">// when current leader cannot be reached</em>
-<a class="jxr_linenumber" name="L277" href="#L277">277</a>       <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> storeWithProxy = switchProxyStore(backOffer);
-<a class="jxr_linenumber" name="L278" href="#L278">278</a>       <strong class="jxr_keyword">if</strong> (storeWithProxy == <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L279" href="#L279">279</a>         <em class="jxr_comment">// no store available, retry</em>
-<a class="jxr_linenumber" name="L280" href="#L280">280</a>         logger.warn(String.format(<span class="jxr_string">"No store available, retry: region[%d]"</span>, region.getId()));
-<a class="jxr_linenumber" name="L281" href="#L281">281</a>         <strong class="jxr_keyword">return</strong> false;
-<a class="jxr_linenumber" name="L282" href="#L282">282</a>       }
-<a class="jxr_linenumber" name="L283" href="#L283">283</a>       <em class="jxr_comment">// use proxy store to forward requests</em>
-<a class="jxr_linenumber" name="L284" href="#L284">284</a>       regionManager.updateStore(store, storeWithProxy);
-<a class="jxr_linenumber" name="L285" href="#L285">285</a>       store = storeWithProxy;
-<a class="jxr_linenumber" name="L286" href="#L286">286</a>       updateClientStub();
-<a class="jxr_linenumber" name="L287" href="#L287">287</a>       <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
-<a class="jxr_linenumber" name="L288" href="#L288">288</a>     } <strong class="jxr_keyword">finally</strong> {
-<a class="jxr_linenumber" name="L289" href="#L289">289</a>       grpcForwardDurationTimer.observeDuration();
-<a class="jxr_linenumber" name="L290" href="#L290">290</a>       slowLogSpan.end();
-<a class="jxr_linenumber" name="L291" href="#L291">291</a>     }
-<a class="jxr_linenumber" name="L292" href="#L292">292</a>   }
-<a class="jxr_linenumber" name="L293" href="#L293">293</a> 
-<a class="jxr_linenumber" name="L294" href="#L294">294</a>   <em class="jxr_comment">// first: leader peer, second: true if any responses returned with grpc error</em>
-<a class="jxr_linenumber" name="L295" href="#L295">295</a>   <strong class="jxr_keyword">private</strong> Metapb.Peer switchLeaderStore(<a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
-<a class="jxr_linenumber" name="L296" href="#L296">296</a>     List&lt;SwitchLeaderTask&gt; responses = <strong class="jxr_keyword">new</strong> LinkedList&lt;&gt;();
-<a class="jxr_linenumber" name="L297" href="#L297">297</a>     <strong class="jxr_keyword">for</strong> (Metapb.Peer peer : region.getFollowerList()) {
-<a class="jxr_linenumber" name="L298" href="#L298">298</a>       ByteString key = region.getStartKey();
-<a class="jxr_linenumber" name="L299" href="#L299">299</a>       <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L300" href="#L300">300</a>         <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> peerStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
-<a class="jxr_linenumber" name="L301" href="#L301">301</a>         ManagedChannel channel =
-<a class="jxr_linenumber" name="L302" href="#L302">302</a>             channelFactory.getChannel(
-<a class="jxr_linenumber" name="L303" href="#L303">303</a>                 peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
-<a class="jxr_linenumber" name="L304" href="#L304">304</a>         TikvGrpc.TikvFutureStub stub =
-<a class="jxr_linenumber" name="L305" href="#L305">305</a>             TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
-<a class="jxr_linenumber" name="L306" href="#L306">306</a>         Kvrpcpb.RawGetRequest rawGetRequest =
-<a class="jxr_linenumber" name="L307" href="#L307">307</a>             Kvrpcpb.RawGetRequest.newBuilder()
-<a class="jxr_linenumber" name="L308" href="#L308">308</a>                 .setContext(makeContext(peer))
-<a class="jxr_linenumber" name="L309" href="#L309">309</a>                 .setKey(codec.encodeKey(key))
-<a class="jxr_linenumber" name="L310" href="#L310">310</a>                 .build();
-<a class="jxr_linenumber" name="L311" href="#L311">311</a>         ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task = stub.rawGet(rawGetRequest);
-<a class="jxr_linenumber" name="L312" href="#L312">312</a>         responses.add(<strong class="jxr_keyword">new</strong> SwitchLeaderTask(task, peer));
-<a class="jxr_linenumber" name="L313" href="#L313">313</a>       } <strong class="jxr_keyword">catch</strong> (Exception e) {
-<a class="jxr_linenumber" name="L314" href="#L314">314</a>         logger.warn(
-<a class="jxr_linenumber" name="L315" href="#L315">315</a>             <span class="jxr_string">"switch region[{}] leader store to {} failed: {}"</span>,
-<a class="jxr_linenumber" name="L316" href="#L316">316</a>             region.getId(),
-<a class="jxr_linenumber" name="L317" href="#L317">317</a>             peer.getStoreId(),
-<a class="jxr_linenumber" name="L318" href="#L318">318</a>             e);
-<a class="jxr_linenumber" name="L319" href="#L319">319</a>       }
-<a class="jxr_linenumber" name="L320" href="#L320">320</a>     }
-<a class="jxr_linenumber" name="L321" href="#L321">321</a>     <strong class="jxr_keyword">while</strong> (<strong class="jxr_keyword">true</strong>) {
-<a class="jxr_linenumber" name="L322" href="#L322">322</a>       <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L323" href="#L323">323</a>         Thread.sleep(2);
-<a class="jxr_linenumber" name="L324" href="#L324">324</a>       } <strong class="jxr_keyword">catch</strong> (InterruptedException e) {
-<a class="jxr_linenumber" name="L325" href="#L325">325</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a>(e);
-<a class="jxr_linenumber" name="L326" href="#L326">326</a>       }
-<a class="jxr_linenumber" name="L327" href="#L327">327</a>       List&lt;SwitchLeaderTask&gt; unfinished = <strong class="jxr_keyword">new</strong> LinkedList&lt;&gt;();
-<a class="jxr_linenumber" name="L328" href="#L328">328</a>       <strong class="jxr_keyword">for</strong> (SwitchLeaderTask task : responses) {
-<a class="jxr_linenumber" name="L329" href="#L329">329</a>         <strong class="jxr_keyword">if</strong> (!task.task.isDone()) {
-<a class="jxr_linenumber" name="L330" href="#L330">330</a>           unfinished.add(task);
-<a class="jxr_linenumber" name="L331" href="#L331">331</a>           <strong class="jxr_keyword">continue</strong>;
-<a class="jxr_linenumber" name="L332" href="#L332">332</a>         }
-<a class="jxr_linenumber" name="L333" href="#L333">333</a>         <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L334" href="#L334">334</a>           Kvrpcpb.RawGetResponse resp = task.task.get();
-<a class="jxr_linenumber" name="L335" href="#L335">335</a>           <strong class="jxr_keyword">if</strong> (resp != <strong class="jxr_keyword">null</strong>) {
-<a class="jxr_linenumber" name="L336" href="#L336">336</a>             <strong class="jxr_keyword">if</strong> (!resp.hasRegionError()) {
-<a class="jxr_linenumber" name="L337" href="#L337">337</a>               <em class="jxr_comment">// the peer is leader</em>
-<a class="jxr_linenumber" name="L338" href="#L338">338</a>               logger.info(
-<a class="jxr_linenumber" name="L339" href="#L339">339</a>                   String.format(<span class="jxr_string">"rawGet response indicates peer[%d] is leader"</span>, task.peer.getId()));
-<a class="jxr_linenumber" name="L340" href="#L340">340</a>               <strong class="jxr_keyword">return</strong> task.peer;
-<a class="jxr_linenumber" name="L341" href="#L341">341</a>             }
-<a class="jxr_linenumber" name="L342" href="#L342">342</a>           }
-<a class="jxr_linenumber" name="L343" href="#L343">343</a>         } <strong class="jxr_keyword">catch</strong> (Exception ignored) {
-<a class="jxr_linenumber" name="L344" href="#L344">344</a>         }
-<a class="jxr_linenumber" name="L345" href="#L345">345</a>       }
-<a class="jxr_linenumber" name="L346" href="#L346">346</a>       <strong class="jxr_keyword">if</strong> (unfinished.isEmpty()) {
-<a class="jxr_linenumber" name="L347" href="#L347">347</a>         <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L348" href="#L348">348</a>       }
-<a class="jxr_linenumber" name="L349" href="#L349">349</a>       responses = unfinished;
-<a class="jxr_linenumber" name="L350" href="#L350">350</a>     }
-<a class="jxr_linenumber" name="L351" href="#L351">351</a>   }
-<a class="jxr_linenumber" name="L352" href="#L352">352</a> 
-<a class="jxr_linenumber" name="L353" href="#L353">353</a>   <strong class="jxr_keyword">private</strong> <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> switchProxyStore(<a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
-<a class="jxr_linenumber" name="L354" href="#L354">354</a>     <strong class="jxr_keyword">long</strong> forwardTimeout = conf.getForwardTimeout();
-<a class="jxr_linenumber" name="L355" href="#L355">355</a>     List&lt;ForwardCheckTask&gt; responses = <strong class="jxr_keyword">new</strong> LinkedList&lt;&gt;();
-<a class="jxr_linenumber" name="L356" href="#L356">356</a>     <strong class="jxr_keyword">for</strong> (Metapb.Peer peer : region.getFollowerList()) {
-<a class="jxr_linenumber" name="L357" href="#L357">357</a>       ByteString key = region.getStartKey();
-<a class="jxr_linenumber" name="L358" href="#L358">358</a>       <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L359" href="#L359">359</a>         <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> peerStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
-<a class="jxr_linenumber" name="L360" href="#L360">360</a>         ManagedChannel channel =
-<a class="jxr_linenumber" name="L361" href="#L361">361</a>             channelFactory.getChannel(
-<a class="jxr_linenumber" name="L362" href="#L362">362</a>                 peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
-<a class="jxr_linenumber" name="L363" href="#L363">363</a>         TikvGrpc.TikvFutureStub stub =
-<a class="jxr_linenumber" name="L364" href="#L364">364</a>             TikvGrpc.newFutureStub(channel)
-<a class="jxr_linenumber" name="L365" href="#L365">365</a>                 .withDeadlineAfter(forwardTimeout, TimeUnit.MILLISECONDS);
-<a class="jxr_linenumber" name="L366" href="#L366">366</a>         Metadata header = <strong class="jxr_keyword">new</strong> Metadata();
-<a class="jxr_linenumber" name="L367" href="#L367">367</a>         header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
-<a class="jxr_linenumber" name="L368" href="#L368">368</a>         Kvrpcpb.RawGetRequest rawGetRequest =
-<a class="jxr_linenumber" name="L369" href="#L369">369</a>             Kvrpcpb.RawGetRequest.newBuilder()
-<a class="jxr_linenumber" name="L370" href="#L370">370</a>                 .setContext(makeContext())
-<a class="jxr_linenumber" name="L371" href="#L371">371</a>                 .setKey(codec.encodeKey(key))
-<a class="jxr_linenumber" name="L372" href="#L372">372</a>                 .build();
-<a class="jxr_linenumber" name="L373" href="#L373">373</a>         ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task =
-<a class="jxr_linenumber" name="L374" href="#L374">374</a>             MetadataUtils.attachHeaders(stub, header).rawGet(rawGetRequest);
-<a class="jxr_linenumber" name="L375" href="#L375">375</a>         responses.add(<strong class="jxr_keyword">new</strong> ForwardCheckTask(task, peerStore.getStore()));
-<a class="jxr_linenumber" name="L376" href="#L376">376</a>       } <strong class="jxr_keyword">catch</strong> (Exception e) {
-<a class="jxr_linenumber" name="L377" href="#L377">377</a>         logger.warn(
-<a class="jxr_linenumber" name="L378" href="#L378">378</a>             <span class="jxr_string">"switch region[{}] leader store to {} failed: {}"</span>,
-<a class="jxr_linenumber" name="L379" href="#L379">379</a>             region.getId(),
-<a class="jxr_linenumber" name="L380" href="#L380">380</a>             peer.getStoreId(),
-<a class="jxr_linenumber" name="L381" href="#L381">381</a>             e);
-<a class="jxr_linenumber" name="L382" href="#L382">382</a>       }
-<a class="jxr_linenumber" name="L383" href="#L383">383</a>     }
-<a class="jxr_linenumber" name="L384" href="#L384">384</a>     <strong class="jxr_keyword">while</strong> (<strong class="jxr_keyword">true</strong>) {
-<a class="jxr_linenumber" name="L385" href="#L385">385</a>       <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L386" href="#L386">386</a>         Thread.sleep(2);
-<a class="jxr_linenumber" name="L387" href="#L387">387</a>       } <strong class="jxr_keyword">catch</strong> (InterruptedException e) {
-<a class="jxr_linenumber" name="L388" href="#L388">388</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a>(e);
-<a class="jxr_linenumber" name="L389" href="#L389">389</a>       }
-<a class="jxr_linenumber" name="L390" href="#L390">390</a>       List&lt;ForwardCheckTask&gt; unfinished = <strong class="jxr_keyword">new</strong> LinkedList&lt;&gt;();
-<a class="jxr_linenumber" name="L391" href="#L391">391</a>       <strong class="jxr_keyword">for</strong> (ForwardCheckTask task : responses) {
-<a class="jxr_linenumber" name="L392" href="#L392">392</a>         <strong class="jxr_keyword">if</strong> (!task.task.isDone()) {
-<a class="jxr_linenumber" name="L393" href="#L393">393</a>           unfinished.add(task);
-<a class="jxr_linenumber" name="L394" href="#L394">394</a>           <strong class="jxr_keyword">continue</strong>;
-<a class="jxr_linenumber" name="L395" href="#L395">395</a>         }
-<a class="jxr_linenumber" name="L396" href="#L396">396</a>         <strong class="jxr_keyword">try</strong> {
-<a class="jxr_linenumber" name="L397" href="#L397">397</a>           <em class="jxr_comment">// any answer will do</em>
-<a class="jxr_linenumber" name="L398" href="#L398">398</a>           Kvrpcpb.RawGetResponse resp = task.task.get();
-<a class="jxr_linenumber" name="L399" href="#L399">399</a>           logger.info(
-<a class="jxr_linenumber" name="L400" href="#L400">400</a>               String.format(
-<a class="jxr_linenumber" name="L401" href="#L401">401</a>                   <span class="jxr_string">"rawGetResponse indicates forward from [%s] to [%s]"</span>,
-<a class="jxr_linenumber" name="L402" href="#L402">402</a>                   task.store.getAddress(), store.getAddress()));
-<a class="jxr_linenumber" name="L403" href="#L403">403</a>           <strong class="jxr_keyword">return</strong> store.withProxy(task.store);
-<a class="jxr_linenumber" name="L404" href="#L404">404</a>         } <strong class="jxr_keyword">catch</strong> (Exception ignored) {
-<a class="jxr_linenumber" name="L405" href="#L405">405</a>         }
-<a class="jxr_linenumber" name="L406" href="#L406">406</a>       }
-<a class="jxr_linenumber" name="L407" href="#L407">407</a>       <strong class="jxr_keyword">if</strong> (unfinished.isEmpty()) {
-<a class="jxr_linenumber" name="L408" href="#L408">408</a>         <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
-<a class="jxr_linenumber" name="L409" href="#L409">409</a>       }
-<a class="jxr_linenumber" name="L410" href="#L410">410</a>       responses = unfinished;
-<a class="jxr_linenumber" name="L411" href="#L411">411</a>     }
-<a class="jxr_linenumber" name="L412" href="#L412">412</a>   }
-<a class="jxr_linenumber" name="L413" href="#L413">413</a> 
-<a class="jxr_linenumber" name="L414" href="#L414">414</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">class</strong> SwitchLeaderTask {
+<a class="jxr_linenumber" name="L212" href="#L212">212</a>       blockingStub =
+<a class="jxr_linenumber" name="L213" href="#L213">213</a>           blockingStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(header));
+<a class="jxr_linenumber" name="L214" href="#L214">214</a>       asyncStub = asyncStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(header));
+<a class="jxr_linenumber" name="L215" href="#L215">215</a>     }
+<a class="jxr_linenumber" name="L216" href="#L216">216</a>   }
+<a class="jxr_linenumber" name="L217" href="#L217">217</a> 
+<a class="jxr_linenumber" name="L218" href="#L218">218</a>   <strong class="jxr_keyword">private</strong> Boolean seekLeaderStore(<a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
+<a class="jxr_linenumber" name="L219" href="#L219">219</a>     Histogram.Timer switchLeaderDurationTimer =
+<a class="jxr_linenumber" name="L220" href="#L220">220</a>         SEEK_LEADER_STORE_DURATION
+<a class="jxr_linenumber" name="L221" href="#L221">221</a>             .labels(regionManager.getPDClient().getClusterId().toString())
+<a class="jxr_linenumber" name="L222" href="#L222">222</a>             .startTimer();
+<a class="jxr_linenumber" name="L223" href="#L223">223</a>     <a name="SlowLogSpan" href="../../../../org/tikv/common/log/SlowLogSpan.html#SlowLogSpan">SlowLogSpan</a> slowLogSpan = backOffer.getSlowLog().start(<span class="jxr_string">"seekLeaderStore"</span>);
+<a class="jxr_linenumber" name="L224" href="#L224">224</a>     <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L225" href="#L225">225</a>       List&lt;Metapb.Peer&gt; peers = region.getFollowerList();
+<a class="jxr_linenumber" name="L226" href="#L226">226</a>       <strong class="jxr_keyword">if</strong> (peers.isEmpty()) {
+<a class="jxr_linenumber" name="L227" href="#L227">227</a>         <em class="jxr_comment">// no followers available, retry</em>
+<a class="jxr_linenumber" name="L228" href="#L228">228</a>         logger.warn(String.format(<span class="jxr_string">"no followers of region[%d] available, retry"</span>, region.getId()));
+<a class="jxr_linenumber" name="L229" href="#L229">229</a>         regionManager.onRequestFail(region);
+<a class="jxr_linenumber" name="L230" href="#L230">230</a>         <strong class="jxr_keyword">return</strong> false;
+<a class="jxr_linenumber" name="L231" href="#L231">231</a>       }
+<a class="jxr_linenumber" name="L232" href="#L232">232</a> 
+<a class="jxr_linenumber" name="L233" href="#L233">233</a>       logger.info(String.format(<span class="jxr_string">"try switch leader: region[%d]"</span>, region.getId()));
+<a class="jxr_linenumber" name="L234" href="#L234">234</a> 
+<a class="jxr_linenumber" name="L235" href="#L235">235</a>       Metapb.Peer peer = switchLeaderStore(backOffer);
+<a class="jxr_linenumber" name="L236" href="#L236">236</a>       <strong class="jxr_keyword">if</strong> (peer != <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L237" href="#L237">237</a>         <em class="jxr_comment">// we found a leader</em>
+<a class="jxr_linenumber" name="L238" href="#L238">238</a>         <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> currentLeaderStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
+<a class="jxr_linenumber" name="L239" href="#L239">239</a>         <strong class="jxr_keyword">if</strong> (currentLeaderStore.isReachable()) {
+<a class="jxr_linenumber" name="L240" href="#L240">240</a>           logger.info(
+<a class="jxr_linenumber" name="L241" href="#L241">241</a>               String.format(
+<a class="jxr_linenumber" name="L242" href="#L242">242</a>                   <span class="jxr_string">"update leader using switchLeader logic from store[%d] to store[%d]"</span>,
+<a class="jxr_linenumber" name="L243" href="#L243">243</a>                   region.getLeader().getStoreId(), peer.getStoreId()));
+<a class="jxr_linenumber" name="L244" href="#L244">244</a>           <em class="jxr_comment">// update region cache</em>
+<a class="jxr_linenumber" name="L245" href="#L245">245</a>           <a name="TiRegion" href="../../../../org/tikv/common/region/TiRegion.html#TiRegion">TiRegion</a> result = regionManager.updateLeader(region, peer.getStoreId());
+<a class="jxr_linenumber" name="L246" href="#L246">246</a>           <strong class="jxr_keyword">if</strong> (result != <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L247" href="#L247">247</a>             region = result;
+<a class="jxr_linenumber" name="L248" href="#L248">248</a>             <em class="jxr_comment">// switch to leader store</em>
+<a class="jxr_linenumber" name="L249" href="#L249">249</a>             store = currentLeaderStore;
+<a class="jxr_linenumber" name="L250" href="#L250">250</a>             updateClientStub();
+<a class="jxr_linenumber" name="L251" href="#L251">251</a>             <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L252" href="#L252">252</a>           }
+<a class="jxr_linenumber" name="L253" href="#L253">253</a>           <strong class="jxr_keyword">return</strong> false;
+<a class="jxr_linenumber" name="L254" href="#L254">254</a>         }
+<a class="jxr_linenumber" name="L255" href="#L255">255</a>       } <strong class="jxr_keyword">else</strong> {
+<a class="jxr_linenumber" name="L256" href="#L256">256</a>         <em class="jxr_comment">// no leader found, some response does not return normally, there may be network partition.</em>
+<a class="jxr_linenumber" name="L257" href="#L257">257</a>         logger.warn(
+<a class="jxr_linenumber" name="L258" href="#L258">258</a>             String.format(
+<a class="jxr_linenumber" name="L259" href="#L259">259</a>                 <span class="jxr_string">"leader for region[%d] is not found, it is possible that network partition occurred"</span>,
+<a class="jxr_linenumber" name="L260" href="#L260">260</a>                 region.getId()));
+<a class="jxr_linenumber" name="L261" href="#L261">261</a>       }
+<a class="jxr_linenumber" name="L262" href="#L262">262</a>     } <strong class="jxr_keyword">finally</strong> {
+<a class="jxr_linenumber" name="L263" href="#L263">263</a>       switchLeaderDurationTimer.observeDuration();
+<a class="jxr_linenumber" name="L264" href="#L264">264</a>       slowLogSpan.end();
+<a class="jxr_linenumber" name="L265" href="#L265">265</a>     }
+<a class="jxr_linenumber" name="L266" href="#L266">266</a>     <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L267" href="#L267">267</a>   }
+<a class="jxr_linenumber" name="L268" href="#L268">268</a> 
+<a class="jxr_linenumber" name="L269" href="#L269">269</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">boolean</strong> seekProxyStore(<a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
+<a class="jxr_linenumber" name="L270" href="#L270">270</a>     <a name="SlowLogSpan" href="../../../../org/tikv/common/log/SlowLogSpan.html#SlowLogSpan">SlowLogSpan</a> slowLogSpan = backOffer.getSlowLog().start(<span class="jxr_string">"seekProxyStore"</span>);
+<a class="jxr_linenumber" name="L271" href="#L271">271</a>     Histogram.Timer grpcForwardDurationTimer =
+<a class="jxr_linenumber" name="L272" href="#L272">272</a>         SEEK_PROXY_STORE_DURATION
+<a class="jxr_linenumber" name="L273" href="#L273">273</a>             .labels(regionManager.getPDClient().getClusterId().toString())
+<a class="jxr_linenumber" name="L274" href="#L274">274</a>             .startTimer();
+<a class="jxr_linenumber" name="L275" href="#L275">275</a>     <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L276" href="#L276">276</a>       logger.info(String.format(<span class="jxr_string">"try grpc forward: region[%d]"</span>, region.getId()));
+<a class="jxr_linenumber" name="L277" href="#L277">277</a>       <em class="jxr_comment">// when current leader cannot be reached</em>
+<a class="jxr_linenumber" name="L278" href="#L278">278</a>       <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> storeWithProxy = switchProxyStore(backOffer);
+<a class="jxr_linenumber" name="L279" href="#L279">279</a>       <strong class="jxr_keyword">if</strong> (storeWithProxy == <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L280" href="#L280">280</a>         <em class="jxr_comment">// no store available, retry</em>
+<a class="jxr_linenumber" name="L281" href="#L281">281</a>         logger.warn(String.format(<span class="jxr_string">"No store available, retry: region[%d]"</span>, region.getId()));
+<a class="jxr_linenumber" name="L282" href="#L282">282</a>         <strong class="jxr_keyword">return</strong> false;
+<a class="jxr_linenumber" name="L283" href="#L283">283</a>       }
+<a class="jxr_linenumber" name="L284" href="#L284">284</a>       <em class="jxr_comment">// use proxy store to forward requests</em>
+<a class="jxr_linenumber" name="L285" href="#L285">285</a>       regionManager.updateStore(store, storeWithProxy);
+<a class="jxr_linenumber" name="L286" href="#L286">286</a>       store = storeWithProxy;
+<a class="jxr_linenumber" name="L287" href="#L287">287</a>       updateClientStub();
+<a class="jxr_linenumber" name="L288" href="#L288">288</a>       <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">true</strong>;
+<a class="jxr_linenumber" name="L289" href="#L289">289</a>     } <strong class="jxr_keyword">finally</strong> {
+<a class="jxr_linenumber" name="L290" href="#L290">290</a>       grpcForwardDurationTimer.observeDuration();
+<a class="jxr_linenumber" name="L291" href="#L291">291</a>       slowLogSpan.end();
+<a class="jxr_linenumber" name="L292" href="#L292">292</a>     }
+<a class="jxr_linenumber" name="L293" href="#L293">293</a>   }
+<a class="jxr_linenumber" name="L294" href="#L294">294</a> 
+<a class="jxr_linenumber" name="L295" href="#L295">295</a>   <em class="jxr_comment">// first: leader peer, second: true if any responses returned with grpc error</em>
+<a class="jxr_linenumber" name="L296" href="#L296">296</a>   <strong class="jxr_keyword">private</strong> Metapb.Peer switchLeaderStore(<a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
+<a class="jxr_linenumber" name="L297" href="#L297">297</a>     List&lt;SwitchLeaderTask&gt; responses = <strong class="jxr_keyword">new</strong> LinkedList&lt;&gt;();
+<a class="jxr_linenumber" name="L298" href="#L298">298</a>     <strong class="jxr_keyword">for</strong> (Metapb.Peer peer : region.getFollowerList()) {
+<a class="jxr_linenumber" name="L299" href="#L299">299</a>       ByteString key = region.getStartKey();
+<a class="jxr_linenumber" name="L300" href="#L300">300</a>       <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L301" href="#L301">301</a>         <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> peerStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
+<a class="jxr_linenumber" name="L302" href="#L302">302</a>         ManagedChannel channel =
+<a class="jxr_linenumber" name="L303" href="#L303">303</a>             channelFactory.getChannel(
+<a class="jxr_linenumber" name="L304" href="#L304">304</a>                 peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
+<a class="jxr_linenumber" name="L305" href="#L305">305</a>         TikvGrpc.TikvFutureStub stub =
+<a class="jxr_linenumber" name="L306" href="#L306">306</a>             TikvGrpc.newFutureStub(channel).withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+<a class="jxr_linenumber" name="L307" href="#L307">307</a>         Kvrpcpb.RawGetRequest rawGetRequest =
+<a class="jxr_linenumber" name="L308" href="#L308">308</a>             Kvrpcpb.RawGetRequest.newBuilder()
+<a class="jxr_linenumber" name="L309" href="#L309">309</a>                 .setContext(makeContext(peer))
+<a class="jxr_linenumber" name="L310" href="#L310">310</a>                 .setKey(codec.encodeKey(key))
+<a class="jxr_linenumber" name="L311" href="#L311">311</a>                 .build();
+<a class="jxr_linenumber" name="L312" href="#L312">312</a>         ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task = stub.rawGet(rawGetRequest);
+<a class="jxr_linenumber" name="L313" href="#L313">313</a>         responses.add(<strong class="jxr_keyword">new</strong> SwitchLeaderTask(task, peer));
+<a class="jxr_linenumber" name="L314" href="#L314">314</a>       } <strong class="jxr_keyword">catch</strong> (Exception e) {
+<a class="jxr_linenumber" name="L315" href="#L315">315</a>         logger.warn(
+<a class="jxr_linenumber" name="L316" href="#L316">316</a>             <span class="jxr_string">"switch region[{}] leader store to {} failed: {}"</span>,
+<a class="jxr_linenumber" name="L317" href="#L317">317</a>             region.getId(),
+<a class="jxr_linenumber" name="L318" href="#L318">318</a>             peer.getStoreId(),
+<a class="jxr_linenumber" name="L319" href="#L319">319</a>             e);
+<a class="jxr_linenumber" name="L320" href="#L320">320</a>       }
+<a class="jxr_linenumber" name="L321" href="#L321">321</a>     }
+<a class="jxr_linenumber" name="L322" href="#L322">322</a>     <strong class="jxr_keyword">while</strong> (<strong class="jxr_keyword">true</strong>) {
+<a class="jxr_linenumber" name="L323" href="#L323">323</a>       <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L324" href="#L324">324</a>         Thread.sleep(2);
+<a class="jxr_linenumber" name="L325" href="#L325">325</a>       } <strong class="jxr_keyword">catch</strong> (InterruptedException e) {
+<a class="jxr_linenumber" name="L326" href="#L326">326</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a>(e);
+<a class="jxr_linenumber" name="L327" href="#L327">327</a>       }
+<a class="jxr_linenumber" name="L328" href="#L328">328</a>       List&lt;SwitchLeaderTask&gt; unfinished = <strong class="jxr_keyword">new</strong> LinkedList&lt;&gt;();
+<a class="jxr_linenumber" name="L329" href="#L329">329</a>       <strong class="jxr_keyword">for</strong> (SwitchLeaderTask task : responses) {
+<a class="jxr_linenumber" name="L330" href="#L330">330</a>         <strong class="jxr_keyword">if</strong> (!task.task.isDone()) {
+<a class="jxr_linenumber" name="L331" href="#L331">331</a>           unfinished.add(task);
+<a class="jxr_linenumber" name="L332" href="#L332">332</a>           <strong class="jxr_keyword">continue</strong>;
+<a class="jxr_linenumber" name="L333" href="#L333">333</a>         }
+<a class="jxr_linenumber" name="L334" href="#L334">334</a>         <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L335" href="#L335">335</a>           Kvrpcpb.RawGetResponse resp = task.task.get();
+<a class="jxr_linenumber" name="L336" href="#L336">336</a>           <strong class="jxr_keyword">if</strong> (resp != <strong class="jxr_keyword">null</strong>) {
+<a class="jxr_linenumber" name="L337" href="#L337">337</a>             <strong class="jxr_keyword">if</strong> (!resp.hasRegionError()) {
+<a class="jxr_linenumber" name="L338" href="#L338">338</a>               <em class="jxr_comment">// the peer is leader</em>
+<a class="jxr_linenumber" name="L339" href="#L339">339</a>               logger.info(
+<a class="jxr_linenumber" name="L340" href="#L340">340</a>                   String.format(<span class="jxr_string">"rawGet response indicates peer[%d] is leader"</span>, task.peer.getId()));
+<a class="jxr_linenumber" name="L341" href="#L341">341</a>               <strong class="jxr_keyword">return</strong> task.peer;
+<a class="jxr_linenumber" name="L342" href="#L342">342</a>             }
+<a class="jxr_linenumber" name="L343" href="#L343">343</a>           }
+<a class="jxr_linenumber" name="L344" href="#L344">344</a>         } <strong class="jxr_keyword">catch</strong> (Exception ignored) {
+<a class="jxr_linenumber" name="L345" href="#L345">345</a>         }
+<a class="jxr_linenumber" name="L346" href="#L346">346</a>       }
+<a class="jxr_linenumber" name="L347" href="#L347">347</a>       <strong class="jxr_keyword">if</strong> (unfinished.isEmpty()) {
+<a class="jxr_linenumber" name="L348" href="#L348">348</a>         <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L349" href="#L349">349</a>       }
+<a class="jxr_linenumber" name="L350" href="#L350">350</a>       responses = unfinished;
+<a class="jxr_linenumber" name="L351" href="#L351">351</a>     }
+<a class="jxr_linenumber" name="L352" href="#L352">352</a>   }
+<a class="jxr_linenumber" name="L353" href="#L353">353</a> 
+<a class="jxr_linenumber" name="L354" href="#L354">354</a>   <strong class="jxr_keyword">private</strong> <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> switchProxyStore(<a name="BackOffer" href="../../../../org/tikv/common/util/BackOffer.html#BackOffer">BackOffer</a> backOffer) {
+<a class="jxr_linenumber" name="L355" href="#L355">355</a>     <strong class="jxr_keyword">long</strong> forwardTimeout = conf.getForwardTimeout();
+<a class="jxr_linenumber" name="L356" href="#L356">356</a>     List&lt;ForwardCheckTask&gt; responses = <strong class="jxr_keyword">new</strong> LinkedList&lt;&gt;();
+<a class="jxr_linenumber" name="L357" href="#L357">357</a>     <strong class="jxr_keyword">for</strong> (Metapb.Peer peer : region.getFollowerList()) {
+<a class="jxr_linenumber" name="L358" href="#L358">358</a>       ByteString key = region.getStartKey();
+<a class="jxr_linenumber" name="L359" href="#L359">359</a>       <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L360" href="#L360">360</a>         <a name="TiStore" href="../../../../org/tikv/common/region/TiStore.html#TiStore">TiStore</a> peerStore = regionManager.getStoreById(peer.getStoreId(), backOffer);
+<a class="jxr_linenumber" name="L361" href="#L361">361</a>         ManagedChannel channel =
+<a class="jxr_linenumber" name="L362" href="#L362">362</a>             channelFactory.getChannel(
+<a class="jxr_linenumber" name="L363" href="#L363">363</a>                 peerStore.getAddress(), regionManager.getPDClient().getHostMapping());
+<a class="jxr_linenumber" name="L364" href="#L364">364</a>         TikvGrpc.TikvFutureStub stub =
+<a class="jxr_linenumber" name="L365" href="#L365">365</a>             TikvGrpc.newFutureStub(channel)
+<a class="jxr_linenumber" name="L366" href="#L366">366</a>                 .withDeadlineAfter(forwardTimeout, TimeUnit.MILLISECONDS);
+<a class="jxr_linenumber" name="L367" href="#L367">367</a>         Metadata header = <strong class="jxr_keyword">new</strong> Metadata();
+<a class="jxr_linenumber" name="L368" href="#L368">368</a>         header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
+<a class="jxr_linenumber" name="L369" href="#L369">369</a>         Kvrpcpb.RawGetRequest rawGetRequest =
+<a class="jxr_linenumber" name="L370" href="#L370">370</a>             Kvrpcpb.RawGetRequest.newBuilder()
+<a class="jxr_linenumber" name="L371" href="#L371">371</a>                 .setContext(makeContext())
+<a class="jxr_linenumber" name="L372" href="#L372">372</a>                 .setKey(codec.encodeKey(key))
+<a class="jxr_linenumber" name="L373" href="#L373">373</a>                 .build();
+<a class="jxr_linenumber" name="L374" href="#L374">374</a>         ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task =
+<a class="jxr_linenumber" name="L375" href="#L375">375</a>             stub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(header))
+<a class="jxr_linenumber" name="L376" href="#L376">376</a>                 .rawGet(rawGetRequest);
+<a class="jxr_linenumber" name="L377" href="#L377">377</a>         responses.add(<strong class="jxr_keyword">new</strong> ForwardCheckTask(task, peerStore.getStore()));
+<a class="jxr_linenumber" name="L378" href="#L378">378</a>       } <strong class="jxr_keyword">catch</strong> (Exception e) {
+<a class="jxr_linenumber" name="L379" href="#L379">379</a>         logger.warn(
+<a class="jxr_linenumber" name="L380" href="#L380">380</a>             <span class="jxr_string">"switch region[{}] leader store to {} failed: {}"</span>,
+<a class="jxr_linenumber" name="L381" href="#L381">381</a>             region.getId(),
+<a class="jxr_linenumber" name="L382" href="#L382">382</a>             peer.getStoreId(),
+<a class="jxr_linenumber" name="L383" href="#L383">383</a>             e);
+<a class="jxr_linenumber" name="L384" href="#L384">384</a>       }
+<a class="jxr_linenumber" name="L385" href="#L385">385</a>     }
+<a class="jxr_linenumber" name="L386" href="#L386">386</a>     <strong class="jxr_keyword">while</strong> (<strong class="jxr_keyword">true</strong>) {
+<a class="jxr_linenumber" name="L387" href="#L387">387</a>       <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L388" href="#L388">388</a>         Thread.sleep(2);
+<a class="jxr_linenumber" name="L389" href="#L389">389</a>       } <strong class="jxr_keyword">catch</strong> (InterruptedException e) {
+<a class="jxr_linenumber" name="L390" href="#L390">390</a>         <strong class="jxr_keyword">throw</strong> <strong class="jxr_keyword">new</strong> <a name="GrpcException" href="../../../../org/tikv/common/exception/GrpcException.html#GrpcException">GrpcException</a>(e);
+<a class="jxr_linenumber" name="L391" href="#L391">391</a>       }
+<a class="jxr_linenumber" name="L392" href="#L392">392</a>       List&lt;ForwardCheckTask&gt; unfinished = <strong class="jxr_keyword">new</strong> LinkedList&lt;&gt;();
+<a class="jxr_linenumber" name="L393" href="#L393">393</a>       <strong class="jxr_keyword">for</strong> (ForwardCheckTask task : responses) {
+<a class="jxr_linenumber" name="L394" href="#L394">394</a>         <strong class="jxr_keyword">if</strong> (!task.task.isDone()) {
+<a class="jxr_linenumber" name="L395" href="#L395">395</a>           unfinished.add(task);
+<a class="jxr_linenumber" name="L396" href="#L396">396</a>           <strong class="jxr_keyword">continue</strong>;
+<a class="jxr_linenumber" name="L397" href="#L397">397</a>         }
+<a class="jxr_linenumber" name="L398" href="#L398">398</a>         <strong class="jxr_keyword">try</strong> {
+<a class="jxr_linenumber" name="L399" href="#L399">399</a>           <em class="jxr_comment">// any answer will do</em>
+<a class="jxr_linenumber" name="L400" href="#L400">400</a>           Kvrpcpb.RawGetResponse resp = task.task.get();
+<a class="jxr_linenumber" name="L401" href="#L401">401</a>           logger.info(
+<a class="jxr_linenumber" name="L402" href="#L402">402</a>               String.format(
+<a class="jxr_linenumber" name="L403" href="#L403">403</a>                   <span class="jxr_string">"rawGetResponse indicates forward from [%s] to [%s]"</span>,
+<a class="jxr_linenumber" name="L404" href="#L404">404</a>                   task.store.getAddress(), store.getAddress()));
+<a class="jxr_linenumber" name="L405" href="#L405">405</a>           <strong class="jxr_keyword">return</strong> store.withProxy(task.store);
+<a class="jxr_linenumber" name="L406" href="#L406">406</a>         } <strong class="jxr_keyword">catch</strong> (Exception ignored) {
+<a class="jxr_linenumber" name="L407" href="#L407">407</a>         }
+<a class="jxr_linenumber" name="L408" href="#L408">408</a>       }
+<a class="jxr_linenumber" name="L409" href="#L409">409</a>       <strong class="jxr_keyword">if</strong> (unfinished.isEmpty()) {
+<a class="jxr_linenumber" name="L410" href="#L410">410</a>         <strong class="jxr_keyword">return</strong> <strong class="jxr_keyword">null</strong>;
+<a class="jxr_linenumber" name="L411" href="#L411">411</a>       }
+<a class="jxr_linenumber" name="L412" href="#L412">412</a>       responses = unfinished;
+<a class="jxr_linenumber" name="L413" href="#L413">413</a>     }
+<a class="jxr_linenumber" name="L414" href="#L414">414</a>   }
 <a class="jxr_linenumber" name="L415" href="#L415">415</a> 
-<a class="jxr_linenumber" name="L416" href="#L416">416</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task;
-<a class="jxr_linenumber" name="L417" href="#L417">417</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> Metapb.Peer peer;
-<a class="jxr_linenumber" name="L418" href="#L418">418</a> 
-<a class="jxr_linenumber" name="L419" href="#L419">419</a>     <strong class="jxr_keyword">private</strong> SwitchLeaderTask(ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task, Metapb.Peer peer) {
-<a class="jxr_linenumber" name="L420" href="#L420">420</a>       <strong class="jxr_keyword">this</strong>.task = task;
-<a class="jxr_linenumber" name="L421" href="#L421">421</a>       <strong class="jxr_keyword">this</strong>.peer = peer;
-<a class="jxr_linenumber" name="L422" href="#L422">422</a>     }
-<a class="jxr_linenumber" name="L423" href="#L423">423</a>   }
-<a class="jxr_linenumber" name="L424" href="#L424">424</a> 
-<a class="jxr_linenumber" name="L425" href="#L425">425</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">class</strong> ForwardCheckTask {
+<a class="jxr_linenumber" name="L416" href="#L416">416</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">class</strong> SwitchLeaderTask {
+<a class="jxr_linenumber" name="L417" href="#L417">417</a> 
+<a class="jxr_linenumber" name="L418" href="#L418">418</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task;
+<a class="jxr_linenumber" name="L419" href="#L419">419</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> Metapb.Peer peer;
+<a class="jxr_linenumber" name="L420" href="#L420">420</a> 
+<a class="jxr_linenumber" name="L421" href="#L421">421</a>     <strong class="jxr_keyword">private</strong> SwitchLeaderTask(ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task, Metapb.Peer peer) {
+<a class="jxr_linenumber" name="L422" href="#L422">422</a>       <strong class="jxr_keyword">this</strong>.task = task;
+<a class="jxr_linenumber" name="L423" href="#L423">423</a>       <strong class="jxr_keyword">this</strong>.peer = peer;
+<a class="jxr_linenumber" name="L424" href="#L424">424</a>     }
+<a class="jxr_linenumber" name="L425" href="#L425">425</a>   }
 <a class="jxr_linenumber" name="L426" href="#L426">426</a> 
-<a class="jxr_linenumber" name="L427" href="#L427">427</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task;
-<a class="jxr_linenumber" name="L428" href="#L428">428</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> Metapb.Store store;
-<a class="jxr_linenumber" name="L429" href="#L429">429</a> 
-<a class="jxr_linenumber" name="L430" href="#L430">430</a>     <strong class="jxr_keyword">private</strong> ForwardCheckTask(ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task, Metapb.Store store) {
-<a class="jxr_linenumber" name="L431" href="#L431">431</a>       <strong class="jxr_keyword">this</strong>.task = task;
-<a class="jxr_linenumber" name="L432" href="#L432">432</a>       <strong class="jxr_keyword">this</strong>.store = store;
-<a class="jxr_linenumber" name="L433" href="#L433">433</a>     }
-<a class="jxr_linenumber" name="L434" href="#L434">434</a>   }
-<a class="jxr_linenumber" name="L435" href="#L435">435</a> }
+<a class="jxr_linenumber" name="L427" href="#L427">427</a>   <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">static</strong> <strong class="jxr_keyword">class</strong> ForwardCheckTask {
+<a class="jxr_linenumber" name="L428" href="#L428">428</a> 
+<a class="jxr_linenumber" name="L429" href="#L429">429</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task;
+<a class="jxr_linenumber" name="L430" href="#L430">430</a>     <strong class="jxr_keyword">private</strong> <strong class="jxr_keyword">final</strong> Metapb.Store store;
+<a class="jxr_linenumber" name="L431" href="#L431">431</a> 
+<a class="jxr_linenumber" name="L432" href="#L432">432</a>     <strong class="jxr_keyword">private</strong> ForwardCheckTask(ListenableFuture&lt;Kvrpcpb.RawGetResponse&gt; task, Metapb.Store store) {
+<a class="jxr_linenumber" name="L433" href="#L433">433</a>       <strong class="jxr_keyword">this</strong>.task = task;
+<a class="jxr_linenumber" name="L434" href="#L434">434</a>       <strong class="jxr_keyword">this</strong>.store = store;
+<a class="jxr_linenumber" name="L435" href="#L435">435</a>     }
+<a class="jxr_linenumber" name="L436" href="#L436">436</a>   }
+<a class="jxr_linenumber" name="L437" href="#L437">437</a> }
 </pre>
 <hr/>
 <div id="footer">Copyright &#169; 2024 PingCAP. All rights reserved.</div>
