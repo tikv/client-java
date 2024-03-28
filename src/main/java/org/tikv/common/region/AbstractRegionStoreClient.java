@@ -209,8 +209,9 @@ public abstract class AbstractRegionStoreClient
     if (store.getProxyStore() != null) {
       Metadata header = new Metadata();
       header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
-      blockingStub = MetadataUtils.attachHeaders(blockingStub, header);
-      asyncStub = MetadataUtils.attachHeaders(asyncStub, header);
+      blockingStub =
+          blockingStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(header));
+      asyncStub = asyncStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(header));
     }
   }
 
@@ -371,7 +372,8 @@ public abstract class AbstractRegionStoreClient
                 .setKey(codec.encodeKey(key))
                 .build();
         ListenableFuture<Kvrpcpb.RawGetResponse> task =
-            MetadataUtils.attachHeaders(stub, header).rawGet(rawGetRequest);
+            stub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(header))
+                .rawGet(rawGetRequest);
         responses.add(new ForwardCheckTask(task, peerStore.getStore()));
       } catch (Exception e) {
         logger.warn(
