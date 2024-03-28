@@ -127,6 +127,7 @@ import org.tikv.txn.exception.LockException;
 
 /** Note that RegionStoreClient itself is not thread-safe */
 public class RegionStoreClient extends AbstractRegionStoreClient {
+
   private static final Logger logger = LoggerFactory.getLogger(RegionStoreClient.class);
   @VisibleForTesting public final AbstractLockResolverClient lockResolverClient;
   private final TiStoreType storeType;
@@ -1395,8 +1396,12 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
             channelFactory.getChannel(addressStr, regionManager.getPDClient().getHostMapping());
         Metadata header = new Metadata();
         header.put(TiConfiguration.FORWARD_META_DATA_KEY, store.getStore().getAddress());
-        blockingStub = MetadataUtils.attachHeaders(TikvGrpc.newBlockingStub(channel), header);
-        asyncStub = MetadataUtils.attachHeaders(TikvGrpc.newFutureStub(channel), header);
+        blockingStub =
+            TikvGrpc.newBlockingStub(channel)
+                .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(header));
+        asyncStub =
+            TikvGrpc.newFutureStub(channel)
+                .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(header));
       } else {
         channel = channelFactory.getChannel(addressStr, pdClient.getHostMapping());
         blockingStub = TikvGrpc.newBlockingStub(channel);
