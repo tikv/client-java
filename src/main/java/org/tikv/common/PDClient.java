@@ -841,8 +841,11 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
         Metadata header = new Metadata();
         header.put(TiConfiguration.PD_FORWARD_META_DATA_KEY, addrToUri(leaderInfo).toString());
         this.blockingStub =
-            MetadataUtils.attachHeaders(PDGrpc.newBlockingStub(clientChannel), header);
-        this.asyncStub = MetadataUtils.attachHeaders(PDGrpc.newFutureStub(clientChannel), header);
+            PDGrpc.newBlockingStub(clientChannel)
+                .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(header));
+        this.asyncStub =
+            PDGrpc.newFutureStub(clientChannel)
+                .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(header));
       } else {
         this.blockingStub = PDGrpc.newBlockingStub(clientChannel);
         this.asyncStub = PDGrpc.newFutureStub(clientChannel);
