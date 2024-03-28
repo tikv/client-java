@@ -108,7 +108,6 @@ import org.tikv.kvproto.Pdpb.UpdateServiceGCSafePointRequest;
 
 public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     implements ReadOnlyPDClient {
-
   private static final String TIFLASH_TABLE_SYNC_PROGRESS_PATH = "/tiflash/table/sync";
   private static final long MIN_TRY_UPDATE_DURATION = 50;
   private static final int PAUSE_CHECKER_TIMEOUT = 300; // in seconds
@@ -830,7 +829,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   }
 
   static class PDClientWrapper {
-
     private final String leaderInfo;
     private final PDBlockingStub blockingStub;
     private final PDFutureStub asyncStub;

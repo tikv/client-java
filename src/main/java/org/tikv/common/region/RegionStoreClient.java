@@ -127,7 +127,6 @@ import org.tikv.txn.exception.LockException;
 
 /** Note that RegionStoreClient itself is not thread-safe */
 public class RegionStoreClient extends AbstractRegionStoreClient {
-
   private static final Logger logger = LoggerFactory.getLogger(RegionStoreClient.class);
   @VisibleForTesting public final AbstractLockResolverClient lockResolverClient;
   private final TiStoreType storeType;
