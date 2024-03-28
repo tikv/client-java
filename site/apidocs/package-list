@@ -5,12 +5,6 @@ configpb
 deadlock
 enginepb
 eraftpb
-io.grpc.internal
-io.grpc.netty
-io.grpc.stub
-io.netty.buffer
-io.netty.channel.socket.nio
-io.netty.handler.codec.http2
 org.tikv.common
 org.tikv.common.apiversion
 org.tikv.common.catalog

@@ -329,7 +329,7 @@
 <a class="jxr_linenumber" name="L321" href="#L321">321</a> 
 <a class="jxr_linenumber" name="L322" href="#L322">322</a>     <em class="jxr_comment">// Channel should be lazy without actual connection until first call</em>
 <a class="jxr_linenumber" name="L323" href="#L323">323</a>     <em class="jxr_comment">// So a coarse grain lock is ok here</em>
-<a class="jxr_linenumber" name="L324" href="#L324">324</a>     <a name="NettyChannelBuilder" href="../../../../io/grpc/netty/NettyChannelBuilder.html#NettyChannelBuilder">NettyChannelBuilder</a> builder =
+<a class="jxr_linenumber" name="L324" href="#L324">324</a>     NettyChannelBuilder builder =
 <a class="jxr_linenumber" name="L325" href="#L325">325</a>         NettyChannelBuilder.forAddress(mapped.getHost(), mapped.getPort())
 <a class="jxr_linenumber" name="L326" href="#L326">326</a>             .maxInboundMessageSize(maxFrameSize)
 <a class="jxr_linenumber" name="L327" href="#L327">327</a>             .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
@@ -382,6 +382,6 @@
 <a class="jxr_linenumber" name="L374" href="#L374">374</a> }
 </pre>
 <hr/>
-<div id="footer">Copyright &#169; 2023 PingCAP. All rights reserved.</div>
+<div id="footer">Copyright &#169; 2024 PingCAP. All rights reserved.</div>
 </body>
 </html>
