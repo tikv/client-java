@@ -88,17 +88,7 @@ public class TwoPhaseCommitter implements AutoCloseable {
   }
 
   public TwoPhaseCommitter(TiSession session, long startTime, long lockTTL) {
-    this(
-        session,
-        startTime,
-        lockTTL,
-        TXN_COMMIT_BATCH_SIZE,
-        TXN_COMMIT_BATCH_SIZE,
-        WRITE_BUFFER_SIZE,
-        1,
-        true,
-        3,
-        createExecutorService(WRITE_BUFFER_SIZE));
+    this(session, startTime, lockTTL, createExecutorService(WRITE_BUFFER_SIZE));
   }
 
   public TwoPhaseCommitter(
