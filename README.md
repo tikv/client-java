@@ -10,7 +10,7 @@ It is supposed to:
 + Talk to Placement Driver searching for a region
 + Talk to TiKV for reading/writing data
 
-## Quick Start
+## Quick Start2
 
 > TiKV Java Client is designed to communicate with [PD](https://github.com/tikv/pd) and [TiKV](https://github.com/tikv/tikv), please run PD and TiKV in advance.
 
