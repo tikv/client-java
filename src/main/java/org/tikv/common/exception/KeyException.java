@@ -31,7 +31,7 @@ public class KeyException extends TiKVException {
   }
 
   public KeyException(Kvrpcpb.KeyError keyErr) {
-    super("Key exception occurred");
+    super("Key exception occurred " + keyErr.toString());
     this.keyErr = keyErr;
   }
 
