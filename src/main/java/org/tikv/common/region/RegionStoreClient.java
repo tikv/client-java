@@ -70,8 +70,7 @@ import org.tikv.common.util.ConcreteBackOffer;
 import org.tikv.common.util.HistogramUtils;
 import org.tikv.common.util.Pair;
 import org.tikv.common.util.RangeSplitter;
-import org.tikv.kvproto.Coprocessor;
-import org.tikv.kvproto.Errorpb;
+import org.tikv.kvproto.*;
 import org.tikv.kvproto.Kvrpcpb.BatchGetRequest;
 import org.tikv.kvproto.Kvrpcpb.BatchGetResponse;
 import org.tikv.kvproto.Kvrpcpb.CommitRequest;
@@ -109,8 +108,6 @@ import org.tikv.kvproto.Kvrpcpb.SplitRegionRequest;
 import org.tikv.kvproto.Kvrpcpb.SplitRegionResponse;
 import org.tikv.kvproto.Kvrpcpb.TxnHeartBeatRequest;
 import org.tikv.kvproto.Kvrpcpb.TxnHeartBeatResponse;
-import org.tikv.kvproto.Metapb;
-import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvFutureStub;
 import org.tikv.txn.AbstractLockResolverClient;
@@ -336,7 +333,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
   }
 
   public List<KvPair> scan(
-      BackOffer backOffer, ByteString startKey, long version, boolean keyOnly) {
+      BackOffer backOffer, ByteString startKey, long version, boolean keyOnly, boolean reverse) {
     boolean forWrite = false;
     while (true) {
       Supplier<ScanRequest> request =
@@ -348,6 +345,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                   .setStartKey(codec.encodeKey(startKey))
                   .setVersion(version)
                   .setKeyOnly(keyOnly)
+                  .setReverse(reverse)
                   .setLimit(getConf().getScanBatchSize())
                   .build();
 
@@ -415,6 +413,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public List<KvPair> scan(BackOffer backOffer, ByteString startKey, long version) {
     return scan(backOffer, startKey, version, false);
+  }
+
+  public List<KvPair> scan(
+      BackOffer backOffer, ByteString startKey, long version, boolean reverse) {
+    return scan(backOffer, startKey, version, false, reverse);
   }
 
   /**
@@ -1238,9 +1241,11 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
    * @param backOffer BackOffer
    * @param key startKey
    * @param keyOnly true if value of KvPair is not needed
+   * @param reverse
    * @return KvPair list
    */
-  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, int limit, boolean keyOnly) {
+  public List<KvPair> rawScan(
+      BackOffer backOffer, ByteString key, int limit, boolean keyOnly, boolean reverse) {
     Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
         GRPC_RAW_REQUEST_LATENCY.labels("client_grpc_raw_scan", clusterId.toString()).startTimer();
@@ -1254,6 +1259,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                 .setEndKey(range.second)
                 .setKeyOnly(keyOnly)
                 .setLimit(limit)
+                .setReverse(reverse)
                 .build();
           };
 
@@ -1271,8 +1277,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     }
   }
 
-  public List<KvPair> rawScan(BackOffer backOffer, ByteString key, boolean keyOnly) {
-    return rawScan(backOffer, key, getConf().getScanBatchSize(), keyOnly);
+  public List<KvPair> rawScan(
+      BackOffer backOffer, ByteString key, boolean keyOnly, boolean reverse) {
+    return rawScan(backOffer, key, getConf().getScanBatchSize(), keyOnly, reverse);
   }
 
   private List<KvPair> rawScanHelper(RawScanResponse resp) {

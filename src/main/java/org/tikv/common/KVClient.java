@@ -101,7 +101,25 @@ public class KVClient implements AutoCloseable {
    */
   public List<KvPair> scan(ByteString startKey, ByteString endKey, long version)
       throws GrpcException {
-    Iterator<KvPair> iterator = scanIterator(conf, clientBuilder, startKey, endKey, version);
+    return scan(startKey, endKey, version, false);
+  }
+
+  /**
+   * Scan key-value pairs from TiKV in range [startKey, endKey) or if reversely, [endKey, startKey)
+   *
+   * @param startKey start key, inclusive
+   * @param endKey end key, exclusive
+   * @param reverse whether to scan reversely
+   * @return list of key-value pairs in range
+   */
+  public List<KvPair> scan(ByteString startKey, ByteString endKey, long version, boolean reverse)
+      throws GrpcException {
+    Iterator<KvPair> iterator;
+    if (reverse) {
+      iterator = scanIterator(conf, clientBuilder, endKey, startKey, version, reverse);
+    } else {
+      iterator = scanIterator(conf, clientBuilder, startKey, endKey, version, reverse);
+    }
     List<KvPair> result = new ArrayList<>();
     iterator.forEachRemaining(result::add);
     return result;
@@ -115,7 +133,7 @@ public class KVClient implements AutoCloseable {
    * @return list of key-value pairs in range
    */
   public List<KvPair> scan(ByteString startKey, long version, int limit) throws GrpcException {
-    Iterator<KvPair> iterator = scanIterator(conf, clientBuilder, startKey, version, limit);
+    Iterator<KvPair> iterator = scanIterator(conf, clientBuilder, startKey, version, limit, false);
     List<KvPair> result = new ArrayList<>();
     iterator.forEachRemaining(result::add);
     return result;
@@ -183,8 +201,9 @@ public class KVClient implements AutoCloseable {
       RegionStoreClientBuilder builder,
       ByteString startKey,
       ByteString endKey,
-      long version) {
-    return new ConcreteScanIterator(conf, builder, startKey, endKey, version);
+      long version,
+      boolean reverse) {
+    return new ConcreteScanIterator(conf, builder, startKey, endKey, version, reverse);
   }
 
   private Iterator<KvPair> scanIterator(
@@ -192,7 +211,8 @@ public class KVClient implements AutoCloseable {
       RegionStoreClientBuilder builder,
       ByteString startKey,
       long version,
-      int limit) {
-    return new ConcreteScanIterator(conf, builder, startKey, version, limit);
+      int limit,
+      boolean reverse) {
+    return new ConcreteScanIterator(conf, builder, startKey, version, limit, reverse);
   }
 }

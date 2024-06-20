@@ -114,8 +114,37 @@ public class KVClient implements AutoCloseable {
    */
   public List<Kvrpcpb.KvPair> scan(ByteString startKey, ByteString endKey, long version)
       throws GrpcException {
+    return scan(startKey, endKey, version, false);
+  }
+  /**
+   * Scan key-value pairs from TiKV reversely in range (startKey, endKey]
+   *
+   * @param startKey start key, inclusive
+   * @param endKey end key, exclusive
+   * @return list of key-value pairs in range
+   */
+  public List<Kvrpcpb.KvPair> reverseScan(ByteString startKey, ByteString endKey, long version)
+      throws GrpcException {
+    return scan(endKey, startKey, version, true);
+  }
+
+  public List<Kvrpcpb.KvPair> scan(
+      ByteString startKey, ByteString endKey, long version, boolean reverse) throws GrpcException {
+    Iterator<Kvrpcpb.KvPair> iterator;
+    if (reverse) {
+      iterator = scanIterator(conf, clientBuilder, endKey, startKey, version, reverse);
+    } else {
+      iterator = scanIterator(conf, clientBuilder, startKey, endKey, version, reverse);
+    }
+    List<Kvrpcpb.KvPair> result = new ArrayList<>();
+    iterator.forEachRemaining(result::add);
+    return result;
+  }
+
+  public List<Kvrpcpb.KvPair> scan(ByteString startKey, long version, int limit, boolean reverse)
+      throws GrpcException {
     Iterator<Kvrpcpb.KvPair> iterator =
-        scanIterator(conf, clientBuilder, startKey, endKey, version);
+        scanIterator(conf, clientBuilder, startKey, version, limit, reverse);
     List<Kvrpcpb.KvPair> result = new ArrayList<>();
     iterator.forEachRemaining(result::add);
     return result;
@@ -130,14 +159,27 @@ public class KVClient implements AutoCloseable {
    */
   public List<Kvrpcpb.KvPair> scan(ByteString startKey, long version, int limit)
       throws GrpcException {
-    Iterator<Kvrpcpb.KvPair> iterator = scanIterator(conf, clientBuilder, startKey, version, limit);
-    List<Kvrpcpb.KvPair> result = new ArrayList<>();
-    iterator.forEachRemaining(result::add);
-    return result;
+    return scan(startKey, version, limit, false);
+  }
+
+  /**
+   * Scan key-value pairs reversively from TiKV in range ('', endKey], maximum to `limit` pairs
+   *
+   * @param endKey start key, inclusive
+   * @param limit limit of kv pairs
+   * @return list of key-value pairs in range
+   */
+  public List<Kvrpcpb.KvPair> reverseScan(ByteString endKey, long version, int limit)
+      throws GrpcException {
+    return scan(endKey, version, limit, true);
   }
 
   public List<Kvrpcpb.KvPair> scan(ByteString startKey, long version) throws GrpcException {
-    return scan(startKey, version, Integer.MAX_VALUE);
+    return scan(startKey, version, Integer.MAX_VALUE, false);
+  }
+
+  public List<Kvrpcpb.KvPair> reverseScan(ByteString endKey, long version) throws GrpcException {
+    return scan(endKey, version, Integer.MAX_VALUE, true);
   }
 
   public synchronized void ingest(List<Pair<ByteString, ByteString>> list) throws GrpcException {
@@ -264,8 +306,9 @@ public class KVClient implements AutoCloseable {
       RegionStoreClientBuilder builder,
       ByteString startKey,
       ByteString endKey,
-      long version) {
-    return new ConcreteScanIterator(conf, builder, startKey, endKey, version);
+      long version,
+      boolean reverse) {
+    return new ConcreteScanIterator(conf, builder, startKey, endKey, version, reverse);
   }
 
   private Iterator<Kvrpcpb.KvPair> scanIterator(
@@ -273,8 +316,9 @@ public class KVClient implements AutoCloseable {
       RegionStoreClientBuilder builder,
       ByteString startKey,
       long version,
-      int limit) {
-    return new ConcreteScanIterator(conf, builder, startKey, version, limit);
+      int limit,
+      boolean reverse) {
+    return new ConcreteScanIterator(conf, builder, startKey, version, limit, reverse);
   }
 
   private void doIngest(TiRegion region, List<Pair<ByteString, ByteString>> sortedList)
