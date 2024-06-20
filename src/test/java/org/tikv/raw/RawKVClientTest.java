@@ -68,6 +68,7 @@ import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 public class RawKVClientTest extends BaseRawKVTest {
+
   private static final String RAW_PREFIX = "raw_\u0001_";
   private static final int KEY_POOL_SIZE = 1000000;
   private static final int TEST_CASES = 10000;
@@ -143,7 +144,7 @@ public class RawKVClientTest extends BaseRawKVTest {
     long ttl = 10;
     ByteString key = ByteString.copyFromUtf8("key_ttl");
     ByteString value = ByteString.copyFromUtf8("value");
-    client.put(key, value, ttl);
+    client.put(key, value, ttl, TimeUnit.SECONDS);
     for (int i = 0; i < 9; i++) {
       Optional<Long> t = client.getKeyTTL(key);
       logger.info("current ttl of key is " + t.orElse(null));
