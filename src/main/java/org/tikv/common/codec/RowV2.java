@@ -78,6 +78,7 @@ public class RowV2 {
     this.numNotNullCols = cdi.readUnsignedShort();
     this.numNullCols = cdi.readUnsignedShort();
     int cursor = 6;
+    int dataLen = 0;
     if (this.large) {
       int numCols = this.numNotNullCols + this.numNullCols;
       int colIDsLen = numCols * 4;
@@ -93,6 +94,9 @@ public class RowV2 {
         this.offsets32[i] = cdi.readInt();
       }
       cursor += offsetsLen;
+      if (numCols > 0) {
+        dataLen = this.offsets[numCols - 1];
+      }
     } else {
       int numCols = this.numNotNullCols + this.numNullCols;
       int colIDsLen = numCols;
@@ -106,8 +110,11 @@ public class RowV2 {
         this.offsets[i] = cdi.readUnsignedShort();
       }
       cursor += offsetsLen;
+      if (numCols > 0) {
+        dataLen = this.offsets[numCols - 1];
+      }
     }
-    this.data = Arrays.copyOfRange(rowData, cursor, rowData.length);
+    this.data = Arrays.copyOfRange(rowData, cursor, cursor + dataLen);
   }
 
   private void writeShortArray(CodecDataOutput cdo, int[] arr) {
