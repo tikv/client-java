@@ -41,6 +41,7 @@ public class TiDBJDBCClient implements AutoCloseable {
   private static final int DELAY_CLEAN_TABLE_LOCK_DEFAULT = 0;
   private static final String TIDB_ROW_FORMAT_VERSION_SQL = "select @@tidb_row_format_version";
   private static final int TIDB_ROW_FORMAT_VERSION_DEFAULT = 1;
+  private static final ObjectMapper objectMapper = new ObjectMapper();
   private final Logger logger = LoggerFactory.getLogger(getClass().getName());
   private final Connection connection;
 
@@ -120,7 +121,6 @@ public class TiDBJDBCClient implements AutoCloseable {
 
   private Map<String, Object> readConfMapFromTiDB() throws SQLException, IOException {
     String configJSON = (String) queryTiDBViaJDBC(SELECT_TIDB_CONFIG_SQL).get(0).get(0);
-    ObjectMapper objectMapper = new ObjectMapper();
     TypeReference<HashMap<String, Object>> typeRef =
         new TypeReference<HashMap<String, Object>>() {};
     return objectMapper.readValue(configJSON, typeRef);

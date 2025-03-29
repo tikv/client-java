@@ -113,6 +113,7 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
   private static final int PAUSE_CHECKER_TIMEOUT = 300; // in seconds
   private static final int KEEP_CHECKER_PAUSE_PERIOD = PAUSE_CHECKER_TIMEOUT / 5; // in seconds
   private static final Logger logger = LoggerFactory.getLogger(PDClient.class);
+  private static final ObjectMapper mapper = new ObjectMapper();
 
   private final RequestKeyCodec codec;
   private RequestHeader header;
@@ -226,7 +227,6 @@ public class PDClient extends AbstractGRPCClient<PDBlockingStub, PDFutureStub>
     URI url = pdAddrs.get(0);
     String api = url.toString() + "/pd/api/v1/checker/" + checker.apiName();
     try {
-      ObjectMapper mapper = new ObjectMapper();
       HashMap<String, Boolean> status =
           mapper.readValue(new URL(api), new TypeReference<HashMap<String, Boolean>>() {});
       return status.get("paused");

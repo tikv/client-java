@@ -40,6 +40,7 @@ import org.tikv.common.util.Pair;
 
 public class CatalogTransaction {
   protected static final Logger logger = LoggerFactory.getLogger(CatalogTransaction.class);
+  private static final ObjectMapper mapper = new ObjectMapper();
   private final Snapshot snapshot;
 
   CatalogTransaction(Snapshot snapshot) {
@@ -51,7 +52,6 @@ public class CatalogTransaction {
     Objects.requireNonNull(cls, "cls is null");
 
     logger.debug(String.format("Parse Json %s : %s", cls.getSimpleName(), json.toStringUtf8()));
-    ObjectMapper mapper = new ObjectMapper();
     try {
       return mapper.readValue(json.toStringUtf8(), cls);
     } catch (JsonParseException | JsonMappingException e) {
