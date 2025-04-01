@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
 import org.tikv.common.ReadOnlyPDClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.exception.GrpcException;
-import org.tikv.common.exception.KeyException;
 import org.tikv.common.exception.RegionException;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.exception.TiKVException;
@@ -181,7 +180,6 @@ public class TxnKVClient implements AutoCloseable {
   // TODO: check this logic to see are we satisfied?
   private boolean retryableException(Exception e) {
     return e instanceof TiClientInternalException
-        || e instanceof KeyException
         || e instanceof RegionException
         || e instanceof StatusRuntimeException;
   }
