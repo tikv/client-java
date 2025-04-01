@@ -43,6 +43,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
   protected Key endKey;
   protected boolean hasEndKey;
   protected boolean processingLastBatch = false;
+  protected boolean reverse = false;
 
   ScanIterator(
       TiConfiguration conf,
@@ -50,7 +51,8 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
       ByteString startKey,
       ByteString endKey,
       int limit,
-      boolean keyOnly) {
+      boolean keyOnly,
+      boolean reverse) {
     this.startKey = requireNonNull(startKey, "start key is null");
     this.endKey = Key.toRawKey(requireNonNull(endKey, "end key is null"));
     this.hasEndKey = !endKey.isEmpty();
@@ -58,6 +60,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
     this.keyOnly = keyOnly;
     this.conf = conf;
     this.builder = builder;
+    this.reverse = reverse;
   }
 
   /**

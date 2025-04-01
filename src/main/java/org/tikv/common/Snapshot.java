@@ -157,7 +157,24 @@ public class Snapshot {
         session.getRegionStoreClientBuilder(),
         startKey,
         timestamp.getVersion(),
-        Integer.MAX_VALUE);
+        Integer.MAX_VALUE,
+        false);
+  }
+
+  /**
+   * scan all keys becofe startKey, inclusive
+   *
+   * @param startKey start of keys
+   * @return iterator of kvPair
+   */
+  public Iterator<KvPair> reverseScan(ByteString startKey) {
+    return new ConcreteScanIterator(
+        session.getConf(),
+        session.getRegionStoreClientBuilder(),
+        startKey,
+        timestamp.getVersion(),
+        Integer.MAX_VALUE,
+        true);
   }
 
   /**
@@ -173,7 +190,24 @@ public class Snapshot {
         session.getRegionStoreClientBuilder(),
         prefix,
         nextPrefix,
-        timestamp.getVersion());
+        timestamp.getVersion(),
+        false);
+  }
+  /**
+   * scan all keys with prefix, reversely
+   *
+   * @param prefix prefix of keys
+   * @return iterator of kvPair
+   */
+  public Iterator<KvPair> reverseScanPrefix(ByteString prefix) {
+    ByteString nextPrefix = Key.toRawKey(prefix).nextPrefix().toByteString();
+    return new ConcreteScanIterator(
+        session.getConf(),
+        session.getRegionStoreClientBuilder(),
+        nextPrefix,
+        prefix,
+        timestamp.getVersion(),
+        true);
   }
 
   public TiConfiguration getConf() {
