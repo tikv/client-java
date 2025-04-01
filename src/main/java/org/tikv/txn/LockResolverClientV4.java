@@ -52,6 +52,7 @@ import org.tikv.kvproto.Kvrpcpb;
 import org.tikv.kvproto.TikvGrpc;
 import org.tikv.kvproto.TikvGrpc.TikvBlockingStub;
 import org.tikv.kvproto.TikvGrpc.TikvFutureStub;
+import org.tikv.txn.exception.PrimaryMismatchException;
 import org.tikv.txn.exception.TxnNotFoundException;
 import org.tikv.txn.exception.WriteConflictException;
 
@@ -114,7 +115,22 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
     Set<Long> pushed = new HashSet<>(locks.size());
 
     for (Lock l : locks) {
-      TxnStatus status = getTxnStatusFromLock(bo, l, callerStartTS);
+
+      TxnStatus status = null;
+
+      try {
+        status = getTxnStatusFromLock(bo, l, callerStartTS);
+      } catch (PrimaryMismatchException e) {
+        if (l.getLockType() != Kvrpcpb.Op.PessimisticLock) {
+          logger.info(
+              String.format(
+                  "unexpected primaryMismatch error occurred on a non-pessimistic lock, lock: %s",
+                  l));
+          throw e;
+        }
+        // Pessimistic rollback the pessimistic lock as it points to an invalid primary.
+        status = new TxnStatus();
+      }
 
       if (status.getTtl() == 0) {
         Set<RegionVerID> cleanRegion =
@@ -231,7 +247,13 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
     while (true) {
       try {
         return getTxnStatus(
-            bo, lock.getTxnID(), lock.getPrimary(), callerStartTS, currentTS, rollbackIfNotExist);
+            bo,
+            lock.getTxnID(),
+            lock.getPrimary(),
+            callerStartTS,
+            currentTS,
+            rollbackIfNotExist,
+            lock);
       } catch (TxnNotFoundException e) {
         // If the error is something other than txnNotFoundErr, throw the error (network
         // unavailable, tikv down, backoff timeout etc) to the caller.
@@ -271,11 +293,15 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
       ByteString primary,
       Long callerStartTS,
       Long currentTS,
-      boolean rollbackIfNotExist) {
+      boolean rollbackIfNotExist,
+      Lock lock) {
     TxnStatus status = getResolved(txnID);
     if (status != null) {
       return status;
     }
+
+    boolean resolvingPessimisticLock =
+        (lock != null && lock.getLockType() == Kvrpcpb.Op.PessimisticLock);
 
     // CheckTxnStatus may meet the following cases:
     // 1. LOCK
@@ -295,6 +321,7 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
               .setCallerStartTs(callerStartTS)
               .setCurrentTs(currentTS)
               .setRollbackIfNotExist(rollbackIfNotExist)
+              .setVerifyIsPrimary(true)
               .build();
         };
 
@@ -336,6 +363,12 @@ public class LockResolverClientV4 extends AbstractRegionStoreClient
 
         if (keyError.hasTxnNotFound()) {
           throw new TxnNotFoundException();
+        }
+
+        if (resolvingPessimisticLock && keyError.hasPrimaryMismatch()) {
+          logger.info(
+              String.format("getTxnStatus was called on secondary lock. err: %s", keyError));
+          throw new PrimaryMismatchException();
         }
 
         logger.error(String.format("unexpected cleanup err: %s, tid: %d", keyError, txnID));
