@@ -23,10 +23,15 @@ import static org.tikv.common.util.KeyRangeUtils.makeCoprocRange;
 
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
-import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import java.io.Serializable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.tikv.common.handle.Handle;
 import org.tikv.common.key.RowKey;
 import org.tikv.common.pd.PDUtils;
 import org.tikv.common.region.RegionManager;
@@ -53,24 +58,23 @@ public class RangeSplitter {
    * @param handles Handle list
    * @return {@code <Region, HandleList>} map
    */
-  public Map<Pair<TiRegion, TiStore>, TLongArrayList> groupByAndSortHandlesByRegionId(
-      long tableId, TLongArrayList handles) {
-    TLongObjectHashMap<TLongArrayList> regionHandles = new TLongObjectHashMap<>();
+  public Map<Pair<TiRegion, TiStore>, List<Handle>> groupByAndSortHandlesByRegionId(
+      long tableId, List<Handle> handles) {
+    TLongObjectHashMap<List<Handle>> regionHandles = new TLongObjectHashMap<>();
     TLongObjectHashMap<Pair<TiRegion, TiStore>> idToRegionStorePair = new TLongObjectHashMap<>();
-    Map<Pair<TiRegion, TiStore>, TLongArrayList> result = new HashMap<>();
-    handles.sort();
+    Map<Pair<TiRegion, TiStore>, List<Handle>> result = new HashMap<>();
+    handles.sort(Handle::compare);
 
     byte[] endKey = null;
     TiRegion curRegion = null;
-    TLongArrayList handlesInCurRegion = new TLongArrayList();
-    for (int i = 0; i < handles.size(); i++) {
-      long curHandle = handles.get(i);
+    List<Handle> handlesInCurRegion = new ArrayList<>();
+    for (Handle curHandle : handles) {
       RowKey key = RowKey.toRowKey(tableId, curHandle);
       if (endKey == null
           || (endKey.length != 0 && FastByteComparisons.compareTo(key.getBytes(), endKey) >= 0)) {
         if (curRegion != null) {
           regionHandles.put(curRegion.getId(), handlesInCurRegion);
-          handlesInCurRegion = new TLongArrayList();
+          handlesInCurRegion = new ArrayList<>();
         }
         Pair<TiRegion, TiStore> regionStorePair =
             regionManager.getRegionStorePairByKey(ByteString.copyFrom(key.getBytes()));
@@ -80,7 +84,7 @@ public class RangeSplitter {
       }
       handlesInCurRegion.add(curHandle);
     }
-    if (!handlesInCurRegion.isEmpty() && curRegion != null) {
+    if (!handlesInCurRegion.isEmpty()) {
       regionHandles.put(curRegion.getId(), handlesInCurRegion);
     }
     regionHandles.forEachEntry(
@@ -92,7 +96,7 @@ public class RangeSplitter {
     return result;
   }
 
-  public List<RegionTask> splitAndSortHandlesByRegion(List<Long> ids, TLongArrayList handles) {
+  public List<RegionTask> splitAndSortHandlesByRegion(List<Long> ids, List<Handle> handles) {
     Set<RegionTask> regionTasks = new HashSet<>();
     for (Long id : ids) {
       regionTasks.addAll(splitAndSortHandlesByRegion(id, handles));
@@ -107,11 +111,11 @@ public class RangeSplitter {
    * @param handles Handle list
    * @return A list of region tasks
    */
-  private List<RegionTask> splitAndSortHandlesByRegion(long tableId, TLongArrayList handles) {
+  private List<RegionTask> splitAndSortHandlesByRegion(long tableId, List<Handle> handles) {
     // Max value for current index handle range
     ImmutableList.Builder<RegionTask> regionTasks = ImmutableList.builder();
 
-    Map<Pair<TiRegion, TiStore>, TLongArrayList> regionHandlesMap =
+    Map<Pair<TiRegion, TiStore>, List<Handle>> regionHandlesMap =
         groupByAndSortHandlesByRegionId(tableId, handles);
 
     regionHandlesMap.forEach((k, v) -> createTask(0, v.size(), tableId, v, k, regionTasks));
@@ -123,21 +127,21 @@ public class RangeSplitter {
       int startPos,
       int endPos,
       long tableId,
-      TLongArrayList handles,
+      List<Handle> handles,
       Pair<TiRegion, TiStore> regionStorePair,
       ImmutableList.Builder<RegionTask> regionTasks) {
     List<KeyRange> newKeyRanges = new ArrayList<>(endPos - startPos + 1);
-    long startHandle = handles.get(startPos);
-    long endHandle = startHandle;
+    Handle startHandle = handles.get(startPos);
+    Handle endHandle = startHandle;
     for (int i = startPos + 1; i < endPos; i++) {
-      long curHandle = handles.get(i);
-      if (endHandle + 1 == curHandle) {
+      Handle curHandle = handles.get(i);
+      if (endHandle.next().equals(curHandle)) {
         endHandle = curHandle;
       } else {
         newKeyRanges.add(
             makeCoprocRange(
                 RowKey.toRowKey(tableId, startHandle).toByteString(),
-                RowKey.toRowKey(tableId, endHandle + 1).toByteString()));
+                RowKey.toRowKey(tableId, endHandle.next()).toByteString()));
         startHandle = curHandle;
         endHandle = startHandle;
       }
@@ -145,8 +149,9 @@ public class RangeSplitter {
     newKeyRanges.add(
         makeCoprocRange(
             RowKey.toRowKey(tableId, startHandle).toByteString(),
-            RowKey.toRowKey(tableId, endHandle + 1).toByteString()));
-    regionTasks.add(new RegionTask(regionStorePair.first, regionStorePair.second, newKeyRanges));
+            RowKey.toRowKey(tableId, endHandle.next()).toByteString()));
+    regionTasks.add(
+        RegionTask.newInstance(regionStorePair.first, regionStorePair.second, newKeyRanges));
   }
 
   /**

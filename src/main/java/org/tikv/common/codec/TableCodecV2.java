@@ -20,7 +20,10 @@ package org.tikv.common.codec;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import org.tikv.common.handle.Handle;
 import org.tikv.common.meta.TiColumnInfo;
+import org.tikv.common.meta.TiIndexColumn;
+import org.tikv.common.meta.TiIndexInfo;
 import org.tikv.common.meta.TiTableInfo;
 import org.tikv.common.row.ObjectRowImpl;
 import org.tikv.common.row.Row;
@@ -51,7 +54,7 @@ public class TableCodecV2 {
     return encoder.encode(columnInfoList, valueList);
   }
 
-  protected static Object[] decodeObjects(byte[] value, Long handle, TiTableInfo tableInfo) {
+  protected static Object[] decodeObjects(byte[] value, Handle handle, TiTableInfo tableInfo) {
     if (handle == null && tableInfo.isPkHandle()) {
       throw new IllegalArgumentException("when pk is handle, handle cannot be null");
     }
@@ -60,12 +63,33 @@ public class TableCodecV2 {
     HashMap<Long, Object> decodedDataMap = new HashMap<>(colSize);
     org.tikv.common.codec.RowV2 rowV2 = org.tikv.common.codec.RowV2.createNew(value);
 
+    TiIndexInfo pk = tableInfo.getPrimaryKey();
+
+    if (pk != null) {
+      List<TiColumnInfo> cols = new ArrayList<>();
+      for (TiIndexColumn indexColumn : pk.getIndexColumns()) {
+        TiColumnInfo col = tableInfo.getColumn(indexColumn.getOffset());
+        cols.add(col);
+      }
+      if (tableInfo.isPkHandle()) {
+        assert cols.size() == 1;
+        decodedDataMap.put(cols.get(0).getId(), handle.data()[0]);
+      }
+      if (tableInfo.isCommonHandle()) {
+        for (int i = 0; i < cols.size(); i++) {
+          decodedDataMap.put(cols.get(i).getId(), handle.data()[i]);
+        }
+      }
+    }
+
     for (TiColumnInfo col : tableInfo.getColumns()) {
-      if (col.isPrimaryKey() && tableInfo.isPkHandle()) {
+      if (decodedDataMap.containsKey(col.getId())) {
+        continue;
+      } else if (col.isPrimaryKey() && tableInfo.isPkHandle()) {
         decodedDataMap.put(col.getId(), handle);
         continue;
       }
-      org.tikv.common.codec.RowV2.ColIDSearchResult searchResult = rowV2.findColID(col.getId());
+      RowV2.ColIDSearchResult searchResult = rowV2.findColID(col.getId());
       if (searchResult.isNull) {
         // current col is null, nothing should be added to decodedMap
         continue;
@@ -78,7 +102,6 @@ public class TableCodecV2 {
         decodedDataMap.put(col.getId(), d);
       }
     }
-
     Object[] res = new Object[colSize];
 
     // construct Row with Map<ColumnID, Data> & handle
@@ -90,7 +113,7 @@ public class TableCodecV2 {
     return res;
   }
 
-  protected static Row decodeRow(byte[] value, Long handle, TiTableInfo tableInfo) {
+  protected static Row decodeRow(byte[] value, Handle handle, TiTableInfo tableInfo) {
     return ObjectRowImpl.create(decodeObjects(value, handle, tableInfo));
   }
 }

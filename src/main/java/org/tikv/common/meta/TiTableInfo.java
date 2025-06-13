@@ -44,6 +44,11 @@ public class TiTableInfo implements Serializable {
   private final Map<String, org.tikv.common.meta.TiColumnInfo> columnsMap;
   private final List<org.tikv.common.meta.TiIndexInfo> indices;
   private final boolean pkIsHandle;
+  private final boolean isCommonHandle;
+  // CommonHandleVersion is the version of the clustered index.
+  // 0 for the clustered index created == 5.0.0 RC.
+  // 1 for the clustered index created > 5.0.0 RC.
+  private final int commonHandleVersion;
   private final String comment;
   private final long autoIncId;
   private final long maxColumnId;
@@ -58,6 +63,12 @@ public class TiTableInfo implements Serializable {
   private final long updateTimestamp;
   private final long maxShardRowIDBits;
   private final org.tikv.common.meta.TiSequenceInfo sequenceInfo;
+  private final long autoRandomBits;
+
+  /** without hiden column */
+  private final List<TiColumnInfo> columnsWithoutHidden;
+
+  private final List<TiIndexInfo> indicesWithoutHiddenAndInvisible;
 
   @JsonCreator
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -67,6 +78,8 @@ public class TiTableInfo implements Serializable {
       @JsonProperty("charset") String charset,
       @JsonProperty("collate") String collate,
       @JsonProperty("pk_is_handle") boolean pkIsHandle,
+      @JsonProperty("is_common_handle") boolean isCommonHandle,
+      @JsonProperty("common_handle_version") int commonHandleVersion,
       @JsonProperty("cols") List<org.tikv.common.meta.TiColumnInfo> columns,
       @JsonProperty("index_info") List<org.tikv.common.meta.TiIndexInfo> indices,
       @JsonProperty("comment") String comment,
@@ -80,27 +93,49 @@ public class TiTableInfo implements Serializable {
       @JsonProperty("version") long version,
       @JsonProperty("update_timestamp") long updateTimestamp,
       @JsonProperty("max_shard_row_id_bits") long maxShardRowIDBits,
-      @JsonProperty("sequence") org.tikv.common.meta.TiSequenceInfo sequenceInfo) {
+      @JsonProperty("sequence") org.tikv.common.meta.TiSequenceInfo sequenceInfo,
+      @JsonProperty("auto_random_bits") long autoRandomBits) {
     this.id = id;
     this.name = name.getL();
     this.charset = charset;
     this.collate = collate;
     if (sequenceInfo == null) {
       this.columns = ImmutableList.copyOf(requireNonNull(columns, "columns is null"));
+      this.columnsWithoutHidden =
+          columns.stream().filter(col -> !col.isHidden()).collect(Collectors.toList());
       this.columnsMap = new HashMap<>();
-      for (org.tikv.common.meta.TiColumnInfo col : this.columns) {
+      for (TiColumnInfo col : this.columns) {
         this.columnsMap.put(col.getName(), col);
       }
-      this.rowSize = columns.stream().mapToLong(org.tikv.common.meta.TiColumnInfo::getSize).sum();
+      this.rowSize = columns.stream().mapToLong(TiColumnInfo::getSize).sum();
     } else {
       this.columns = null;
+      this.columnsWithoutHidden = null;
       this.columnsMap = null;
       // 9 is the rowSize for type bigint
       this.rowSize = 9;
     }
     // TODO: Use more precise predication according to types
     this.pkIsHandle = pkIsHandle;
+    this.isCommonHandle = isCommonHandle;
+    this.commonHandleVersion = commonHandleVersion;
     this.indices = indices != null ? ImmutableList.copyOf(indices) : ImmutableList.of();
+    this.indicesWithoutHiddenAndInvisible =
+        this.indices
+            .stream()
+            .filter(
+                idx -> {
+                  if (idx.isInvisible()) {
+                    return false;
+                  }
+                  for (TiIndexColumn idc : idx.getIndexColumns()) {
+                    if (getColumn(idc.getName()).isHidden()) {
+                      return false;
+                    }
+                  }
+                  return true;
+                })
+            .collect(Collectors.toList());
     if (this.columns != null) {
       this.indices.forEach(x -> x.calculateIndexSize(columns));
     }
@@ -116,10 +151,11 @@ public class TiTableInfo implements Serializable {
     this.updateTimestamp = updateTimestamp;
     this.maxShardRowIDBits = maxShardRowIDBits;
     this.sequenceInfo = sequenceInfo;
+    this.autoRandomBits = autoRandomBits;
 
-    org.tikv.common.meta.TiColumnInfo primaryKey = null;
+    TiColumnInfo primaryKey = null;
     if (sequenceInfo == null) {
-      for (org.tikv.common.meta.TiColumnInfo col : this.columns) {
+      for (TiColumnInfo col : this.columns) {
         if (col.isPrimaryKey()) {
           primaryKey = col;
           break;
@@ -203,7 +239,15 @@ public class TiTableInfo implements Serializable {
   }
 
   public List<org.tikv.common.meta.TiIndexInfo> getIndices() {
-    return indices;
+    return getIndices(false);
+  }
+
+  public List<TiIndexInfo> getIndices(boolean includingAll) {
+    if (includingAll) {
+      return this.indices;
+    } else {
+      return this.indicesWithoutHiddenAndInvisible;
+    }
   }
 
   public String getComment() {
@@ -226,6 +270,10 @@ public class TiTableInfo implements Serializable {
     return oldSchemaId;
   }
 
+  public boolean isCommonHandle() {
+    return isCommonHandle;
+  }
+
   public org.tikv.common.meta.TiPartitionInfo getPartitionInfo() {
     return partitionInfo;
   }
@@ -244,6 +292,15 @@ public class TiTableInfo implements Serializable {
 
   public boolean hasPrimaryKey() {
     return primaryKeyColumn != null;
+  }
+
+  public TiIndexInfo getPrimaryKey() {
+    for (TiIndexInfo index : getIndices()) {
+      if (index.isPrimary()) {
+        return index;
+      }
+    }
+    return null;
   }
 
   // Only Integer Column will be a PK column
@@ -275,7 +332,8 @@ public class TiTableInfo implements Serializable {
             col.getDefaultValueBit(),
             col.getComment(),
             col.getVersion(),
-            col.getGeneratedExprString())
+            col.getGeneratedExprString(),
+            col.isHidden())
         .copyWithoutPrimaryKey();
   }
 
@@ -292,6 +350,8 @@ public class TiTableInfo implements Serializable {
           getCharset(),
           getCollate(),
           true,
+          isCommonHandle,
+          commonHandleVersion,
           newColumns.build(),
           getIndices(),
           getComment(),
@@ -305,7 +365,8 @@ public class TiTableInfo implements Serializable {
           version,
           updateTimestamp,
           maxShardRowIDBits,
-          null);
+          null,
+          autoRandomBits);
     } else {
       return this;
     }

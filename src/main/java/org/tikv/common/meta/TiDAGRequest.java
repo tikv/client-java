@@ -26,9 +26,27 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.pingcap.tidb.tipb.*;
-import java.io.*;
-import java.util.*;
+import com.pingcap.tidb.tipb.Aggregation;
+import com.pingcap.tidb.tipb.ColumnInfo;
+import com.pingcap.tidb.tipb.DAGRequest;
+import com.pingcap.tidb.tipb.EncodeType;
+import com.pingcap.tidb.tipb.ExecType;
+import com.pingcap.tidb.tipb.Executor;
+import com.pingcap.tidb.tipb.IndexScan;
+import com.pingcap.tidb.tipb.Limit;
+import com.pingcap.tidb.tipb.Selection;
+import com.pingcap.tidb.tipb.TableScan;
+import com.pingcap.tidb.tipb.TopN;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.tikv.common.codec.KeyUtils;
@@ -174,6 +192,10 @@ public class TiDAGRequest implements Serializable {
 
   public void setEncodeType(EncodeType encodeType) {
     this.encodeType = encodeType;
+  }
+
+  public boolean isCommonHandle() {
+    return tableInfo.isCommonHandle();
   }
 
   public DAGRequest buildIndexScan() {

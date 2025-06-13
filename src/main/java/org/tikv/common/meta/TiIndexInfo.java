@@ -44,6 +44,7 @@ public class TiIndexInfo implements Serializable {
   private final String comment;
   private final org.tikv.common.meta.IndexType indexType;
   private final boolean isFakePrimaryKey;
+  private final boolean isInvisible;
 
   // default index column size (TypeFlag + Int64)
   private long indexColumnSize = 9;
@@ -62,7 +63,8 @@ public class TiIndexInfo implements Serializable {
       @JsonProperty("index_type") int indexType,
       // This is a fake property and added JsonProperty only to
       // to bypass Jackson frameworks's check
-      @JsonProperty("___isFakePrimaryKey") boolean isFakePrimaryKey) {
+      @JsonProperty("___isFakePrimaryKey") boolean isFakePrimaryKey,
+      @JsonProperty("is_invisible") boolean isInvisible) {
     this.id = id;
     this.name = requireNonNull(name, "index name is null").getL();
     this.tableName = requireNonNull(tableName, "table name is null").getL();
@@ -73,6 +75,7 @@ public class TiIndexInfo implements Serializable {
     this.comment = comment;
     this.indexType = org.tikv.common.meta.IndexType.fromValue(indexType);
     this.isFakePrimaryKey = isFakePrimaryKey;
+    this.isInvisible = isInvisible;
   }
 
   public static TiIndexInfo generateFakePrimaryKeyIndex(TiTableInfo table) {
@@ -88,7 +91,8 @@ public class TiIndexInfo implements Serializable {
           org.tikv.common.meta.SchemaState.StatePublic.getStateCode(),
           "Fake Column",
           org.tikv.common.meta.IndexType.IndexTypeHash.getTypeCode(),
-          true);
+          true,
+          false);
     }
     return null;
   }
@@ -184,6 +188,10 @@ public class TiIndexInfo implements Serializable {
 
   public boolean isFakePrimaryKey() {
     return isFakePrimaryKey;
+  }
+
+  public boolean isInvisible() {
+    return isInvisible;
   }
 
   @Override
