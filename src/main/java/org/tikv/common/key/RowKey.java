@@ -25,15 +25,19 @@ import org.tikv.common.codec.CodecDataInput;
 import org.tikv.common.codec.CodecDataOutput;
 import org.tikv.common.exception.TiClientInternalException;
 import org.tikv.common.exception.TiExpressionException;
+import org.tikv.common.handle.CommonHandle;
+import org.tikv.common.handle.Handle;
+import org.tikv.common.handle.IntHandle;
 
 public class RowKey extends Key implements Serializable {
   private static final byte[] REC_PREFIX_SEP = new byte[] {'_', 'r'};
-
+  private static final int INT_HANDLE_SIZE = 19;
+  private static final int HANDLE_PREFIX_SIZE = 11;
   private final long tableId;
-  private final long handle;
+  private final Handle handle;
   private final boolean maxHandleFlag;
 
-  private RowKey(long tableId, long handle) {
+  private RowKey(long tableId, Handle handle) {
     super(encode(tableId, handle));
     this.tableId = tableId;
     this.handle = handle;
@@ -48,24 +52,24 @@ public class RowKey extends Key implements Serializable {
   private RowKey(long tableId) {
     super(encodeBeyondMaxHandle(tableId));
     this.tableId = tableId;
-    this.handle = Long.MAX_VALUE;
+    this.handle = new IntHandle(Long.MAX_VALUE);
     this.maxHandleFlag = true;
   }
 
-  public static RowKey toRowKey(long tableId, long handle) {
+  public static RowKey toRowKey(long tableId, Handle handle) {
     return new RowKey(tableId, handle);
   }
 
   public static RowKey toRowKey(long tableId, org.tikv.common.key.TypedKey handle) {
     Object obj = handle.getValue();
     if (obj instanceof Long) {
-      return new RowKey(tableId, (long) obj);
+      return new RowKey(tableId, new IntHandle((Long) obj));
     }
     throw new TiExpressionException("Cannot encode row key with non-long type");
   }
 
   public static RowKey createMin(long tableId) {
-    return toRowKey(tableId, Long.MIN_VALUE);
+    return toRowKey(tableId, new IntHandle(Long.MIN_VALUE));
   }
 
   public static RowKey createBeyondMax(long tableId) {
@@ -75,22 +79,35 @@ public class RowKey extends Key implements Serializable {
   public static RowKey decode(byte[] value) {
     CodecDataInput cdi = new CodecDataInput(value);
     cdi.readByte();
-    long tableId = IntegerCodec.readLong(cdi); // tableId
+    long tableId = IntegerCodec.readLong(cdi);
     cdi.readByte();
     cdi.readByte();
-    long handle = IntegerCodec.readLong(cdi); // handle
+
+    Handle handle;
+    if (value.length == INT_HANDLE_SIZE) {
+      handle = new IntHandle(IntegerCodec.readLong(cdi));
+    } else {
+      byte[] buffer = new byte[value.length - HANDLE_PREFIX_SIZE];
+      cdi.readFully(buffer);
+      handle = new CommonHandle(buffer);
+    }
+
     return toRowKey(tableId, handle);
   }
 
-  private static byte[] encode(long tableId, long handle) {
+  private static byte[] encode(long tableId, Handle handle) {
+    return encode(tableId, handle.encoded());
+  }
+
+  public static byte[] encode(long tableId, byte[] key) {
     CodecDataOutput cdo = new CodecDataOutput();
     encodePrefix(cdo, tableId);
-    writeLong(cdo, handle);
+    cdo.write(key);
     return cdo.toBytes();
   }
 
   private static byte[] encodeBeyondMaxHandle(long tableId) {
-    return prefixNext(encode(tableId, Long.MAX_VALUE));
+    return prefixNext(encode(tableId, new IntHandle(Long.MAX_VALUE)));
   }
 
   private static void encodePrefix(CodecDataOutput cdo, long tableId) {
@@ -101,22 +118,22 @@ public class RowKey extends Key implements Serializable {
 
   @Override
   public RowKey next() {
-    long handle = getHandle();
+    Handle handle = getHandle();
     boolean maxHandleFlag = getMaxHandleFlag();
     if (maxHandleFlag) {
       throw new TiClientInternalException("Handle overflow for Long MAX");
     }
-    if (handle == Long.MAX_VALUE) {
+    if (handle.isInt() && handle.intValue() == Long.MAX_VALUE) {
       return createBeyondMax(tableId);
     }
-    return new RowKey(tableId, handle + 1);
+    return new RowKey(tableId, handle.next());
   }
 
   public long getTableId() {
     return tableId;
   }
 
-  public long getHandle() {
+  public Handle getHandle() {
     return handle;
   }
 
@@ -126,7 +143,7 @@ public class RowKey extends Key implements Serializable {
 
   @Override
   public String toString() {
-    return Long.toString(handle);
+    return "handle" + handle.toString();
   }
 
   public static class DecodeResult {

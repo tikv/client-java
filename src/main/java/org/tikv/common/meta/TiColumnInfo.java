@@ -53,6 +53,7 @@ public class TiColumnInfo implements Serializable {
   // if version is 1 then timestamp's default value will be read and decoded as utc.
   private final long version;
   private final String generatedExprString;
+  private final boolean hidden;
 
   @JsonCreator
   public TiColumnInfo(
@@ -66,7 +67,8 @@ public class TiColumnInfo implements Serializable {
       @JsonProperty("default_bit") String defaultValueBit,
       @JsonProperty("comment") String comment,
       @JsonProperty("version") long version,
-      @JsonProperty("generated_expr_string") String generatedExprString) {
+      @JsonProperty("generated_expr_string") String generatedExprString,
+      @JsonProperty("hidden") boolean hidden) {
     this.id = id;
     this.name = requireNonNull(name, "column name is null").getL();
     this.offset = offset;
@@ -81,6 +83,7 @@ public class TiColumnInfo implements Serializable {
     this.isPrimaryKey = (type.getFlag() & PK_MASK) > 0;
     this.version = version;
     this.generatedExprString = generatedExprString;
+    this.hidden = hidden;
   }
 
   public TiColumnInfo(
@@ -94,7 +97,8 @@ public class TiColumnInfo implements Serializable {
       String defaultValueBit,
       String comment,
       long version,
-      String generatedExprString) {
+      String generatedExprString,
+      boolean hidden) {
     this.id = id;
     this.name = requireNonNull(name, "column name is null").toLowerCase();
     this.offset = offset;
@@ -107,6 +111,7 @@ public class TiColumnInfo implements Serializable {
     this.isPrimaryKey = (type.getFlag() & PK_MASK) > 0;
     this.version = version;
     this.generatedExprString = generatedExprString;
+    this.hidden = hidden;
   }
 
   @VisibleForTesting
@@ -123,6 +128,7 @@ public class TiColumnInfo implements Serializable {
     this.defaultValueBit = null;
     this.version = DataType.COLUMN_VERSION_FLAG;
     this.generatedExprString = "";
+    this.hidden = false;
   }
 
   static TiColumnInfo getRowIdColumn(int offset) {
@@ -144,7 +150,8 @@ public class TiColumnInfo implements Serializable {
         this.defaultValueBit,
         this.comment,
         this.version,
-        this.generatedExprString);
+        this.generatedExprString,
+        this.hidden);
   }
 
   public long getId() {
@@ -221,6 +228,10 @@ public class TiColumnInfo implements Serializable {
 
   public boolean isAutoIncrement() {
     return this.type.isAutoIncrement();
+  }
+
+  public boolean isHidden() {
+    return hidden;
   }
 
   TiIndexColumn toFakeIndexColumn() {

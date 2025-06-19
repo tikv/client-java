@@ -32,10 +32,18 @@ import org.joda.time.IllegalInstantException;
 import org.joda.time.LocalDate;
 import org.joda.time.LocalDateTime;
 import org.tikv.common.ExtendedDateTime;
+import org.tikv.common.exception.CodecException;
 import org.tikv.common.exception.ConvertOverflowException;
 import org.tikv.common.exception.InvalidCodecFormatException;
 import org.tikv.common.exception.TypeException;
 import org.tikv.common.exception.UnsupportedSyntaxException;
+import org.tikv.common.types.BytesType;
+import org.tikv.common.types.DataType;
+import org.tikv.common.types.DecimalType;
+import org.tikv.common.types.IntegerType;
+import org.tikv.common.types.JsonType;
+import org.tikv.common.types.RealType;
+import org.tikv.common.types.TimeType;
 
 public class Codec {
 
@@ -55,6 +63,41 @@ public class Codec {
 
   public static boolean isNullFlag(int flag) {
     return flag == NULL_FLAG;
+  }
+
+  public static Object decodeOne(byte[] colData) {
+    if (colData.length <= 1) {
+      throw new CodecException("invalid encoded column data, length <=1");
+    }
+    int flag = colData[0];
+    DataType tp;
+    switch (flag) {
+      case INT_FLAG:
+      case UINT_FLAG:
+      case VARINT_FLAG:
+      case UVARINT_FLAG:
+        tp = IntegerType.BIGINT;
+        break;
+      case FLOATING_FLAG:
+        tp = RealType.DOUBLE;
+        break;
+      case BYTES_FLAG:
+      case COMPACT_BYTES_FLAG:
+        tp = BytesType.TEXT;
+        break;
+      case DECIMAL_FLAG:
+        tp = DecimalType.DECIMAL;
+        break;
+      case DURATION_FLAG:
+        tp = TimeType.TIME;
+        break;
+      case JSON_FLAG:
+        tp = JsonType.JSON;
+        break;
+      default:
+        throw new CodecException("Unknown type");
+    }
+    return tp.decode(new CodecDataInput(colData));
   }
 
   public static class IntegerCodec {
@@ -603,10 +646,10 @@ public class Codec {
      * Read datetime from packed Long encoded as unsigned var-len integer converting into specified
      * timezone
      *
-     * @see DateTimeCodec#fromPackedLong(long, DateTimeZone)
      * @param cdi codec buffer input
      * @param tz timezone to interpret datetime parts
      * @return decoded ExtendedDateTime using provided timezone
+     * @see DateTimeCodec#fromPackedLong(long, DateTimeZone)
      */
     public static ExtendedDateTime readFromUVarInt(CodecDataInput cdi, DateTimeZone tz) {
       return DateTimeCodec.fromPackedLong(IntegerCodec.readUVarLong(cdi), tz);
@@ -615,10 +658,10 @@ public class Codec {
     /**
      * Read datetime from packed Long as unsigned fixed-len integer
      *
-     * @see DateTimeCodec#fromPackedLong(long, DateTimeZone)
      * @param cdi codec buffer input
      * @param tz timezone to interpret datetime parts
      * @return decoded ExtendedDateTime using provided timezone
+     * @see DateTimeCodec#fromPackedLong(long, DateTimeZone)
      */
     public static ExtendedDateTime readFromUInt(CodecDataInput cdi, DateTimeZone tz) {
       return DateTimeCodec.fromPackedLong(IntegerCodec.readULong(cdi), tz);
@@ -731,9 +774,9 @@ public class Codec {
      * Read date from packed Long encoded as unsigned var-len integer converting into specified
      * timezone
      *
-     * @see DateCodec#fromPackedLong(long)
      * @param cdi codec buffer input
      * @return decoded DateTime using provided timezone
+     * @see DateCodec#fromPackedLong(long)
      */
     public static LocalDate readFromUVarInt(CodecDataInput cdi) {
       return DateCodec.fromPackedLong(IntegerCodec.readUVarLong(cdi));
@@ -742,9 +785,9 @@ public class Codec {
     /**
      * Read date from packed Long as unsigned fixed-len integer
      *
-     * @see DateCodec#fromPackedLong(long)
      * @param cdi codec buffer input
      * @return decoded DateTime using provided timezone
+     * @see DateCodec#fromPackedLong(long)
      */
     public static LocalDate readFromUInt(CodecDataInput cdi) {
       return DateCodec.fromPackedLong(IntegerCodec.readULong(cdi));

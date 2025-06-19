@@ -17,7 +17,6 @@
 
 package org.tikv.common.operation.iterator;
 
-import gnu.trove.list.array.TLongArrayList;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -27,13 +26,14 @@ import org.tikv.common.Snapshot;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.exception.TiClientInternalException;
+import org.tikv.common.handle.Handle;
 import org.tikv.common.meta.TiDAGRequest;
 import org.tikv.common.row.Row;
 import org.tikv.common.util.RangeSplitter;
 import org.tikv.common.util.RangeSplitter.RegionTask;
 
 public class IndexScanIterator implements Iterator<Row> {
-  private final Iterator<Long> handleIterator;
+  private final Iterator<Handle> handleIterator;
   private final TiDAGRequest dagReq;
   private final Snapshot snapshot;
   private final ExecutorCompletionService<Iterator<Row>> completionService;
@@ -41,7 +41,7 @@ public class IndexScanIterator implements Iterator<Row> {
   private Iterator<Row> rowIterator;
   private int batchCount = 0;
 
-  public IndexScanIterator(Snapshot snapshot, TiDAGRequest req, Iterator<Long> handleIterator) {
+  public IndexScanIterator(Snapshot snapshot, TiDAGRequest req, Iterator<Handle> handleIterator) {
     TiSession session = snapshot.getSession();
     TiConfiguration conf = session.getConf();
     this.dagReq = req;
@@ -51,8 +51,8 @@ public class IndexScanIterator implements Iterator<Row> {
     this.completionService = new ExecutorCompletionService<>(session.getThreadPoolForIndexScan());
   }
 
-  private TLongArrayList feedBatch() {
-    TLongArrayList handles = new TLongArrayList(512);
+  private List<Handle> feedBatch() {
+    List<Handle> handles = new ArrayList<>(512);
     while (handleIterator.hasNext()) {
       handles.add(handleIterator.next());
       if (batchSize <= handles.size()) {
@@ -68,7 +68,7 @@ public class IndexScanIterator implements Iterator<Row> {
       if (rowIterator == null) {
         TiSession session = snapshot.getSession();
         while (handleIterator.hasNext()) {
-          TLongArrayList handles = feedBatch();
+          List<Handle> handles = feedBatch();
           batchCount++;
           completionService.submit(
               () -> {

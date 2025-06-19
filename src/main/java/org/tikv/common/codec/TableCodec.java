@@ -19,6 +19,9 @@ package org.tikv.common.codec;
 
 import java.util.List;
 import org.tikv.common.exception.CodecException;
+import org.tikv.common.handle.CommonHandle;
+import org.tikv.common.handle.Handle;
+import org.tikv.common.handle.IntHandle;
 import org.tikv.common.meta.TiColumnInfo;
 import org.tikv.common.meta.TiTableInfo;
 import org.tikv.common.row.Row;
@@ -42,7 +45,7 @@ public class TableCodec {
     return TableCodecV1.encodeRow(columnInfos, values, isPkHandle);
   }
 
-  public static Object[] decodeObjects(byte[] value, Long handle, TiTableInfo tableInfo) {
+  public static Object[] decodeObjects(byte[] value, Handle handle, TiTableInfo tableInfo) {
     if (value.length == 0) {
       throw new CodecException("Decode fails: value length is zero");
     }
@@ -52,7 +55,7 @@ public class TableCodec {
     return TableCodecV1.decodeObjects(value, handle, tableInfo);
   }
 
-  public static Row decodeRow(byte[] value, Long handle, TiTableInfo tableInfo) {
+  public static Row decodeRow(byte[] value, Handle handle, TiTableInfo tableInfo) {
     if (value.length == 0) {
       throw new CodecException("Decode fails: value length is zero");
     }
@@ -62,7 +65,10 @@ public class TableCodec {
     return TableCodecV1.decodeRow(value, handle, tableInfo);
   }
 
-  public static long decodeHandle(byte[] value) {
-    return new CodecDataInput(value).readLong();
+  public static Handle decodeHandle(byte[] value, boolean isCommonHandle) {
+    if (isCommonHandle) {
+      return new CommonHandle(value);
+    }
+    return new IntHandle(new CodecDataInput(value).readLong());
   }
 }

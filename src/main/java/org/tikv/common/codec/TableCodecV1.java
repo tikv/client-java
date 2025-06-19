@@ -20,6 +20,7 @@ package org.tikv.common.codec;
 import java.util.HashMap;
 import java.util.List;
 import org.tikv.common.codec.Codec.IntegerCodec;
+import org.tikv.common.handle.Handle;
 import org.tikv.common.meta.TiColumnInfo;
 import org.tikv.common.meta.TiTableInfo;
 import org.tikv.common.row.ObjectRowImpl;
@@ -51,7 +52,7 @@ public class TableCodecV1 {
     return cdo.toBytes();
   }
 
-  protected static Object[] decodeObjects(byte[] value, Long handle, TiTableInfo tableInfo) {
+  protected static Object[] decodeObjects(byte[] value, Handle handle, TiTableInfo tableInfo) {
     if (handle == null && tableInfo.isPkHandle()) {
       throw new IllegalArgumentException("when pk is handle, handle cannot be null");
     }
@@ -85,7 +86,7 @@ public class TableCodecV1 {
     return res;
   }
 
-  protected static Row decodeRow(byte[] value, Long handle, TiTableInfo tableInfo) {
+  protected static Row decodeRow(byte[] value, Handle handle, TiTableInfo tableInfo) {
     return ObjectRowImpl.create(decodeObjects(value, handle, tableInfo));
   }
 }

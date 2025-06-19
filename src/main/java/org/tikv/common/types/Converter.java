@@ -38,6 +38,7 @@ import org.tikv.common.ExtendedDateTime;
 import org.tikv.common.exception.ConvertNotSupportException;
 import org.tikv.common.exception.ConvertOverflowException;
 import org.tikv.common.exception.TypeException;
+import org.tikv.common.handle.Handle;
 
 public class Converter {
 
@@ -72,6 +73,8 @@ public class Converter {
       result = doubleToLong((Double) value);
     } else if (value instanceof String) {
       result = stringToLong((String) value);
+    } else if (value instanceof Handle) {
+      result = ((Handle) value).intValue();
     } else {
       throw new ConvertNotSupportException(value.getClass().getName(), "SIGNED");
     }

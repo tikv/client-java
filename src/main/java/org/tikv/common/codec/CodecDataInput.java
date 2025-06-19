@@ -17,9 +17,23 @@
 
 package org.tikv.common.codec;
 
+import static org.tikv.common.codec.Codec.BYTES_FLAG;
+import static org.tikv.common.codec.Codec.COMPACT_BYTES_FLAG;
+import static org.tikv.common.codec.Codec.DECIMAL_FLAG;
+import static org.tikv.common.codec.Codec.DURATION_FLAG;
+import static org.tikv.common.codec.Codec.FLOATING_FLAG;
+import static org.tikv.common.codec.Codec.INT_FLAG;
+import static org.tikv.common.codec.Codec.NULL_FLAG;
+import static org.tikv.common.codec.Codec.UINT_FLAG;
+
 import com.google.protobuf.ByteString;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import javax.annotation.Nonnull;
+import org.tikv.common.exception.CodecException;
 
 public class CodecDataInput implements DataInput {
   protected final DataInputStream inputStream;
@@ -189,6 +203,48 @@ public class CodecDataInput implements DataInput {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * peek the first encoded value and return its length
+   *
+   * @return first encoded value
+   */
+  public int cutOne() {
+    if (available() < 1) {
+      throw new CodecException("invalid encoded key");
+    }
+    int flag = readByte();
+    int a1 = this.available();
+
+    switch (flag) {
+      case NULL_FLAG:
+      case INT_FLAG:
+      case UINT_FLAG:
+      case FLOATING_FLAG:
+      case DURATION_FLAG:
+        Codec.RealCodec.readDouble(this);
+        break;
+      case BYTES_FLAG:
+        Codec.BytesCodec.readBytes(this);
+        break;
+      case COMPACT_BYTES_FLAG:
+        Codec.BytesCodec.readCompactBytes(this);
+        break;
+      case DECIMAL_FLAG:
+        Codec.DecimalCodec.readDecimal(this);
+        break;
+        // case VARINT_FLAG:
+        //      l = peekVarint(b);
+        // case UVARINT_FLAG:
+        //        l = peekUvarint(b);
+        // case JSON_FLAG:
+        //        l = json.PeekBytesAsJSON(b);
+      default:
+        throw new CodecException("invalid encoded key flag " + flag);
+    }
+    int a2 = this.available();
+    return a1 - a2 + 1;
   }
 
   public int peekByte() {
