@@ -87,7 +87,7 @@ public class TableCodecV2 {
             if (decodedDataMap.containsKey(col.getId())) {
                 continue;
             } else if (col.isPrimaryKey() && tableInfo.isPkHandle()) {
-                decodedDataMap.put(col.getId(), handle.data());
+                decodedDataMap.put(col.getId(), handle.data()[0]);
                 continue;
             }
             RowV2.ColIDSearchResult searchResult = rowV2.findColID(col.getId());
