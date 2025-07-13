@@ -117,7 +117,6 @@ public class ScanSpec {
             break;
           }
           pushedPredicates.addAll(predicates);
-          TiColumnInfo tiColumnInfo = table.getColumn(indexColumn.getOffset());
           points.add(mergeCNFExpressions(predicates));
         }
       }
