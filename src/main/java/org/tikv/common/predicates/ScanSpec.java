@@ -109,7 +109,6 @@ public class ScanSpec {
 
     public ScanSpec build() {
       List<Expression> points = new ArrayList<>();
-      List<DataType> pointTypes = new ArrayList<>();
       Set<Expression> pushedPredicates = new HashSet<>();
       if (index != null) {
         for (TiIndexColumn indexColumn : index.getIndexColumns()) {
@@ -118,10 +117,7 @@ public class ScanSpec {
             break;
           }
           pushedPredicates.addAll(predicates);
-          TiColumnInfo tiColumnInfo = table.getColumn(indexColumn.getOffset());
-          DataType type = tiColumnInfo.getType();
           points.add(mergeCNFExpressions(predicates));
-          pointTypes.add(type);
         }
       }
       Optional<Expression> newRangePred =
