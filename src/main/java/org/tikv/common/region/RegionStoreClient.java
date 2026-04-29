@@ -355,8 +355,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
                     .setKeyOnly(keyOnly)
                     .setLimit(getConf().getScanBatchSize());
 
-            // API version matters here: v2 transactional keys are keyspace-prefixed; encodeRange applies
-            // that encoding to both bounds. v1 passes raw keys and only sets start on the RPC in this client path
+            // API version matters here: v2 transactional keys are keyspace-prefixed; encodeRange
+            // applies that encoding to both bounds. v1 passes raw keys and only sets start on the
+            // RPC in this client path
             if (getConf().getApiVersion().isV2()) {
               Pair<ByteString, ByteString> range = codec.encodeRange(startKey, endKey);
               b.setStartKey(range.first).setEndKey(range.second);
