@@ -337,19 +337,35 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public List<KvPair> scan(
       BackOffer backOffer, ByteString startKey, long version, boolean keyOnly) {
+    return scan(backOffer, startKey, ByteString.EMPTY, version, keyOnly);
+  }
+
+  public List<KvPair> scan(
+      BackOffer backOffer, ByteString startKey, ByteString endKey, long version, boolean keyOnly) {
     boolean forWrite = false;
     while (true) {
       Supplier<ScanRequest> request =
-          () ->
-              ScanRequest.newBuilder()
-                  .setContext(
-                      makeContext(
-                          getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
-                  .setStartKey(codec.encodeKey(startKey))
-                  .setVersion(version)
-                  .setKeyOnly(keyOnly)
-                  .setLimit(getConf().getScanBatchSize())
-                  .build();
+          () -> {
+            ScanRequest.Builder b =
+                ScanRequest.newBuilder()
+                    .setContext(
+                        makeContext(
+                            getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
+                    .setVersion(version)
+                    .setKeyOnly(keyOnly)
+                    .setLimit(getConf().getScanBatchSize());
+
+            // API version matters here: v2 transactional keys are keyspace-prefixed; encodeRange
+            // applies that encoding to both bounds. v1 passes raw keys and only sets start on the
+            // RPC in this client path
+            if (getConf().getApiVersion().isV2()) {
+              Pair<ByteString, ByteString> range = codec.encodeRange(startKey, endKey);
+              b.setStartKey(range.first).setEndKey(range.second);
+            } else {
+              b.setStartKey(codec.encodeKey(startKey));
+            }
+            return b.build();
+          };
 
       KVErrorHandler<ScanResponse> handler =
           new KVErrorHandler<>(
@@ -367,7 +383,9 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       region = regionManager.getRegionByKey(startKey, backOffer);
 
       if (handleScanResponse(backOffer, resp, version, forWrite)) {
-        return resp.getPairsList();
+        // Return logical user-space keys (same as batchGet) so scan iterators, prefix bounds, and
+        // get() stay consistent in API v2; wire format includes the keyspace prefix.
+        return codec.decodeKvPairs(resp.getPairsList());
       }
     }
   }

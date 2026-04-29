@@ -43,6 +43,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.key.Key;
@@ -362,9 +363,13 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         }
       } else {
         SortedMap<Key, ByteString> kvs = dataMap.tailMap(key);
+        Stream<Map.Entry<Key, ByteString>> entryStream = kvs.entrySet().stream();
+        if (!request.getEndKey().isEmpty()) {
+          Key rangeEnd = toRawKey(request.getEndKey());
+          entryStream = entryStream.filter(entry -> entry.getKey().compareTo(rangeEnd) < 0);
+        }
         builder.addAllPairs(
-            kvs.entrySet()
-                .stream()
+            entryStream
                 .map(
                     kv -> {
                       Kvrpcpb.KvPair.Builder kvBuilder =
