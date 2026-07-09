@@ -76,7 +76,7 @@ public class ConcreteScanIterator extends ScanIterator {
     try (RegionStoreClient client = builder.build(startKey)) {
       client.setTimeout(conf.getScanTimeout());
       BackOffer backOffer = ConcreteBackOffer.newScannerNextMaxBackOff();
-      currentCache = client.scan(backOffer, startKey, version);
+      currentCache = client.scan(backOffer, startKey, rangeEndKey, version, keyOnly);
       // If we get region before scan, we will use region from cache which
       // may have wrong end key. This may miss some regions that split from old region.
       // Client will get the newest region during scan. So we need to
@@ -115,7 +115,8 @@ public class ConcreteScanIterator extends ScanIterator {
     // for last batch to be processed, we have to check if
     return !processingLastBatch
         || current == null
-        || (hasEndKey && Key.toRawKey(current.getKey()).compareTo(endKey) < 0);
+        || !hasEndKey
+        || (Key.toRawKey(current.getKey()).compareTo(endKey) < 0);
   }
 
   @Override

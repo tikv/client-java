@@ -337,15 +337,23 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
 
   public List<KvPair> scan(
       BackOffer backOffer, ByteString startKey, long version, boolean keyOnly) {
+    return scan(backOffer, startKey, ByteString.EMPTY, version, keyOnly);
+  }
+
+  public List<KvPair> scan(
+      BackOffer backOffer, ByteString startKey, ByteString endKey, long version, boolean keyOnly) {
     boolean forWrite = false;
     while (true) {
+      Pair<ByteString, ByteString> range = codec.encodeRange(startKey, endKey);
+
       Supplier<ScanRequest> request =
           () ->
               ScanRequest.newBuilder()
                   .setContext(
                       makeContext(
                           getResolvedLocks(version), this.storeType, backOffer.getSlowLog()))
-                  .setStartKey(codec.encodeKey(startKey))
+                  .setStartKey(range.first)
+                  .setEndKey(range.second)
                   .setVersion(version)
                   .setKeyOnly(keyOnly)
                   .setLimit(getConf().getScanBatchSize())
@@ -367,7 +375,7 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
       region = regionManager.getRegionByKey(startKey, backOffer);
 
       if (handleScanResponse(backOffer, resp, version, forWrite)) {
-        return resp.getPairsList();
+        return codec.decodeKvPairs(resp.getPairsList());
       }
     }
   }

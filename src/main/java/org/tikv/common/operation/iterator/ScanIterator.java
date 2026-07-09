@@ -35,6 +35,7 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
   protected final RegionStoreClientBuilder builder;
   protected List<Kvrpcpb.KvPair> currentCache;
   protected ByteString startKey;
+  protected ByteString rangeEndKey;
   protected int index = -1;
   protected int limit;
   protected boolean keyOnly;
@@ -52,7 +53,8 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
       int limit,
       boolean keyOnly) {
     this.startKey = requireNonNull(startKey, "start key is null");
-    this.endKey = Key.toRawKey(requireNonNull(endKey, "end key is null"));
+    this.rangeEndKey = requireNonNull(endKey, "end key is null");
+    this.endKey = Key.toRawKey(this.rangeEndKey);
     this.hasEndKey = !endKey.isEmpty();
     this.limit = limit;
     this.keyOnly = keyOnly;
@@ -106,9 +108,11 @@ public abstract class ScanIterator implements Iterator<Kvrpcpb.KvPair> {
       }
       // notify last batch if lastKey is greater than or equal to endKey
       // if startKey is empty, it indicates +∞
-      if (hasEndKey && lastKey.compareTo(endKey) >= 0 || startKey.isEmpty()) {
+      if (hasEndKey && lastKey.compareTo(endKey) >= 0) {
         processingLastBatch = true;
         startKey = null;
+      } else if (startKey.isEmpty()) {
+        processingLastBatch = true;
       }
     } catch (Exception e) {
       throw new TiClientInternalException("Error scanning data from region.", e);
