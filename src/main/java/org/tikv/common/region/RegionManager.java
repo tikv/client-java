@@ -165,6 +165,11 @@ public class RegionManager {
     return getRegionByKey(key, defaultBackOff());
   }
 
+  /** Returns the cached region for the key without querying PD; null on cache miss. */
+  public TiRegion getRegionByKeyFromCache(ByteString key) {
+    return cache.getRegionByKey(key, defaultBackOff());
+  }
+
   public TiRegion getRegionByKey(ByteString key, BackOffer backOffer) {
     Long clusterId = pdClient.getClusterId();
     Histogram.Timer requestTimer =
@@ -324,6 +329,11 @@ public class RegionManager {
 
   public TiStore getStoreById(long id) {
     return getStoreById(id, defaultBackOff());
+  }
+
+  /** Returns the cached store without querying PD; null on cache miss. */
+  public TiStore getStoreByIdFromCache(long id) {
+    return cache.getStoreById(id);
   }
 
   public TiStore getStoreById(long id, BackOffer backOffer) {

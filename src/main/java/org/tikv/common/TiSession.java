@@ -57,6 +57,7 @@ import org.tikv.kvproto.Errorpb;
 import org.tikv.kvproto.ImportSstpb;
 import org.tikv.kvproto.Metapb;
 import org.tikv.kvproto.Pdpb;
+import org.tikv.raw.RawKVAsyncClient;
 import org.tikv.raw.RawKVClient;
 import org.tikv.raw.SmartRawKVClient;
 import org.tikv.service.failsafe.CircuitBreaker;
@@ -291,6 +292,24 @@ public class TiSession implements AutoCloseable {
     checkIsClosed();
 
     return new RawKVClient(this, this.getRegionStoreClientBuilder());
+  }
+
+  public RawKVAsyncClient createRawAsyncClient() {
+    checkIsClosed();
+
+    return new RawKVAsyncClient(this, this.getRegionStoreClientBuilder());
+  }
+
+  public RawKVAsyncClient createRawAsyncClient(int metadataThreads) {
+    checkIsClosed();
+
+    return new RawKVAsyncClient(this, this.getRegionStoreClientBuilder(), metadataThreads);
+  }
+
+  public RawKVAsyncClient createRawAsyncClient(ExecutorService metadataExecutor) {
+    checkIsClosed();
+
+    return new RawKVAsyncClient(this, this.getRegionStoreClientBuilder(), metadataExecutor);
   }
 
   public SmartRawKVClient createSmartRawClient() {

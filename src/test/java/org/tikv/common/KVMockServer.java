@@ -230,9 +230,10 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
       } else {
         ByteString value = dataMap.get(key);
         if (value == null) {
-          value = ByteString.EMPTY;
+          builder.setNotFound(true);
+        } else {
+          builder.setValue(value);
         }
-        builder.setValue(value);
       }
       responseObserver.onNext(builder.build());
       responseObserver.onCompleted();
@@ -263,6 +264,8 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         if (eb != null) {
           builder.setRegionError(eb.build());
         }
+      } else {
+        dataMap.put(key, request.getValue());
       }
 
       responseObserver.onNext(builder.build());
@@ -293,10 +296,226 @@ public class KVMockServer extends TikvGrpc.TikvImplBase {
         if (eb != null) {
           builder.setRegionError(eb.build());
         }
+      } else {
+        dataMap.remove(key);
       }
       responseObserver.onNext(builder.build());
       responseObserver.onCompleted();
     } catch (Exception e) {
+      responseObserver.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  @Override
+  public void rawScan(
+      org.tikv.kvproto.Kvrpcpb.RawScanRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawScanResponse> responseObserver) {
+    try {
+      Kvrpcpb.RawScanResponse.Builder builder = Kvrpcpb.RawScanResponse.newBuilder();
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      Key start = toRawKey(request.getStartKey());
+      Key end = request.getEndKey().isEmpty() ? null : toRawKey(request.getEndKey());
+      int limit = request.getLimit() <= 0 ? Integer.MAX_VALUE : request.getLimit();
+      SortedMap<Key, ByteString> sub =
+          end == null ? dataMap.tailMap(start) : dataMap.subMap(start, end);
+      for (Map.Entry<Key, ByteString> entry : sub.entrySet()) {
+        if (limit-- <= 0) {
+          break;
+        }
+        builder.addKvs(
+            Kvrpcpb.KvPair.newBuilder()
+                .setKey(entry.getKey().toByteString())
+                .setValue(request.getKeyOnly() ? ByteString.EMPTY : entry.getValue())
+                .build());
+      }
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.error("internal error", e);
+      responseObserver.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  @Override
+  public void rawBatchGet(
+      org.tikv.kvproto.Kvrpcpb.RawBatchGetRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawBatchGetResponse> responseObserver) {
+    try {
+      Kvrpcpb.RawBatchGetResponse.Builder builder = Kvrpcpb.RawBatchGetResponse.newBuilder();
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      for (ByteString k : request.getKeysList()) {
+        Key key = toRawKey(k);
+        ByteString value = dataMap.get(key);
+        if (value != null) {
+          builder.addPairs(Kvrpcpb.KvPair.newBuilder().setKey(k).setValue(value).build());
+        }
+      }
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.error("internal error", e);
+      responseObserver.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  @Override
+  public void rawBatchPut(
+      org.tikv.kvproto.Kvrpcpb.RawBatchPutRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawBatchPutResponse> responseObserver) {
+    try {
+      Kvrpcpb.RawBatchPutResponse.Builder builder = Kvrpcpb.RawBatchPutResponse.newBuilder();
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      for (Kvrpcpb.KvPair pair : request.getPairsList()) {
+        dataMap.put(toRawKey(pair.getKey()), pair.getValue());
+      }
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.error("internal error", e);
+      responseObserver.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  @Override
+  public void rawBatchDelete(
+      org.tikv.kvproto.Kvrpcpb.RawBatchDeleteRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawBatchDeleteResponse>
+          responseObserver) {
+    try {
+      Kvrpcpb.RawBatchDeleteResponse.Builder builder = Kvrpcpb.RawBatchDeleteResponse.newBuilder();
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      for (ByteString k : request.getKeysList()) {
+        dataMap.remove(toRawKey(k));
+      }
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.error("internal error", e);
+      responseObserver.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  @Override
+  public void rawDeleteRange(
+      org.tikv.kvproto.Kvrpcpb.RawDeleteRangeRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawDeleteRangeResponse>
+          responseObserver) {
+    try {
+      Kvrpcpb.RawDeleteRangeResponse.Builder builder = Kvrpcpb.RawDeleteRangeResponse.newBuilder();
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      Key start = toRawKey(request.getStartKey());
+      Key end = request.getEndKey().isEmpty() ? null : toRawKey(request.getEndKey());
+      if (end == null) {
+        dataMap.tailMap(start).clear();
+      } else {
+        dataMap.subMap(start, end).clear();
+      }
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.error("internal error", e);
+      responseObserver.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  @Override
+  public void rawCompareAndSwap(
+      org.tikv.kvproto.Kvrpcpb.RawCASRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawCASResponse> responseObserver) {
+    try {
+      Key key = toRawKey(request.getKey());
+      Kvrpcpb.RawCASResponse.Builder builder = Kvrpcpb.RawCASResponse.newBuilder();
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      ByteString prev = dataMap.get(key);
+      boolean notExist = prev == null;
+      boolean match =
+          request.getPreviousNotExist()
+              ? notExist
+              : (!notExist && prev.equals(request.getPreviousValue()));
+      if (!match) {
+        builder.setSucceed(false).setPreviousNotExist(notExist);
+        if (!notExist) {
+          builder.setPreviousValue(prev);
+        }
+      } else {
+        dataMap.put(key, request.getValue());
+        builder.setSucceed(true);
+      }
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.error("internal error", e);
+      responseObserver.onError(Status.INTERNAL.asRuntimeException());
+    }
+  }
+
+  @Override
+  public void rawGetKeyTTL(
+      org.tikv.kvproto.Kvrpcpb.RawGetKeyTTLRequest request,
+      io.grpc.stub.StreamObserver<org.tikv.kvproto.Kvrpcpb.RawGetKeyTTLResponse> responseObserver) {
+    try {
+      Key key = toRawKey(request.getKey());
+      Kvrpcpb.RawGetKeyTTLResponse.Builder builder = Kvrpcpb.RawGetKeyTTLResponse.newBuilder();
+
+      Error e = verifyContext(request.getContext());
+      if (e != null) {
+        responseObserver.onNext(builder.setRegionError(e).build());
+        responseObserver.onCompleted();
+        return;
+      }
+
+      if (!dataMap.containsKey(key)) {
+        builder.setNotFound(true);
+      } else {
+        // The mock does not simulate TTL countdown; return 0 to indicate no expiration
+        builder.setNotFound(false).setTtl(0);
+      }
+      responseObserver.onNext(builder.build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.error("internal error", e);
       responseObserver.onError(Status.INTERNAL.asRuntimeException());
     }
   }
