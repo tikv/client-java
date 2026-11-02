@@ -23,6 +23,9 @@ import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLock;
 import static org.tikv.common.util.BackOffFunction.BackOffFuncType.BoTxnLockFast;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.pingcap.tidb.tipb.DAGRequest;
@@ -1333,6 +1336,173 @@ public class RegionStoreClient extends AbstractRegionStoreClient {
     if (resp.hasRegionError()) {
       throw new RegionException(resp.getRegionError());
     }
+  }
+
+  // ==================== Async RawKV methods (based on gRPC FutureStub) ====================
+  // Each method sends a single gRPC request under the default stub deadline, without retry
+  // or error handling; RegionError retries and backoff are left to the caller.
+
+  /** Sends one rawGet request; the future may carry a RegionError. */
+  public ListenableFuture<RawGetResponse> rawGetAsync(ByteString key) {
+    Histogram.Timer requestTimer = rawRequestTimer("client_grpc_raw_get");
+    RawGetRequest request =
+        RawGetRequest.newBuilder()
+            .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
+            .setKey(codec.encodeKey(key))
+            .build();
+    return observe(getAsyncStub().rawGet(request), requestTimer);
+  }
+
+  /** Sends one rawGetKeyTTL request; the future may carry a RegionError. */
+  public ListenableFuture<RawGetKeyTTLResponse> rawGetKeyTTLAsync(ByteString key) {
+    Histogram.Timer requestTimer = rawRequestTimer("client_grpc_raw_get_key_ttl");
+    RawGetKeyTTLRequest request =
+        RawGetKeyTTLRequest.newBuilder()
+            .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
+            .setKey(codec.encodeKey(key))
+            .build();
+    return observe(getAsyncStub().rawGetKeyTTL(request), requestTimer);
+  }
+
+  /** Sends one rawPut request; the future may carry a RegionError. */
+  public ListenableFuture<RawPutResponse> rawPutAsync(
+      ByteString key, ByteString value, long ttl, boolean atomicForCAS) {
+    Histogram.Timer requestTimer = rawRequestTimer("client_grpc_raw_put");
+    RawPutRequest request =
+        RawPutRequest.newBuilder()
+            .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
+            .setKey(codec.encodeKey(key))
+            .setValue(value)
+            .setTtl(ttl)
+            .setForCas(atomicForCAS)
+            .build();
+    return observe(getAsyncStub().rawPut(request), requestTimer);
+  }
+
+  /** Sends one rawDelete request; the future may carry a RegionError. */
+  public ListenableFuture<RawDeleteResponse> rawDeleteAsync(ByteString key, boolean atomicForCAS) {
+    Histogram.Timer requestTimer = rawRequestTimer("client_grpc_raw_delete");
+    RawDeleteRequest request =
+        RawDeleteRequest.newBuilder()
+            .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
+            .setKey(codec.encodeKey(key))
+            .setForCas(atomicForCAS)
+            .build();
+    return observe(getAsyncStub().rawDelete(request), requestTimer);
+  }
+
+  /** Sends one rawCompareAndSet request; the future may carry a RegionError. */
+  public ListenableFuture<RawCASResponse> rawCompareAndSetAsync(
+      ByteString key, Optional<ByteString> prevValue, ByteString value, long ttl) {
+    Histogram.Timer requestTimer = rawRequestTimer("client_grpc_raw_put_if_absent");
+    RawCASRequest request =
+        RawCASRequest.newBuilder()
+            .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
+            .setKey(codec.encodeKey(key))
+            .setValue(value)
+            .setPreviousValue(prevValue.orElse(ByteString.EMPTY))
+            .setPreviousNotExist(!prevValue.isPresent())
+            .setTtl(ttl)
+            .build();
+    return observe(getAsyncStub().rawCompareAndSwap(request), requestTimer);
+  }
+
+  /** Sends one rawBatchGet request; the future may carry a RegionError. */
+  public ListenableFuture<RawBatchGetResponse> rawBatchGetAsync(List<ByteString> keys) {
+    if (keys.isEmpty()) {
+      return Futures.immediateFuture(RawBatchGetResponse.getDefaultInstance());
+    }
+    Histogram.Timer requestTimer = rawRequestTimer("client_grpc_raw_batch_get");
+    RawBatchGetRequest request =
+        RawBatchGetRequest.newBuilder()
+            .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
+            .addAllKeys(codec.encodeKeys(keys))
+            .build();
+    return observe(getAsyncStub().rawBatchGet(request), requestTimer);
+  }
+
+  /** Sends one rawBatchPut request; the future may carry a RegionError. */
+  public ListenableFuture<RawBatchPutResponse> rawBatchPutAsync(
+      Batch batch, long ttl, boolean atomicForCAS) {
+    if (batch.getKeys().isEmpty()) {
+      return Futures.immediateFuture(RawBatchPutResponse.getDefaultInstance());
+    }
+    Histogram.Timer requestTimer = rawRequestTimer("client_grpc_raw_batch_put");
+    List<KvPair> pairs = new ArrayList<>(batch.getKeys().size());
+    for (int i = 0; i < batch.getKeys().size(); i++) {
+      pairs.add(
+          KvPair.newBuilder()
+              .setKey(codec.encodeKey(batch.getKeys().get(i)))
+              .setValue(batch.getValues().get(i))
+              .build());
+    }
+    RawBatchPutRequest request =
+        RawBatchPutRequest.newBuilder()
+            .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
+            .addAllPairs(pairs)
+            .setTtl(ttl)
+            .addTtls(ttl)
+            .setForCas(atomicForCAS)
+            .build();
+    return observe(getAsyncStub().rawBatchPut(request), requestTimer);
+  }
+
+  /** Sends one rawBatchDelete request; the future may carry a RegionError. */
+  public ListenableFuture<RawBatchDeleteResponse> rawBatchDeleteAsync(
+      List<ByteString> keys, boolean atomicForCAS) {
+    if (keys.isEmpty()) {
+      return Futures.immediateFuture(RawBatchDeleteResponse.getDefaultInstance());
+    }
+    Histogram.Timer requestTimer = rawRequestTimer("client_grpc_raw_batch_delete");
+    RawBatchDeleteRequest request =
+        RawBatchDeleteRequest.newBuilder()
+            .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
+            .addAllKeys(codec.encodeKeys(keys))
+            .setForCas(atomicForCAS)
+            .build();
+    return observe(getAsyncStub().rawBatchDelete(request), requestTimer);
+  }
+
+  /** Sends one rawDeleteRange request; the future may carry a RegionError. */
+  public ListenableFuture<RawDeleteRangeResponse> rawDeleteRangeAsync(
+      ByteString startKey, ByteString endKey) {
+    Histogram.Timer requestTimer = rawRequestTimer("client_grpc_raw_delete_range");
+    Pair<ByteString, ByteString> range = codec.encodeRange(startKey, endKey);
+    RawDeleteRangeRequest request =
+        RawDeleteRangeRequest.newBuilder()
+            .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
+            .setStartKey(range.first)
+            .setEndKey(range.second)
+            .build();
+    return observe(getAsyncStub().rawDeleteRange(request), requestTimer);
+  }
+
+  /** Sends one rawScan request; the future may carry a RegionError. */
+  public ListenableFuture<RawScanResponse> rawScanAsync(
+      ByteString key, int limit, boolean keyOnly) {
+    Histogram.Timer requestTimer = rawRequestTimer("client_grpc_raw_scan");
+    Pair<ByteString, ByteString> range = codec.encodeRange(key, ByteString.EMPTY);
+    RawScanRequest request =
+        RawScanRequest.newBuilder()
+            .setContext(makeContext(storeType, SlowLogEmptyImpl.INSTANCE))
+            .setStartKey(range.first)
+            .setEndKey(range.second)
+            .setKeyOnly(keyOnly)
+            .setLimit(limit)
+            .build();
+    return observe(getAsyncStub().rawScan(request), requestTimer);
+  }
+
+  /** Starts a latency timer for a raw request, labeled by method name. */
+  private Histogram.Timer rawRequestTimer(String name) {
+    return GRPC_RAW_REQUEST_LATENCY.labels(name, pdClient.getClusterId().toString()).startTimer();
+  }
+
+  /** Observes the request duration once the future completes, then returns the future. */
+  private static <T> ListenableFuture<T> observe(
+      ListenableFuture<T> future, Histogram.Timer requestTimer) {
+    future.addListener(requestTimer::observeDuration, MoreExecutors.directExecutor());
+    return future;
   }
 
   public enum RequestTypes {
