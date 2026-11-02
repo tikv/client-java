@@ -73,6 +73,25 @@ import org.tikv.kvproto.Metapb.Peer;
  *   <li>Scan and deleteRange are single-shot requests against one Region: the caller is responsible
  *       for iterating across Region boundaries.
  * </ul>
+ *
+ * <p>Timeout semantics (aligned with the synchronous {@link RawKVClient}):
+ *
+ * <ul>
+ *   <li>Single-key RPCs (get, put, delete, getKeyTTL, CAS) are bounded by the gRPC stub deadline
+ *       ({@code tikv.grpc.timeout_in_ms}, default 200ms).
+ *   <li>{@code scanAsync} uses {@code tikv.rawkv.scan_timeout_in_ms} (default 10s) as the stub
+ *       deadline, matching the synchronous {@code scan0}.
+ *   <li>{@code deleteRangeAsync} uses {@code tikv.grpc.scan_timeout_in_ms} (default 20s) as the
+ *       stub deadline, matching the synchronous {@code deleteRange}.
+ *   <li>Metadata lookup on a cache miss queries PD via a blocking stub with a BackOffer timeout
+ *       ({@code tikv.rawkv.default_backoff_in_ms}, default 20 seconds), the same budget as the
+ *       synchronous client. It is intentionally longer than the data-RPC deadlines: PD queries are
+ *       infrequent and more sensitive to transient load.
+ *   <li>As a result, the end-to-end completion time of a returned future can differ by an order of
+ *       magnitude between a hot key (cache hit) and a cold key (cache miss: data-RPC deadline + PD
+ *       budget). Callers that apply a uniform {@code CompletableFuture.orTimeout} should account
+ *       for this difference, or retry on timeout to handle cold-key scenarios gracefully.
+ * </ul>
  */
 public class RawKVAsyncClient implements AutoCloseable {
 
@@ -312,11 +331,14 @@ public class RawKVAsyncClient implements AutoCloseable {
     }
     return buildClientAsync(startKey)
         .thenCompose(
-            client ->
-                sendAsync(
-                    client,
-                    c -> c.rawScanAsync(startKey, limit, keyOnly),
-                    resp -> resp.hasRegionError() ? resp.getRegionError() : null))
+            client -> {
+              // Align with the synchronous scan: use the RawKV scan timeout as the stub deadline.
+              client.setTimeout(conf.getRawKVScanTimeoutInMS());
+              return sendAsync(
+                  client,
+                  c -> c.rawScanAsync(startKey, limit, keyOnly),
+                  resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+            })
         .thenApply(resp -> codec.decodeKvPairs(resp.getKvsList()));
   }
 
@@ -329,11 +351,14 @@ public class RawKVAsyncClient implements AutoCloseable {
   public CompletableFuture<Void> deleteRangeAsync(ByteString startKey, ByteString endKey) {
     return buildClientAsync(startKey)
         .thenCompose(
-            client ->
-                sendAsync(
-                    client,
-                    c -> c.rawDeleteRangeAsync(startKey, endKey),
-                    resp -> resp.hasRegionError() ? resp.getRegionError() : null))
+            client -> {
+              // Align with the synchronous deleteRange: use the scan/deleteRange grpc timeout.
+              client.setTimeout(conf.getScanTimeout());
+              return sendAsync(
+                  client,
+                  c -> c.rawDeleteRangeAsync(startKey, endKey),
+                  resp -> resp.hasRegionError() ? resp.getRegionError() : null);
+            })
         .thenApply(
             resp -> {
               if (!resp.getError().isEmpty()) {
